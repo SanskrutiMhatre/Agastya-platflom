@@ -1,0 +1,19 @@
+<applicCrossRefTable>
+  <productAttributeList>
+    <productAttribute id="prodattr-0001">
+      <name>Model</name>
+      <displayName>Model</displayName>
+      <descr>Aircraft model variant</descr>
+      <enumeration applicPropertyValues="A|B|C"/>
+    </productAttribute>
+    <productAttribute id="prodattr-0002">
+      <name>Serial number</name>
+      <displayName>Serial number</displayName>
+      <descr>Aircraft serial number range</descr>
+      <prompt>
+        <paraBasic>Enter the serial number</paraBasic>
+      </prompt>
+      <enumeration applicPropertyValues="001~100"/>
+    </productAttribute>
+  </productAttributeList>
+</applicCrossRefTable>

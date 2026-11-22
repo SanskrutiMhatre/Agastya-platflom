@@ -1,0 +1,43 @@
+<container>
+  <refs>
+    <dmRef>
+      <dmRefIdent>
+        <dmCode modelIdentCode="EXAMPLE" systemDiffCode="A" systemCode="00" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="00" disassyCodeVariant="A" infoCode="040" infoCodeVariant="A" itemLocationCode="D"/>
+        <issueInfo issueNumber="001" inWork="00"/>
+        <language languageIsoCode="en" countryIsoCode="US"/>
+      </dmRefIdent>
+      <dmRefAddressItems>
+        <dmTitle>
+          <techName>Example system</techName>
+          <infoName>Referenced module 040</infoName>
+        </dmTitle>
+      </dmRefAddressItems>
+    </dmRef>
+    <dmRef>
+      <dmRefIdent>
+        <dmCode modelIdentCode="EXAMPLE" systemDiffCode="A" systemCode="00" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="00" disassyCodeVariant="A" infoCode="520" infoCodeVariant="A" itemLocationCode="D"/>
+        <issueInfo issueNumber="001" inWork="00"/>
+        <language languageIsoCode="en" countryIsoCode="US"/>
+      </dmRefIdent>
+      <dmRefAddressItems>
+        <dmTitle>
+          <techName>Example system</techName>
+          <infoName>Referenced module 520</infoName>
+        </dmTitle>
+      </dmRefAddressItems>
+    </dmRef>
+    <dmRef>
+      <dmRefIdent>
+        <dmCode modelIdentCode="EXAMPLE" systemDiffCode="A" systemCode="00" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="00" disassyCodeVariant="A" infoCode="421" infoCodeVariant="A" itemLocationCode="D"/>
+        <issueInfo issueNumber="001" inWork="00"/>
+        <language languageIsoCode="en" countryIsoCode="US"/>
+      </dmRefIdent>
+      <dmRefAddressItems>
+        <dmTitle>
+          <techName>Example system</techName>
+          <infoName>Referenced module 421</infoName>
+        </dmTitle>
+      </dmRefAddressItems>
+    </dmRef>
+  </refs>
+</container>

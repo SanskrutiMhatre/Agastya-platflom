@@ -1,0 +1,22 @@
+<illustratedPartsCatalog>
+  <figure id="fig-0001">
+    <title>Unit assembly</title>
+    <graphic infoEntityIdent="ICN-S1KSTUDIO-A-291000-A-00001-00001-A-001-01"/>
+  </figure>
+  <catalogSeqNumber figureNumber="01" item="001" indenture="1">
+    <itemSeqNumber itemSeqNumberValue="00A">
+      <quantityPerNextHigherAssy>1</quantityPerNextHigherAssy>
+      <partRef manufacturerCodeValue="00000" partNumberValue="PN-0001"/>
+    </itemSeqNumber>
+  </catalogSeqNumber>
+  <catalogSeqNumber figureNumber="01" item="002" indenture="2">
+    <itemSeqNumber itemSeqNumberValue="00A">
+      <quantityPerNextHigherAssy>4</quantityPerNextHigherAssy>
+      <partRef manufacturerCodeValue="00000" partNumberValue="PN-0002"/>
+    </itemSeqNumber>
+    <itemSeqNumber itemSeqNumberValue="00B">
+      <quantityPerNextHigherAssy>4</quantityPerNextHigherAssy>
+      <partRef manufacturerCodeValue="00000" partNumberValue="PN-0002-ALT"/>
+    </itemSeqNumber>
+  </catalogSeqNumber>
+</illustratedPartsCatalog>

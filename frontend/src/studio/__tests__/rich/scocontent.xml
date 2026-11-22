@@ -1,0 +1,15 @@
+<scoContent>
+  <contentDescription>
+    <simplePara>Learning content for the hydraulic system.</simplePara>
+  </contentDescription>
+  <trainingStep>
+    <contentDescription>
+      <simplePara>Read the description.</simplePara>
+    </contentDescription>
+    <dmRef>
+      <dmRefIdent>
+        <dmCode modelIdentCode="EXAMPLE" systemDiffCode="A" systemCode="00" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="00" disassyCodeVariant="A" infoCode="040" infoCodeVariant="A" itemLocationCode="D"/>
+      </dmRefIdent>
+    </dmRef>
+  </trainingStep>
+</scoContent>

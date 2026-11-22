@@ -1,0 +1,11 @@
+<productCrossRefTable>
+  <product>
+    <assign applicPropertyIdent="prodattr-0001" applicPropertyType="prodattr" applicPropertyValue="A"/>
+    <assign applicPropertyIdent="prodattr-0002" applicPropertyType="prodattr" applicPropertyValue="001"/>
+    <assign applicPropertyIdent="cond-0001" applicPropertyType="condition" applicPropertyValue="Dry"/>
+  </product>
+  <product>
+    <assign applicPropertyIdent="prodattr-0001" applicPropertyType="prodattr" applicPropertyValue="B"/>
+    <assign applicPropertyIdent="prodattr-0002" applicPropertyType="prodattr" applicPropertyValue="002"/>
+  </product>
+</productCrossRefTable>

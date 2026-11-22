@@ -1,0 +1,366 @@
+// =============================================================================
+// StudioSession - the platform's host for the embedded S1000D Studio editor.
+//
+// The Studio is an imperative, framework-free application that binds global
+// listeners when it is constructed, so exactly ONE instance lives for the page
+// and React only moves its root element in and out of the editor route. That is
+// also what keeps open documents (and their undo history) alive while the author
+// looks at Explore or Validation and comes back.
+//
+// What the host adds, and the Studio did not have:
+//   - documents come from and go to the project's CSDB (server), not local files
+//   - saves carry the hash the author loaded, so a concurrent change is refused (409)
+//   - ICN artwork is supplied from the project's graphics
+//   - quick preview formats with the project's own publication settings
+//   - open/dirty state is published to React for the sidebar
+// =============================================================================
+
+import { create } from 'zustand';
+import { contentApi, referenceApi, s1000dApi, type DmSummary } from '../api';
+import { csdbApi } from '../api/csdb';
+import type { ProjectRefs, ReferenceData } from '../studio/core/reference';
+import { ApiError } from '../api/client';
+import { useUi } from '../store/ui';
+import { setGrammarBase } from '../studio/core/grammar';
+import type { EditorDocument } from '../studio/core/document';
+import { App, type StudioHost } from '../studio/ui/app';
+import { DesignView } from '../studio/view/design';
+import { formatDmc } from '../studio/core/s1000d';
+import type { DocumentEditor } from '../studio/ui/editor';
+import { toPublicationSettings } from './publicationSettings';
+import type { PublicationSettings } from '../studio/export/pdf-settings';
+
+export interface OpenDoc { key: string; file: string | null; title: string; dirty: boolean; active: boolean }
+
+interface StudioState { docs: OpenDoc[]; ready: boolean; projectId: string | null }
+export const useStudio = create<StudioState>(() => ({ docs: [], ready: false, projectId: null }));
+
+/** `object` = a CSDB object (comment, update file, ICN metadata, SCORM package) rather than a data module: saved through the objects API. */
+interface Ref { file: string; hash: string; object?: boolean }
+const DM_FILE = /^DMC-[A-Za-z0-9._-]+\.xml$/i;
+
+class StudioSession {
+  private app: App | null = null;
+  private readonly root = document.createElement('div');
+  private refs = new WeakMap<EditorDocument, Ref>();
+  private projectId: string | null = null;
+  private media: Array<{ name: string; dir: string }> = [];
+  private settingsCache: Partial<PublicationSettings> | undefined;
+  /** The project's data modules as the server last listed them (identity checks for the New data module wizard). */
+  private serverDms: DmSummary[] = [];
+  /** Reports user-facing messages (toast) and lets the page reload counts after a save. */
+  notify: (msg: string, kind?: 'info' | 'error' | 'success') => void = () => undefined;
+  onSaved: () => void = () => undefined;
+
+  constructor() {
+    this.root.className = 'app';
+    this.root.style.height = '100%';
+  }
+
+  private host(): StudioHost {
+    return {
+      save: (ed, text) => this.save(ed, text),
+      isDark: () => document.documentElement.dataset.theme === 'dark',
+      toggleTheme: () => useUi.getState().setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'),
+      beforeNew: async () => { await Promise.all([this.refreshProjectData(), this.loadReference()]); },
+      reference: () => this.reference,
+      projectRefs: () => this.projectRefs,
+      modelIdent: () => this.modelIdent(),
+      identityTaken: (key) => this.identityTaken(key),
+      changed: () => this.publish(),
+      pdfSettings: () => this.settingsCache,
+    };
+  }
+
+  /** The Administrator's lists for the New data module wizard (languages, countries, DM types, enterprises ...); refreshed each time the wizard opens. */
+  private reference: ReferenceData | null = null;
+  private projectRefs: ProjectRefs | null = null;
+  private async loadReference(): Promise<void> {
+    const id = this.projectId;
+    try { const ref = await referenceApi.get(); if (this.projectId === id) this.reference = ref; } catch { /* keep the last lists (or none): the wizard falls back to text boxes */ }
+    if (!id) { this.projectRefs = null; return; }
+    try {
+      const [b, a] = await Promise.all([s1000dApi.project(id), s1000dApi.applicability(id).catch(() => null)]);
+      if (this.projectId !== id) return;                  // the author moved to another project while this was loading
+      const c = b.config;
+      const brief = (k: 'infoCode' | 'learnCode' | 'learnEventCode' | 'itemLocationCode') => b.codes[k].map((x) => ({ code: x.code, title: x.title }));
+      const act = a?.files.act ?? null;
+      const m = act ? /^DMC-([A-Za-z0-9]+)-/.exec(act) : null;
+      this.projectRefs = {
+        mic: c.mic, issue: c.issue, language: c.language, country: c.country, responsiblePartner: c.responsiblePartner, originator: c.originator, security: c.security, brex: c.brex,
+        codes: { infoCode: brief('infoCode'), learnCode: brief('learnCode'), learnEventCode: brief('learnEventCode'), itemLocationCode: brief('itemLocationCode') },
+        dmTypes: b.dmTypes.map((t) => ({ schema: t.schema, name: t.name, enabled: t.enabled, defaultCode: t.infoCode ?? '', recommended: t.advice?.recommended ?? [], unresolved: t.advice?.unresolved ?? null })),
+        sns: b.sns, snsEnforced: c.snsEnforced,
+        applic: a && act && m ? {
+          act: { mic: m[1], info: /-(\w{3})\w-\w_/.exec(act)?.[1] ?? '00W', schemaFile: act },
+          attributes: a.model.attributes.map((x) => ({ id: x.id, name: x.name, values: x.values.map((v) => v.value), type: x.valueDataType })),
+          conditions: a.model.conditions.map((cd) => ({ id: cd.id, name: cd.name, values: a.model.conditionTypes.find((t) => t.id === cd.condTypeId)?.values.map((v) => v.value) ?? [], type: a.model.conditionTypes.find((t) => t.id === cd.condTypeId)?.valueDataType ?? 'string' })),
+        } : null,
+      };
+    } catch { this.projectRefs = null; }
+  }
+
+  private starting: Promise<App> | null = null;
+  /** Create the Studio once, on first use. Concurrent callers (StrictMode, the side panel, ?file=) all wait for the same initialisation. */
+  private ensure(): Promise<App> {
+    this.starting ??= this.create().catch((e) => { this.starting = null; this.app = null; throw e; });
+    return this.starting;
+  }
+
+  private async create(): Promise<App> {
+    setGrammarBase('/grammar');
+    // A clean first view: the Navigation, Properties and Problems panes stay closed until the author opens them (View ribbon; the status
+    // bar badge opens Problems, and a failed validation does), and the Identification section starts folded. The author's own choice is
+    // remembered from then on; the one-time reset below also applies to layouts saved before this default existed.
+    DesignView.defaultIdentCollapsed = true;
+    try {
+      if (!localStorage.getItem('agastya.editor.panes.v1')) {
+        const saved = JSON.parse(localStorage.getItem('studio.layout') ?? '{}');
+        localStorage.setItem('studio.layout', JSON.stringify({ ...saved, left: false, right: false, bottom: false }));
+        localStorage.setItem('agastya.editor.panes.v1', '1');
+      }
+    } catch { /* private mode */ }
+    const app = new App(this.root, this.host());
+    this.app = app;
+    // The page theme changes from the platform's own switch or the OS; the editor's views (CodeMirror) must follow.
+    new MutationObserver(() => app.applySettings()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    await app.init();
+    useStudio.setState({ ready: true });
+    return app;
+  }
+
+  /** Put the editor into `container` (the editor route), creating it the first time. */
+  async mount(container: HTMLElement): Promise<void> {
+    const app = await this.ensure();
+    if (this.root.parentElement !== container) container.appendChild(this.root);
+    // Views measure themselves against their container: tell them it has one now.
+    requestAnimationFrame(() => { app.active?.xml.view.requestMeasure(); window.dispatchEvent(new Event('resize')); });
+  }
+
+  unmount(): void { this.root.remove(); }
+
+  get currentProject(): string | null { return this.projectId; }
+
+  /** Open or close the Studio's own side panes (outline on the left, attributes/elements on the right). */
+  setPanes(left: boolean, right: boolean): void {
+    const app = this.app;
+    if (!app) return;
+    if (app.layout.left !== left) app.togglePane('left');
+    if (app.layout.right !== right) app.togglePane('right');
+  }
+
+  /** Views measure themselves against their container: call after the container changes size or visibility. */
+  relayout(): void {
+    requestAnimationFrame(() => { this.app?.active?.xml.view.requestMeasure(); window.dispatchEvent(new Event('resize')); });
+  }
+
+  hasUnsaved(): boolean {
+    return !!this.app && this.app.editors.some((ed) => this.app!.hasUnsavedWork(ed));
+  }
+
+  /** Bind the editor to a project. A different project closes the previous project's documents. */
+  async setProject(projectId: string): Promise<void> {
+    const app = await this.ensure();
+    if (this.projectId !== projectId) {
+      await app.closeAll();
+      // Linked artwork is cached per browser by ICN; a different project must not see the previous one's figures.
+      for (const icn of app.images.names()) await app.images.remove(icn);
+      this.projectId = projectId;
+      this.media = [];
+      this.serverDms = [];
+      this.settingsCache = undefined;
+      this.projectRefs = null;
+      useStudio.setState({ projectId });
+    }
+    await this.refreshProjectData();
+  }
+
+  /** Media list (for ICN artwork) and publication settings (for quick preview). */
+  async refreshProjectData(): Promise<void> {
+    if (!this.projectId) return;
+    const id = this.projectId;
+    const [media, settings, dms] = await Promise.all([contentApi.media(id).catch(() => []), contentApi.settings(id).catch(() => null), contentApi.dms(id).catch(() => null)]);
+    if (id !== this.projectId) return;
+    this.media = media;
+    if (dms) this.serverDms = dms;
+    if (settings) this.settingsCache = toPublicationSettings(settings.project, settings.house);
+  }
+
+  // ── Identity (New data module wizard) ───────────────────────────────────
+
+  /** Documents open in the editor that are not in the project yet: their identity is spoken for too. */
+  private unsavedIdentities(): Array<{ key: string; label: string; model: string }> {
+    const out: Array<{ key: string; label: string; model: string }> = [];
+    for (const ed of this.app?.editors ?? []) {
+      if (this.refs.get(ed.doc)) continue;
+      const i = ed.doc.ident;
+      if (!i?.parts) continue;
+      out.push({ key: `${formatDmc(i.parts, false)}|${i.issueNumber}-${i.inWork}|${i.language}-${i.country}`.toUpperCase(), label: `${ed.doc.fileName} (open, not saved yet)`, model: i.parts.modelIdentCode });
+    }
+    return out;
+  }
+
+  /** The model identification code most of the project's data modules use. */
+  private modelIdent(): string | null {
+    const count = new Map<string, number>();
+    for (const d of this.serverDms) { const m = d.dmCodeAttrs?.modelIdentCode; if (m) count.set(m, (count.get(m) ?? 0) + 1); }
+    for (const u of this.unsavedIdentities()) count.set(u.model, (count.get(u.model) ?? 0) + 1);
+    let best: string | null = null;
+    for (const [m, n] of count) if (best === null || n > (count.get(best) ?? 0)) best = m;
+    return best;
+  }
+
+  /** The module already holding this identity (code + issue + language), or null. Mirrors the server's rule. */
+  private identityTaken(key: string): string | null {
+    const hit = this.serverDms.find((d) => `${d.dmc}|${d.issueNumber}-${d.inWork}|${d.language}`.toUpperCase() === key);
+    if (hit) return hit.file;
+    return this.unsavedIdentities().find((u) => u.key === key)?.label ?? null;
+  }
+
+  // ── Documents ───────────────────────────────────────────────────────────
+
+  private editorFor(file: string): DocumentEditor | null {
+    return this.app?.editors.find((ed) => this.refs.get(ed.doc)?.file === file) ?? null;
+  }
+
+  /** Open a data module, or (`object`) a CSDB object: comment, data update file, ICN metadata, SCORM package. Both use the same structured editor. */
+  private async openFile(file: string, read: (pid: string) => Promise<{ xml: string; hash?: string }>, object: boolean, line?: number): Promise<void> {
+    const app = await this.ensure();
+    if (!this.projectId) return;
+    let ed = this.editorFor(file);
+    if (!ed) {
+      const pid = this.projectId;
+      const doc = await read(pid);
+      if (this.projectId !== pid) return;                 // the author switched project while it loaded: never open it into the other one
+      ed = await app.openText(doc.xml, file, null);
+      if (!ed) return;
+      this.refs.set(ed.doc, object ? { file, hash: '', object: true } : { file, hash: doc.hash ?? '' });
+      ed.doc.markSaved();
+      if (!object) await this.linkArtwork(doc.xml);
+      app.updateChrome();
+    } else {
+      app.activate(ed);
+    }
+    if (line && ed) app.gotoLine(ed, line);
+    this.publish();
+  }
+
+  openDm(file: string, line?: number): Promise<void> { return this.openFile(file, (pid) => contentApi.readDm(pid, file), false, line); }
+  openObject(file: string): Promise<void> { return this.openFile(file, (pid) => csdbApi.readObject(pid, file), true); }
+
+  /** After graphics are added to the project: refresh the list and re-link every open document. */
+  async relinkArtwork(): Promise<void> {
+    const app = this.app;
+    if (!app) return;
+    await this.refreshProjectData();
+    for (const ed of app.editors) { await this.linkArtwork(ed.doc.toString()); ed.design.render(); }
+    app.updateChrome();
+  }
+
+  /** Make the project's graphics available to the document by ICN, by entity declaration or by file name. */
+  private async linkArtwork(xml: string): Promise<void> {
+    const app = this.app; const id = this.projectId;
+    if (!app || !id || !this.media.length) return;
+    const entities = new Map<string, string>();
+    for (const m of xml.matchAll(/<!ENTITY\s+([\w.\-]+)\s+SYSTEM\s+"([^"]+)"/g)) entities.set(m[1], m[2].split('/').pop() ?? m[2]);
+    const byName = new Map(this.media.map((m) => [m.name.toLowerCase(), m]));
+    const byStem = new Map(this.media.map((m) => [m.name.replace(/\.[^.]+$/, '').toLowerCase(), m]));
+    for (const m of xml.matchAll(/infoEntityIdent\s*=\s*"([^"]+)"/g)) {
+      const icn = m[1];
+      if (app.images.has(icn)) continue;
+      const declared = entities.get(icn);
+      const hit = (declared && byName.get(declared.toLowerCase())) || byStem.get(icn.toLowerCase());
+      if (!hit) continue;
+      try {
+        const res = await fetch(contentApi.mediaUrl(id, hit.name), { credentials: 'same-origin' });
+        if (res.ok) await app.images.add(await res.blob(), icn);
+      } catch { /* the editor shows a placeholder for artwork it cannot load */ }
+    }
+  }
+
+  /** Persist to the project. Existing modules are saved against the hash the author loaded; new ones are created. */
+  private async save(ed: DocumentEditor, text: string): Promise<boolean> {
+    const id = this.projectId;
+    if (!id) return false;
+    const ref = this.refs.get(ed.doc);
+    try {
+      if (ref?.object) {
+        await csdbApi.saveObject(id, ref.file, text);
+      } else if (ref) {
+        const out = await contentApi.saveDm(id, ref.file, text, ref.hash);
+        this.refs.set(ed.doc, { file: ref.file, hash: out.hash });
+      } else {
+        const suggested = ed.doc.suggestedFileName();
+        if (!DM_FILE.test(suggested)) {
+          this.notify('Give this data module a data module code first (File → Properties) so it can be named DMC-….XML.', 'error');
+          return false;
+        }
+        const out = await contentApi.createDm(id, suggested, text);
+        this.refs.set(ed.doc, { file: suggested, hash: out.hash });
+        ed.doc.fileName = suggested;
+      }
+      this.onSaved();
+      void this.refreshProjectData();
+      return true;
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'EDIT_CONFLICT') {
+        this.notify('Not saved: this data module was changed by someone else since you opened it. Copy your work, reopen it, and re-apply your changes.', 'error');
+      } else if (e instanceof ApiError && e.status === 403) {
+        this.notify(e.message || 'You do not have permission to change this data module.', 'error');
+      } else {
+        this.notify(e instanceof Error ? e.message : String(e), 'error');
+      }
+      return false;
+    }
+  }
+
+  // ── What the sidebar and PDF pane need ──────────────────────────────────
+
+  get activeFile(): string | null {
+    const ed = this.app?.active;
+    return ed ? this.refs.get(ed.doc)?.file ?? null : null;
+  }
+
+  /** Save the active document (if it has unsaved work) so the server renders what the author sees. */
+  async saveActive(): Promise<boolean> {
+    const app = this.app; const ed = app?.active;
+    if (!app || !ed) return false;
+    if (app.hasUnsavedWork(ed)) await app.save(ed);
+    return !app.hasUnsavedWork(ed);
+  }
+
+  /** Browser-side quick preview of the active data module. */
+  async quickPreview(): Promise<{ blob: Blob; warnings: string[] } | null> {
+    const ed = this.app?.active;
+    if (!this.app || !ed) return null;
+    return this.app.quickPreview(ed);
+  }
+
+  newDocument(): void { this.app?.run('file.new'); }
+  focusEditor(): void { this.app?.active?.focus(); }
+
+  private publish(): void {
+    const app = this.app;
+    if (!app) return;
+    const docs: OpenDoc[] = app.editors.map((ed, i) => ({
+      key: `${i}:${ed.doc.id}`,
+      file: this.refs.get(ed.doc)?.file ?? null,
+      title: ed.doc.fileName,
+      dirty: ed.doc.dirty,
+      active: ed === app.active,
+    }));
+    const prev = useStudio.getState().docs;
+    if (prev.length === docs.length && prev.every((d, i) => d.key === docs[i].key && d.dirty === docs[i].dirty && d.active === docs[i].active && d.file === docs[i].file)) return;
+    useStudio.setState({ docs });
+  }
+
+  /** Reflect a module deleted or renamed elsewhere. */
+  forget(file: string): void {
+    const ed = this.editorFor(file);
+    if (ed) this.refs.delete(ed.doc);
+    this.publish();
+  }
+}
+
+export const studio = new StudioSession();
+export type { DmSummary };

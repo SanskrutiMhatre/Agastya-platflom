@@ -1,0 +1,18 @@
+<brDoc>
+  <para>These business rules apply to all data modules of the project.</para>
+  <brLevelledPara>
+    <title>Naming rules</title>
+    <para>Data module codes shall follow the project SNS.</para>
+    <note>
+      <notePara>Rules are checked by the project BREX.</notePara>
+    </note>
+    <brLevelledPara>
+      <title>Titles</title>
+      <para>Technical names are in sentence case.</para>
+    </brLevelledPara>
+  </brLevelledPara>
+  <brLevelledPara>
+    <title>Security</title>
+    <para>All data modules are unclassified unless stated.</para>
+  </brLevelledPara>
+</brDoc>

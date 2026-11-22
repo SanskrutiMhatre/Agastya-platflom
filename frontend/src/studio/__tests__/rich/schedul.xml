@@ -1,0 +1,17 @@
+<maintPlanning>
+  <inspectionDefinition>
+    <inspection>
+      <limit>
+        <threshold thresholdUnitOfMeasure="th01">
+          <thresholdValue>500</thresholdValue>
+        </threshold>
+        <remarks>
+          <simplePara>Flight hours.</simplePara>
+        </remarks>
+      </limit>
+      <remarks>
+        <simplePara>General visual inspection.</simplePara>
+      </remarks>
+    </inspection>
+  </inspectionDefinition>
+</maintPlanning>

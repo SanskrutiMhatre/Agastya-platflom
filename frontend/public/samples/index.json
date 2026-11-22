@@ -1,0 +1,5 @@
+[
+  { "file": "DMC-S1KSTUDIO-A-29-10-00-00A-040A-D_001-00_EN-US.XML", "title": "Hydraulic pump – Description", "description": "Descriptive DM (Issue 5.0): levelled paragraphs, figure, CALS table with spans, lists, warnings, cross-references", "images": ["ICN-S1KSTUDIO-A-291000-A-00001-00001-A-001-01.svg"] },
+  { "file": "DMC-S1KSTUDIO-A-29-10-00-00A-520A-A_001-00_EN-US.XML", "title": "Hydraulic pump – Remove procedure", "description": "Procedural DM (Issue 5.0): preliminary requirements, support equipment, nested steps", "images": [] },
+  { "file": "DMC-S1KSTUDIO-A-29-10-00-00A-421A-A_001-00_EN-US.XML", "title": "Hydraulic pump – Fault isolation", "description": "Fault isolation DM (Issue 4.2) with yes/no isolation steps", "images": [] }
+]

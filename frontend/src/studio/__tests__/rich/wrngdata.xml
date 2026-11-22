@@ -1,0 +1,14 @@
+<wiringData>
+  <wireGroup>
+    <wire>
+      <wireIdent>
+        <wireNumber>W0001</wireNumber>
+      </wireIdent>
+      <wireConnection>
+        <fromEquip>
+          <functionalItemRef functionalItemNumber="J1"/>
+        </fromEquip>
+      </wireConnection>
+    </wire>
+  </wireGroup>
+</wiringData>

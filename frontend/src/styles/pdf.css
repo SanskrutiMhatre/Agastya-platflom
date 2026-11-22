@@ -1,0 +1,66 @@
+/* =============================================================================
+   pdf.js text layer.
+
+   The viewer draws each page to a canvas and then positions an invisible copy
+   of the text on top of it, so the reader can select and copy real text rather
+   than a picture of it. These rules are what make that overlay line up with the
+   rasterised glyphs — without them the spans stack at the top-left corner and
+   selection lands nowhere near the words.
+
+   --scale-factor is set per page by the viewer at render time; pdf.js's own
+   positioning maths is expressed in terms of it.
+   ============================================================================= */
+
+.textLayer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  line-height: 1;
+  text-align: initial;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  z-index: 2;
+  /* Invisible, but still selectable and searchable by the browser. */
+  color: transparent;
+  caret-color: transparent;
+}
+
+.textLayer span,
+.textLayer br {
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  margin: 0;
+}
+
+/* pdf.js emits these to correct per-run horizontal scaling. */
+.textLayer span.markedContent {
+  top: 0;
+  height: 0;
+}
+
+.textLayer .highlight {
+  background-color: rgba(180, 0, 170, 0.25);
+  border-radius: 4px;
+}
+
+.textLayer ::selection {
+  background: rgba(0, 100, 255, 0.3);
+}
+
+/* pdf.js parks a hidden helper element at the end of the layer; left visible it
+   adds a stray selectable gap below every page. */
+.textLayer .endOfContent {
+  display: block;
+  position: absolute;
+  inset: 100% 0 0;
+  z-index: 0;
+  cursor: default;
+  user-select: none;
+}
+
+.textLayer .endOfContent.active {
+  top: 0;
+}

@@ -1,0 +1,36 @@
+{
+  "recordedOn": "2026-11-17",
+  "note": "Executed in the BREX enforcement phase (phase 12). Suites this phase could not affect were not rerun and are listed as such.",
+  "commands": [
+    {
+      "command": "npm test",
+      "dir": "Agastya-platform-v2/",
+      "result": "build OK; backend 85 tests: 83 passed, 0 failed, 2 todo (known gap: BREX/COMREP bodies in the PDF); frontend vitest 384 passed, 2 skipped (fixture writers); Playwright 49 passed (incl. the new BREX browser test)"
+    },
+    {
+      "command": "npm --prefix backend run test:verify",
+      "dir": "Agastya-platform-v2/",
+      "result": "publication gate + BREX gate + 21-type backend checks, all four issues: 53 tests, 51 passed, 2 todo, 0 failed"
+    },
+    {
+      "command": "npm --prefix frontend run test:verify",
+      "dir": "Agastya-platform-v2/",
+      "result": "7 files, 382 passed (rules 84, editor 85, controls 10, editor-controls 2, inventory 193, BREX engine cross-checks 8)"
+    },
+    {
+      "command": "npm run test:verify:e2e",
+      "dir": "Agastya-platform-v2/",
+      "result": "16 passed (wizard 4 issues x 21 types; workflows 4 issues x 21 types)"
+    },
+    {
+      "command": "npm run test:verify:elements",
+      "dir": "Agastya-platform-v2/",
+      "result": "NOT rerun in this phase: it exercises only the grammars and schemas, which this phase did not touch (last run in phase 10: all four issues passed)"
+    },
+    {
+      "command": "Studio suites (original Editor/ and the embedded copy)",
+      "dir": "Editor/ and embedded build",
+      "result": "NOT rerun in this phase: no Studio file was changed (the server BREX engine and the platform pages are outside the Studio); last run: original unit 660, browser 133 + 1 skipped; embedded unit 716, browser 133 + 1 skipped"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+<brex>
+  <contextRules>
+    <structureObjectRuleGroup>
+      <structureObjectRule>
+        <objectPath allowedObjectFlag="0">//emphasis[@emphasisType = 'em05']</objectPath>
+        <objectUse>Strikethrough emphasis must not be used.</objectUse>
+      </structureObjectRule>
+      <structureObjectRule>
+        <objectPath allowedObjectFlag="2">//dmStatus/@issueType</objectPath>
+        <objectUse>Issue type must be one of the listed values.</objectUse>
+        <objectValue valueForm="single" valueAllowed="new">New</objectValue>
+        <objectValue valueForm="single" valueAllowed="changed">Changed</objectValue>
+      </structureObjectRule>
+    </structureObjectRuleGroup>
+  </contextRules>
+</brex>

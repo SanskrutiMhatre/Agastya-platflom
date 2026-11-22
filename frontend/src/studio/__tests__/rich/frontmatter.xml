@@ -1,0 +1,20 @@
+<frontMatter>
+  <frontMatterTitlePage>
+    <productIntroName>
+      <name>Example Aircraft</name>
+    </productIntroName>
+    <pmTitle>Maintenance Manual</pmTitle>
+    <shortPmTitle>MM</shortPmTitle>
+    <pmCode modelIdentCode="EXAMPLE" pmIssuer="00000" pmNumber="00001" pmVolume="00"/>
+    <issueInfo issueNumber="001" inWork="00"/>
+    <issueDate year="2026" month="01" day="15"/>
+    <security securityClassification="01"/>
+    <responsiblePartnerCompany enterpriseCode="00000">
+      <enterpriseName>Example Company</enterpriseName>
+    </responsiblePartnerCompany>
+    <frontMatterInfo>
+      <title>Notice</title>
+      <reducedPara>This publication is for authorized maintenance personnel.</reducedPara>
+    </frontMatterInfo>
+  </frontMatterTitlePage>
+</frontMatter>

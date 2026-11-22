@@ -1,0 +1,662 @@
+{
+ "6": [
+  {
+   "schema": "appliccrossreftable",
+   "root": "dmodule",
+   "elements": 196
+  },
+  {
+   "schema": "brdoc",
+   "root": "dmodule",
+   "elements": 249
+  },
+  {
+   "schema": "brex",
+   "root": "dmodule",
+   "elements": 240
+  },
+  {
+   "schema": "checklist",
+   "root": "dmodule",
+   "elements": 334
+  },
+  {
+   "schema": "comment",
+   "root": "comment",
+   "elements": 178
+  },
+  {
+   "schema": "comrep",
+   "root": "dmodule",
+   "elements": 396
+  },
+  {
+   "schema": "condcrossreftable",
+   "root": "dmodule",
+   "elements": 200
+  },
+  {
+   "schema": "container",
+   "root": "dmodule",
+   "elements": 200
+  },
+  {
+   "schema": "crew",
+   "root": "dmodule",
+   "elements": 246
+  },
+  {
+   "schema": "ddn",
+   "root": "ddn",
+   "elements": 168
+  },
+  {
+   "schema": "descript",
+   "root": "dmodule",
+   "elements": 234
+  },
+  {
+   "schema": "dml",
+   "root": "dml",
+   "elements": 144
+  },
+  {
+   "schema": "fault",
+   "root": "dmodule",
+   "elements": 367
+  },
+  {
+   "schema": "frontmatter",
+   "root": "dmodule",
+   "elements": 232
+  },
+  {
+   "schema": "icnmetadata",
+   "root": "icnMetadata",
+   "elements": 174
+  },
+  {
+   "schema": "ipd",
+   "root": "dmodule",
+   "elements": 269
+  },
+  {
+   "schema": "learning",
+   "root": "dmodule",
+   "elements": 376
+  },
+  {
+   "schema": "pm",
+   "root": "pm",
+   "elements": 185
+  },
+  {
+   "schema": "prdcrossreftable",
+   "root": "dmodule",
+   "elements": 184
+  },
+  {
+   "schema": "proced",
+   "root": "dmodule",
+   "elements": 290
+  },
+  {
+   "schema": "process",
+   "root": "dmodule",
+   "elements": 349
+  },
+  {
+   "schema": "sb",
+   "root": "dmodule",
+   "elements": 326
+  },
+  {
+   "schema": "schedul",
+   "root": "dmodule",
+   "elements": 332
+  },
+  {
+   "schema": "scocontent",
+   "root": "dmodule",
+   "elements": 231
+  },
+  {
+   "schema": "scormcontentpackage",
+   "root": "scormContentPackage",
+   "elements": 164
+  },
+  {
+   "schema": "update",
+   "root": "dataUpdateFile",
+   "elements": 366
+  },
+  {
+   "schema": "wrngdata",
+   "root": "dmodule",
+   "elements": 332
+  },
+  {
+   "schema": "wrngflds",
+   "root": "dmodule",
+   "elements": 293
+  }
+ ],
+ "7": [
+  {
+   "schema": "appliccrossreftable",
+   "root": "dmodule",
+   "elements": 197
+  },
+  {
+   "schema": "brdoc",
+   "root": "dmodule",
+   "elements": 250
+  },
+  {
+   "schema": "brex",
+   "root": "dmodule",
+   "elements": 241
+  },
+  {
+   "schema": "checklist",
+   "root": "dmodule",
+   "elements": 318
+  },
+  {
+   "schema": "comrep",
+   "root": "dmodule",
+   "elements": 375
+  },
+  {
+   "schema": "condcrossreftable",
+   "root": "dmodule",
+   "elements": 201
+  },
+  {
+   "schema": "container",
+   "root": "dmodule",
+   "elements": 201
+  },
+  {
+   "schema": "crew",
+   "root": "dmodule",
+   "elements": 247
+  },
+  {
+   "schema": "descript",
+   "root": "dmodule",
+   "elements": 235
+  },
+  {
+   "schema": "dml",
+   "root": "dml",
+   "elements": 145
+  },
+  {
+   "schema": "fault",
+   "root": "dmodule",
+   "elements": 368
+  },
+  {
+   "schema": "frontmatter",
+   "root": "dmodule",
+   "elements": 233
+  },
+  {
+   "schema": "icnmetadata",
+   "root": "icnMetadataFile",
+   "elements": 188
+  },
+  {
+   "schema": "ipd",
+   "root": "dmodule",
+   "elements": 270
+  },
+  {
+   "schema": "learning",
+   "root": "dmodule",
+   "elements": 377
+  },
+  {
+   "schema": "pm",
+   "root": "pm",
+   "elements": 186
+  },
+  {
+   "schema": "prdcrossreftable",
+   "root": "dmodule",
+   "elements": 185
+  },
+  {
+   "schema": "proced",
+   "root": "dmodule",
+   "elements": 291
+  },
+  {
+   "schema": "process",
+   "root": "dmodule",
+   "elements": 350
+  },
+  {
+   "schema": "sb",
+   "root": "dmodule",
+   "elements": 327
+  },
+  {
+   "schema": "schedul",
+   "root": "dmodule",
+   "elements": 333
+  },
+  {
+   "schema": "scocontent",
+   "root": "dmodule",
+   "elements": 232
+  },
+  {
+   "schema": "wrngdata",
+   "root": "dmodule",
+   "elements": 333
+  },
+  {
+   "schema": "wrngflds",
+   "root": "dmodule",
+   "elements": 294
+  }
+ ],
+ "4-1": [
+  {
+   "schema": "appliccrossreftable",
+   "root": "dmodule",
+   "elements": 178
+  },
+  {
+   "schema": "brex",
+   "root": "dmodule",
+   "elements": 203
+  },
+  {
+   "schema": "checklist",
+   "root": "dmodule",
+   "elements": 288
+  },
+  {
+   "schema": "comrep",
+   "root": "dmodule",
+   "elements": 368
+  },
+  {
+   "schema": "condcrossreftable",
+   "root": "dmodule",
+   "elements": 165
+  },
+  {
+   "schema": "container",
+   "root": "dmodule",
+   "elements": 164
+  },
+  {
+   "schema": "crew",
+   "root": "dmodule",
+   "elements": 209
+  },
+  {
+   "schema": "descript",
+   "root": "dmodule",
+   "elements": 197
+  },
+  {
+   "schema": "dml",
+   "root": "dml",
+   "elements": 139
+  },
+  {
+   "schema": "fault",
+   "root": "dmodule",
+   "elements": 325
+  },
+  {
+   "schema": "frontmatter",
+   "root": "dmodule",
+   "elements": 219
+  },
+  {
+   "schema": "ipd",
+   "root": "dmodule",
+   "elements": 232
+  },
+  {
+   "schema": "learning",
+   "root": "dmodule",
+   "elements": 340
+  },
+  {
+   "schema": "pm",
+   "root": "pm",
+   "elements": 150
+  },
+  {
+   "schema": "prdcrossreftable",
+   "root": "dmodule",
+   "elements": 149
+  },
+  {
+   "schema": "proced",
+   "root": "dmodule",
+   "elements": 249
+  },
+  {
+   "schema": "process",
+   "root": "dmodule",
+   "elements": 308
+  },
+  {
+   "schema": "sb",
+   "root": "dmodule",
+   "elements": 314
+  },
+  {
+   "schema": "schedul",
+   "root": "dmodule",
+   "elements": 291
+  },
+  {
+   "schema": "scocontent",
+   "root": "dmodule",
+   "elements": 195
+  },
+  {
+   "schema": "wrngdata",
+   "root": "dmodule",
+   "elements": 294
+  },
+  {
+   "schema": "wrngflds",
+   "root": "dmodule",
+   "elements": 258
+  }
+ ],
+ "4-2": [
+  {
+   "schema": "appliccrossreftable",
+   "root": "dmodule",
+   "elements": 209
+  },
+  {
+   "schema": "brdoc",
+   "root": "dmodule",
+   "elements": 242
+  },
+  {
+   "schema": "brex",
+   "root": "dmodule",
+   "elements": 235
+  },
+  {
+   "schema": "checklist",
+   "root": "dmodule",
+   "elements": 319
+  },
+  {
+   "schema": "comment",
+   "root": "comment",
+   "elements": 174
+  },
+  {
+   "schema": "comrep",
+   "root": "dmodule",
+   "elements": 379
+  },
+  {
+   "schema": "condcrossreftable",
+   "root": "dmodule",
+   "elements": 196
+  },
+  {
+   "schema": "container",
+   "root": "dmodule",
+   "elements": 195
+  },
+  {
+   "schema": "crew",
+   "root": "dmodule",
+   "elements": 240
+  },
+  {
+   "schema": "ddn",
+   "root": "ddn",
+   "elements": 164
+  },
+  {
+   "schema": "descript",
+   "root": "dmodule",
+   "elements": 228
+  },
+  {
+   "schema": "dml",
+   "root": "dml",
+   "elements": 140
+  },
+  {
+   "schema": "fault",
+   "root": "dmodule",
+   "elements": 357
+  },
+  {
+   "schema": "frontmatter",
+   "root": "dmodule",
+   "elements": 226
+  },
+  {
+   "schema": "icnmetadata",
+   "root": "icnMetadata",
+   "elements": 169
+  },
+  {
+   "schema": "ipd",
+   "root": "dmodule",
+   "elements": 264
+  },
+  {
+   "schema": "learning",
+   "root": "dmodule",
+   "elements": 371
+  },
+  {
+   "schema": "pm",
+   "root": "pm",
+   "elements": 181
+  },
+  {
+   "schema": "prdcrossreftable",
+   "root": "dmodule",
+   "elements": 180
+  },
+  {
+   "schema": "proced",
+   "root": "dmodule",
+   "elements": 280
+  },
+  {
+   "schema": "process",
+   "root": "dmodule",
+   "elements": 339
+  },
+  {
+   "schema": "sb",
+   "root": "dmodule",
+   "elements": 321
+  },
+  {
+   "schema": "schedul",
+   "root": "dmodule",
+   "elements": 322
+  },
+  {
+   "schema": "scocontent",
+   "root": "dmodule",
+   "elements": 226
+  },
+  {
+   "schema": "scormcontentpackage",
+   "root": "scormContentPackage",
+   "elements": 156
+  },
+  {
+   "schema": "update",
+   "root": "dataUpdateFile",
+   "elements": 351
+  },
+  {
+   "schema": "wrngdata",
+   "root": "dmodule",
+   "elements": 328
+  },
+  {
+   "schema": "wrngflds",
+   "root": "dmodule",
+   "elements": 289
+  }
+ ],
+ "5-0": [
+  {
+   "schema": "appliccrossreftable",
+   "root": "dmodule",
+   "elements": 196
+  },
+  {
+   "schema": "brdoc",
+   "root": "dmodule",
+   "elements": 247
+  },
+  {
+   "schema": "brex",
+   "root": "dmodule",
+   "elements": 239
+  },
+  {
+   "schema": "checklist",
+   "root": "dmodule",
+   "elements": 323
+  },
+  {
+   "schema": "comment",
+   "root": "comment",
+   "elements": 178
+  },
+  {
+   "schema": "comrep",
+   "root": "dmodule",
+   "elements": 383
+  },
+  {
+   "schema": "condcrossreftable",
+   "root": "dmodule",
+   "elements": 200
+  },
+  {
+   "schema": "container",
+   "root": "dmodule",
+   "elements": 199
+  },
+  {
+   "schema": "crew",
+   "root": "dmodule",
+   "elements": 244
+  },
+  {
+   "schema": "ddn",
+   "root": "ddn",
+   "elements": 168
+  },
+  {
+   "schema": "descript",
+   "root": "dmodule",
+   "elements": 232
+  },
+  {
+   "schema": "dml",
+   "root": "dml",
+   "elements": 144
+  },
+  {
+   "schema": "fault",
+   "root": "dmodule",
+   "elements": 361
+  },
+  {
+   "schema": "frontmatter",
+   "root": "dmodule",
+   "elements": 230
+  },
+  {
+   "schema": "icnmetadata",
+   "root": "icnMetadata",
+   "elements": 173
+  },
+  {
+   "schema": "ipd",
+   "root": "dmodule",
+   "elements": 264
+  },
+  {
+   "schema": "learning",
+   "root": "dmodule",
+   "elements": 375
+  },
+  {
+   "schema": "pm",
+   "root": "pm",
+   "elements": 185
+  },
+  {
+   "schema": "prdcrossreftable",
+   "root": "dmodule",
+   "elements": 184
+  },
+  {
+   "schema": "proced",
+   "root": "dmodule",
+   "elements": 284
+  },
+  {
+   "schema": "process",
+   "root": "dmodule",
+   "elements": 343
+  },
+  {
+   "schema": "sb",
+   "root": "dmodule",
+   "elements": 325
+  },
+  {
+   "schema": "schedul",
+   "root": "dmodule",
+   "elements": 326
+  },
+  {
+   "schema": "scocontent",
+   "root": "dmodule",
+   "elements": 230
+  },
+  {
+   "schema": "scormcontentpackage",
+   "root": "scormContentPackage",
+   "elements": 163
+  },
+  {
+   "schema": "update",
+   "root": "dataUpdateFile",
+   "elements": 355
+  },
+  {
+   "schema": "wrngdata",
+   "root": "dmodule",
+   "elements": 332
+  },
+  {
+   "schema": "wrngflds",
+   "root": "dmodule",
+   "elements": 293
+  }
+ ]
+}

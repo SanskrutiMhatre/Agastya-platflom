@@ -1,0 +1,27 @@
+<condCrossRefTable>
+  <condTypeList>
+    <condType id="condtype-0001">
+      <name>Weather</name>
+      <descr>Weather at the work site</descr>
+      <enumeration applicPropertyValues="Dry|Wet"/>
+    </condType>
+    <condType id="condtype-0002">
+      <name>Kit</name>
+      <descr>Installed kit</descr>
+    </condType>
+  </condTypeList>
+  <condList>
+    <cond id="cond-0001" condTypeRefId="condtype-0001">
+      <name>Weather</name>
+      <displayName>Weather</displayName>
+      <descr>Weather condition</descr>
+      <prompt>
+        <paraBasic>Is it raining?</paraBasic>
+      </prompt>
+    </cond>
+    <cond id="cond-0002" condTypeRefId="condtype-0002">
+      <name>Cold weather kit</name>
+      <descr>Cold weather kit is installed</descr>
+    </cond>
+  </condList>
+</condCrossRefTable>

@@ -1,0 +1,31 @@
+{
+  "note": "The Studio's own suites (from the Editor/ repository) run against the original and against the platform's embedded copy (frontend/src/studio, built standalone with Editor/src/main.ts). Recorded by hand after each run; rerun to refresh.",
+  "recordedOn": "2026-11-17",
+  "runs": [
+    {
+      "suite": "unit (vitest)",
+      "target": "original Editor/",
+      "result": "660 / 660 passed"
+    },
+    {
+      "suite": "unit (vitest)",
+      "target": "embedded copy",
+      "result": "716 / 716 passed (56 extra checks, one per added template and issue)"
+    },
+    {
+      "suite": "browser (Playwright, 134 tests)",
+      "target": "original Editor/",
+      "result": "133 passed, 1 BLOCKED (skipped upstream: Windows OS-clipboard test, needs headed Windows), 0 failed"
+    },
+    {
+      "suite": "browser (Playwright, 134 tests)",
+      "target": "embedded copy",
+      "result": "133 passed, 1 BLOCKED (same test), 0 failed"
+    },
+    {
+      "suite": "verification suites (rules, editor, controls, editor-controls) on the 7 types the original wizard has x 4 issues",
+      "target": "original Editor/ code",
+      "result": "69 / 69 passed"
+    }
+  ]
+}

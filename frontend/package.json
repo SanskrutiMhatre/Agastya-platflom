@@ -1,0 +1,48 @@
+{
+  "name": "agastya-platform-v2-frontend",
+  "private": true,
+  "version": "2.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 4174 --strictPort",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --exclude \"src/studio/__tests__/verify/{rules,controls,editor,editor-controls,elements,brex-parity,brex-xpath}.test.ts\"",
+    "e2e": "playwright test",
+    "test:verify": "vitest run --no-file-parallelism src/studio/__tests__/verify/rules.test.ts src/studio/__tests__/verify/controls.test.ts src/studio/__tests__/verify/editor.test.ts src/studio/__tests__/verify/editor-controls.test.ts src/studio/__tests__/verify/inventory.test.ts src/studio/__tests__/verify/brex-parity.test.ts src/studio/__tests__/verify/brex-xpath.test.ts"
+  },
+  "dependencies": {
+    "@codemirror/autocomplete": "^6.20.4",
+    "@codemirror/commands": "^6.11.1",
+    "@codemirror/lang-xml": "^6.1.0",
+    "@codemirror/language": "^6.13.1",
+    "@codemirror/lint": "^6.9.7",
+    "@codemirror/search": "^6.7.2",
+    "@codemirror/state": "^6.7.6",
+    "@codemirror/view": "^6.43.15",
+    "@lezer/highlight": "^1.2.5",
+    "codemirror": "^6.0.2",
+    "lucide": "^1.69.0",
+    "pdfjs-dist": "^4.10.38",
+    "pdfmake": "^0.3.13",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.28.0",
+    "xmllint-wasm": "^5.3.0",
+    "zustand": "^4.5.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "jsdom": "^25.0.0",
+    "postcss": "^8.4.39",
+    "tailwindcss": "^3.4.6",
+    "typescript": "^5.5.3",
+    "vite": "^5.4.0",
+    "vitest": "^2.1.0"
+  }
+}

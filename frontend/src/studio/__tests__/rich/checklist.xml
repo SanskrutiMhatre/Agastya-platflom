@@ -1,0 +1,38 @@
+<checkList>
+  <checkListInfo>
+    <title>Pre-flight checklist</title>
+    <warning>
+      <warningAndCautionPara>Do not start the engine with the propeller area occupied.</warningAndCautionPara>
+    </warning>
+    <caution>
+      <warningAndCautionPara>Check the area for loose objects.</warningAndCautionPara>
+    </caution>
+    <note>
+      <notePara>Complete the items in order.</notePara>
+    </note>
+    <checkListItems>
+      <checkListItem>
+        <itemNumber>1</itemNumber>
+        <name>Fuel</name>
+        <checkListProcedure>
+          <checkListPara>
+            <para>Check the fuel quantity.</para>
+          </checkListPara>
+        </checkListProcedure>
+      </checkListItem>
+      <checkListItem>
+        <itemNumber>2</itemNumber>
+        <name>Controls</name>
+        <checkListProcedure>
+          <title>Flight controls</title>
+          <checkListStep>
+            <para>Move the controls through full travel.</para>
+            <checkListStep>
+              <para>Confirm freedom of movement.</para>
+            </checkListStep>
+          </checkListStep>
+        </checkListProcedure>
+      </checkListItem>
+    </checkListItems>
+  </checkListInfo>
+</checkList>

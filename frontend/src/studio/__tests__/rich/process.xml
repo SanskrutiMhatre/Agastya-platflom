@@ -1,0 +1,21 @@
+<process>
+  <dmSeq>
+    <dmNode>
+      <title>Prepare</title>
+      <proceduralStep>
+        <para>Isolate the system.</para>
+        <proceduralStep>
+          <para>Open the breaker.</para>
+        </proceduralStep>
+      </proceduralStep>
+    </dmNode>
+    <dmNode>
+      <title>Remove the unit</title>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="EXAMPLE" systemDiffCode="A" systemCode="00" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="00" disassyCodeVariant="A" infoCode="520" infoCodeVariant="A" itemLocationCode="D"/>
+        </dmRefIdent>
+      </dmRef>
+    </dmNode>
+  </dmSeq>
+</process>

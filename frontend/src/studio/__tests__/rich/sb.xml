@@ -1,0 +1,31 @@
+<sb>
+  <sbManagementInfo>
+    <sbCompliance sbComplianceCategory="sbcc01"/>
+    <sbTaskType sbTaskCategory="sbtc01"/>
+    <sbOriginalIssueDate>
+      <issueDate year="2026" month="01" day="15"/>
+    </sbOriginalIssueDate>
+  </sbManagementInfo>
+  <sbRevisionInfo>
+    <noInfo/>
+  </sbRevisionInfo>
+  <sbSummary>
+    <para>Replace the hydraulic pump seal.</para>
+    <sbTopic sbTopicType="sbtt02">
+      <title>Reason</title>
+      <noInfo/>
+    </sbTopic>
+  </sbSummary>
+  <sbPlanningInfo>
+    <noInfo/>
+  </sbPlanningInfo>
+  <sbMaterialInfo>
+    <noInfo/>
+  </sbMaterialInfo>
+  <sbAccomplishmentInstructions>
+    <para>Do the procedure in the referenced data module.</para>
+  </sbAccomplishmentInstructions>
+  <sbAdditionalInfo>
+    <noInfo/>
+  </sbAdditionalInfo>
+</sb>

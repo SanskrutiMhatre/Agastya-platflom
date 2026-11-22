@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dmodule xmlns:dc="http://www.purl.org/dc/elements/1.1/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.s1000d.org/S1000D_5-0/xml_schema_flat/proced.xsd">
+  <identAndStatusSection>
+    <dmAddress>
+      <dmIdent>
+        <dmCode modelIdentCode="S1KSTUDIO" systemDiffCode="A" systemCode="29" subSystemCode="1" subSubSystemCode="0" assyCode="00" disassyCode="00" disassyCodeVariant="A" infoCode="520" infoCodeVariant="A" itemLocationCode="A"/>
+        <language languageIsoCode="en" countryIsoCode="US"/>
+        <issueInfo issueNumber="001" inWork="00"/>
+      </dmIdent>
+      <dmAddressItems>
+        <issueDate year="2026" month="11" day="06"/>
+        <dmTitle>
+          <techName>Hydraulic pump</techName>
+          <infoName>Remove procedure</infoName>
+        </dmTitle>
+      </dmAddressItems>
+    </dmAddress>
+    <dmStatus issueType="new">
+      <security securityClassification="01"/>
+      <responsiblePartnerCompany enterpriseCode="S1K01">
+        <enterpriseName>S1000D Studio Sample Data</enterpriseName>
+      </responsiblePartnerCompany>
+      <originator enterpriseCode="S1K01">
+        <enterpriseName>S1000D Studio Sample Data</enterpriseName>
+      </originator>
+      <applic>
+        <displayText>
+          <simplePara>All aircraft</simplePara>
+        </displayText>
+      </applic>
+      <brexDmRef>
+        <dmRef>
+          <dmRefIdent>
+            <dmCode modelIdentCode="S1000D" systemDiffCode="G" systemCode="04" subSystemCode="1" subSubSystemCode="0" assyCode="0301" disassyCode="00" disassyCodeVariant="A" infoCode="022" infoCodeVariant="A" itemLocationCode="D"/>
+          </dmRefIdent>
+        </dmRef>
+      </brexDmRef>
+      <qualityAssurance>
+        <unverified/>
+      </qualityAssurance>
+    </dmStatus>
+  </identAndStatusSection>
+  <content>
+    <procedure>
+      <preliminaryRqmts>
+        <reqCondGroup>
+          <reqCondNoRef>
+            <reqCond>Aircraft on wheels with hydraulic power off</reqCond>
+          </reqCondNoRef>
+        </reqCondGroup>
+        <reqSupportEquips>
+          <supportEquipDescrGroup>
+            <supportEquipDescr id="seq-0001">
+              <name>Torque wrench, 10-100 Nm</name>
+              <identNumber>
+                <manufacturerCode>S1K01</manufacturerCode>
+                <partAndSerialNumber>
+                  <partNumber>TW-100</partNumber>
+                </partAndSerialNumber>
+              </identNumber>
+              <reqQuantity>1</reqQuantity>
+            </supportEquipDescr>
+            <supportEquipDescr id="seq-0002">
+              <name>Container, 5 l</name>
+              <identNumber>
+                <manufacturerCode>S1K01</manufacturerCode>
+                <partAndSerialNumber>
+                  <partNumber>CNT-5L</partNumber>
+                </partAndSerialNumber>
+              </identNumber>
+              <reqQuantity>1</reqQuantity>
+            </supportEquipDescr>
+          </supportEquipDescrGroup>
+        </reqSupportEquips>
+        <reqSupplies>
+          <noSupplies/>
+        </reqSupplies>
+        <reqSpares>
+          <noSpares/>
+        </reqSpares>
+        <reqSafety>
+          <safetyRqmts>
+            <warning>
+              <warningAndCautionPara>Make sure that the hydraulic system is depressurized before you disconnect the lines. Fluid under pressure can cause injury.</warningAndCautionPara>
+            </warning>
+          </safetyRqmts>
+        </reqSafety>
+      </preliminaryRqmts>
+      <mainProcedure>
+        <proceduralStep id="stp-0001">
+          <para>Release the hydraulic pressure of the green system.</para>
+        </proceduralStep>
+        <proceduralStep id="stp-0002">
+          <para>Put the container (<internalRef internalRefId="seq-0002" internalRefTargetType="irtt05"/>) below the pump.</para>
+        </proceduralStep>
+        <proceduralStep id="stp-0003">
+          <caution>
+            <warningAndCautionPara>Install blanking caps on all open ports immediately to prevent contamination.</warningAndCautionPara>
+          </caution>
+          <para>Disconnect the hydraulic lines:</para>
+          <proceduralStep id="stp-0004">
+            <para>Disconnect the pressure line.</para>
+          </proceduralStep>
+          <proceduralStep id="stp-0005">
+            <para>Disconnect the case drain line.</para>
+          </proceduralStep>
+          <proceduralStep id="stp-0006">
+            <para>Disconnect the suction line.</para>
+          </proceduralStep>
+        </proceduralStep>
+        <proceduralStep id="stp-0007">
+          <para>Remove the six nuts and washers with the torque wrench (<internalRef internalRefId="seq-0001" internalRefTargetType="irtt05"/>).</para>
+        </proceduralStep>
+        <proceduralStep id="stp-0008">
+          <para>Remove the pump from the gearbox pad.</para>
+          <note>
+            <notePara>Keep the pump in the horizontal position to prevent fluid spillage.</notePara>
+          </note>
+        </proceduralStep>
+      </mainProcedure>
+      <closeRqmts>
+        <reqCondGroup>
+          <noConds/>
+        </reqCondGroup>
+      </closeRqmts>
+    </procedure>
+  </content>
+</dmodule>

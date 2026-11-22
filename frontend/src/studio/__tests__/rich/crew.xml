@@ -1,0 +1,27 @@
+<crew>
+  <crewRefCard>
+    <title>Engine start</title>
+    <para>Complete the drills in order.</para>
+    <crewDrill>
+      <crewDrillStep>
+        <challengeAndResponse>
+          <challenge><para>Parking brake</para></challenge>
+          <response><para>SET</para></response>
+        </challengeAndResponse>
+        <challengeAndResponse>
+          <challenge><para>Fuel selector</para></challenge>
+          <response><para>BOTH</para></response>
+        </challengeAndResponse>
+      </crewDrillStep>
+    </crewDrill>
+    <crewDrill>
+      <crewDrillStep>
+        <title>After start</title>
+        <challengeAndResponse>
+          <challenge><para>Oil pressure</para></challenge>
+          <response><para>CHECK</para></response>
+        </challengeAndResponse>
+      </crewDrillStep>
+    </crewDrill>
+  </crewRefCard>
+</crew>

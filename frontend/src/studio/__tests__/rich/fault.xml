@@ -1,0 +1,47 @@
+<faultIsolation>
+  <faultIsolationProcedure>
+    <isolationProcedure>
+      <preliminaryRqmts>
+        <reqCondGroup><noConds/></reqCondGroup>
+        <reqSupportEquips><noSupportEquips/></reqSupportEquips>
+        <reqSupplies><noSupplies/></reqSupplies>
+        <reqSpares><noSpares/></reqSpares>
+        <reqSafety><noSafety/></reqSafety>
+      </preliminaryRqmts>
+      <isolationMainProcedure>
+        <isolationStep id="isol-0001">
+          <action>Check the system indicator.</action>
+          <isolationStepQuestion>Is the indicator on?</isolationStepQuestion>
+          <isolationStepAnswer>
+            <yesNoAnswer>
+              <yesAnswer nextActionRefId="isol-0002"/>
+              <noAnswer nextActionRefId="isol-0003"/>
+            </yesNoAnswer>
+          </isolationStepAnswer>
+        </isolationStep>
+        <isolationStep id="isol-0002">
+          <action>Measure the supply voltage.</action>
+          <isolationStepQuestion>What is the reading?</isolationStepQuestion>
+          <isolationStepAnswer>
+            <listOfChoices>
+              <choice nextActionRefId="isol-end1">28 V</choice>
+              <choice nextActionRefId="isol-end2">0 V</choice>
+            </listOfChoices>
+          </isolationStepAnswer>
+        </isolationStep>
+        <isolationProcedureEnd id="isol-0003">
+          <action>Replace the indicator lamp.</action>
+        </isolationProcedureEnd>
+        <isolationProcedureEnd id="isol-end1">
+          <action>The system is serviceable.</action>
+        </isolationProcedureEnd>
+        <isolationProcedureEnd id="isol-end2">
+          <action>Replace the power supply.</action>
+        </isolationProcedureEnd>
+      </isolationMainProcedure>
+      <closeRqmts>
+        <reqCondGroup><noConds/></reqCondGroup>
+      </closeRqmts>
+    </isolationProcedure>
+  </faultIsolationProcedure>
+</faultIsolation>

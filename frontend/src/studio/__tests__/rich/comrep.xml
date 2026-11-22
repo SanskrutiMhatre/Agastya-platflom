@@ -1,0 +1,12 @@
+<commonRepository>
+  <warningRepository>
+    <warningSpec>
+      <warningIdent warningIdentNumber="WRN-0001"/>
+      <warningAndCautionPara>Hazardous voltage. Disconnect power before maintenance.</warningAndCautionPara>
+    </warningSpec>
+    <warningSpec>
+      <warningIdent warningIdentNumber="WRN-0002"/>
+      <warningAndCautionPara>Hot surface.</warningAndCautionPara>
+    </warningSpec>
+  </warningRepository>
+</commonRepository>

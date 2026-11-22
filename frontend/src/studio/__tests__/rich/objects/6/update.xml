@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dataUpdateFile xmlns:dc="http://www.purl.org/dc/elements/1.1/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.s1000d.org/S1000D_6/xml_schema_flat/update.xsd"><updateIdentAndStatusSection><updateAddress><updateIdent><updateCode objectIdentCode="UPF" modelIdentCode="EXAMPLE" systemDiffCode="A" systemCode="00" subSystemCode="0" subSubSystemCode="0" assyCode="01" disassyCode="00" disassyCodeVariant="A" infoCode="040" infoCodeVariant="A" itemLocationCode="D"/><language languageIsoCode="en" countryIsoCode="IN"/><issueInfo issueNumber="001" inWork="00"/></updateIdent><issueDate year="2026" month="11" day="22"/></updateAddress><updateStatus><sourceDmIdent><dmCode modelIdentCode="EXAMPLE" systemDiffCode="A" systemCode="00" subSystemCode="0" subSubSystemCode="0" assyCode="01" disassyCode="00" disassyCodeVariant="A" infoCode="040" infoCodeVariant="A" itemLocationCode="D"/><language languageIsoCode="en" countryIsoCode="IN"/><issueInfo issueNumber="001" inWork="00"/></sourceDmIdent><targetDmIssueInfo issueNumber="001" inWork="00"/><responsiblePartnerCompany enterpriseCode="00000"><enterpriseName>Example Company</enterpriseName></responsiblePartnerCompany><originator enterpriseCode="00000"><enterpriseName>Example Company</enterpriseName></originator><brexDmRef>
+        <dmRef>
+          <dmRefIdent>
+            <dmCode modelIdentCode="S1000D" systemDiffCode="H" systemCode="04" subSystemCode="1" subSubSystemCode="0" assyCode="0301" disassyCode="00" disassyCodeVariant="A" infoCode="022" infoCodeVariant="A" itemLocationCode="D"/>
+          </dmRefIdent>
+        </dmRef>
+      </brexDmRef><qualityAssurance><unverified/></qualityAssurance></updateStatus><targetDmStatus><security securityClassification="01"/><responsiblePartnerCompany enterpriseCode="00000"><enterpriseName>Example Company</enterpriseName></responsiblePartnerCompany><originator enterpriseCode="00000"><enterpriseName>Example Company</enterpriseName></originator><applic><displayText><simplePara>All</simplePara></displayText></applic><brexDmRef>
+        <dmRef>
+          <dmRefIdent>
+            <dmCode modelIdentCode="S1000D" systemDiffCode="H" systemCode="04" subSystemCode="1" subSubSystemCode="0" assyCode="0301" disassyCode="00" disassyCodeVariant="A" infoCode="022" infoCodeVariant="A" itemLocationCode="D"/>
+          </dmRefIdent>
+        </dmRef>
+      </brexDmRef><qualityAssurance><unverified/></qualityAssurance></targetDmStatus></updateIdentAndStatusSection><content><update><deleteObjectGroup><deleteObject><partIdent manufacturerCodeValue="00000" partNumberValue="PN-AB-12"/></deleteObject></deleteObjectGroup></update></content></dataUpdateFile>

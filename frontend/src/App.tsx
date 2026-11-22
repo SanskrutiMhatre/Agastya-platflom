@@ -1,0 +1,85 @@
+import { Suspense, lazy, useEffect, useRef } from 'react';
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { useSession } from './store/session';
+import { Loading, Toasts } from './components/ui';
+import { AuthScreens } from './pages/AuthScreens';
+import { AppShell } from './layouts/AppShell';
+import { Overview } from './pages/Overview';
+import { Workspace } from './pages/Workspace';
+import { Projects } from './pages/Projects';
+import { Activity } from './pages/Activity';
+import { canMonitor } from './lib/roles';
+import { Settings } from './pages/Settings';
+import { Notifications } from './pages/Notifications';
+import { PreviewWindow } from './pages/PreviewWindow';
+import { GraphicsPage } from './pages/Graphics';
+import { CirPage } from './pages/Cir';
+import { BackupPage } from './pages/BackupPage';
+import { AdministratorPage } from './pages/Administrator';
+import { ProjectGraphicsPage } from './pages/project/GraphicsPage';
+import { ProjectShell } from './layouts/ProjectShell';
+import { ExplorePage } from './pages/project/ExplorePage';
+import { PublicationPage } from './pages/project/PublicationPage';
+import { ValidationPage } from './pages/project/ValidationPage';
+import { ReleasePage } from './pages/project/ReleasePage';
+import { CsdbPage } from './pages/project/CsdbPage';
+import { ProjectSettingsPage } from './pages/project/ProjectSettingsPage';
+
+// The editor (CodeMirror, pdfmake, the schema engine) is large and only this route needs it.
+const EditorPage = lazy(() => import('./pages/project/EditorPage').then((m) => ({ default: m.EditorPage })));
+
+export function App() {
+  const status = useSession((s) => s.status);
+  const load = useSession((s) => s.load);
+  const user = useSession((s) => s.user);
+  useEffect(() => { void load(); }, [load]);
+
+  /*
+    Everyone lands on their own dashboard after signing in. The browser keeps the address of whatever
+    was open when the last person signed out (say /settings), and a fresh sign-in used to reopen it -
+    so the address is reset whenever the signed-in state starts or ends. A page reload keeps its address.
+  */
+  const nav = useNavigate();
+  const wasAuthed = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (status === 'loading') return;
+    const now = status === 'authed' || status === 'gated';
+    if (wasAuthed.current !== null && wasAuthed.current !== now) nav('/overview', { replace: true });
+    wasAuthed.current = now;
+  }, [status, nav]);
+
+  let body;
+  if (status === 'loading') body = <Loading label="Starting…" />;
+  else if (status !== 'authed') body = <AuthScreens />;
+  else body = (
+    <Routes>
+      <Route element={<AppShell />}>
+        <Route index element={<Navigate to="/overview" replace />} />
+        <Route path="overview" element={<Overview />} />
+        <Route path="workspace" element={<Workspace />} />
+        <Route path="projects" element={<Projects />} />
+        {canMonitor(user) ? <Route path="activity" element={<Activity />} /> : null}
+        <Route path="notifications" element={<Notifications />} />
+        <Route path="graphics" element={<GraphicsPage />} />
+        <Route path="cir" element={<CirPage />} />
+        <Route path="backup" element={<BackupPage />} />
+        {user?.role === 'admin' ? <Route path="administrator/*" element={<AdministratorPage />} /> : null}
+        <Route path="settings/*" element={<Settings />} />
+      </Route>
+      <Route path="preview/:id/:mode" element={<PreviewWindow />} />
+      <Route path="projects/:id" element={<ProjectShell />}>
+        <Route index element={<Navigate to="editor" replace />} />
+        <Route path="editor" element={<Suspense fallback={<Loading label="Loading the editor…" />}><EditorPage /></Suspense>} />
+        <Route path="explore" element={<ExplorePage />} />
+        <Route path="publication" element={<PublicationPage />} />
+        <Route path="validation" element={<ValidationPage />} />
+        <Route path="graphics" element={<ProjectGraphicsPage />} />
+        <Route path="release" element={<ReleasePage />} />
+        <Route path="csdb" element={<CsdbPage />} />
+        <Route path="settings/*" element={<ProjectSettingsPage />} />
+      </Route>
+      <Route path="*" element={<Navigate to="/overview" replace />} />
+    </Routes>
+  );
+  return <>{body}<Toasts /></>;
+}
