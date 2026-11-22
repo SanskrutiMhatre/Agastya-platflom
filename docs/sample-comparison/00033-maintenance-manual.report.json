@@ -1,0 +1,281 @@
+{
+ "name": "Maintenance Manual RDR-1671Y-00033",
+ "startedAt": "2026-11-22T03:05:47.787Z",
+ "deviations": [
+  "The data modules name a project BREX (DMC-RDR-A-00-00-00-00A-022A-D_001-00_EN-IN.xml) that is not in the package; the gate refused the build ({\"error\":\"Not published: a BREX cannot be used: BREX DMC-RDR-A-00-00-00-00A-022A-D is not available (first: DMC-RDR-B-GP1-40-10-290-280A-D_001-00_EN-IN.xml - BREX DMC-RDR-A-00-00-00-00A-022A-D is not ). A stand-in BREX with that code (the platform's 4.2 test BREX, no project rules of its own) was added to the COPY (HTTP 201) so the build could run. The original package is unchanged."
+ ],
+ "notes": [],
+ "package": {
+  "source": "PMC-RDR-1671Y-00033-00_000-01.xml (1).zip",
+  "bytes": 666714
+ },
+ "reference": {
+  "file": "RDR-1671Y-00033-00.pdf",
+  "bytes": 2825748
+ },
+ "import": {
+  "strict": {
+   "status": 200,
+   "ms": 824,
+   "counts": {
+    "accepted": 18,
+    "unchanged": 0,
+    "skipped": 0,
+    "rejected": 0
+   },
+   "applied": true
+  },
+  "rejectedFinal": []
+ },
+ "project": {
+  "dataModules": 9
+ },
+ "validation": {
+  "ms": 565,
+  "summary": {
+   "error": 5,
+   "warn": 0,
+   "info": 3
+  },
+  "schemaChecked": 10,
+  "brexChecked": 9,
+  "unchecked": 0,
+  "bySourceSeverity": {
+   "ids/info": 2,
+   "pm/error": 4,
+   "pm/info": 1,
+   "brex/error": 1
+  },
+  "errorKinds": {
+   "pm: Publication entry has no data module": 4,
+   "brex: BREX data module unavailable": 1
+  },
+  "firstErrors": [
+   "publication.xml: Publication entry has no data module",
+   "publication.xml: Publication entry has no data module",
+   "publication.xml: Publication entry has no data module",
+   "publication.xml: Publication entry has no data module",
+   "csdb/DMC-RDR-B-GP1-40-10-290-280A-D_001-00_EN-IN.xml: BREX data module unavailable"
+  ],
+  "notes": []
+ },
+ "findings": {
+  "counts": {
+   "error": 4,
+   "warn": 9,
+   "info": 3
+  },
+  "byRule": {
+   "info:IDS": 2,
+   "error:PM": 4,
+   "info:PM": 1,
+   "warn:XREF_DM": 9
+  }
+ },
+ "graphics": {
+  "assets": 8,
+  "findings": {},
+  "referencedIcns": 8,
+  "imagesInOurPdf": {
+   "placed": 13,
+   "distinct": 8
+  },
+  "imagesInReferencePdf": {
+   "placed": 59,
+   "distinct": 10
+  },
+  "figureCaptions": {
+   "ours": 8,
+   "reference": 8
+  }
+ },
+ "refusedByGate": [],
+ "validationAfterStandIn": {
+  "summary": {
+   "error": 4,
+   "warn": 0,
+   "info": 3
+  },
+  "bySourceSeverity": {
+   "ids/info": 2,
+   "pm/error": 4,
+   "pm/info": 1
+  },
+  "errorKinds": {
+   "pm: Publication entry has no data module": 4
+  },
+  "unchecked": 0
+ },
+ "pdfBuild": {
+  "status": 200,
+  "ms": 4658,
+  "refused": []
+ },
+ "htmlBuild": {
+  "status": 201,
+  "ms": 1088,
+  "pages": 9,
+  "assets": 8,
+  "missing": [],
+  "zipBytes": 674588,
+  "htmlFiles": 10,
+  "wordsMissing": 0,
+  "firstMissing": [],
+  "titlesMissing": []
+ },
+ "pmCoverage": {
+  "dataModulesInPackage": 9,
+  "referencedBySuppliedPm": 9,
+  "notReferencedBySuppliedPm": 0,
+  "pmRefEntries": 0,
+  "referencedPublicationModules": [
+   "RDR-1671Y-00033-00"
+  ]
+ },
+ "content": {
+  "dataModules": 9,
+  "words": 444,
+  "wordsMissingInOurs": 0,
+  "firstMissing": [],
+  "wordsMissingInReference": 0
+ },
+ "toc": {
+  "tocPagesReference": 3,
+  "tocPagesOurs": 3,
+  "codesInReferenceToc": 9,
+  "codesInOurToc": 9,
+  "inReferenceNotOurs": [],
+  "inOursNotReference": []
+ },
+ "order": {
+  "publicationModules": 9,
+  "locatedInOurs": 9,
+  "locatedInReference": 9,
+  "inversionsVsPublicationOrderOurs": 3,
+  "inversionsVsPublicationOrderReference": 3,
+  "note": "Title text may repeat (running headers), so a located page is the first body page carrying the title; inversions count pairs found in a different order than the publication module lists them.",
+  "commonModules": 9,
+  "pairsOrderedDifferentlyBetweenOursAndReference": 0
+ },
+ "pagination": {
+  "pages": {
+   "reference": 30,
+   "ours": 32,
+   "ratio": 1.07
+  },
+  "blank": {
+   "reference": {
+    "intentionallyBlankNotice": 8,
+    "emptyPages": 0,
+    "nearEmptyPages": 0
+   },
+   "ours": {
+    "intentionallyBlankNotice": 8,
+    "emptyPages": 0,
+    "nearEmptyPages": 0
+   }
+  }
+ },
+ "layout": {
+  "reference": {
+   "surveyedPagesForFontsAndSizes": 120,
+   "sampledPages": 11,
+   "pageSizesPts": [
+    "595.275 x 841.889 pts (A4)"
+   ],
+   "landscapePages": 0,
+   "fonts": [
+    "Arial-BoldItalicMT",
+    "Arial-BoldMT",
+    "DocuneeringISO8879-Regular",
+    "ArialMT",
+    "Arial-ItalicMT"
+   ],
+   "medianMarginPts": {
+    "left": 24.1,
+    "right": 42.5,
+    "top": 29,
+    "bottom": 33.7
+   },
+   "headerFooterPatterns": [
+    "H:CONFIDENTIAL RDR­#Y­#­# | F:CONFIDENTIAL #­#­# Page #",
+    "H:RDR­#Y­#­# CONFIDENTIAL | F:Page # #­#­# CONFIDENTIAL"
+   ]
+  },
+  "ours": {
+   "surveyedPagesForFontsAndSizes": 120,
+   "sampledPages": 16,
+   "pageSizesPts": [
+    "595.275 x 841.889 pts (A4)"
+   ],
+   "landscapePages": 0,
+   "fonts": [
+    "DejaVuSans-Bold",
+    "Helvetica",
+    "DejaVuSans",
+    "Helvetica-Oblique",
+    "Helvetica-Bold"
+   ],
+   "medianMarginPts": {
+    "left": 64.2,
+    "right": 51,
+    "top": 35.3,
+    "bottom": 35.3
+   },
+   "headerFooterPatterns": [
+    "H:RESTRICTED #KVA | F:RESTRICTED End of data module #-#-# Page #",
+    "H:RESTRICTED #KVA | F:Applicable to: APPLIC RESTRICTED RDR-B-GP#-#-#-#-#A-D #-#-# Page #",
+    "H:#KVA RESTRICTED | F:RESTRICTED End of data module #-#-# Page #"
+   ]
+  }
+ },
+ "scaleBuild": {
+  "note": "SYNTHETIC publication module: every data module the gate accepts, alphabetical by code. Not the original structure.",
+  "modulesInPackage": 9,
+  "refusedByGate": [],
+  "modulesPublished": 9,
+  "pdf": {
+   "status": 200,
+   "ms": 2523,
+   "pages": 32,
+   "bytes": 731913,
+   "referencePages": 30,
+   "ratioToReference": 1.07,
+   "contentWords": 444,
+   "wordsMissing": 0,
+   "firstMissing": [],
+   "titlesMissing": [],
+   "blank": {
+    "intentionallyBlankNotice": 8,
+    "emptyPages": 0,
+    "nearEmptyPages": 0
+   },
+   "imagesPlaced": {
+    "placed": 13,
+    "distinct": 8
+   },
+   "referencedIcns": 8
+  },
+  "html": {
+   "status": 201,
+   "pages": 9,
+   "assets": 8,
+   "missing": [],
+   "htmlFiles": 10,
+   "wordsMissing": 0,
+   "firstMissing": [],
+   "titlesMissing": []
+  }
+ },
+ "pictures": [
+  "ours-p1-01.png",
+  "ours-p16-16.png",
+  "ours-p3-03.png",
+  "ours-p32-32.png",
+  "reference-p1-01.png",
+  "reference-p15-15.png",
+  "reference-p3-03.png",
+  "reference-p30-30.png"
+ ],
+ "finishedAt": "2026-11-22T03:06:54.195Z"
+}

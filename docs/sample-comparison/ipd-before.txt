@@ -1,0 +1,247 @@
+[build:one-ipd] Validating the publication against the S1000D schemas...
+[build:one-ipd] Engine: direct S1000D -> FO
+[build:one-ipd] Watermark: NOT RELEASED (diagonal)
+[build:one-ipd] Added 14 front-matter pages from settings
+[build:one-ipd] Front-matter artwork missing from the project: Media/Satya.png, Media/JACKSON.png, Media/Satya.png - upload it under Settings > Branding
+[build:one-ipd] Resolved 1 dmRef entry to xi:include
+[build:one-ipd] Indexed 0 images for sizing
+[build:one-ipd] Applied 63 layout settings
+[build:one-ipd] Rendering XSL-FO (direct S1000D)...
+[build:one-ipd] Rendering XSL-FO (direct S1000D) — 31ms
+[build:one-ipd] Image references: 3 unresolved: Media/Screenshot 2026-09-05 160259.png, Media/JACKSON.png, csdb/ICN-S1KSTUDIO-A-291000-A-00001-00001-A-001-01.svg
+[build:one-ipd] Generating PDF (FOP)...
+[build:one-ipd] Generating PDF (FOP) — 1.55s
+[build:one-ipd] Done in 1.61s — fo 31ms · pdf 1.55s (warm FOP)
+                              RESTRICTED                   160KVA
+
+
+
+
+One IPD
+MODEL-00000-00000-00
+Issue No. 001, 2026-11-22
+
+
+
+
+                                                 D
+                                             SE
+                               EA
+                            EL
+                    R
+                 T
+       O
+
+
+
+
+Publisher:
+N
+
+
+
+
+Applicable to:
+                              RESTRICTED          2026-11-22 Page 1
+                            End of data module
+This page is intentionally left blank.
+                                                RESTRICTED                                           160KVA
+
+
+
+
+                                           Table of contents
+
+            The listed documents are included in issue 001, dated 2026-11-22, of this publication.
+
+
+Document title                    Data module code                Issue date    Page      Applicable to
+                                  Publication module code
+
+Example system – Illustrated EXAMPLE-                             2026-11-17    1         All
+parts data                   A-00-00-05-00A-941A-D
+
+
+
+
+                                                                               D
+                                                                SE
+                                                EA
+                                  EL
+                          R
+                 T
+       O
+N
+
+
+
+
+Applicable to:
+                                               RESTRICTED                                  2026-11-22 Page 3
+                                             End of data module
+This page is intentionally left blank.
+                                        RESTRICTED                   160KVA
+
+
+
+
+                                List of illustrations
+
+Data module code                Figure      Title
+
+EXAMPLE-A-00-00-05-00A-941A-D   Fig 1       Unit assembly
+
+
+
+
+                                                            D
+                                                     SE
+                                        EA
+                          EL
+                    R
+                 T
+       O
+N
+
+
+
+
+Applicable to:
+                                     RESTRICTED             2026-11-22 Page 5
+                                   End of data module
+This page is intentionally left blank.
+                                   RESTRICTED                   160KVA
+
+
+
+
+                              List of abbreviations
+
+Abbreviation     Definition
+
+None
+
+
+
+
+                                                      D
+                                                  SE
+                                    EA
+                       EL
+                 R
+                 T
+       O
+N
+
+
+
+
+Applicable to:
+                                   RESTRICTED          2026-11-22 Page 7
+                                 End of data module
+This page is intentionally left blank.
+                                                Example system
+
+                                                 Illustrated parts data
+
+Table of Contents
+
+    List of Figures........................................................................................................................2
+    Illustrated Parts List...............................................................................................................3
+
+
+
+
+                                                                                                    D
+                                                                                SE
+                                                           EA
+                                        EL
+                             R
+               T
+    O
+N
+                                                        RESTRICTED                                                         160KVA
+
+
+
+
+List of Figures
+
+     Figure 1 - Unit assembly.......................................................................................................3
+
+
+
+
+                                                                                               D
+                                                                            SE
+                                                         EA
+                                       EL
+                            R
+                T
+     O
+N
+
+
+
+
+EXAMPLE-A-00-00-05-00A-941A-D                                                                                    Applicable to: All
+Page 2 2026-11-17                                       RESTRICTED
+                                        RESTRICTED                                        160KVA
+
+
+
+
+                               Figure 1 - Unit assembly
+
+
+
+                         ICN-S1KSTUDIO-A-291000-A-00001-00001-A-001-01
+
+
+
+
+                                                                         D
+                                                         SE
+                                         EA
+                          EL
+                     R
+                     T
+       O
+N
+
+
+
+
+Applicable to: All                                                  EXAMPLE-A-00-00-05-00A-941A-D
+                                        RESTRICTED                               2026-11-17 Page 3
+                                          RESTRICTED                                160KVA
+
+
+
+
+Illustrated Parts List
+
+  FIG.   ITEM             PART NUMBER            CAGE        NOMENCLATURE            QTY
+  01     001    PN-0001                          00000                                1
+  01     .002   PN-0002                          00000                                4
+  01     .002   PN-0002-ALT                      00000                                4
+
+
+
+
+                                                                  D
+                                                         SE
+                                           EA
+                                EL
+                          R
+                T
+         O
+N
+
+
+
+
+EXAMPLE-A-00-00-05-00A-941A-D                                               Applicable to: All
+Page 4 2026-11-17                         RESTRICTED
+                                        End of data module
+

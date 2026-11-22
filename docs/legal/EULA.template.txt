@@ -1,0 +1,33 @@
+=====================================================================================================================
+  THIS IS A SKELETON, NOT A LICENCE.  It is not shipped, and the installer does not read it.
+
+  It lists the headings an end-user licence for this product usually has, with the points that are specific to
+  Agastya Platform filled in as FACTS to be checked, and every legal decision left as a [PLACEHOLDER].
+  Your organisation's legal adviser must write or approve the real text.
+
+  To use it: have the licence text written, save it as  docs\EULA.txt  (plain text), and rebuild. The installer
+  then shows a licence page that the user must accept. Without docs\EULA.txt the installer shows no licence page.
+=====================================================================================================================
+
+[PRODUCT]  Agastya Platform [VERSION]
+[LICENSOR] [Legal name and registered address of the organisation granting the licence]
+
+1.  Grant                      [Who may use it, how many users / PCs / sites, for what purpose, for how long.]
+2.  Restrictions               [What the licensee may not do: copy, resell, reverse-engineer, remove notices ...]
+3.  Ownership                  [Who owns the software, and who owns the licensee's own publications and data.
+                                 Fact to state accurately: publications and data stay on the licensee's own servers;
+                                 the product contains no code path that contacts the internet.]
+4.  Third-party components      The product contains third-party software under its own licences. They are listed with their
+                                licence texts in THIRD-PARTY-NOTICES.txt and the licenses\ folder of the installed product
+                                (Node.js, Apache FOP, Eclipse Temurin / OpenJDK, libxml2, libxslt, and others).
+                                [State that those licences apply to those components.]
+5.  Fonts                       [Only if the package includes Arial: state that Arial is licensed by its owner and is included
+                                 under the distributor's licence for it - see backend\vendor\tools\fonts\README.md. If
+                                 the package was built with --no-arial, delete this clause.]
+6.  Support and updates        [What, if anything, is promised.]
+7.  Warranty and liability     [Disclaimer and limits - wording and what is lawful depend on the governing law.]
+8.  Export and defence-sector  [Any export-control or classification-handling terms that apply to the organisation.]
+9.  Term and termination       [When the licence ends and what happens to the software.]
+10. Governing law              [Country / state, and where disputes are heard.]
+
+[Signature / acceptance mechanism, if any, and the date of this version.]

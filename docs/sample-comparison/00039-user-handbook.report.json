@@ -1,0 +1,452 @@
+{
+ "name": "User Handbook RDR-1671Y-00039",
+ "startedAt": "2026-11-22T03:07:00.820Z",
+ "deviations": [
+  "The data modules name a project BREX (DMC-RDR-A-00-00-00-00A-022A-D_001-00_EN-IN.xml) that is not in the package; the gate refused the build ({\"error\":\"Not published: a BREX cannot be used: BREX DMC-RDR-A-00-00-00-00A-022A-D is not available (first: DMC-RDR-A-A00-00-00-00A-018A-D_001-00_EN-IN.xml - BREX DMC-RDR-A-00-00-00-00A-022A-D is not ). A stand-in BREX with that code (the platform's 4.2 test BREX, no project rules of its own) was added to the COPY (HTTP 201) so the build could run. The original package is unchanged.",
+  "2 data module(s) that the publication gate refused (schema or BREX breaches, listed under refusedByGate) were removed from the COPY so that the rest could be built and compared. Their publication entries were left as they are."
+ ],
+ "notes": [
+  "The folder was zipped into a copy first; the original folder was only read."
+ ],
+ "package": {
+  "source": "PMC-RDR-1671Y-00039-00_001-01.xml (2)",
+  "bytes": 183328235
+ },
+ "reference": {
+  "file": "RDR-1671Y-00039-00 (9).pdf",
+  "bytes": 214761382
+ },
+ "import": {
+  "strict": {
+   "status": 200,
+   "ms": 10044,
+   "counts": {
+    "accepted": 710,
+    "unchanged": 0,
+    "skipped": 0,
+    "rejected": 0
+   },
+   "applied": true
+  },
+  "rejectedFinal": []
+ },
+ "project": {
+  "dataModules": 218
+ },
+ "validation": {
+  "ms": 4343,
+  "summary": {
+   "error": 11,
+   "warn": 16,
+   "info": 69
+  },
+  "schemaChecked": 219,
+  "brexChecked": 218,
+  "unchecked": 0,
+  "bySourceSeverity": {
+   "xsd/error": 9,
+   "applic/warn": 16,
+   "applic/error": 1,
+   "ids/info": 68,
+   "pm/info": 1,
+   "brex/error": 1
+  },
+  "errorKinds": {
+   "xsd: Does not match the S1000D schema": 9,
+   "applic: Applicability APPLIC-ACT-MISSING": 1,
+   "brex: BREX data module unavailable": 1
+  },
+  "firstErrors": [
+   "publication.xml: Does not match the S1000D schema",
+   "publication.xml: Does not match the S1000D schema",
+   "publication.xml: Does not match the S1000D schema",
+   "publication.xml: Does not match the S1000D schema",
+   "publication.xml: Does not match the S1000D schema",
+   "publication.xml: Does not match the S1000D schema",
+   "publication.xml: Does not match the S1000D schema",
+   "publication.xml: Does not match the S1000D schema",
+   "publication.xml: Does not match the S1000D schema",
+   "csdb/DMC-RDR-A-GP1-40-10-120-034A-D_001-00_EN-IN.xml: Applicability APPLIC-ACT-MISSING",
+   "csdb/DMC-RDR-A-A00-00-00-00A-018A-D_001-00_EN-IN.xml: BREX data module unavailable"
+  ],
+  "notes": []
+ },
+ "findings": {
+  "counts": {
+   "error": 10,
+   "warn": 242,
+   "info": 69
+  },
+  "byRule": {
+   "error:XSD": 9,
+   "warn:APPLIC:APPLIC-NO-TABLES": 16,
+   "error:APPLIC:APPLIC-ACT-MISSING": 1,
+   "info:IDS": 68,
+   "info:PM": 1,
+   "warn:XREF_DM": 220,
+   "warn:DMC_FILE_NAME": 1,
+   "warn:ICN_DUPLICATE_CONTENT": 5
+  }
+ },
+ "graphics": {
+  "assets": 491,
+  "findings": {
+   "warn:DUPLICATE_CONTENT": 5
+  },
+  "referencedIcns": 40,
+  "imagesInOurPdf": {
+   "placed": 78,
+   "distinct": 40
+  },
+  "imagesInReferencePdf": {
+   "placed": 3870,
+   "distinct": 492
+  },
+  "figureCaptions": {
+   "ours": 99,
+   "reference": 4518
+  }
+ },
+ "refusedByGate": [
+  {
+   "file": "DMC-RDR-A-A00-00-00-32A-001A-D_001-00_EN-IN.xml",
+   "round": 1,
+   "removed": 200,
+   "why": [
+    "brex: Breaks business rule BREX-S1-00035 - Company or organization must be indicated by at least one of either the name of the company and/or the companys CAGE code, .... However, if a responsible partner company has an enterprise code, then t",
+    "brex: Breaks business rule BREX-S1-00113 - A front matter title page must always specify the name of the publisher (Chap 3.9.5.2.16, Para 2.3.1.12) (at dmodule/content/frontMatter; rule from S1000D default BREX (issue 4.2))"
+   ]
+  },
+  {
+   "file": "DMC-RDR-A-A05-50-00-00A-400A-D_001-00_EN-IN.xml",
+   "round": 1,
+   "removed": 200,
+   "why": [
+    "brex: Breaks business rule BREX-S1-00208 - Attribute listItemPrefix - Prefix for list items of random/unordered lists (Chap 3.9.6.1, Table 37) - \"pf08\" is not one of the permitted values: pf01 (Simple (No prefix, only indent)), pf02 (Unorder ("
+   ]
+  }
+ ],
+ "validationAfterStandIn": {
+  "summary": {
+   "error": 35,
+   "warn": 16,
+   "info": 65
+  },
+  "bySourceSeverity": {
+   "xsd/error": 9,
+   "applic/warn": 16,
+   "applic/error": 1,
+   "ids/info": 64,
+   "pm/error": 2,
+   "pm/info": 1,
+   "brex/error": 23
+  },
+  "errorKinds": {
+   "xsd: Does not match the S1000D schema": 9,
+   "applic: Applicability APPLIC-ACT-MISSING": 1,
+   "pm: Publication entry has no data module": 2,
+   "brex: BREX BREX-S1-00035": 9,
+   "brex: BREX BREX-S1-00113": 9,
+   "brex: BREX BREX-S1-00038": 2,
+   "brex: BREX BREX-S1-00264": 3
+  },
+  "unchecked": 0
+ },
+ "pdfBuild": {
+  "status": 200,
+  "ms": 30637,
+  "refused": []
+ },
+ "htmlBuild": {
+  "status": 201,
+  "ms": 9479,
+  "pages": 30,
+  "assets": 40,
+  "missing": [],
+  "zipBytes": 86829551,
+  "htmlFiles": 31,
+  "wordsMissing": 0,
+  "firstMissing": [],
+  "titlesMissing": []
+ },
+ "pmCoverage": {
+  "dataModulesInPackage": 216,
+  "referencedBySuppliedPm": 30,
+  "notReferencedBySuppliedPm": 186,
+  "pmRefEntries": 9,
+  "referencedPublicationModules": [
+   "RDR-1671Y-00039-00",
+   "RDR-1671Y-00010-00",
+   "RDR-1671Y-00041-00",
+   "RDR-1671Y-00043-00",
+   "RDR-1671Y-00028-00",
+   "RDR-1671Y-00018-00",
+   "RDR-1671Y-00025-00",
+   "RDR-1671Y-00023-00",
+   "RDR-1671Y-00014-00",
+   "RDR-1671Y-00009-00"
+  ]
+ },
+ "content": {
+  "dataModules": 30,
+  "words": 2621,
+  "wordsMissingInOurs": 0,
+  "firstMissing": [],
+  "wordsMissingInReference": 19
+ },
+ "toc": {
+  "tocPagesReference": 155,
+  "tocPagesOurs": 7,
+  "codesInReferenceToc": 30,
+  "codesInOurToc": 30,
+  "inReferenceNotOurs": [],
+  "inOursNotReference": []
+ },
+ "order": {
+  "publicationModules": 30,
+  "locatedInOurs": 30,
+  "locatedInReference": 30,
+  "inversionsVsPublicationOrderOurs": 15,
+  "inversionsVsPublicationOrderReference": 47,
+  "note": "Title text may repeat (running headers), so a located page is the first body page carrying the title; inversions count pairs found in a different order than the publication module lists them.",
+  "commonModules": 30,
+  "pairsOrderedDifferentlyBetweenOursAndReference": 33
+ },
+ "pagination": {
+  "pages": {
+   "reference": 1502,
+   "ours": 128,
+   "ratio": 0.09
+  },
+  "blank": {
+   "reference": {
+    "intentionallyBlankNotice": 221,
+    "emptyPages": 0,
+    "nearEmptyPages": 0
+   },
+   "ours": {
+    "intentionallyBlankNotice": 24,
+    "emptyPages": 0,
+    "nearEmptyPages": 0
+   }
+  }
+ },
+ "layout": {
+  "reference": {
+   "surveyedPagesForFontsAndSizes": 120,
+   "sampledPages": 11,
+   "pageSizesPts": [
+    "595.275 x 841.889 pts (A4)",
+    "1190.55 x 841.889 pts (A3)"
+   ],
+   "landscapePages": 2,
+   "fonts": [
+    "Arial-ItalicMT",
+    "ArialMT",
+    "Arial-BoldItalicMT",
+    "Arial-BoldMT",
+    "DocuneeringISO8879-Regular"
+   ],
+   "medianMarginPts": {
+    "left": 24.1,
+    "right": 42.5,
+    "top": 29,
+    "bottom": 33.7
+   },
+   "headerFooterPatterns": [
+    "H:RDR-#Y-#-# | F:Page # #-#-#",
+    "H:RDR-#Y-#-# RESTRICTED | F:Page # #-#-# RESTRICTED",
+    "H:RDR-#Y-#-# | F:#-#-# Page #",
+    "H:RESTRICTED RDR-#Y-#-# | F:RESTRICTED #-#-# Page #"
+   ]
+  },
+  "ours": {
+   "surveyedPagesForFontsAndSizes": 120,
+   "sampledPages": 12,
+   "pageSizesPts": [
+    "595.275 x 841.889 pts (A4)",
+    "841.889 x 595.275 pts (A4)"
+   ],
+   "landscapePages": 2,
+   "fonts": [
+    "Courier",
+    "Courier-Bold",
+    "DejaVuSans-Bold",
+    "Helvetica",
+    "DejaVuSans",
+    "Helvetica-Oblique",
+    "Helvetica-Bold"
+   ],
+   "medianMarginPts": {
+    "left": 44.3,
+    "right": 70.9,
+    "top": 35.3,
+    "bottom": 35.3
+   },
+   "headerFooterPatterns": [
+    "H:RESTRICTED #KVA | F:Applicable to: APPLIC Page # #-#-# RESTRICTED",
+    "H:#KVA RESTRICTED | F:RDR-A-A#-#-#-#A-#A-D Page # #-#-# Applicable to: APPLIC RESTRICTED",
+    "H:RESTRICTED #KVA | F:Page # #-#-# RESTRICTED End of data module",
+    "H:#KVA RESTRICTED | F:Page # #-#-# RESTRICTED End of data module",
+    "H:RESTRICTED #KVA | F:RDR-A-A#-#-#-#A-#A-D Page # #-#-# Applicable to: APPLIC RESTRICTED"
+   ]
+  }
+ },
+ "scaleBuild": {
+  "note": "SYNTHETIC publication module: every data module the gate accepts, alphabetical by code. Not the original structure.",
+  "modulesInPackage": 216,
+  "refusedByGate": [
+   {
+    "file": "DMC-RDR-A-GP1-40-10-120-034A-D_001-00_EN-IN.xml",
+    "round": 1,
+    "why": [
+     "applic: Applicability APPLIC-ACT-MISSING"
+    ]
+   },
+   {
+    "file": "DMC-RDR-A-A00-00-00-02A-001A-D_001-00_EN-IN.xml",
+    "round": 1,
+    "why": [
+     "brex: Breaks business rule BREX-S1-00035",
+     "brex: Breaks business rule BREX-S1-00113"
+    ]
+   },
+   {
+    "file": "DMC-RDR-A-A00-00-00-05A-001A-D_000-01_EN-IN.xml",
+    "round": 1,
+    "why": [
+     "brex: Breaks business rule BREX-S1-00035",
+     "brex: Breaks business rule BREX-S1-00113"
+    ]
+   },
+   {
+    "file": "DMC-RDR-A-A00-00-00-06A-001A-D_001-00_EN-IN.xml",
+    "round": 1,
+    "why": [
+     "brex: Breaks business rule BREX-S1-00035",
+     "brex: Breaks business rule BREX-S1-00113"
+    ]
+   },
+   {
+    "file": "DMC-RDR-A-A00-00-00-10A-001A-D_001-00_EN-IN.xml",
+    "round": 1,
+    "why": [
+     "brex: Breaks business rule BREX-S1-00035",
+     "brex: Breaks business rule BREX-S1-00113"
+    ]
+   },
+   {
+    "file": "DMC-RDR-A-A00-00-00-15A-001A-D_001-00_EN-IN.xml",
+    "round": 1,
+    "why": [
+     "brex: Breaks business rule BREX-S1-00035",
+     "brex: Breaks business rule BREX-S1-00113"
+    ]
+   },
+   {
+    "file": "DMC-RDR-A-A00-00-00-34A-001A-D_001-00_EN-IN.xml",
+    "round": 1,
+    "why": [
+     "brex: Breaks business rule BREX-S1-00035",
+     "brex: Breaks business rule BREX-S1-00113"
+    ]
+   },
+   {
+    "file": "DMC-RDR-A-A00-00-00-56A-001A-D_001-00_EN-IN.xml",
+    "round": 1,
+    "why": [
+     "brex: Breaks business rule BREX-S1-00035",
+     "brex: Breaks business rule BREX-S1-00113"
+    ]
+   },
+   {
+    "file": "DMC-RDR-A-A00-00-00-68A-001A-D_001-00_EN-IN.xml",
+    "round": 1,
+    "why": [
+     "brex: Breaks business rule BREX-S1-00035",
+     "brex: Breaks business rule BREX-S1-00113"
+    ]
+   },
+   {
+    "file": "DMC-RDR-A-DB5-20-10-03A-920A-D_002-00_EN-IN.xml",
+    "round": 1,
+    "why": [
+     "brex: Breaks business rule BREX-S1-00038"
+    ]
+   },
+   {
+    "file": "DMC-RDR-A-DE3-00-00-00A-273A-D_001-00_EN-IN.xml",
+    "round": 1,
+    "why": [
+     "brex: Breaks business rule BREX-S1-00264"
+    ]
+   },
+   {
+    "file": "DMC-RDR-A-DE3-00-00-00B-273A-D_001-00_EN-IN.xml",
+    "round": 1,
+    "why": [
+     "brex: Breaks business rule BREX-S1-00264"
+    ]
+   },
+   {
+    "file": "DMC-RDR-A-GD1-10-11-35A-605A-D_002-00_EN-IN.xml",
+    "round": 1,
+    "why": [
+     "brex: Breaks business rule BREX-S1-00038"
+    ]
+   },
+   {
+    "file": "DMC-RDR-A-GG1-00-50-35A-001A-D_001-00_EN-IN.xml",
+    "round": 1,
+    "why": [
+     "brex: Breaks business rule BREX-S1-00035",
+     "brex: Breaks business rule BREX-S1-00113"
+    ]
+   }
+  ],
+  "modulesPublished": 202,
+  "pdf": {
+   "status": 200,
+   "ms": 90607,
+   "pages": 848,
+   "bytes": 140615822,
+   "referencePages": 1502,
+   "ratioToReference": 0.56,
+   "contentWords": 13360,
+   "wordsMissing": 0,
+   "firstMissing": [],
+   "titlesMissing": [],
+   "blank": {
+    "intentionallyBlankNotice": 131,
+    "emptyPages": 0,
+    "nearEmptyPages": 0
+   },
+   "imagesPlaced": {
+    "placed": 932,
+    "distinct": 455
+   },
+   "referencedIcns": 455
+  },
+  "html": {
+   "status": 201,
+   "pages": 202,
+   "assets": 455,
+   "missing": [],
+   "htmlFiles": 203,
+   "wordsMissing": 0,
+   "firstMissing": [],
+   "titlesMissing": []
+  }
+ },
+ "pictures": [
+  "ours-p1-001.png",
+  "ours-p128-128.png",
+  "ours-p3-003.png",
+  "ours-p64-064.png",
+  "reference-p1-0001.png",
+  "reference-p1502-1502.png",
+  "reference-p3-0003.png",
+  "reference-p751-0751.png"
+ ],
+ "finishedAt": "2026-11-22T03:24:05.951Z"
+}
