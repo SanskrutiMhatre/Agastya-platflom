@@ -115,7 +115,7 @@
           </xsl:when>
           <xsl:otherwise>
             <xsl:text>table-auto-</xsl:text>
-            <xsl:value-of select="generate-id()"/>
+            <xsl:call-template name="node-gid"/>
           </xsl:otherwise>
         </xsl:choose>
       </xsl:attribute>

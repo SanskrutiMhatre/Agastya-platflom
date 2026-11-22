@@ -242,6 +242,16 @@
          Docuneering S1000D reference. Empty keeps the engine's own. -->
     <xsl:param name="layout.profile"/>
     <!--
+      Does the PUBLICATION's classification print in the running head and foot of the prelim pages (title continuation, contents, lists)?
+      The engine's own layout says yes: front matter belongs to no data module, and an unmarked page in a classified book is the page a reader
+      checks first. The Xignal reference says no: on its 569 front-matter pages not one carries a marking, while every data module page carries its
+      module's own class. The Xignal profile therefore follows the reference; 'yes' / 'no' (the stylesheet parameter prelim.classification) override either default. Body pages
+      are not affected: they always print the class of their own module.
+    -->
+    <xsl:param name="prelim.classification"/>
+    <xsl:variable name="prelim.classification.on"
+      select="$prelim.classification = 'yes' or ($prelim.classification != 'no' and $layout.profile != 'xignal')"/>
+    <!--
       The room reserved under the last line of every data module. The engine's own profiles keep 20mm, a margin that was put there so the end
       of a module never touches the footer. It has a cost under FOP: the padding belongs to the block that wraps the whole module, so the
       module's LAST paragraph has to fit with all 20mm below it, or the whole paragraph moves to a new page - even with plenty of room,

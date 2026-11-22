@@ -161,7 +161,9 @@ function resolveMarkings(o) {
     const ds = marks.draft || {};
     if (ds.enabled !== false) {
         const when = String(ds.showWhen || 'inWork');
-        const show = when === 'always' || (when === 'inWork' && issue.draft);
+        // "inWork": while the issue is in work (in-work number not 00) - or the build is not a released one, which is a draft copy whatever the
+        // issue number says (the NOT RELEASED watermark is on the same pages). A caller that does not state the release state keeps the old rule.
+        const show = when === 'always' || (when === 'inWork' && (issue.draft || o.released === false));
         if (isSet(ds.text)) {                       // Settings own the wording; showWhen still decides when it appears
             if (show) draft = fill(ds.text, tokens).trim();
             overridden('draft line', dir.draft, fill(ds.text, tokens).trim());

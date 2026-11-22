@@ -50,11 +50,12 @@ const PM = (entries) => `<?xml version="1.0" encoding="UTF-8"?>
  <pmStatus><security securityClassification="01"/><responsiblePartnerCompany enterpriseCode="1234Y"><enterpriseName>Acme</enterpriseName></responsiblePartnerCompany></pmStatus></identAndStatusSection>
  <content>${entries.map((e, i) => `<pmEntry><pmEntryTitle>Chapter ${i + 1}</pmEntryTitle>${e}</pmEntry>`).join('')}</content></pm>`;
 
-function render(pmXml) {
+function render(pmXml, params = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agastya-dupid-'));
   fs.writeFileSync(path.join(dir, 'pm.xml'), pmXml);
   fs.writeFileSync(path.join(dir, '_image-dims.xml'), '<imageDims><img name="pic.png" stem="icn-tst-pic" src="pic.png" w="600" h="400"/></imageDims>');
-  const r = spawnSync(paths.XSLTPROC, [pathToFileURL(XSL).href, path.join(dir, 'pm.xml')], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, cwd: dir });
+  const sp = Object.entries(params).flatMap(([k, v]) => ['--stringparam', k, String(v)]);
+  const r = spawnSync(paths.XSLTPROC, [...sp, pathToFileURL(XSL).href, path.join(dir, 'pm.xml')], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, cwd: dir });
   assert.equal(r.status, 0, `xsltproc failed: ${(r.stderr || '').slice(0, 600)}`);
   fs.rmSync(dir, { recursive: true, force: true });
   return r.stdout;
@@ -112,4 +113,19 @@ test('levelled-paragraph targets in a module printed twice: unique ids, each ref
   const fo = render(PM([dm('30', 'Paragraph targets', LP('A')) + dm('31', 'Other', LP('B')), dm('30', 'Paragraph targets', LP('A'))]));
   assert.deepEqual(dups(fo), [], 'no id repeats');
   assert.deepEqual(dangling(fo), [], 'every link has a destination');
+});
+
+// The publication-level List of illustrations links every titled figure by the id the standard figure template gives it. A parts-catalogue
+// figure is drawn by its own template, which only carried an ipd-fig- id - so its row linked to nothing and a click fell back to page 1.
+test('a parts-catalogue figure has the id the List of illustrations links to', { skip: SKIP }, () => {
+  const ipd = dm('30', 'Parts', `<illustratedPartsCatalog><figure id="fig-9"><title>Unit assembly</title><graphic infoEntityIdent="ICN-TST-PIC"/></figure>
+    <catalogSeqNumber figureNumber="01" item="001" indenture="1"><itemSeqNumber itemSeqNumberValue="00A"><quantityPerNextHigherAssy>1</quantityPerNextHigherAssy><partRef manufacturerCodeValue="00000" partNumberValue="PN-1"/></itemSeqNumber></catalogSeqNumber>
+  </illustratedPartsCatalog>`).replace('infoCode="040"', 'infoCode="941"');
+  for (const profile of ['xignal', '']) {
+    const fo = render(PM([A + ipd]), { 'frontmatter.style': 's1000d', 'layout.profile': profile });
+    assert.deepEqual(dangling(fo), [], `every link has a destination (profile "${profile}")`);
+    assert.deepEqual(dups(fo), [], 'and no id repeats');
+    assert.ok(ids(fo).includes('fig-9'), 'the parts-catalogue figure carries the figure id');
+    assert.ok(ids(fo).some((i) => /^ipd-fig-/.test(i)), 'and still its own ipd-fig- id, which the module list of figures uses');
+  }
 });

@@ -8,7 +8,9 @@
      time in the body.
 
      Active only when $layout.profile = 'xignal' AND the S1000D front-matter style is in use AND the publication's first data
-     module is such a title page. Otherwise nothing here applies and the engine prints the page it always did.
+     module is such a title page. When it is not (a publication whose first module is something else), the page the engine
+     generates from the publication module (frontmatter-s1000d.xsl, s1000d-title-page-generated) is set with these same
+     parameters, so the two covers have one size and one spacing; any other layout profile prints the page it always did.
 
      Geometry, measured on the reference (A4 portrait, points; the head/foot are the profile's own):
        publication title   24 pt bold, line 1.2, left
@@ -17,7 +19,13 @@
                            older and is not what the reference prints)
        product picture     174.2 mm wide, centred on the text block (4.2 mm wider than it), 14.6 pt under the issue line's baseline
        "Publisher:"        8 pt, then the publisher's logo 30 mm wide
-     The company name is printed only when the title page itself carries one (the reference's is empty).
+     The company name is printed only when there is no logo to carry it (the reference prints the logo alone, although S1000D requires the
+     title page to name its publisher - BREX-S1-00113 - so a valid title page always has a name in its data).
+
+     The product picture is an anchor (cover-picture-<module>): the List of illustrations has a row for it that jumps here.
+     The publisher's logo is the title page's own (<publisherLogo>), else the platform's default publisher logo ($publisher.logo.uri,
+     supplied by the build like the default header logo; a project can switch it off). Both covers print it through
+     xs-cover-publisher below.
      ******************************************************************** -->
 <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0"
   xmlns:fo="http://www.w3.org/1999/XSL/Format">
@@ -33,6 +41,9 @@
   <xsl:param name="xs.cover.publisher.gap">11.3pt</xsl:param>
   <xsl:param name="xs.cover.logo.gap">0.9pt</xsl:param>
   <xsl:param name="xs.cover.logo.width">30mm</xsl:param>
+  <!-- The platform's default publisher logo: a path relative to the project folder, empty = none. Used only where no logo of the
+       publication's own is given. -->
+  <xsl:param name="publisher.logo.uri" select="''"/>
 
   <!-- The cover is wanted at all: the profile, the S1000D prelims. -->
   <xsl:variable name="xs.cover.on" select="$layout.profile = 'xignal' and $frontmatter.style = 's1000d'"/>
@@ -137,28 +148,64 @@
     <xsl:if test="$pic != ''">
       <xsl:variable name="src"><xsl:call-template name="xs-icn-src"><xsl:with-param name="icn" select="$pic"/></xsl:call-template></xsl:variable>
       <xsl:if test="$src != ''">
-        <fo:block space-before="{$xs.cover.image.gap}" space-before.conditionality="retain"
+        <fo:block id="cover-picture-{generate-id(ancestor::dmodule[1])}" space-before="{$xs.cover.image.gap}" space-before.conditionality="retain"
                   start-indent="-{$xs.cover.image.overhang}" end-indent="-{$xs.cover.image.overhang}" text-align="center">
           <fo:external-graphic src="url('{$src}')" content-width="{$xs.cover.image.width}" content-height="auto" scaling="uniform"/>
         </fo:block>
       </xsl:if>
     </xsl:if>
 
+    <xsl:call-template name="xs-cover-publisher">
+      <xsl:with-param name="logo" select="normalize-space(publisherLogo/symbol/@infoEntityIdent)"/>
+      <xsl:with-param name="enterprise" select="normalize-space(responsiblePartnerCompany/enterpriseName)"/>
+    </xsl:call-template>
+  </xsl:template>
+
+  <!--
+    The "Publisher:" block, one template for both covers (this one and the page the engine generates when there is no title-page module).
+      logo        the publisher's logo as the title page names it (an ICN), or empty
+      logo.src    a logo file the caller already has the path of, or empty
+      enterprise  the enterprise name to fall back on when the build has no company line
+    The logo, in this order: the title page's own, the file the caller was handed, the platform's default publisher logo. A logo is the
+    publisher's name in the reference and nothing is printed under it, so the name is printed only when there is no logo to carry it
+    (S1000D requires the title page to NAME its publisher in the data, BREX-S1-00113, so "the page names one" cannot decide this). What is printed is the company line the publication is set up with (settings,
+    publication comment or brand pack: the same line the second margin mark carries); the enterprise name held in the data is only the
+    fallback, because a code name such as the one an S1000D registry holds for the enterprise is not how the organisation signs its
+    publications.
+  -->
+  <xsl:template name="xs-cover-publisher">
+    <xsl:param name="logo"/>
+    <xsl:param name="logo.src"/>
+    <xsl:param name="enterprise"/>
+    <xsl:variable name="own">
+      <xsl:if test="$logo != ''"><xsl:call-template name="xs-icn-src"><xsl:with-param name="icn" select="$logo"/></xsl:call-template></xsl:if>
+    </xsl:variable>
+    <xsl:variable name="src">
+      <xsl:choose>
+        <xsl:when test="$own != ''"><xsl:value-of select="$own"/></xsl:when>
+        <xsl:when test="normalize-space($logo.src) != ''"><xsl:value-of select="normalize-space($logo.src)"/></xsl:when>
+        <xsl:otherwise><xsl:value-of select="normalize-space($publisher.logo.uri)"/></xsl:otherwise>
+      </xsl:choose>
+    </xsl:variable>
     <fo:block font-size="8pt" space-before="{$xs.cover.publisher.gap}" space-before.conditionality="retain">
       <xsl:value-of select="$fm.label.s1000d.publisher"/>
     </fo:block>
-    <xsl:variable name="logo" select="normalize-space(publisherLogo/symbol/@infoEntityIdent)"/>
-    <xsl:if test="$logo != ''">
-      <xsl:variable name="lsrc"><xsl:call-template name="xs-icn-src"><xsl:with-param name="icn" select="$logo"/></xsl:call-template></xsl:variable>
-      <xsl:if test="$lsrc != ''">
-        <fo:block space-before="{$xs.cover.logo.gap}" space-before.conditionality="retain">
-          <fo:external-graphic src="url('{$lsrc}')" content-width="{$xs.cover.logo.width}" content-height="auto" scaling="uniform"/>
-        </fo:block>
-      </xsl:if>
+    <xsl:if test="$src != ''">
+      <fo:block space-before="{$xs.cover.logo.gap}" space-before.conditionality="retain">
+        <fo:external-graphic src="url('{$src}')" content-width="{$xs.cover.logo.width}" content-height="auto" scaling="uniform"/>
+      </fo:block>
     </xsl:if>
-    <xsl:if test="normalize-space(responsiblePartnerCompany/enterpriseName) != ''">
+    <xsl:variable name="publisher.name">
+      <xsl:if test="$src = ''">
+        <xsl:choose>
+          <xsl:when test="normalize-space($xs.mark.company) != ''"><xsl:value-of select="normalize-space($xs.mark.company)"/></xsl:when>
+          <xsl:otherwise><xsl:value-of select="$enterprise"/></xsl:otherwise>
+        </xsl:choose>
+      </xsl:if>
+    </xsl:variable>
+    <xsl:if test="$publisher.name != ''">
       <fo:block font-size="{$table-font-size}">
-        <xsl:value-of select="normalize-space(responsiblePartnerCompany/enterpriseName)"/>
+        <xsl:value-of select="$publisher.name"/>
       </fo:block>
     </xsl:if>
   </xsl:template>

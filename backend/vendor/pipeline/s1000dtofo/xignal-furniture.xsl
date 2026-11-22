@@ -199,9 +199,19 @@
       <!-- Row A: applicability and the data module code, under the rule -->
       <fo:block-container height="{$xs.foot.row.a}" overflow="visible" border-top="{$xs.rule.width} solid black"
           font-family="{$font-stack}" font-size="{$header-footer-size}" font-weight="bold" line-height="1.12">
+        <!-- The code gets the larger share (3 of 5): it is one unbreakable-looking string, and a long model identification code
+             (EXAMPLE-A-00-00-00-00A-009A-D) must stay on one line as the reference's does; the applicability wraps happily. -->
         <fo:table table-layout="fixed" width="100%">
-          <fo:table-column column-width="proportional-column-width(2)"/>
-          <fo:table-column column-width="proportional-column-width(1)"/>
+          <xsl:choose>
+            <xsl:when test="$verso = '1'">
+              <fo:table-column column-width="proportional-column-width(3)"/>
+              <fo:table-column column-width="proportional-column-width(2)"/>
+            </xsl:when>
+            <xsl:otherwise>
+              <fo:table-column column-width="proportional-column-width(2)"/>
+              <fo:table-column column-width="proportional-column-width(3)"/>
+            </xsl:otherwise>
+          </xsl:choose>
           <fo:table-body>
             <fo:table-row>
               <xsl:choose>

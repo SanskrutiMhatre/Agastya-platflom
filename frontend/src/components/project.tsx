@@ -6,6 +6,7 @@ import { ISSUE_OPTIONS, issueLabel, referenceApi, s1000dApi, workspaceApi, type 
 import { useUi } from '../store/ui';
 import { Icon } from './Icon';
 import { Badge, Field, Modal, ago, errText, Alert, useAsync } from './ui';
+import { refusalHint, refusalReasons, type RefusalReason } from './importRefusal';
 
 const ROLE_TONE: Record<ProjectRole, 'accent' | 'ok' | 'warn' | undefined> = { owner: 'accent', manager: 'accent', editor: 'ok', reviewer: 'warn', viewer: undefined };
 export const RoleBadge = ({ role }: { role: ProjectRole }) => <Badge tone={ROLE_TONE[role]}>{role === 'manager' ? 'project manager' : role}</Badge>;
@@ -68,6 +69,7 @@ export function CreateProjectModal({ folders, defaultFolder = '', onClose, onCre
   const catalogue = useAsync(() => s1000dApi.catalogue(issue, 'infoCode'), [issue]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [refusal, setRefusal] = useState<RefusalReason[]>([]);   // why the server refused the package (grouped), shown under the error
 
   // the SNS an Administrator built for this model code is offered as soon as the code is known (the author can still choose another or none)
   const [presetTouched, setPresetTouched] = useState(false);
@@ -125,17 +127,21 @@ export function CreateProjectModal({ folders, defaultFolder = '', onClose, onCre
 
   const submit = async () => {
     const p = problem(stepId === 'import' ? 'import' : 'project'); if (p) { setErr(p); return; }
-    setBusy(true); setErr('');
+    setBusy(true); setErr(''); setRefusal([]);
     try {
       let card: ProjectCard;
       if (way === 'import') card = (await workspaceApi.importProject({ token: found!.token, name: name.trim(), folder: folder.trim(), format: fmt, ...(fmt !== 's1000d' ? { domain, manualType } : {}) })).project;
       else card = await workspaceApi.createProject({ name: name.trim(), folder: folder.trim(), format: fmt, ...(fmt === 's1000d' ? { s1000d: config() } : { domain, manualType }) });
       toast(`${way === 'import' ? 'Imported' : 'Created'} "${card.name}"`, 'success');
       onCreated(card); onClose();
-    } catch (e) { setErr(errText(e)); setBusy(false); }
+    } catch (e) {
+      // a refused package: the reasons are in the response, and the author needs to read them (this used to say "the report says why" with no report to read)
+      const why = refusalReasons(e);
+      setRefusal(why); setErr(why.length ? 'The package was not imported, so no project was created.' : errText(e)); setBusy(false);
+    }
   };
   const chosenFile = async (f: File | undefined) => {
-    if (!f) return; setErr(''); setFound(null); setDetecting(true);
+    if (!f) return; setErr(''); setRefusal([]); setFound(null); setDetecting(true);
     try { const d = await workspaceApi.detectPackage(f); setFound(d); if (!name.trim()) setName(f.name.replace(/\.zip$/i, '')); if (d.format === 's1000d') pickFormat('s1000d'); }
     catch (e) { setErr(errText(e)); } finally { setDetecting(false); }
   };
@@ -257,6 +263,18 @@ export function CreateProjectModal({ folders, defaultFolder = '', onClose, onCre
           {notes.length && fmt === 's1000d' ? <Alert tone="ok"><ul style={{ margin: 0, paddingLeft: 18 }}>{notes.map((n) => <li key={n}>{n}</li>)}</ul></Alert> : null}
         </div>) : null}
         {err ? <Alert tone="bad">{err}</Alert> : null}
+        {refusal.length ? (
+          <div className="v2-card" data-testid="wiz-import-reasons" style={{ marginTop: 8, padding: '10px 14px' }}>
+            <b>Why it was not imported</b>
+            <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+              {refusal.slice(0, 6).map((r) => (
+                <li key={r.message}>{r.message}{r.count > 1 ? ` (${r.count} files, for example ${r.files.join(', ')})` : r.files.length ? ` (${r.files[0]})` : ''}</li>
+              ))}
+            </ul>
+            {refusal.length > 6 ? <div className="v2-muted">…and {refusal.length - 6} other reason{refusal.length - 6 === 1 ? '' : 's'}.</div> : null}
+            {refusalHint(refusal) ? <p className="v2-muted" style={{ margin: '8px 0 0' }}>{refusalHint(refusal)}</p> : null}
+          </div>
+        ) : null}
       </div>
     </Modal>
   );

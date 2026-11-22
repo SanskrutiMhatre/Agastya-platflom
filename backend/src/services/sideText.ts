@@ -13,6 +13,9 @@ import { getConfig } from './projectConfig';
 export interface SideTextSettings { enabled?: boolean; publisher?: string; draftNote?: boolean }
 export const DEFAULT_LOGO_FILE = '_header-logo.png';
 const LOGO_SOURCE = path.resolve(__dirname, '..', '..', 'assets', 'default-header-logo.png');
+/** The publisher's logo (the mark with the company name under it) that the Xignal cover prints under "Publisher:" when the title page names none of its own. */
+export const DEFAULT_PUBLISHER_LOGO_FILE = '_publisher-logo.png';
+const PUBLISHER_LOGO_SOURCE = path.resolve(__dirname, '..', '..', 'assets', 'default-publisher-logo.png');
 
 /** MODEL-ISSUER-NUMBER-VOLUME, the publication module's own code as the reference publications print it in the header. */
 export function publicationCode(projectId: string, root: string): string {
@@ -73,4 +76,17 @@ export function furnitureParams(projectId: string, opts: { released: boolean; di
     try { fs.copyFileSync(LOGO_SOURCE, path.join(opts.dir, DEFAULT_LOGO_FILE)); out.push(['header.logo.uri', DEFAULT_LOGO_FILE]); } catch { /* no logo this time */ }
   }
   return out;
+}
+
+/**
+ * The default publisher logo for one build: copied into the build directory (a build artefact, like the default header logo) and handed to the
+ * stylesheets as `publisher.logo.uri`. Only the Xignal cover prints it, and only where the title page names no logo of its own. Nothing when the project
+ * switched it off (project.json `publisherLogo: false`) or the file is missing.
+ */
+export function publisherLogoParams(projectId: string, dir: string): Array<[string, string]> {
+  try {
+    if (readProjectJson(projectId).publisherLogo === false || !fs.existsSync(PUBLISHER_LOGO_SOURCE)) return [];
+    fs.copyFileSync(PUBLISHER_LOGO_SOURCE, path.join(dir, DEFAULT_PUBLISHER_LOGO_FILE));
+    return [['publisher.logo.uri', DEFAULT_PUBLISHER_LOGO_FILE]];
+  } catch { return []; }
 }

@@ -14,7 +14,7 @@ import path from 'path';
 import { nowIso } from '../../config';
 import { projectDirFor, store } from '../../context';
 import { bad, conflict, notFound, HttpError } from '../http';
-import type { OrderConfig } from './codes';
+import { DEFAULT_ORDER_KEYS, type OrderConfig } from './codes';
 import { displayCode, levelOf, normalizeRow, rowKey, sortRows, validateRowSet, type SnsProblem, type SnsRow, type SnsRowData } from './model';
 
 const { newId } = require('../../core/auth/crypto');
@@ -249,3 +249,34 @@ export function memoryRepo(initial: readonly SnsRow[]): Repo {
     remove(id) { rows = rows.filter((r) => r.id !== id); },
   };
 }
+
+// ── the ordering a caller sends ─────────────────────────────────────────────
+
+const isStrings = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === 'string');
+
+/**
+ * The ordering a caller sends, checked before it is stored or used: an unknown sort key would make every later derive fail, and a malformed
+ * table would be saved for good. Refused with BAD_ORDER and a sentence that says which part is wrong.
+ */
+export const checkedOrder = (v: unknown): OrderConfig | undefined => {
+  if (v === undefined || v === null) return undefined;
+  if (typeof v !== 'object' || Array.isArray(v)) throw bad('order must be an object.', 'BAD_ORDER');
+  const o = v as Record<string, unknown>;
+  const known = new Set<string>(DEFAULT_ORDER_KEYS);
+  if (o.keys !== undefined) {
+    if (!isStrings(o.keys)) throw bad('order.keys must be a list of sort keys.', 'BAD_ORDER');
+    const unknown = o.keys.filter((k) => !known.has(k));
+    if (unknown.length) throw bad(`order.keys has unknown sort key(s): ${unknown.join(', ')}. Known: ${DEFAULT_ORDER_KEYS.join(', ')}.`, 'BAD_ORDER');
+    if (new Set(o.keys).size !== o.keys.length) throw bad('order.keys names a sort key twice.', 'BAD_ORDER');
+  }
+  for (const f of ['pinFirst', 'pinLast'] as const) if (o[f] !== undefined && !isStrings(o[f])) throw bad(`order.${f} must be a list of information codes.`, 'BAD_ORDER');
+  if (o.rank !== undefined) {
+    const r = o.rank;
+    if (typeof r !== 'object' || r === null || Array.isArray(r) || !Object.values(r).every((n) => typeof n === 'number' && Number.isFinite(n))) throw bad('order.rank must map information codes to numbers.', 'BAD_ORDER');
+  }
+  if (o.groups !== undefined) {
+    const g = o.groups;
+    if (!Array.isArray(g) || !g.every((x) => x && typeof x === 'object' && typeof x.id === 'string' && typeof x.label === 'string' && typeof x.from === 'string' && typeof x.to === 'string')) throw bad('order.groups must be a list of { id, label, from, to }.', 'BAD_ORDER');
+  }
+  return v as OrderConfig;
+};

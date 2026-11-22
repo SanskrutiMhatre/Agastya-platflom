@@ -28,7 +28,8 @@ const PUBS = [
 const have = fs.existsSync(SAMPLES);
 const flat = (s) => s.toLowerCase().replace(/[\s­-]+/g, '');
 const pages = (pdf) => spawnSync('pdftotext', ['-raw', pdf, '-'], { encoding: 'utf8', maxBuffer: 1 << 28 }).stdout.split('\f').slice(0, -1);
-const unzip = (zip, to) => { const r = spawnSync('unzip', ['-q', '-o', zip, '-d', to]); assert.equal(r.status, 0, 'unzip'); };
+// Setup, not verification: the sample ZIPs are unpacked with the platform's own reader, so the test needs no Info-ZIP `unzip` (absent on Windows).
+const unzip = async (zip, to) => { const r = require('../dist/services/zipio').ZipFileReader.open(zip); try { await r.extractTo(to); } finally { r.close(); } };
 const RESULTS = {};
 
 let h; let w;
@@ -52,7 +53,7 @@ test.after(async () => {
 for (const pub of PUBS) {
   test(`${pub.name}: our PDF carries the same data modules, titles, dates and content as the reference`, { skip: !have && 'the 20 Nov samples are not in this checkout', timeout: 300000 }, async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ref-'));
-    unzip(path.join(SAMPLES, pub.zip), dir);
+    await unzip(path.join(SAMPLES, pub.zip), dir);
     const files = fs.readdirSync(dir);
     const dmFiles = files.filter((f) => /^DMC-.*\.xml$/i.test(f) && !pub.skip.some((re) => re.test(f)));
     const skipped = files.filter((f) => /^DMC-.*\.xml$/i.test(f) && pub.skip.some((re) => re.test(f)));

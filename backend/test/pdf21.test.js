@@ -26,11 +26,14 @@ const KIND = { descript: 'narrative', proced: 'narrative', fault: 'narrative', c
   appliccrossreftable: 'reference', condcrossreftable: 'reference', prdcrossreftable: 'reference' };
 
 const schemaOf = (xml) => (/xml_schema_flat\/(\w+)\.xsd/.exec(xml) || [])[1];
-const flat = (s) => s.toLowerCase().replace(/[\s­-]+/g, '');
+// A word is its letters: whitespace, hyphens, soft hyphens and zero-width spaces are not part of it (a word wrapped inside a narrow table cell is two pieces on two lines).
+const flat = (s) => s.toLowerCase().replace(/[\s­​-]+/g, '');
 function pdfText(buf) {
   const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pdf21-')), 'x.pdf');
   fs.writeFileSync(f, buf);
-  return spawnSync('pdftotext', [f, '-'], { encoding: 'utf8' }).stdout;
+  // -raw: the text in the order the PDF draws it. In page-layout order a narrow column's wrapped word is interleaved with its neighbours' text
+  // ("area occupi" ... "R Caution" ... "ed."), so a word that IS printed looks missing.
+  return spawnSync('pdftotext', ['-raw', f, '-'], { encoding: 'utf8', maxBuffer: 1 << 28 }).stdout;
 }
 function tokensOf(xml, schema) {
   const raw = xml.split('<content')[1] ?? '';

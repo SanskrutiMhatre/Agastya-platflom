@@ -57,3 +57,27 @@ async function boot() {
 }
 
 module.exports = { boot, SAMPLES };
+
+/**
+ * Check a ZIP with a tool that is NOT this project's own reader (a verifier that shares the writer's mistakes proves nothing):
+ * Python's zipfile, Info-ZIP's "unzip -t", or libarchive's bsdtar (the tar.exe in Windows 10+ System32, "bsdtar" elsewhere; it reads ZIP and ZIP64
+ * and fails on a bad CRC when an entry is read). GNU tar cannot read ZIP, so a tar that says so is not a verifier and is skipped.
+ * Returns the name of the tool used; throws when the archive is rejected, or when the machine has no independent tool.
+ */
+function verifyZip(file) {
+  const { spawnSync } = require('child_process');
+  const cwd = path.dirname(file); const name = path.basename(file);          // relative name: a drive letter (C:) is read as host:path by some tars
+  const winTar = process.platform === 'win32' ? path.join(process.env.SystemRoot || 'C:\Windows', 'System32', 'tar.exe') : 'bsdtar';
+  const attempts = [['python3', ['-m', 'zipfile', '-t', name]], ['python', ['-m', 'zipfile', '-t', name]], ['unzip', ['-tqq', name]], [winTar, ['-xOf', name]]];
+  for (const [cmd, args] of attempts) {
+    const r = spawnSync(cmd, args, { cwd, encoding: 'utf8', maxBuffer: 1024 * 1024 * 1024, stdio: ['ignore', 'ignore', 'pipe'] });
+    if (r.error) continue;                                              // not installed
+    const err = (r.stderr || '').trim();
+    if (/Python was not found/i.test(err) || /does not look like a tar archive/i.test(err) || /Cannot connect to/i.test(err)) continue;   // a Store stub, or a tar that cannot read ZIP
+    if (r.status !== 0) throw new Error(`${path.basename(cmd)} rejected ${name}: ${err.slice(0, 300)}`);
+    return path.basename(cmd);
+  }
+  throw new Error('no independent ZIP verifier on this machine (need python3, unzip or bsdtar)');
+}
+
+module.exports.verifyZip = verifyZip;

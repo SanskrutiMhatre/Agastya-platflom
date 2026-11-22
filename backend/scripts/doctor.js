@@ -19,6 +19,14 @@ row('Java runtime (FOP renders PDF)', java.status === 0, java.status === 0 ? Str
 row('xsltproc', fs.existsSync(paths.XSLTPROC), paths.XSLTPROC);
 row('Apache FOP', fs.existsSync(paths.FOP_BAT), paths.FOP_BAT);
 row('S1000D schemas', fs.existsSync(paths.SCHEMAS), paths.SCHEMAS);
+// Windows stops the bundled native tools (xsltproc, xmllint) at 259 characters of path. A file is <workspace>\projects\<project id>\csdb\<data module file>:
+// the project id is the project name (up to 80 characters), a data module file name up to ~60. Leave room for both.
+const workspace = path.resolve(process.env.AGASTYA_WORKSPACE_DIR || path.join(root, '..', 'workspace'));
+const worst = workspace.length + '\\projects\\'.length + 80 + '\\csdb\\'.length + 60;
+row('Workspace path length (Windows 259-character limit)', process.platform !== 'win32' || worst < 260,
+  `${workspace} is ${workspace.length} characters; with an 80-character project name and a long data module file name a file path reaches ${worst}` +
+  (worst < 260 || process.platform !== 'win32' ? '' : ' - move the workspace nearer the drive root (AGASTYA_WORKSPACE_DIR) or keep project names short'));
+
 row('Client build (optional)', fs.existsSync(path.resolve(root, '..', 'frontend', 'dist', 'index.html')), 'run "npm run build" in frontend/ to serve the UI from this process');
 
 let bad = 0;

@@ -29,6 +29,7 @@ test('the catalogue: three formats; JSS has Land and Naval with manual types; on
 test('creating by format: S1000D uses the direct S1000D engine; JSS Land UHB the JSS book engine; a format without an engine is refused plainly', async () => {
   const a = await w.post('/api/projects', { name: 'Fmt S1000D', format: 's1000d' });
   assert.equal(a.status, 201, JSON.stringify(a.json)); assert.equal(a.json.project.format, 's1000d'); assert.equal(a.json.project.pipeline, 's1000dtofo');
+  assert.equal(a.json.project.templateRef, 'xignal-s1000d', 'an S1000D publication is printed in the reference (Xignal) layout');
   const b = await w.post('/api/projects', { name: 'Fmt JSS Land UHB', format: 'jss', domain: 'land', manualType: 'uhb' });
   assert.equal(b.status, 201, JSON.stringify(b.json)); assert.equal(b.json.project.format, 'jss'); assert.equal(b.json.project.domain, 'land'); assert.equal(b.json.project.manualType, 'uhb'); assert.equal(b.json.project.pipeline, 's1000dtojss'); assert.equal(b.json.project.templateRef, 'uhb');
   for (const body of [{ format: 'jss', domain: 'naval', manualType: 'uhb' }, { format: 'jsg', domain: 'land', manualType: 'uhb' }, { format: 'jss', domain: 'land' }, { format: 'jss' }]) {

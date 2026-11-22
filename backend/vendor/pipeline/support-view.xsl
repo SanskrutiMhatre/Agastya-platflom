@@ -23,13 +23,34 @@
   <!-- the content roots the engines print natively: never handled here -->
   <xsl:template name="render-support-content">
     <xsl:variable name="view">
-      <description>
+      <!-- sv-owner: which data module this view belongs to (see node-gid below) -->
+      <description sv-owner="{generate-id(ancestor-or-self::dmodule[1])}">
         <xsl:apply-templates select="*[not(self::description or self::procedure or self::faultIsolation or self::faultReporting
                                            or self::illustratedPartsCatalog or self::crew or self::refs or self::warningsAndCautions
                                            or self::referencedApplicGroup or self::referencedApplicGroupRef)]" mode="sv"/>
       </description>
     </xsl:variable>
     <xsl:apply-templates select="exsl:node-set($view)/description"/>
+  </xsl:template>
+
+  <!--
+    An id for the context node that is unique across the whole publication, for the engines' templates that write one from the node itself.
+
+    generate-id() is NOT safe on the nodes of the view above. The view is a result tree fragment: libxslt frees it when the template that built it
+    returns, and the next module's view is allocated in the same memory, so generate-id() hands the SAME string to the corresponding node of two
+    different modules - and FOP stops on a repeated id ("Property ID ... previously used; ID values must be unique within a document"). Measured: the
+    products cross-reference table and the business rules document of one publication both printed their <description> as idm1620353012.
+
+    So a node inside a view takes the id of its owning data module (a real node of the source document, which is never freed: its generate-id() is
+    stable and different for every module, and for every print of the same module) plus its position in the view. Any other node keeps exactly the
+    generate-id() it always had, so the output of every module that has no view is unchanged.
+  -->
+  <xsl:template name="node-gid">
+    <xsl:variable name="owner" select="ancestor-or-self::*[@sv-owner][1]/@sv-owner"/>
+    <xsl:choose>
+      <xsl:when test="$owner"><xsl:value-of select="concat($owner, '-v', count(preceding::*) + count(ancestor::*))"/></xsl:when>
+      <xsl:otherwise><xsl:value-of select="generate-id()"/></xsl:otherwise>
+    </xsl:choose>
   </xsl:template>
 
   <!-- true for the content roots the engines have no template for (used by callers that must decide whether to call the template) -->

@@ -75,6 +75,13 @@ deflate writer with data descriptors, ZIP64 records where a size/offset/count ne
 absolute, drive-lettered, containing NUL or `..` (ZIP Slip); duplicates are refused; encrypted entries and unsupported methods are refused, not skipped;
 limits on entry count, per-entry and total expanded size and compression ratio (zip bombs); CRC and size are checked while reading.
 
+**Project settings travel with a project package (Phase 21, `packageSettings.ts`).** `manifest.json` carries `project.settings`: the project configuration (responsible partner, originator,
+security, BREX, code mode, SNS enforcement, applicability references, country), the selected information codes, the data module types the project does not offer, and **both SNS systems side
+by side** (system 1: the presets / project table; system 2: the row model and its ordering) - never converted into each other (`docs/SNS_SYSTEMS.md`). They are restored only when a package **starts
+a new project** (the import-first wizard way), field by field through the same validators the screens use; an invalid value is left out and reported (`settings.notes` in the response and the
+configuration's origin notes), the import never fails because of it, and what the data modules say (model code, issue, language) always wins over the manifest. A package without settings (another
+tool, an older version) imports as before, with the configuration derived from the data modules. Importing into an *existing* project never touches its settings (`test/package-settings.test.js`).
+
 * **Project package** (`GET .../packages/project`): `manifest.json` (SHA-256 per file) + `csdb/` + `Media/` + `publication.xml`.
 * **Delivery package** (`POST .../packages/delivery`): the S1000D transfer package of Chap 7.5.1 - **one DDN + flat data files** (no directories) - from the
   publication (PM, its data modules, their ICNs and IMFs, ACT/CCT/PCT, BREX) or from selected modules, an optional generated DML, and an
@@ -136,6 +143,47 @@ cross-module `dmRef`, ICN references, asset integrity).
   DOCTYPE declares its graphics (one `<!ENTITY ... NDATA>` per ICN, as every real handbook does) had its own `<dmCode>` beyond that, was never indexed, and was **silently
   left out of the PDF** (only a log line said its publication entry "refers to a data module this project does not have"). Measured on the 00039 sample: **1 of its 218 modules** is affected (its `<dmIdent>` starts at byte 25 339; 65 words were missing from the PDF until the fix).
   A shared `readHead` now grows (8 KiB, doubling, at most 4 MiB) until the root element and its identification block are read (`test/pdf-long-doctype.test.js`, failing first).
+
+* `backend/vendor/engine/build.js` and `validateXml.js` (Phase 21, 2026-11-22, **exception A**): xsltproc joins a *relative* stylesheet location to the working directory as a string
+  before it opens it. The project folder is the working directory and the stylesheets are in the application folder, so the location was one `../` per level of the project's own
+  path plus the way down to the pipeline - past Windows' 260 characters while the real path is short (`warning: failed to load external entity ../../../..`; measured: a project folder
+  of 136 characters on a checkout under `C:\Users\...` already failed; an installed application with a long user name and an 80-character project name reaches it). The engine now hands xsltproc
+  **absolute** locations (`absLoc`, and a `file:` URL in the generated driver stylesheet), which also works when the workspace and the application are on different drives. Verified: same PDF text
+  at 30 / 70 / 100 / 120 characters of workspace depth (`test/deep-workspace.test.js`; failing first). What cannot be fixed: a **file** whose own path is 260+ characters cannot be opened by the
+  bundled libxml2 at all; it was reported as "XML cannot be parsed", and is now reported as "File path too long" with what to do. `npm run doctor` checks the workspace path length.
+* `backend/vendor/pipeline/support-view.xsl`, `s1000dtofo/descript.xsl`, `s1000dtofo/tables.xsl` (Phase 21, **exception B**): FOP refused a publication with "Property ID ... previously used"
+  (`brex-gate`, `publish-gate`: a BREX-clean build failed). libxslt 1.1.28 reuses memory between result tree fragments, so `generate-id()` of nodes in a freed fragment repeats; ids built from it
+  collided across support modules. A `node-gid` template builds the id from the enclosing module's id plus the node's document position, and the three places that built ids from
+  `generate-id()` of fragment nodes use it. PDF text is unchanged.
+* `backend/vendor/pipeline/s1000dtofo/s1000dtofo.xsl`, `headers_footers.xsl`, `frontmatter-shared.xsl` (Phase 21, **exception C**): the classification marker of the prelim pages (contents, lists; the markers
+  of the front-matter flows and the publication-module fallback of `generate-markers`) is conditional on `$prelim.classification.on`, declared in `s1000dtofo.xsl` from the new parameter
+  `prelim.classification` (`yes` / `no`; empty = on, except under `layout.profile = xignal`, which follows the reference: its 569 front-matter pages print no classification). Body pages and the title-page
+  data module keep the class of their own module; every other profile is unchanged (`test/xignal-prelim-marking.test.js`).
+
+* `backend/vendor/pipeline/s1000dtofo/frontmatter-s1000d.xsl`, `headers_footers.xsl`, `xignal-cover.xsl` (Phase 22, 2026-11-23, **exception D**, all behind `layout.profile = xignal`, every other profile unchanged): (1) the contents
+  Page column is resolved once into `$toc.page.show` - a project that states `toc.s1000d.showPage` ('1'/'0') is obeyed, otherwise the Xignal profile prints none (the reference list has four columns) and every other
+  profile keeps it, so an older workspace copy of the house template cannot bring the column back; (2) the cover generated from the publication module (used when the first module is not a title-page module) is set with the
+  same `xs.cover.*` geometry as the title-page-module cover (24 pt title, 14 pt code and issue line, 8 pt "Publisher:"), and the publisher line prints the resolved company line (`xs.mark.company`: settings, publication comment
+  or brand pack) before the enterprise name held in the data; on the title-page-module cover the text is printed only when the page names an enterprise or has no logo to carry the name; (3) `generate-markers` takes an optional
+  `info` parameter: the generated contents (009), list of illustrations (00A) and abbreviations (005) pages print a data module code in the foot (model identification code - system difference code of the first module -
+  00-00-00-00A - information code + variant A - D, one code, printed once) and the publication's applicability, or "All" when it states none, as the data-module pages do. Tests: `test/xignal-cover.test.js` (3 new or
+  changed), `golden-xignal.test.js` (the reference title page still agrees).
+  **Phase 22b (same day):** (4) `headers_footers.xsl` `security`: a class-to-marking table with an EMPTY entry (Xignal: class 01) no longer silences the marking the project itself states
+  (`$security.classification`, Settings > Security classification, "stamped on every page"; "Unclassified" states nothing): the empty entry falls back to it, a filled entry is that class's own marking;
+  (5) the generated title page passes `info` 001 to `generate-markers`: it carries a data module code and is classified like the title-page module would be (unless `prelim.classification` = no);
+  (6) `xignal-furniture.xsl` footer row A gives the data module code 3 of 5 parts of the width (it was 1 of 3 on odd pages), so a long model identification code stays on one line;
+  (7) `engine/brand.js` + `publisher.ts`: `showWhen: "inWork"` also prints the draft-copy note on a build that is NOT released (the NOT RELEASED watermark is on the same pages); a caller that does not state the
+  release state keeps the old rule. Tests: `xignal-prelim-marking.test.js` (+2), `brand.test.js` (+1), `xignal-cover.test.js`.
+  **Phase 22c (same day):** (8) `frontmatter-s1000d.xsl`: under the Xignal profile every header row of the contents, illustrations and abbreviations tables has the reference's 0.25 mm hairline ABOVE as well as below
+  (`xs-fm-head-rules`), and the last page of each table closes with one more hairline (`xs-fm-end-rule`); measured against RDR-1671Y-00039-00 the rules are within 0.1 pt (the cell padding moved 0.7 pt from below the text to above it and
+  the caption row lost its extra 1.4 pt so rules and text both land on the reference); (9) the illustrations list links as the reference does: the module code (first figure of a module only) is a blue link to the module, the figure
+  number and title are black links to the figure; (10) `ipd.xsl`: a parts-catalogue figure now also carries the standard figure id (`unique-id`), which the illustrations list links to - before, its row had no target and a click fell back
+  to page 1. Tests: `repeated-dm-ids.test.js` (+1, fails without the fix), `xignal-cover.test.js` (rules, closing rule, link colours; the 1 mm padding assertion now reads the 4-value shorthand).
+  **Phase 22d (same day):** (11) `xignal-cover.xsl` / `frontmatter-s1000d.xsl`: the product picture on the Xignal cover is an anchor (`cover-picture-<module>`) and the List of illustrations has its FIRST row for it
+  (the module code is a blue link to the cover, "Fig 1" / "Product illustration" are black links to the picture); (12) one `xs-cover-publisher` block for both covers: the logo is the title page's own `<publisherLogo>`, else the
+  platform default `publisher.logo.uri` (`assets/default-publisher-logo.png`, copied into the build by `sideText.publisherLogoParams`, called from the Xignal branch of `furnitureFor` in `publisher.ts`; project switch
+  `publisherLogo: false` in project.json / `PATCH` `publisherLogo`, no screen for it yet), 30 mm wide; the name is printed only when there is no logo (S1000D requires the title page to NAME its publisher, BREX-S1-00113, so
+  "the page names one" cannot decide it). The picture itself is data: `<productIllustration>` of the title-page module (Studio's Front matter template does not offer one). Tests: `xignal-cover.test.js` (+2), `publisher-logo.test.js` (new).
 
 ## 11. Migration
 

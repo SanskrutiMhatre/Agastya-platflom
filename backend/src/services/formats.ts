@@ -57,7 +57,9 @@ export interface ResolvedFormat { format: FormatId; domain: string | null; manua
 export function resolveFormat(input: { format?: unknown; domain?: unknown; manualType?: unknown }): ResolvedFormat {
   const f = formatById(input.format ?? 's1000d');
   if (!f) throw new Error('Choose S1000D, JSS or JSG.');
-  if (f.id === 's1000d') return { format: 's1000d', domain: null, manualType: null, pipeline: 's1000dtofo', type: 'S1000D' };
+  // An S1000D publication is printed the way the reference publication is (services/profiles: the Xignal layout: logo + publication code head,
+  // mirrored furniture, DMC / date / page foot, margin marks). Nothing else about the project changes: every S1000D rule applies as before.
+  if (f.id === 's1000d') return { format: 's1000d', domain: null, manualType: null, profile: 'xignal-s1000d', pipeline: 's1000dtofo', type: 'S1000D' };
   const d = f.domains.find((x) => x.id === input.domain);
   if (!d) throw new Error(`Choose the domain of the ${f.label} manual (${f.domains.map((x) => x.label).join(' or ')}).`);
   const m = d.manualTypes.find((x) => x.id === input.manualType);

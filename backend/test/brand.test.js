@@ -130,6 +130,16 @@ test('markings: the company line is Settings (when filled in), then the publicat
   assert.ok(!disabled.notes.some((n) => /company line/i.test(n)), 'switched off on purpose: no warning');
 });
 
+test('markings: a build that is not released is a draft copy whatever its in-work number says; a released one is not', () => {
+  const layout = house({ draft: { text: 'Draft of Issue {issue}', showWhen: 'inWork' } }).layout;
+  const at = (released) => params(brand.resolveMarkings({ layout, pmText: pm('001', '00'), brand: null, now: NOW, released }))['xs.mark.draft'];
+  assert.equal(at(false), 'Draft of Issue 001-00', 'NOT RELEASED build of issue 001-00');
+  assert.equal(at(true), '', 'released build of issue 001-00');
+  assert.equal(at(undefined), '', 'a caller that does not state the release keeps the in-work rule');
+  const never = brand.resolveMarkings({ layout: house({ draft: { text: 'D {issue}', showWhen: 'never' } }).layout, pmText: pm('001', '00'), brand: null, now: NOW, released: false });
+  assert.equal(params(never)['xs.mark.draft'], '', 'any other showWhen is not widened');
+});
+
 test('markings: the draft line shows for in-work issues only (by default), always, or never; the printed stamp uses the build clock', () => {
   const layout = house({ draft: { text: 'Draft of Issue {issue}', showWhen: 'inWork' }, printed: { text: 'Printed {printed}', format: 'YYYY-MM-DD HH:mm' } }).layout;
   const released = brand.resolveMarkings({ layout, pmText: pm('001', '00'), brand: null, now: NOW });

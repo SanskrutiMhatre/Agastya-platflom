@@ -162,11 +162,42 @@ test('without the profile nothing changes: the generated title page, running num
   assert.deepEqual(seqs.slice(1, 4).map(startsAt), ['auto', 'auto', 'auto']);
 });
 
-test('Xignal profile with no title-page module first: the generated title page is kept', { skip: SKIP }, () => {
+test('Xignal profile with no title-page module first: the generated title page is set in the geometry of the reference cover', { skip: SKIP }, () => {
   const fo = render(PM(''), { 'layout.profile': 'xignal', 'frontmatter.style': 's1000d' });
   const seqs = sequences(fo);
   assert.match(seqs[0], /Publication Title From PM/);
-  assert.equal(count(fo, 'font-size="24pt"'), 0, 'no cover page geometry without a title-page module');
+  // the reference title page is 24 pt bold title, 14 pt bold code and issue line, then an 8 pt "Publisher:" - a publication that has no
+  // title-page module opens on a page of the same size and spacing, from the publication module's own data
+  assert.equal(count(fo, 'font-size="24pt"'), 1, 'the title is the reference cover title size');
+  assert.match(seqs[0], /font-size="24pt" font-weight="bold" line-height="1.2" padding-top="28.3pt"[^>]*>Publication Title From PM/);
+  const bold14 = (seqs[0].match(/<fo:block[^>]*font-size="14pt"[^>]*>/g) || []).filter((b) => /font-weight="bold"/.test(b));
+  assert.ok(bold14.length >= 2, 'publication code and issue line are 14 pt bold');
+  assert.match(seqs[0], /font-size="8pt"[^>]*>Publisher:/);
+  // any other layout keeps the page it always had
+  assert.equal(count(render(PM(''), { 'frontmatter.style': 's1000d' }), 'font-size="24pt"'), 0, 'other profiles are unchanged');
+});
+
+test('Xignal profile: the generated contents, illustrations and abbreviations pages carry one data module code in their foot', { skip: SKIP }, () => {
+  const seqs = sequences(render(PM(COVER), { 'layout.profile': 'xignal', 'frontmatter.style': 's1000d' }));
+  const code = (q) => (/marker-class-name="chapter.data.module.code">([^<]*)</.exec(q) || [])[1];
+  const by = (re) => seqs.find((q) => re.test(q));
+  // model identification code - system difference code - the 00-00-00-00A whole-product block - information code + variant - item location code
+  assert.match(code(by(/Table of contents/)), /^[A-Z0-9]+-A-00-00-00-00A-009A-D$/);
+  assert.match(code(seqs[0]), /^[A-Z0-9]+-A-00-00-00-00A-001A-D$|^TST-A-A00-00-00-32A-001A-D$/, 'the title page, generated or the module itself, has a code in its foot');
+  assert.match(code(by(/List of illustrations/)), /^[A-Z0-9]+-A-00-00-00-00A-00AA-D$/);
+  assert.match(code(by(/Abbreviations|abbreviations/)), /^[A-Z0-9]+-A-00-00-00-00A-005A-D$/);
+  // another layout leaves these pages' foot as it was: no code
+  const other = sequences(render(PM(COVER), { 'frontmatter.style': 's1000d' }));
+  assert.equal(code(other.find((q) => /Table of contents/.test(q))) || '', '', 'other profiles print no code on generated pages');
+});
+
+test('Xignal profile: the contents list has no Page column unless the project asks for one; other profiles keep it', { skip: SKIP }, () => {
+  // the Page column is the only column of the contents table with the width "9"
+  const pageCols = (params) => count(sequences(render(PM(COVER), { 'frontmatter.style': 's1000d', ...params })).find((q) => /Table of contents/.test(q)), 'proportional-column-width(9)');
+  assert.equal(pageCols({ 'layout.profile': 'xignal' }), 0, 'no Page column in the reference contents list');
+  assert.equal(pageCols({ 'layout.profile': 'xignal', 'toc.s1000d.showPage': '0' }), 0);
+  assert.equal(pageCols({ 'layout.profile': 'xignal', 'toc.s1000d.showPage': '1' }), 1, 'asking for it brings the column back');
+  assert.equal(pageCols({}), 1, 'every other profile keeps the Page column it always had');
 });
 
 // ---- divider pages ---------------------------------------------------------------------------------------------------------------------
@@ -235,7 +266,7 @@ test('Xignal profile: the three prelim tables are calibrated to the reference; w
   // contents: the reference's four columns, 1 mm cell padding, no row rules, the title pushed down, a (Continued) caption on later pages
   for (const w of ['3383', '3601', '1419', '1597']) assert.ok(toc.includes('proportional-column-width(' + w + ')'), 'column ' + w);
   assert.ok(toc.includes('padding-top="11.3pt"'), 'the title sits 11.3 pt below the top of the body');
-  assert.ok(toc.includes('padding="1mm"') && !toc.includes('padding="1.5mm"'), '1 mm cells');
+  assert.ok(toc.includes('padding="3.53pt 1mm 2.13pt 1mm"') && !toc.includes('padding="1.5mm"'), '1 mm cells (0.7 pt of the vertical padding moved above the text)');
   assert.ok(!toc.includes('border-bottom="0.4pt solid #999999"'), 'no row rules');
   assert.equal(count(toc, '<fo:retrieve-table-marker'), 1, 'one caption slot in the repeated header');
   assert.equal(count(toc, '<fo:marker marker-class-name="xs-fm-cont"'), 2, 'one marker per row (the cover module and the chapter)');
@@ -250,12 +281,37 @@ test('Xignal profile: the three prelim tables are calibrated to the reference; w
   assert.equal(count(loi, '<fo:retrieve-table-marker'), 1);
   assert.equal(count(loa, '<fo:retrieve-table-marker'), 1);
 
+  // the reference's hairlines: ABOVE and below every header row (also under each "(Continued)" caption) and once more under the last row
+  for (const [name, p] of [['contents', toc], ['illustrations', loi], ['abbreviations', loa]]) {
+    // every header cell has both; the closing rule under the last row is the one extra border-top
+    assert.ok(count(p, 'border-bottom="0.25mm solid black"') >= 2, name + ': header cells are ruled');
+    assert.equal(count(p, 'border-top="0.25mm solid black"'), count(p, 'border-bottom="0.25mm solid black"') + 1, name + ': a rule above AND below every header cell, plus the closing rule');
+    assert.equal(count(p, '<fo:block border-top="0.25mm solid black" font-size="0pt" line-height="0pt"'), 1, name + ': one closing rule under the last row');
+  }
+  // illustrations list: the code of a module's first figure links to the module (blue); the figure and its title link to the figure in black
+  const FIGS = dm({ sys: 'A00', dis: '10', info: '040', tech: 'With pictures', name: 'Description' }, 'descript',
+    '<description><levelledPara><title>P</title><figure id="f1"><title>First picture</title><graphic infoEntityIdent="ICN-TST-PIC"/></figure><figure id="f2"><title>Second picture</title><graphic infoEntityIdent="ICN-TST-PIC"/></figure></levelledPara></description>');
+  const loiFig = part(render(PM(COVER + FIGS), { 'layout.profile': 'xignal', 'frontmatter.style': 's1000d', 'toc.s1000d.showPage': '0' }), 'List of illustrations');
+  // the cover's own picture is the first row (see the next test): one code link, one figure + one title link
+  assert.equal(count(loiFig, '<fo:basic-link internal-destination="content-start-'), 2, 'a code link on the cover picture and on the first figure of the module - not on its other figures');
+  assert.ok(/internal-destination="content-start-[^"]+" color="#0000CC"/.test(loiFig), 'and they are blue');
+  assert.equal(count(loiFig, 'color="#000000"'), 6, 'the cover picture and the two figures, each (figure number + title), link in black');
+  assert.equal(count(loiFig, 'color="#0000CC"'), 2, 'nothing else is blue');
+  assert.ok(loiFig.indexOf('Product illustration') >= 0 && loiFig.indexOf('Product illustration') < loiFig.indexOf('First picture'), 'the cover picture is the first row, the module figures follow');
+
   // without the profile: none of it
   const offToc = part(off, 'Table of contents');
   assert.ok(offToc.includes('proportional-column-width(31)') && offToc.includes('proportional-column-width(28)'));
   assert.ok(offToc.includes('padding="1.5mm"') && offToc.includes('border-bottom="0.4pt solid #999999"'));
   assert.ok(!off.includes('retrieve-table-marker') && !off.includes('xs-fm-cont') && !off.includes('padding-top="11.3pt"'));
   assert.ok(part(off, 'List of illustrations').includes('proportional-column-width(38)'));
+  for (const n of ['Table of contents', 'List of illustrations', 'List of abbreviations']) {
+    const p = part(off, n);
+    assert.ok(!p.includes('border-top="0.25mm') && p.includes('border-bottom="1pt solid black"') && !p.includes('font-size="0pt" line-height="0pt"'), n + ': the single 1 pt rule of the engine, no closing rule');
+  }
+  const offFig = part(render(PM(COVER + FIGS), { 'frontmatter.style': 's1000d', 'toc.s1000d.showPage': '0' }), 'List of illustrations');
+  assert.equal(count(offFig, 'color="#0000CC"'), 4, 'without the profile the figure links stay blue and the code is not a link');
+  assert.equal(count(offFig, 'color="#000000"') + count(offFig, 'content-start-'), 0);
 });
 
 // ---- requirements tables and the procedure headings --------------------------------------------------------------------------------------
@@ -280,4 +336,61 @@ test('requirements tables follow refs.table.style; the Xignal profile labels the
   assert.equal(count(on, '>Main procedure<'), 0);
   assert.ok(count(off, '>Main procedure<') >= 1);
   assert.equal(count(on, '>Procedure<'), count(off, '>Procedure<'), 'one "Procedure" heading either way: the outer one without the profile, the main one with it');
+});
+
+// ---- the cover picture is reachable from the List of illustrations; the publisher's logo -----------------------------------------------------
+// the xml without one element (and everything in it)
+const stripTag = (xml, tag) => { const a = xml.indexOf('<' + tag + '>'); const z = xml.indexOf('</' + tag + '>'); assert.ok(a >= 0 && z > a, tag + ' is in the test module'); return xml.slice(0, a) + xml.slice(z + tag.length + 3); };
+test('Xignal cover: the picture is an anchor and the List of illustrations has its first row for it, linked to the cover and to the picture', { skip: SKIP }, () => {
+  const xig = { 'layout.profile': 'xignal', 'frontmatter.style': 's1000d' };
+  const fo = render(PM(COVER), xig);
+  const seqs = sequences(fo);
+  const anchor = /<fo:block id="(cover-picture-[^"]+)"/.exec(seqs[0]);
+  assert.ok(anchor, 'the picture block on the cover has an id');
+  const loi = seqs.find((s) => s.includes('>List of illustrations<'));
+  assert.equal(count(loi, `internal-destination="${anchor[1]}"`), 2, 'the figure number and the title both jump to the picture');
+  assert.ok(loi.includes('" color="#0000CC">TST-A-A00-00-00-32A-001A-D</fo:basic-link>'), 'the code of the cover module is a blue link');
+  assert.ok(/internal-destination="content-start-[^"]+" color="#0000CC">TST-A/.test(loi), 'to the module itself (the cover page)');
+  assert.match(loi, />Product illustration</);
+  assert.ok(!loi.includes('>None<'), 'the list is not the empty one');
+  assert.deepEqual(dangling(fo), [], 'every link has its target');
+
+  // a title page without a picture has no row, and no anchor
+  const bare = render(PM(stripTag(COVER, 'productIllustration')), xig);
+  assert.ok(!bare.includes('cover-picture-') && !bare.includes('Product illustration'), 'no picture, no row');
+  assert.deepEqual(dangling(bare), []);
+  // other layouts: nothing is added
+  assert.ok(!render(PM(COVER), { 'frontmatter.style': 's1000d' }).includes('cover-picture-'));
+});
+
+test('Xignal cover: the publisher logo is the title page own one, else the platform default; the name is printed only when there is no logo', { skip: SKIP }, () => {
+  const xig = { 'layout.profile': 'xignal', 'frontmatter.style': 's1000d', 'xs.mark.company': 'Test Company Ltd' };
+  const DEF = { 'publisher.logo.uri': '_publisher-logo.png' };
+  const DEFAULT_SRC = "url('_publisher-logo.png')";
+  const hasDefault = (s) => s.includes(DEFAULT_SRC);
+  const hasOwn = (s) => s.includes("/logo.png')");        // the module's entity resolves to a path ending in logo.png; the default ends in -logo.png
+  const NOLOGO = stripTag(COVER, 'publisherLogo');
+  const name = (s) => count(s, 'Test Company Ltd');
+
+  // the title page names a logo: that one, even when the platform has a default
+  const a = sequences(render(PM(COVER), { ...xig, ...DEF }))[0];
+  assert.ok(hasOwn(a) && !hasDefault(a), 'its own logo wins');
+  const base = name(a);                                   // the margin mark carries the company line on its own
+  // it names none: the platform default, 30 mm wide, and no name under it
+  const b = sequences(render(PM(NOLOGO), { ...xig, ...DEF }))[0];
+  assert.ok(hasDefault(b) && !hasOwn(b), 'the platform default stands in');
+  assert.ok(b.includes('<fo:external-graphic src="' + DEFAULT_SRC + '" content-width="30mm"'), '30 mm wide, as the reference logo');
+  assert.equal(name(b), base, 'the logo carries the name: nothing is printed under it');
+  // no logo at all (no default either): the company line is printed under "Publisher:"
+  const c = sequences(render(PM(NOLOGO), xig))[0];
+  assert.ok(!hasDefault(c) && !hasOwn(c));
+  assert.equal(name(c), base + 1, 'the company line stands in for the logo');
+  assert.match(c, /font-size="8pt"[^>]*>Publisher:/);
+
+  // the page the engine generates when there is no title-page module: the same block
+  const g = sequences(render(PM(''), { ...xig, ...DEF }))[0];
+  assert.ok(hasDefault(g)); assert.match(g, /font-size="8pt"[^>]*>Publisher:/);
+  assert.equal(name(sequences(render(PM(''), xig))[0]), name(g) + 1, 'generated cover: no logo, the company line');
+  // any other layout keeps its own publisher block, and ignores the default
+  assert.ok(!render(PM(''), { 'frontmatter.style': 's1000d', ...DEF }).includes('_publisher-logo.png'));
 });

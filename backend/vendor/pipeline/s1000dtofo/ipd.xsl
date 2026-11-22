@@ -216,6 +216,9 @@
   <!-- ==================================================================== -->
   <xsl:template match="illustratedPartsCatalog/figure">
     <fo:block id="ipd-fig-{generate-id()}" break-before="page" keep-together.within-page="always">
+      <!-- The id every other figure carries (figures.xsl), which the publication-level List of illustrations links to. Without it that
+           link had nowhere to land for a parts-catalogue figure and silently fell back to the top of the document. -->
+      <fo:block font-size="0pt" line-height="0pt"><xsl:call-template name="unique-id-attr"/></fo:block>
       <!-- Figure title -->
       <fo:block xsl:use-attribute-sets="centerhead2" space-after="10pt">
         <xsl:text>Figure </xsl:text>

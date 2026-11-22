@@ -56,6 +56,13 @@ function parseOne(xsltproc, dir, rel) {
                 const text = String(stderr || '');
                 if (!text.trim()) return resolve(null);
                 const why = explainBuildFailure({ stderr: text }, { workDir: dir });
+                // The bundled libxml2 opens files through the Windows API without long-path support: a file whose FULL path is 260 characters or more
+                // "cannot be loaded", which reads as a malformed file. Say what it is (the workspace + project folder + file name add up too long).
+                const full = path.join(dir, rel);
+                if (process.platform === 'win32' && full.length >= 260) {
+                    return resolve({ rel, line: 1, title: 'File path too long', summary: `The file's full path is ${full.length} characters`,
+                        hint: 'Windows stops the bundled tools at 259 characters, so this file cannot be opened. Shorten the project name or move the workspace closer to the drive root (AGASTYA_WORKSPACE_DIR). The file itself is not necessarily malformed.', raw: text });
+                }
                 resolve({ rel, line: why.line || 1, summary: why.summary, hint: why.hint, raw: why.raw });
             });
     });
@@ -91,7 +98,7 @@ async function validateProjectXml(xsltproc, dir, { limit = 6 } = {}) {
         files,
         issues: bad.map((b) => ({
             sev: 'crit',
-            title: 'XML cannot be parsed',
+            title: b.title || 'XML cannot be parsed',
             rel: b.rel,
             line: b.line,
             loc: `${b.rel.split('/').pop()}:${b.line}`,

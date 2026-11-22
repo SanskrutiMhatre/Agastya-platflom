@@ -11,9 +11,9 @@
 import type { Express, RequestHandler } from 'express';
 import { requireProject, requireAdmin, requireAuth, audit } from '../context';
 import { wrap, param, bad, notFound } from '../services/http';
-import { DEFAULT_ORDER_KEYS, INFO_CODE_GROUPS, SNS_CODE_RULES, SNS_LEVELS, parseDmCode, type OrderConfig, type SnsLevel } from '../services/sns/codes';
+import { INFO_CODE_GROUPS, SNS_CODE_RULES, SNS_LEVELS, parseDmCode, type OrderConfig, type SnsLevel } from '../services/sns/codes';
 import { SnsTree, normalizeRow, snsTitle, validateRowSet } from '../services/sns/model';
-import { orgRepo, projectRepo, createRow, updateRow, deleteRow, mergeRows, mergeLegacyIntoDefaults, memoryRepo, writeProjectOrder, readProjectOrder } from '../services/sns/store';
+import { orgRepo, projectRepo, createRow, updateRow, deleteRow, mergeRows, mergeLegacyIntoDefaults, memoryRepo, writeProjectOrder, readProjectOrder, checkedOrder as orderOf } from '../services/sns/store';
 import { structureDms } from '../services/sns/derive';
 import { applyDerived, brexRowsForProject, deriveForProject, importDefaultsInto, learnForProject, orderingInfo, type DeriveRequest } from '../services/sns/service';
 
@@ -26,34 +26,6 @@ const rulesView = () => ({
   note: 'systemDiffCode is optional: a row without one applies to every variant, a row with one overrides it for that variant.',
 });
 
-const isStrings = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === 'string');
-
-/**
- * The ordering a caller sends, checked before it is stored or used: an unknown sort key would make every later derive fail, and a malformed
- * table would be saved for good. Refused with BAD_ORDER and a sentence that says which part is wrong.
- */
-const orderOf = (v: unknown): OrderConfig | undefined => {
-  if (v === undefined || v === null) return undefined;
-  if (typeof v !== 'object' || Array.isArray(v)) throw bad('order must be an object.', 'BAD_ORDER');
-  const o = v as Record<string, unknown>;
-  const known = new Set<string>(DEFAULT_ORDER_KEYS);
-  if (o.keys !== undefined) {
-    if (!isStrings(o.keys)) throw bad('order.keys must be a list of sort keys.', 'BAD_ORDER');
-    const unknown = o.keys.filter((k) => !known.has(k));
-    if (unknown.length) throw bad(`order.keys has unknown sort key(s): ${unknown.join(', ')}. Known: ${DEFAULT_ORDER_KEYS.join(', ')}.`, 'BAD_ORDER');
-    if (new Set(o.keys).size !== o.keys.length) throw bad('order.keys names a sort key twice.', 'BAD_ORDER');
-  }
-  for (const f of ['pinFirst', 'pinLast'] as const) if (o[f] !== undefined && !isStrings(o[f])) throw bad(`order.${f} must be a list of information codes.`, 'BAD_ORDER');
-  if (o.rank !== undefined) {
-    const r = o.rank;
-    if (typeof r !== 'object' || r === null || Array.isArray(r) || !Object.values(r).every((n) => typeof n === 'number' && Number.isFinite(n))) throw bad('order.rank must map information codes to numbers.', 'BAD_ORDER');
-  }
-  if (o.groups !== undefined) {
-    const g = o.groups;
-    if (!Array.isArray(g) || !g.every((x) => x && typeof x === 'object' && typeof x.id === 'string' && typeof x.label === 'string' && typeof x.from === 'string' && typeof x.to === 'string')) throw bad('order.groups must be a list of { id, label, from, to }.', 'BAD_ORDER');
-  }
-  return v as OrderConfig;
-};
 
 export function registerSnsRoutes(app: Express): void {
   const base = '/api/projects/:id/sns-rows';

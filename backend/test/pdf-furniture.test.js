@@ -11,7 +11,13 @@ const PW = 'Correct-Horse-9!';
 const FIX = path.resolve(__dirname, '..', '..', 'frontend', 'e2e', 'fixtures', 'dm21', '5-0');
 const pdf = (buf) => { const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'fu-')), 'x.pdf'); fs.writeFileSync(f, buf); return f; };
 const text = (f) => spawnSync('pdftotext', [f, '-'], { encoding: 'utf8' }).stdout;
-const images = (f) => spawnSync('pdfimages', ['-list', f], { encoding: 'utf8' }).stdout.split('\n').slice(2).filter(Boolean).length;
+// poppler's pdfimages is not on every machine (Git for Windows ships pdftotext only). FOP writes each picture as one uncompressed /Subtype /Image
+// dictionary, so counting them in the file answers what the tests ask: is a logo there, or is nothing there.
+const images = (f) => {
+  const r = spawnSync('pdfimages', ['-list', f], { encoding: 'utf8' });
+  if (!r.error && r.status === 0) return r.stdout.split('\n').slice(2).filter(Boolean).length;
+  return (fs.readFileSync(f).toString('latin1').match(/\/Subtype\s*\/Image/g) || []).length;
+};
 let h; let w; let U; let dir;
 
 test.before(async () => {
@@ -19,7 +25,8 @@ test.before(async () => {
   await admin.post('/api/auth/setup', { username: 'admin', password: PW, fullName: 'A' });
   const m = await admin.post('/api/team/users', { username: 'fern', fullName: 'Fern', role: 'author' });
   w = new h.Client('fern'); await w.post('/api/auth/login', { username: 'fern', password: m.json.tempPassword }); await w.post('/api/auth/onboarding', { username: 'fern', password: PW });
-  const pr = await w.post('/api/projects', { name: 'Furniture', format: 's1000d', s1000d: { mic: 'EXAMPLE', issue: '5.0', responsiblePartner: { code: '00000', name: 'Example Company' } } });
+  // the DEFAULT page furniture is under test, so this project is made on the default house template (a wizard S1000D project starts on the Xignal layout, which has its own furniture)
+  const pr = await w.post('/api/projects', { name: 'Furniture', pipeline: 's1000dtofo', s1000d: { mic: 'EXAMPLE', issue: '5.0', responsiblePartner: { code: '00000', name: 'Example Company' } } });
   U = `/api/projects/${pr.json.project.id}`; dir = path.join(h.ws, 'projects', pr.json.project.id);
   const f = fs.readdirSync(FIX).find((x) => /-040A-D_/.test(x));
   assert.equal((await w.post(`${U}/dms`, { file: f, xml: fs.readFileSync(path.join(FIX, f), 'utf8') })).status, 201);   // joins the publication by itself

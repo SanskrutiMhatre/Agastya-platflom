@@ -496,7 +496,9 @@
   <!--                    DESCRIPTION TEMPLATE                               -->
   <!-- ==================================================================== -->
   <xsl:template match="description">
-    <fo:block id="{generate-id()}">
+    <fo:block>
+      <!-- AGASTYA: node-gid, not generate-id(): a description that is the print view of a support module (support-view.xsl) must not repeat another module's id -->
+      <xsl:attribute name="id"><xsl:call-template name="node-gid"/></xsl:attribute>
       <xsl:if test="$show.schema.heading != 0">
         <xsl:choose>
           <!-- JSS format: custom chapter formatting -->
@@ -606,7 +608,8 @@
     </xsl:if>
   </xsl:template>
   <xsl:template match="levelledPara[title]">
-    <fo:block id="{generate-id()}">
+    <fo:block>
+      <xsl:attribute name="id"><xsl:call-template name="node-gid"/></xsl:attribute>
       <xsl:call-template name="levelled-para-anchor"/>
       <!-- select="*" would drop an authored <?page-break?>: a processing
          instruction is not an element, so the break silently did nothing

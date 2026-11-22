@@ -15,6 +15,7 @@ import * as pk from '../services/packages';
 import { generateDml } from '../services/dispatch';
 import { isCirProject, createProject, deleteProject } from '../services/projects';
 import { adoptFromContents } from '../services/projectConfig';
+import { restoreSettings, type RestoreReport } from '../services/packageSettings';
 import { projectDirFor } from '../context';
 import { buildHtmlPublication } from '../services/htmlPublish';
 import { allFindings } from '../services/findings';
@@ -36,7 +37,7 @@ const flag = (v: unknown) => v === '1' || v === 'true' || v === true;
 /** What a package contains, read from its entry names alone (nothing is extracted). */
 export function detectPackage(zipPath: string): { format: 's1000d' | 'unknown'; dataModules: number; publicationModules: number; graphics: number; other: number; entries: number } {
   const r = ZipFileReader.open(zipPath, pk.importLimits()); const names = r.entries.map((e) => e.name.replace(/\\/g, '/').split('/').pop() ?? ''); r.close();
-  const dm = names.filter((n) => /^DMC-.*\.xml$/i.test(n)).length; const pm = names.filter((n) => /^PMC-.*\.xml$/i.test(n)).length;
+  const dm = names.filter((n) => /^DMC-.*\.xml$/i.test(n)).length; const pm = names.filter((n) => pk.classify(n) === 'pm').length;   // a PMC-….xml, or the publication.xml of this platform's own project package
   const gr = names.filter((n) => /\.(png|jpe?g|svg|gif|tiff?|cgm)$/i.test(n)).length;
   return { format: dm || pm ? 's1000d' : 'unknown', dataModules: dm, publicationModules: pm, graphics: gr, other: names.length - dm - pm - gr, entries: names.length };
 }
@@ -67,18 +68,31 @@ export function registerPackageRoutes(app: Express): void {
     const held = TOKEN_RE.test(token) ? pending.get(token) : undefined;
     if (!held || held.userId !== user.id || !fs.existsSync(held.file)) throw bad('That upload has expired. Choose the package again.', 'UPLOAD_EXPIRED');
     const card = await createProject(user, { name: req.body?.name, folder: req.body?.folder, format: req.body?.format, domain: req.body?.domain, manualType: req.body?.manualType });
-    const role = 'owner'; let report;
+    const role = 'owner'; let report; let packageSettings: unknown;
     try {
-      report = await pk.importPackage(card.id, held.file, held.name, { overwrite: false, partial: false, skipChecks: false, replacePm: true, validate: true }, { id: user.id, username: user.username, role: user.role }, role);
+      report = await pk.importPackage(card.id, held.file, held.name, { overwrite: false, partial: false, skipChecks: false, replacePm: true, validate: true, onManifest: (m) => { packageSettings = m?.project?.settings; } },{ id: user.id, username: user.username, role: user.role }, role);
     } catch (e) { try { deleteProject(user, card.id); } catch { /* best effort */ } throw e; }
     if (!report.applied) {                                  // nothing was imported: do not leave an empty project behind
       try { deleteProject(user, card.id); } catch { /* best effort */ }
-      return void res.status(422).json({ error: 'The package was not imported, so no project was created. The report says why.', code: 'IMPORT_REFUSED', report });
+      // Say WHY in the message itself: the most common reason first, how many files it covers, and how many other reasons there are. The whole report is in the body.
+      const why = new Map<string, number>();
+      for (const it of report.items) if (it.status === 'rejected' && it.message) why.set(it.message, (why.get(it.message) ?? 0) + 1);
+      const top = [...why.entries()].sort((a, b) => b[1] - a[1]);
+      const lead = top.length
+        ? ` ${top[0][1] > 1 ? `${top[0][1]} files: ` : ''}${top[0][0]}${top.length > 1 ? ` (and ${top.length - 1} other reason${top.length > 2 ? 's' : ''}; see the report)` : ''}`
+        : (report.notes[0] ? ` ${report.notes[0]}` : ' The report says why.');
+      return void res.status(422).json({ error: `The package was not imported, so no project was created.${lead}`, code: 'IMPORT_REFUSED', report });
     }
     if ((card.format ?? 's1000d') === 's1000d' || card.format === 'jss') adoptFromContents(card.id, user.id);
+    // What the exporting project CHOSE (partner, originator, codes, data module types, both SNS systems) comes back too - validated, and never over what the data modules say.
+    let settings: RestoreReport | null = null;
+    if ((card.format ?? 's1000d') === 's1000d') {
+      try { settings = restoreSettings(card.id, user.id, packageSettings); }
+      catch (e) { settings = { restored: [], notes: [`The package settings could not be applied: ${(e as Error).message}`] }; }
+    }
     pending.delete(token); try { fs.unlinkSync(held.file); } catch { /* gone */ }
-    audit({ actorId: user.id, actorUsername: user.username, action: 'project.imported', projectId: card.id, targetType: 'project', targetId: card.id, meta: { source: held.name, counts: report.counts } });
-    res.status(201).json({ project: card, report });
+    audit({ actorId: user.id, actorUsername: user.username, action: 'project.imported', projectId: card.id, targetType: 'project', targetId: card.id, meta: { source: held.name, counts: report.counts, settings: settings?.restored ?? [] } });
+    res.status(201).json({ project: card, report, settings });
   }));
 
   const actor = (req: any) => ({ id: req.auth.user.id, username: req.auth.user.username, role: req.auth.user.role });
@@ -146,9 +160,9 @@ export function registerPackageRoutes(app: Express): void {
   app.post(`${base}/publish/html`, view('reviewer', 'publish.build'), wrap(async (req, res) => {
     if (isCirProject(req.project.id)) throw new HttpError(403, 'The shared repository is not published.', 'CIR_PUBLISH');
     const input = req.body?.productId || Array.isArray(req.body?.values) ? { productId: req.body?.productId || undefined, values: Array.isArray(req.body?.values) ? req.body.values : undefined } : undefined;
-    const out = await buildHtmlPublication(req.project.id, input);
-    log(req, 'publish.html', { name: out.name, pages: out.pages, configured: out.configured });
-    res.status(201).json({ name: out.name, pages: out.pages, assets: out.assets, missing: out.missing, configured: out.configured, zip: `/api/projects/${req.project.id}/publish/html/${out.name}.zip`, index: `/api/projects/${req.project.id}/publish/html/${out.name}/index.html` });
+    const out = await buildHtmlPublication(req.project.id, input, { allowRuleBreaks: req.body?.allowRuleBreaks === true });
+    log(req, out.ruleBreaks.length ? 'publish.html.with-rule-breaks' : 'publish.html', { name: out.name, pages: out.pages, configured: out.configured, ruleBreaks: out.ruleBreaks });
+    res.status(201).json({ name: out.name, pages: out.pages, assets: out.assets, missing: out.missing, configured: out.configured, ruleBreaks: out.ruleBreaks, warnings: out.warnings, zip: `/api/projects/${req.project.id}/publish/html/${out.name}.zip`, index: `/api/projects/${req.project.id}/publish/html/${out.name}/index.html` });
   }));
   app.get(`${base}/publish/html`, view('viewer'), wrap((req, res) => {
     const d = path.join(projectDirFor(req.project.id), 'html');

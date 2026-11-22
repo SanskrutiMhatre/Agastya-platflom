@@ -155,3 +155,23 @@ Narrative types (`descript, proced, fault, crew, checklist, process, learning, i
 ## 18. Review of the new code
 `/code-review` (high) on the code of this work found ten issues, all fixed and covered by tests: watermark file in configuration builds; configuration PDFs claiming a release; item-location/learn codes emptied by "selected" mode; Issue 5.0 never flagged by the new-module check; dead snapshot function; value-list input losing commas and labels; null not clearing an applicability reference; multi-issue code add not atomic; configuration file names that could collide; SNS edit applying the title before refusing the code change. The `/simplify` agents were rate-limited and returned nothing; the pass was done by hand (unused parameters/exports/imports removed, start-up seeding skips unchanged BREX files and presets).
 
+
+## 19. Phase 21 (2026-11-22): what a project package carries, and the two SNS systems
+
+**Project settings travel with the package.** `manifest.json` has `project.settings` (written by `packageSettings.settingsOf`): responsible partner, originator, security class, BREX, code mode, SNS enforcement,
+applicability references, country, the selected information codes (`code mode: selected`), the data module types the project does not offer, and the SNS data of **both** systems (section 20). When a package starts a
+new project (the wizard's import-first path), `restoreSettings` applies each field through the same validator the screen uses; an invalid value is skipped and reported (`settings.notes`, and as an origin note in the
+project configuration), it never fails the import. Model code, issue and language are *always* read from the data modules (they are facts of the content), a differing manifest value is only noted. A package without
+settings (another tool, an older export) imports as before with `deriveConfig` / `adoptFromContents`: **country, partner, originator, code mode, data module types and SNS cannot be derived** from the content, so such a
+project starts with the platform's defaults for them. Importing into an existing project never changes its settings. Tests: `package-settings.test.js` (5).
+
+## 20. The two SNS systems (kept separate by decision)
+
+See `docs/SNS_SYSTEMS.md`. In short: **system 1** (presets `sns_presets` / `sns_preset_nodes` and the project's `project_sns` table in the database; `/api/projects/:id/sns*`, `/api/s1000d/presets`) and **system 2**
+(the row model with ordering, derive, learn and BREX import in the project's `.sns.json`; `/api/projects/:id/sns-rows*`, `/api/sns/defaults*`) are not merged, renamed, converted or migrated into each other.
+The package carries both side by side; each is restored only into its own store (`sns-separation.test.js`). Unifying them would be a redesign and needs an owner decision (what the single source of truth is).
+
+## 21. Database (Phase 21)
+
+The original database of the recovered tree was restored into the live workspace and migrated additively (016 reference tables, 017 lifecycle / CIR / extensions, 018 `sns_presets.model_code`, 019
+`review_comments.anchor`) behind a snapshot of the database before each migration: no table dropped, no row removed. Counts, steps and the three protected backups are in `docs/DATABASE_RESTORATION.md`.

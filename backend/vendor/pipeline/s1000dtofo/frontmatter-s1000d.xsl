@@ -46,13 +46,16 @@
   -->
   <xsl:variable name="xs.fm.on" select="$layout.profile = 'xignal'"/>
   <xsl:param name="xs.fm.title.pad">11.3pt</xsl:param>
-  <xsl:param name="xs.fm.cell.pad">1mm</xsl:param>
+  <!-- 1 mm all round, with 0.7 pt of the vertical padding moved from below the text to above it: the reference's hairline borders sit inside the cell, so its text starts that much lower. -->
+  <xsl:param name="xs.fm.cell.pad">3.53pt 1mm 2.13pt 1mm</xsl:param>
   <xsl:param name="xs.fm.cell.padleft">0.7pt</xsl:param>
   <xsl:param name="xs.fm.caption.line">12pt</xsl:param>
   <xsl:param name="xs.fm.toc.gap">0pt</xsl:param>
   <xsl:param name="xs.fm.loi.gap">5.7pt</xsl:param>
   <xsl:param name="xs.fm.header.line2">2.9pt</xsl:param>
-  <xsl:param name="xs.fm.caption.pad">1.4pt</xsl:param>
+  <xsl:param name="xs.fm.caption.pad">0pt</xsl:param>
+  <!-- The reference's table rules are 0.25 mm (0.708 pt) hairlines: above and below the header row, and once more under the last row. -->
+  <xsl:param name="xs.fm.rule">0.25mm</xsl:param>
   <xsl:param name="fm.label.s1000d.continued"> (Continued)</xsl:param>
   <xsl:variable name="fm.cell.pad"><xsl:choose><xsl:when test="$xs.fm.on"><xsl:value-of select="$xs.fm.cell.pad"/></xsl:when><xsl:otherwise>1.5mm</xsl:otherwise></xsl:choose></xsl:variable>
   <xsl:variable name="fm.cell.padleft"><xsl:choose><xsl:when test="$xs.fm.on"><xsl:value-of select="$xs.fm.cell.padleft"/></xsl:when><xsl:otherwise>0mm</xsl:otherwise></xsl:choose></xsl:variable>
@@ -60,7 +63,7 @@
   <xsl:variable name="fm.loi.gap"><xsl:choose><xsl:when test="$xs.fm.on"><xsl:value-of select="$xs.fm.loi.gap"/></xsl:when><xsl:otherwise>6mm</xsl:otherwise></xsl:choose></xsl:variable>
   <xsl:variable name="fm.toc.gap"><xsl:choose><xsl:when test="$xs.fm.on"><xsl:value-of select="$xs.fm.toc.gap"/></xsl:when><xsl:otherwise>6mm</xsl:otherwise></xsl:choose></xsl:variable>
   <!-- the four-column contents table of the reference (no Chapter or Page column): 33.68 / 35.86 / 14.13 / 16.33 % of the text width -->
-  <xsl:variable name="xs.fm.toc.fixed" select="$xs.fm.on and $toc.s1000d.showChapter != '1' and $toc.s1000d.showPage != '1'"/>
+  <xsl:variable name="xs.fm.toc.fixed" select="$xs.fm.on and $toc.s1000d.showChapter != '1' and $toc.page.show != '1'"/>
   <xsl:variable name="fm.w.toc1"><xsl:choose><xsl:when test="$xs.fm.toc.fixed">3383</xsl:when><xsl:otherwise>31</xsl:otherwise></xsl:choose></xsl:variable>
   <xsl:variable name="fm.w.toc2"><xsl:choose><xsl:when test="$xs.fm.toc.fixed">3601</xsl:when><xsl:otherwise>28</xsl:otherwise></xsl:choose></xsl:variable>
   <xsl:variable name="fm.w.toc3"><xsl:choose><xsl:when test="$xs.fm.toc.fixed">1419</xsl:when><xsl:otherwise>15</xsl:otherwise></xsl:choose></xsl:variable>
@@ -91,10 +94,25 @@
     Both new toggles for the S1000D-style contents table. Chapter defaults
     off: it is a new column with no equivalent before this setting existed,
     so an existing book's TOC does not change shape until someone opts in.
-    Page defaults on, matching what every book already shows.
+    Page defaults on for every layout profile except the Xignal one, whose
+    contents list has no Page column (see toc.page.show below).
   -->
   <xsl:param name="toc.s1000d.showChapter">0</xsl:param>
-  <xsl:param name="toc.s1000d.showPage">1</xsl:param>
+  <xsl:param name="toc.s1000d.showPage"/>
+  <!--
+    The Page column is resolved once. A project that states it ('1' / '0', from the house template or the
+    project's layout) is obeyed; one that does not gets what its layout profile prints: the Xignal reference
+    contents list has no Page column (Document title / Data module code / Issue date / Applicable to), every
+    other profile keeps the column it always had. Deciding it here, not only in the template file, keeps an
+    older workspace copy of the template from bringing the column back.
+  -->
+  <xsl:variable name="toc.page.show">
+    <xsl:choose>
+      <xsl:when test="$toc.s1000d.showPage = '1' or $toc.s1000d.showPage = '0'"><xsl:value-of select="$toc.s1000d.showPage"/></xsl:when>
+      <xsl:when test="$xs.fm.on">0</xsl:when>
+      <xsl:otherwise>1</xsl:otherwise>
+    </xsl:choose>
+  </xsl:variable>
   <!--
     "Chap " + the pmEntry's position among its own siblings at each nesting
     level, dot-joined down from the outermost chapter — 1, 1.1, 1.4.1, 2.5.3.
@@ -129,6 +147,8 @@
   <xsl:param name="fm.label.s1000d.tocIntroDated">, dated </xsl:param>
   <xsl:param name="fm.label.s1000d.tocIntroEnd">, of this publication.</xsl:param>
   <xsl:param name="fm.label.s1000d.publisher">Publisher:</xsl:param>
+  <!-- The List of illustrations row for the picture on the cover (Xignal cover only). -->
+  <xsl:param name="fm.label.s1000d.coverPicture">Product illustration</xsl:param>
   <xsl:param name="fm.label.s1000d.none">None</xsl:param>
 
   <!--
@@ -240,10 +260,32 @@
     </xsl:if>
   </xsl:template>
 
+  <!--
+    The rules of a header cell. Xignal: a hairline above AND below the row, as the reference draws them on the first page of every
+    table and again under each "(Continued)" caption. Anything else: the engine's own single 1 pt rule below.
+  -->
+  <xsl:template name="xs-fm-head-rules">
+    <xsl:choose>
+      <xsl:when test="$xs.fm.on">
+        <xsl:attribute name="border-top"><xsl:value-of select="concat($xs.fm.rule, ' solid black')"/></xsl:attribute>
+        <xsl:attribute name="border-bottom"><xsl:value-of select="concat($xs.fm.rule, ' solid black')"/></xsl:attribute>
+      </xsl:when>
+      <xsl:otherwise><xsl:attribute name="border-bottom">1pt solid black</xsl:attribute></xsl:otherwise>
+    </xsl:choose>
+  </xsl:template>
+
+  <!-- The closing hairline under a table's last row (the reference draws it on the last page of each table, and only there). -->
+  <xsl:template name="xs-fm-end-rule">
+    <xsl:if test="$xs.fm.on">
+      <fo:block border-top="{concat($xs.fm.rule, ' solid black')}" font-size="0pt" line-height="0pt" keep-with-previous.within-page="always"/>
+    </xsl:if>
+  </xsl:template>
+
   <!-- A ruled header cell. -->
   <xsl:template name="s1000d-th">
     <xsl:param name="t"/>
-    <fo:table-cell border-bottom="1pt solid black" padding="{$fm.cell.pad}" padding-left="{$fm.cell.padleft}">
+    <fo:table-cell padding="{$fm.cell.pad}" padding-left="{$fm.cell.padleft}">
+      <xsl:call-template name="xs-fm-head-rules"/>
       <fo:block font-weight="bold"><xsl:copy-of select="$t"/></fo:block>
     </fo:table-cell>
   </xsl:template>
@@ -252,6 +294,7 @@
   <xsl:template name="s1000d-td">
     <xsl:param name="t"/>
     <xsl:param name="link"/>
+    <xsl:param name="link.color">#0000CC</xsl:param>
     <xsl:param name="bold">0</xsl:param>
     <xsl:param name="cap"/>
     <xsl:param name="cap.first"/>
@@ -264,7 +307,7 @@
         </xsl:if>
         <xsl:choose>
           <xsl:when test="$link != ''">
-            <fo:basic-link internal-destination="{$link}" color="#0000CC">
+            <fo:basic-link internal-destination="{$link}" color="{$link.color}">
               <xsl:copy-of select="$t"/>
             </fo:basic-link>
           </xsl:when>
@@ -299,19 +342,46 @@
       <xsl:with-param name="last" select="1"/>
       <xsl:with-param name="content">
         <fo:block>
-          <xsl:call-template name="generate-markers"/>
-          <fo:block font-size="{$heading1-size}" font-weight="bold" space-before="18mm" space-after="2mm">
-            <xsl:value-of select="/pm/identAndStatusSection/pmAddress/pmAddressItems/pmTitle"/>
-          </fo:block>
-          <xsl:if test="/pm/identAndStatusSection/pmAddress/pmAddressItems/shortPmTitle">
-            <fo:block font-size="{$heading2-size}" font-weight="bold" space-after="8mm">
-              <xsl:value-of select="/pm/identAndStatusSection/pmAddress/pmAddressItems/shortPmTitle"/>
-            </fo:block>
-          </xsl:if>
-          <fo:block font-weight="bold" space-after="1.5mm">
-            <xsl:call-template name="s1000d-pm-code"/>
-          </fo:block>
-          <fo:block font-weight="bold" space-after="10mm">
+          <xsl:call-template name="generate-markers"><xsl:with-param name="info">001</xsl:with-param></xsl:call-template>
+          <!-- Xignal profile: the cover is set exactly as the reference's title page is (xignal-cover.xsl: title 24 pt, code and issue 14 pt bold,
+               the measured gaps), so a publication whose first module is not a title-page module still opens on the same page. -->
+          <xsl:choose>
+            <xsl:when test="$xs.cover.on">
+              <fo:block font-size="{$xs.cover.title.size}" font-weight="bold" line-height="1.2" padding-top="{$xs.cover.top}">
+                <xsl:value-of select="normalize-space(/pm/identAndStatusSection/pmAddress/pmAddressItems/pmTitle)"/>
+              </fo:block>
+              <xsl:if test="normalize-space(/pm/identAndStatusSection/pmAddress/pmAddressItems/shortPmTitle) != ''">
+                <fo:block font-size="{$xs.cover.sub.size}" font-weight="bold" space-before="{$xs.cover.issue.gap}" space-before.conditionality="retain">
+                  <xsl:value-of select="normalize-space(/pm/identAndStatusSection/pmAddress/pmAddressItems/shortPmTitle)"/>
+                </fo:block>
+              </xsl:if>
+              <fo:block font-size="{$xs.cover.sub.size}" font-weight="bold" space-before="{$xs.cover.code.gap}" space-before.conditionality="retain">
+                <xsl:call-template name="s1000d-pm-code"/>
+              </fo:block>
+            </xsl:when>
+            <xsl:otherwise>
+              <fo:block font-size="{$heading1-size}" font-weight="bold" space-before="18mm" space-after="2mm">
+                <xsl:value-of select="/pm/identAndStatusSection/pmAddress/pmAddressItems/pmTitle"/>
+              </fo:block>
+              <xsl:if test="/pm/identAndStatusSection/pmAddress/pmAddressItems/shortPmTitle">
+                <fo:block font-size="{$heading2-size}" font-weight="bold" space-after="8mm">
+                  <xsl:value-of select="/pm/identAndStatusSection/pmAddress/pmAddressItems/shortPmTitle"/>
+                </fo:block>
+              </xsl:if>
+              <fo:block font-weight="bold" space-after="1.5mm">
+                <xsl:call-template name="s1000d-pm-code"/>
+              </fo:block>
+            </xsl:otherwise>
+          </xsl:choose>
+          <fo:block font-weight="bold">
+            <xsl:choose>
+              <xsl:when test="$xs.cover.on">
+                <xsl:attribute name="font-size"><xsl:value-of select="$xs.cover.sub.size"/></xsl:attribute>
+                <xsl:attribute name="space-before"><xsl:value-of select="$xs.cover.issue.gap"/></xsl:attribute>
+                <xsl:attribute name="space-before.conditionality">retain</xsl:attribute>
+              </xsl:when>
+              <xsl:otherwise><xsl:attribute name="space-after">10mm</xsl:attribute></xsl:otherwise>
+            </xsl:choose>
             <xsl:value-of select="$fm.label.s1000d.issueNo"/>
             <xsl:value-of select="$issue/@issueNumber"/>
             <xsl:if test="$date">
@@ -341,39 +411,61 @@
             </fo:block>
           </xsl:if>
 
-          <fo:block space-before="6mm">
-            <xsl:value-of select="$fm.label.s1000d.publisher"/>
-          </fo:block>
-          <xsl:variable name="pubLogo"
-            select="(/pm/bookmeta/publishers/publisher[1]/logo/@src
-                   | /pm/identAndStatusSection/pmStatus/logo/symbol/@infoEntityIdent)[1]"/>
-          <xsl:if test="/pm/bookmeta/publishers/publisher[1]/logo/@src">
-            <fo:block space-before="2mm">
-              <!-- Per-publisher logo/@height in Settings > Publishers overrides
-                   the general "Publisher logo height" setting below, which stays
-                   the default for a publisher that has not set its own. -->
-              <fo:external-graphic src="url('{/pm/bookmeta/publishers/publisher[1]/logo/@src}')"
-                                   content-width="scale-down-to-fit"
-                                   scaling="uniform">
-                <xsl:attribute name="content-height">
-                  <xsl:choose>
-                    <xsl:when test="/pm/bookmeta/publishers/publisher[1]/logo/@height">
-                      <xsl:value-of select="/pm/bookmeta/publishers/publisher[1]/logo/@height"/>
-                    </xsl:when>
-                    <xsl:otherwise><xsl:value-of select="$fm.s1000d.logo.height"/></xsl:otherwise>
-                  </xsl:choose>
-                </xsl:attribute>
-                <xsl:if test="/pm/bookmeta/publishers/publisher[1]/logo/@width">
-                  <xsl:attribute name="width">
-                    <xsl:value-of select="/pm/bookmeta/publishers/publisher[1]/logo/@width"/>
-                  </xsl:attribute>
-                </xsl:if>
-              </fo:external-graphic>
-            </fo:block>
-          </xsl:if>
-          <fo:block font-size="{$table-font-size}">
-            <xsl:value-of select="/pm/identAndStatusSection/pmStatus/responsiblePartnerCompany/enterpriseName"/>
-          </fo:block>
+          <xsl:choose>
+            <!-- Xignal cover: the same "Publisher:" block as the title-page module's cover (xignal-cover.xsl): the logo, 30 mm wide. -->
+            <xsl:when test="$xs.cover.on">
+              <xsl:call-template name="xs-cover-publisher">
+                <xsl:with-param name="logo.src" select="/pm/bookmeta/publishers/publisher[1]/logo/@src"/>
+                <xsl:with-param name="enterprise" select="normalize-space(/pm/identAndStatusSection/pmStatus/responsiblePartnerCompany/enterpriseName)"/>
+              </xsl:call-template>
+            </xsl:when>
+            <xsl:otherwise>
+              <fo:block>
+                <xsl:choose>
+                  <xsl:when test="$xs.cover.on">
+                    <xsl:attribute name="font-size">8pt</xsl:attribute>
+                    <xsl:attribute name="space-before"><xsl:value-of select="$xs.cover.publisher.gap"/></xsl:attribute>
+                    <xsl:attribute name="space-before.conditionality">retain</xsl:attribute>
+                  </xsl:when>
+                  <xsl:otherwise><xsl:attribute name="space-before">6mm</xsl:attribute></xsl:otherwise>
+                </xsl:choose>
+                <xsl:value-of select="$fm.label.s1000d.publisher"/>
+              </fo:block>
+              <xsl:variable name="pubLogo"
+                select="(/pm/bookmeta/publishers/publisher[1]/logo/@src
+                       | /pm/identAndStatusSection/pmStatus/logo/symbol/@infoEntityIdent)[1]"/>
+              <xsl:if test="/pm/bookmeta/publishers/publisher[1]/logo/@src">
+                <fo:block space-before="2mm">
+                  <!-- Per-publisher logo/@height in Settings > Publishers overrides
+                       the general "Publisher logo height" setting below, which stays
+                       the default for a publisher that has not set its own. -->
+                  <fo:external-graphic src="url('{/pm/bookmeta/publishers/publisher[1]/logo/@src}')"
+                                       content-width="scale-down-to-fit"
+                                       scaling="uniform">
+                    <xsl:attribute name="content-height">
+                      <xsl:choose>
+                        <xsl:when test="/pm/bookmeta/publishers/publisher[1]/logo/@height">
+                          <xsl:value-of select="/pm/bookmeta/publishers/publisher[1]/logo/@height"/>
+                        </xsl:when>
+                        <xsl:otherwise><xsl:value-of select="$fm.s1000d.logo.height"/></xsl:otherwise>
+                      </xsl:choose>
+                    </xsl:attribute>
+                    <xsl:if test="/pm/bookmeta/publishers/publisher[1]/logo/@width">
+                      <xsl:attribute name="width">
+                        <xsl:value-of select="/pm/bookmeta/publishers/publisher[1]/logo/@width"/>
+                      </xsl:attribute>
+                    </xsl:if>
+                  </fo:external-graphic>
+                </fo:block>
+              </xsl:if>
+              <fo:block font-size="{$table-font-size}">
+                <xsl:choose>
+                  <xsl:when test="$xs.cover.on and normalize-space($xs.mark.company) != ''"><xsl:value-of select="normalize-space($xs.mark.company)"/></xsl:when>
+                  <xsl:otherwise><xsl:value-of select="/pm/identAndStatusSection/pmStatus/responsiblePartnerCompany/enterpriseName"/></xsl:otherwise>
+                </xsl:choose>
+              </fo:block>
+            </xsl:otherwise>
+          </xsl:choose>
           <fo:block>
             <xsl:call-template name="end-of-datamodule-marker"/>
           </fo:block>
@@ -399,7 +491,7 @@
       <xsl:with-param name="first" select="$fm.s1000d.restart"/>
       <xsl:with-param name="content">
         <fo:block>
-          <xsl:call-template name="generate-markers"/>
+          <xsl:call-template name="generate-markers"><xsl:with-param name="info">009</xsl:with-param></xsl:call-template>
           <xsl:call-template name="page-title">
             <xsl:with-param name="text" select="$fm.label.s1000d.toc"/>
             <xsl:with-param name="padding-top" select="$fm.title.pad"/>
@@ -420,13 +512,13 @@
             <fo:table-column column-width="proportional-column-width({$fm.w.toc1})"/>
             <fo:table-column column-width="proportional-column-width({$fm.w.toc2})"/>
             <fo:table-column column-width="proportional-column-width({$fm.w.toc3})"/>
-            <xsl:if test="$toc.s1000d.showPage = '1'">
+            <xsl:if test="$toc.page.show = '1'">
               <fo:table-column column-width="proportional-column-width(9)"/>
             </xsl:if>
             <fo:table-column column-width="proportional-column-width({$fm.w.toc4})"/>
             <fo:table-header>
               <xsl:call-template name="xs-fm-caption-row">
-                <xsl:with-param name="cols" select="4 + ($toc.s1000d.showChapter = '1') + ($toc.s1000d.showPage = '1')"/>
+                <xsl:with-param name="cols" select="4 + ($toc.s1000d.showChapter = '1') + ($toc.page.show = '1')"/>
               </xsl:call-template>
               <fo:table-row>
                 <xsl:if test="$toc.s1000d.showChapter = '1'">
@@ -437,7 +529,8 @@
                 <xsl:call-template name="s1000d-th">
                   <xsl:with-param name="t" select="$fm.label.s1000d.colTitle"/>
                 </xsl:call-template>
-                <fo:table-cell border-bottom="1pt solid black" padding="{$fm.cell.pad}" padding-left="{$fm.cell.padleft}">
+                <fo:table-cell padding="{$fm.cell.pad}" padding-left="{$fm.cell.padleft}">
+                  <xsl:call-template name="xs-fm-head-rules"/>
                   <fo:block font-weight="bold"><xsl:value-of select="$fm.label.s1000d.colCode"/></fo:block>
                   <fo:block font-weight="bold">
                     <xsl:if test="$xs.fm.on"><xsl:attribute name="space-before"><xsl:value-of select="$xs.fm.header.line2"/></xsl:attribute></xsl:if>
@@ -447,7 +540,7 @@
                 <xsl:call-template name="s1000d-th">
                   <xsl:with-param name="t" select="$fm.label.s1000d.colIssue"/>
                 </xsl:call-template>
-                <xsl:if test="$toc.s1000d.showPage = '1'">
+                <xsl:if test="$toc.page.show = '1'">
                   <xsl:call-template name="s1000d-th">
                     <xsl:with-param name="t" select="$fm.label.s1000d.colPage"/>
                   </xsl:call-template>
@@ -503,7 +596,7 @@
                       </xsl:call-template>
                     </xsl:with-param>
                   </xsl:call-template>
-                  <xsl:if test="$toc.s1000d.showPage = '1'">
+                  <xsl:if test="$toc.page.show = '1'">
                     <fo:table-cell padding="{$fm.cell.pad}" padding-left="{$fm.cell.padleft}">
       <xsl:if test="not($xs.fm.on)"><xsl:attribute name="border-bottom">0.4pt solid #999999</xsl:attribute></xsl:if>
                       <fo:block>
@@ -521,6 +614,7 @@
               </xsl:for-each>
             </fo:table-body>
           </fo:table>
+          <xsl:call-template name="xs-fm-end-rule"/>
           <fo:block>
             <xsl:call-template name="end-of-datamodule-marker"/>
           </fo:block>
@@ -543,7 +637,7 @@
       <xsl:with-param name="first" select="$fm.s1000d.restart"/>
       <xsl:with-param name="content">
         <fo:block>
-          <xsl:call-template name="generate-markers"/>
+          <xsl:call-template name="generate-markers"><xsl:with-param name="info">00A</xsl:with-param></xsl:call-template>
           <xsl:call-template name="page-title">
             <xsl:with-param name="text" select="$fm.label.s1000d.loi"/>
             <xsl:with-param name="padding-top" select="$fm.title.pad"/>
@@ -569,6 +663,41 @@
             </fo:table-header>
             <fo:table-body>
               <!--
+                The picture on the Xignal cover (the title-page module's productIllustration), when there is one and it can be found: its own
+                row, FIRST in the list (the cover is the first module), with the module's code as a link to the cover and the figure and its
+                title as links to the picture itself (cover-picture-<module>, xignal-cover.xsl).
+              -->
+              <xsl:variable name="cover.pic.id">
+                <xsl:variable name="cid"><xsl:call-template name="xs-cover-id"><xsl:with-param name="pm" select="/pm"/></xsl:call-template></xsl:variable>
+                <xsl:for-each select="$all.dmodules[generate-id(.) = $cid]">
+                  <xsl:variable name="pic" select="normalize-space(content/frontMatter/frontMatterTitlePage/productIllustration/graphic/@infoEntityIdent)"/>
+                  <xsl:if test="$pic != ''">
+                    <xsl:variable name="psrc"><xsl:call-template name="xs-icn-src"><xsl:with-param name="icn" select="$pic"/></xsl:call-template></xsl:variable>
+                    <xsl:if test="$psrc != ''"><xsl:value-of select="generate-id(.)"/></xsl:if>
+                  </xsl:if>
+                </xsl:for-each>
+              </xsl:variable>
+              <xsl:for-each select="$all.dmodules[generate-id(.) = $cover.pic.id]">
+                <fo:table-row>
+                  <xsl:call-template name="s1000d-td">
+                    <xsl:with-param name="cap" select="$xs.fm.cap.loi"/>
+                    <xsl:with-param name="cap.first" select="1"/>
+                    <xsl:with-param name="link" select="concat('content-start-', generate-id(.))"/>
+                    <xsl:with-param name="t"><xsl:call-template name="get.dmcode"/></xsl:with-param>
+                  </xsl:call-template>
+                  <xsl:call-template name="s1000d-td">
+                    <xsl:with-param name="link" select="concat('cover-picture-', generate-id(.))"/>
+                    <xsl:with-param name="link.color">#000000</xsl:with-param>
+                    <xsl:with-param name="t">Fig 1</xsl:with-param>
+                  </xsl:call-template>
+                  <xsl:call-template name="s1000d-td">
+                    <xsl:with-param name="link" select="concat('cover-picture-', generate-id(.))"/>
+                    <xsl:with-param name="link.color">#000000</xsl:with-param>
+                    <xsl:with-param name="t" select="$fm.label.s1000d.coverPicture"/>
+                  </xsl:call-template>
+                </fo:table-row>
+              </xsl:for-each>
+              <!--
                 A publication with no titled figure still has to produce a
                 table body: FOP requires at least one row, so the empty case
                 aborted the whole build with a validation error naming
@@ -576,7 +705,7 @@
                 nothing about the book they wrote. The list of abbreviations
                 below already carried its "None" row; this one did not.
               -->
-              <xsl:if test="not(//dmodule//figure[title])">
+              <xsl:if test="not(//dmodule//figure[title]) and $cover.pic.id = ''">
                 <fo:table-row>
                   <xsl:call-template name="s1000d-td">
                     <xsl:with-param name="t" select="$fm.label.s1000d.none"/>
@@ -600,7 +729,9 @@
                   <fo:table-row>
                     <xsl:call-template name="s1000d-td">
                       <xsl:with-param name="cap" select="$xs.fm.cap.loi"/>
-                      <xsl:with-param name="cap.first" select="number(generate-id(.) = generate-id((//dmodule//figure[title])[1]))"/>
+                      <xsl:with-param name="cap.first" select="number($cover.pic.id = '' and generate-id(.) = generate-id((//dmodule//figure[title])[1]))"/>
+                      <!-- Xignal: the code on a module's first figure is a link to the module, as it is in the contents list -->
+                      <xsl:with-param name="link"><xsl:if test="$xs.fm.on and position() = 1"><xsl:value-of select="concat('content-start-', generate-id($dm))"/></xsl:if></xsl:with-param>
                       <xsl:with-param name="t">
                         <!-- Only on the module's FIRST figure. -->
                         <xsl:if test="position() = 1">
@@ -612,6 +743,7 @@
                     </xsl:call-template>
                     <xsl:call-template name="s1000d-td">
                       <xsl:with-param name="link" select="$fig-id"/>
+                      <xsl:with-param name="link.color"><xsl:choose><xsl:when test="$xs.fm.on">#000000</xsl:when><xsl:otherwise>#0000CC</xsl:otherwise></xsl:choose></xsl:with-param>
                       <xsl:with-param name="t">
                         <!--
                           The SAME number the caption prints, not this row's
@@ -629,6 +761,7 @@
                     </xsl:call-template>
                     <xsl:call-template name="s1000d-td">
                       <xsl:with-param name="link" select="$fig-id"/>
+                      <xsl:with-param name="link.color"><xsl:choose><xsl:when test="$xs.fm.on">#000000</xsl:when><xsl:otherwise>#0000CC</xsl:otherwise></xsl:choose></xsl:with-param>
                       <xsl:with-param name="t" select="normalize-space(title)"/>
                     </xsl:call-template>
                   </fo:table-row>
@@ -636,6 +769,7 @@
               </xsl:for-each>
             </fo:table-body>
           </fo:table>
+          <xsl:call-template name="xs-fm-end-rule"/>
           <fo:block>
             <xsl:call-template name="end-of-datamodule-marker"/>
           </fo:block>
@@ -659,7 +793,7 @@
       <xsl:with-param name="first" select="$fm.s1000d.restart"/>
       <xsl:with-param name="content">
         <fo:block>
-          <xsl:call-template name="generate-markers"/>
+          <xsl:call-template name="generate-markers"><xsl:with-param name="info">005</xsl:with-param></xsl:call-template>
           <xsl:call-template name="page-title">
             <xsl:with-param name="text" select="$fm.label.s1000d.loa"/>
             <xsl:with-param name="padding-top" select="$fm.title.pad"/>
@@ -722,6 +856,7 @@
               </xsl:choose>
             </fo:table-body>
           </fo:table>
+          <xsl:call-template name="xs-fm-end-rule"/>
           <fo:block>
             <xsl:call-template name="end-of-datamodule-marker"/>
           </fo:block>

@@ -7,6 +7,9 @@ import { csdbApi, type CsdbObject, type ImportReport, type Suggestion } from '..
 import { contentApi } from '../../api';
 import { Icon } from '../../components/Icon';
 import { PageHeader } from '../../components/PageHeader';
+import { PublishRefusal } from '../../components/PublishRefusal';
+import { onlyRuleBreaks } from '../../lib/ruleBreaks';
+import { refusalOf, type Refusal } from '../../lib/waivers';
 import { Alert, Badge, ConfirmModal, Empty, Field, Loading, Modal, errText, fmtSize, useAsync } from '../../components/ui';
 import { useProject } from '../../layouts/ProjectShell';
 import { useUi } from '../../store/ui';
@@ -192,12 +195,29 @@ function ReportView({ r }: { r: ImportReport }) {
 function HtmlTab({ id, can }: { id: string; can: boolean }) {
   const toast = useUi((s) => s.toast);
   const builds = useAsync(() => csdbApi.html(id), [id]);
+  const { role } = useProject();
   const [busy, setBusy] = useState(false);
-  const build = async () => { setBusy(true); try { const b = await csdbApi.buildHtml(id); toast(`HTML built: ${b.pages} pages`, 'success'); builds.reload(); } catch (e) { toast(errText(e), 'error'); } finally { setBusy(false); } };
+  const [error, setError] = useState('');
+  const [rulesOnly, setRulesOnly] = useState(false);
+  const [refusal, setRefusal] = useState<Refusal | null>(null);
+  // The same gate as the PDF build, with the same two ways past it: build anyway when ONLY business rules are broken, or a recorded BREX waiver (draft only).
+  const build = async (allowRuleBreaks = false) => {
+    setBusy(true); setError(''); setRulesOnly(false); setRefusal(null);
+    try {
+      const b = await csdbApi.buildHtml(id, allowRuleBreaks);
+      toast(`HTML built: ${b.pages} pages${b.ruleBreaks?.length ? ` · ${b.ruleBreaks.length} business rule break${b.ruleBreaks.length === 1 ? '' : 's'} not fixed` : ''}`, 'success');
+      builds.reload();
+    } catch (e) {
+      const only = onlyRuleBreaks(e); const r = only ? null : refusalOf(e);
+      if (r) setRefusal(r); else { setError(errText(e)); setRulesOnly(only); }
+    } finally { setBusy(false); }
+  };
   return (
     <div className="v2-stack">
       <p className="v2-hint">A static HTML publication (AGASTYA's own format): contents, one page per data module, graphics, list of illustrations and abbreviations. It opens from a folder or any web server, with no script. Built only from modules that pass validation.</p>
-      {can ? <div><button className="v2-btn v2-btn-primary" disabled={busy} onClick={build}>{busy ? 'Building…' : 'Build HTML publication'}</button></div> : null}
+      {can ? <div><button className="v2-btn v2-btn-primary" disabled={busy} onClick={() => void build(false)}>{busy ? 'Building…' : 'Build HTML publication'}</button></div> : null}
+      {error ? <div><Alert tone="bad">{error}</Alert>{rulesOnly ? <p className="v2-hint" style={{ margin: '6px 0 0' }}>Only business rules (BREX) are broken. You can still build the HTML to look at it; its front page lists the breaks and it stays NOT RELEASED. <button className="btn btn-sm" disabled={busy} onClick={() => void build(true)}>Build anyway</button></p> : null}</div> : null}
+      {refusal ? <PublishRefusal refusal={refusal} projectId={id} role={role} mode="draft" onDismiss={() => setRefusal(null)} onRecorded={() => void build(false)} /> : null}
       {(builds.data?.builds ?? []).map((b) => <div key={b.name} className="v2-row" style={{ gap: 12 }}><span className="v2-mono">{b.name}</span><span>{fmtSize(b.size)}</span><a href={`/api/projects/${id}/publish/html/${b.name}/index.html`} target="_blank" rel="noreferrer">Open</a><a href={`/api/projects/${id}/publish/html/${b.name}.zip`}>Download ZIP</a></div>)}
     </div>
   );

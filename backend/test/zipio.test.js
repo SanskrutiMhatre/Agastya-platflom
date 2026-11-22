@@ -2,7 +2,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs'); const os = require('os'); const path = require('path'); const zlib = require('zlib');
-const { execFileSync } = require('child_process');
+const { verifyZip } = require('./helpers');
 const Z = require('../dist/services/zipio');
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'zipio-'));
@@ -35,7 +35,7 @@ test('round trip, standard and forced ZIP64; both pass unzip -t', async () => {
     assert.equal((await r.readBuffer(r.entries[2])).length, 0);
     const out = path.join(d, 'out'); await r.extractTo(out);
     assert.equal(fs.readFileSync(path.join(out, 'dir/b.xml'), 'utf8'), '<x/>'); r.close();
-    try { execFileSync('python3', ['-m', 'zipfile', '-t', f], { stdio: 'pipe' }); } catch (e) { assert.fail(`python zipfile rejected ${z64 ? 'ZIP64' : 'ZIP'}: ${e.stderr}`); }
+    try { verifyZip(f); } catch (e) { assert.fail(`${z64 ? 'ZIP64' : 'ZIP'}: ${e.message}`); }
   }
 });
 test('ZIP Slip and unsafe names are refused', async () => {

@@ -57,6 +57,9 @@ test('folders and projects: create, file, list', async () => {
   const p = await writer.post('/api/projects', { name: 'Test Book', folder: 'Navy', pipeline: 's1000dtofo' });
   assert.equal(p.status, 201);
   pid = p.json.project.id;
+  // Since Phase 19 a new module joins the publication by itself. The tests below are about the CSDB pool (unplaced / missing / placed), so this project opts out
+  // of that, with the supported setting; the automatic placement is covered by project-formats.test.js and the e2e platform.spec.ts.
+  assert.equal((await writer.patch(`/api/projects/${pid}`, { autoAddToPublication: false })).status, 200);
   assert.equal(p.json.project.folder, 'Navy');
   assert.equal((await writer.post('/api/projects', { name: 'test book' })).status, 409, 'project names are unique, case-insensitively');
   const ws = await writer.get('/api/workspace');

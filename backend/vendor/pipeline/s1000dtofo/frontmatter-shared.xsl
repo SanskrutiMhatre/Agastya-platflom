@@ -184,14 +184,17 @@
   -->
   <xsl:template name="frontmatter-markers">
     <fo:marker marker-class-name="chapter.classification">
-      <xsl:choose>
-        <xsl:when test="$fm.first.dm/identAndStatusSection/dmStatus/security">
-          <xsl:apply-templates select="$fm.first.dm/identAndStatusSection/dmStatus/security"/>
-        </xsl:when>
-        <xsl:otherwise>
-          <xsl:apply-templates select="/pm/identAndStatusSection/pmStatus/security"/>
-        </xsl:otherwise>
-      </xsl:choose>
+      <!-- Empty for the Xignal profile (see $prelim.classification.on): the marker is still set so the page does not inherit one. -->
+      <xsl:if test="$prelim.classification.on">
+        <xsl:choose>
+          <xsl:when test="$fm.first.dm/identAndStatusSection/dmStatus/security">
+            <xsl:apply-templates select="$fm.first.dm/identAndStatusSection/dmStatus/security"/>
+          </xsl:when>
+          <xsl:otherwise>
+            <xsl:apply-templates select="/pm/identAndStatusSection/pmStatus/security"/>
+          </xsl:otherwise>
+        </xsl:choose>
+      </xsl:if>
     </fo:marker>
 
     <!--

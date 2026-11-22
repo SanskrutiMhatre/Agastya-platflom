@@ -11,7 +11,7 @@ export interface Suggestion { path: string; line: number; type: 'add' | 'modify'
 export interface ExtProfile { id: string; name: string; namespace: string; description: string; enabled?: boolean; projects?: number; xsdName?: string }
 export interface CirLink { file: string; cirFile: string; linkedIssue: string; cirIssue: string | null; state: string; linkedAt: string; approvedBy: string | null; approvedAt: string | null }
 export interface CoverageRow { schema: string; name: string; category: string; filePrefix: string | null; root: Record<string, string | null>; xsd: Record<string, boolean>; authored: boolean }
-export interface HtmlBuild { name: string; pages: number; assets: number; missing: string[]; zip: string; index: string; configured?: string }
+export interface HtmlBuild { name: string; pages: number; assets: number; missing: string[]; zip: string; index: string; configured?: string; ruleBreaks?: string[]; warnings?: string[] }
 
 const P = (id: string) => `/api/projects/${id}`;
 export const csdbApi = {
@@ -31,7 +31,7 @@ export const csdbApi = {
   },
   delivery: (id: string, body: Record<string, unknown>) => request<Response>('POST', `${P(id)}/packages/delivery`, body, { raw: true }),
   html: (id: string) => get<{ builds: Array<{ name: string; size: number; builtAt: string }> }>(`${P(id)}/publish/html`),
-  buildHtml: (id: string) => post<HtmlBuild>(`${P(id)}/publish/html`, {}),
+  buildHtml: (id: string, allowRuleBreaks = false) => post<HtmlBuild>(`${P(id)}/publish/html`, allowRuleBreaks ? { allowRuleBreaks: true } : {}),
   lifecycle: (id: string, file: string) => get<{ revisions: Revision[] }>(`${P(id)}/dms/${encodeURIComponent(file)}/lifecycle`),
   workingRevision: (id: string, file: string, reason?: string) => post<{ file: string }>(`${P(id)}/dms/${encodeURIComponent(file)}/working-revision`, { reason }),
   suggestions: (id: string, file: string) => get<{ against: string | null; suggestions: Suggestion[] }>(`${P(id)}/dms/${encodeURIComponent(file)}/change-suggestions`),

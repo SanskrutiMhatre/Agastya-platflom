@@ -397,6 +397,13 @@
   <!--                    MARKER GENERATION TEMPLATES                        -->
   <!-- ==================================================================== -->
   <xsl:template name="generate-markers">
+    <!--
+      info: the information code of a page the BUILD generates (contents 009, list of illustrations 00A, abbreviations 005).
+      Only the Xignal layout uses it: those pages carry a data module code in their foot, as the reference's do, made
+      the way every data module code is (model identification code, system difference code, the 00-00-00-00A
+      "whole product" block, the information code, item location code D) - one code, printed once.
+    -->
+    <xsl:param name="info"/>
     <!-- Classification marker -->
     <!--
       Classification, issue date and publication code all fall back to the
@@ -413,12 +420,14 @@
         <xsl:when test="identAndStatusSection/dmStatus/security">
           <xsl:apply-templates select="identAndStatusSection/dmStatus/security"/>
         </xsl:when>
-        <xsl:otherwise>
+        <!-- Front matter (the context is the publication module): see $prelim.classification.on. The generated title page (info 001) is the
+             publication's title page, which the reference marks like any module, so it is marked unless the project explicitly turned prelim marking off (prelim.classification = no). -->
+        <xsl:when test="$prelim.classification.on or ($info = '001' and $prelim.classification != 'no')">
           <xsl:apply-templates select="/pm/identAndStatusSection/pmStatus/security"/>
-        </xsl:otherwise>
+        </xsl:when>
       </xsl:choose>
     </fo:marker>
-    
+
     <!-- Applicability marker -->
     <!--
       Applicability, from the data module when it states one and from the
@@ -438,23 +447,32 @@
     <fo:marker marker-class-name="chapter.applicability">
       <xsl:variable name="dm.applic"
         select="normalize-space(identAndStatusSection/dmStatus/applic/displayText/simplePara)"/>
+      <xsl:variable name="pm.applic"
+        select="normalize-space(/pm/identAndStatusSection/pmStatus/applic/displayText/simplePara)"/>
       <xsl:choose>
         <xsl:when test="$dm.applic != ''"><xsl:value-of select="$dm.applic"/></xsl:when>
         <!-- Xignal profile: a data module whose applicability is the empty
              <displayText/> prints "All"; only pages that are not data modules
              (front matter) take the publication's wording. -->
         <xsl:when test="$layout.profile = 'xignal' and identAndStatusSection/dmStatus">All</xsl:when>
-        <xsl:otherwise>
-          <xsl:value-of
-            select="normalize-space(/pm/identAndStatusSection/pmStatus/applic/displayText/simplePara)"/>
-        </xsl:otherwise>
+        <!-- ... and so does a page the build generates, when the publication says nothing either -->
+        <xsl:when test="$layout.profile = 'xignal' and $pm.applic = ''">All</xsl:when>
+        <xsl:otherwise><xsl:value-of select="$pm.applic"/></xsl:otherwise>
       </xsl:choose>
     </fo:marker>
     
     <!-- Data module code marker -->
     <fo:marker marker-class-name="chapter.data.module.code">
-      <xsl:apply-templates select="identAndStatusSection/dmAddress/dmIdent/identExtension"/>
-      <xsl:apply-templates select="identAndStatusSection/dmAddress/dmIdent/dmCode"/>
+      <xsl:choose>
+        <xsl:when test="$layout.profile = 'xignal' and $info != '' and not(identAndStatusSection/dmAddress)">
+          <xsl:variable name="sdc" select="substring(concat($all.dmodules[1]/identAndStatusSection/dmAddress/dmIdent/dmCode/@systemDiffCode, 'A'), 1, 1)"/>
+          <xsl:value-of select="concat(/pm/identAndStatusSection/pmAddress/pmIdent/pmCode/@modelIdentCode, '-', $sdc, '-00-00-00-00A-', $info, 'A-D')"/>
+        </xsl:when>
+        <xsl:otherwise>
+          <xsl:apply-templates select="identAndStatusSection/dmAddress/dmIdent/identExtension"/>
+          <xsl:apply-templates select="identAndStatusSection/dmAddress/dmIdent/dmCode"/>
+        </xsl:otherwise>
+      </xsl:choose>
     </fo:marker>
     
     <!-- Issue date marker -->
@@ -768,6 +786,14 @@
       </xsl:choose>
     </xsl:variable>
     <xsl:variable name="mapped" select="concat('|', $classification.map, '|')"/>
+    <!-- What the table says for this class, and the marking the PROJECT itself states for the whole publication (Settings > Security
+         classification, "stamped on every page"). "Unclassified" states nothing. -->
+    <xsl:variable name="table.mark" select="substring-before(substring-after($mapped, concat('|', $code, '=')), '|')"/>
+    <xsl:variable name="project.mark">
+      <xsl:if test="translate(normalize-space($security.classification), $lower.abc, $upper.abc) != 'UNCLASSIFIED'">
+        <xsl:value-of select="normalize-space($security.classification)"/>
+      </xsl:if>
+    </xsl:variable>
     <xsl:choose>
       <!-- A class-to-marking table from Settings ("01=|02=RESTRICTED|..."):
            the class of THIS module decides what its running head and foot
@@ -776,7 +802,12 @@
            nothing"); only a class missing from the table falls through to the
            engine's own wording. -->
       <xsl:when test="$classification.map != '' and contains($mapped, concat('|', $code, '='))">
-        <xsl:value-of select="substring-before(substring-after($mapped, concat('|', $code, '=')), '|')"/>
+        <xsl:choose>
+          <!-- An empty entry means "this class prints nothing" - but a publication the project itself marks (Restricted, Secret ...) is
+               marked on every page, so an empty entry does not remove the project's own marking. An entry the table fills is that class's own marking. -->
+          <xsl:when test="$table.mark = ''"><xsl:value-of select="$project.mark"/></xsl:when>
+          <xsl:otherwise><xsl:value-of select="$table.mark"/></xsl:otherwise>
+        </xsl:choose>
       </xsl:when>
       <xsl:when test="$code = '01'">Unclassified</xsl:when>
       <xsl:when test="$code = '02'">Restricted</xsl:when>

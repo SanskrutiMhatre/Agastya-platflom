@@ -11,6 +11,7 @@
 import fs from 'fs';
 import path from 'path';
 import { config, nowIso, vendor } from './config';
+import { snapshotBeforeMigration } from './services/dbSnapshot';
 
 /* eslint-disable @typescript-eslint/no-var-requires, @typescript-eslint/no-explicit-any */
 const { AuthStore } = require('./core/auth/store');
@@ -58,18 +59,8 @@ export const store: any = new AuthStore(sqlite);
  * Before the S1000D reference-configuration migration (016) first runs on a database that already holds projects, keep a consistent copy of it
  * (VACUUM INTO) in workspace/backups/. Manual rollback is documented in docs/S1000D_REFERENCE_CONFIG.md. A fresh database has nothing to protect.
  */
-function snapshotBeforeReferenceMigration(): void {
-  try {
-    const has = (sql: string): any => { try { return sqlite.prepare(sql).get(); } catch { return undefined; } };
-    if (has("SELECT 1 AS x FROM schema_migrations WHERE name = '016-s1000d-reference'")) return;
-    if (!has("SELECT 1 AS x FROM schema_migrations LIMIT 1") || !Number(has('SELECT COUNT(*) AS n FROM projects')?.n)) return;
-    const dir = path.join(workspaceDir, 'backups');
-    fs.mkdirSync(dir, { recursive: true });
-    const file = path.join(dir, 'publisher-before-016-s1000d-reference.db');
-    if (!fs.existsSync(file)) sqlite.exec(`VACUUM INTO '${file.replace(/'/g, "''")}'`);
-  } catch (e) { console.error('[migration] pre-migration snapshot failed:', (e as Error).message); }
-}
-snapshotBeforeReferenceMigration();
+const preMigrationSnapshot = snapshotBeforeMigration(sqlite, workspaceDir, '016-s1000d-reference', nowIso());
+if (preMigrationSnapshot) console.log(`[migration] database copy before 016-s1000d-reference: ${preMigrationSnapshot}`);
 store.migrate(nowIso()); // additive migrations only
 
 export const sessionsSvc: any = new SessionService(store, { secureCookies: config.secureCookies });

@@ -35,6 +35,7 @@ import { ZipFileReader, ZipStreamWriter, safeEntryName, DEFAULT_LIMITS, type Ext
 import { hasSchema } from './registry';
 import { analyse as analyseExt, usesForeign } from './extensions';
 import { ISSUE_LABEL } from './s1000dRef';
+import { settingsOf, type PackageSettings } from './packageSettings';
 
 const { validateProjectSchema, declaredSchema } = require('../../vendor/engine/validateSchema');
 const { checkXmlSafety } = require('../core/auth/xmlGuard');
@@ -82,7 +83,7 @@ export function projectInventory(projectId: string): PackageFile[] {
   return out.sort((a, b) => a.path.localeCompare(b.path));
 }
 
-interface Manifest { format: 'agastya-package'; version: 1; kind: 'project' | 'delivery'; createdAt: string; project: { name: string; mic: string; issue: string | null }; files: Array<{ path: string; kind: FileKind; size: number; sha256: string }>; notes: string[]; ddn?: string; dml?: string }
+export interface Manifest { format: 'agastya-package'; version: 1; kind: 'project' | 'delivery'; createdAt: string; project: { name: string; mic: string; issue: string | null; /** What the project chose (a project package only): see services/packageSettings.ts. */ settings?: PackageSettings }; files: Array<{ path: string; kind: FileKind; size: number; sha256: string }>; notes: string[]; ddn?: string; dml?: string }
 
 const manifestOf = (projectId: string, kind: Manifest['kind'], files: PackageFile[], notes: string[], extra: Partial<Manifest> = {}): Manifest => {
   const cfg = getConfig(projectId);
@@ -92,7 +93,9 @@ const manifestOf = (projectId: string, kind: Manifest['kind'], files: PackageFil
 export async function exportProjectPackage(projectId: string, out: Writable): Promise<{ files: number }> {
   const files = projectInventory(projectId);
   const z = new ZipStreamWriter(out);
-  await z.addBuffer('manifest.json', Buffer.from(JSON.stringify(manifestOf(projectId, 'project', files, ['Round-trip project package. Paths are relative to the project; csdb/ holds data modules, CSDB objects and ICNs.']), null, 1)));
+  const man = manifestOf(projectId, 'project', files, ['Round-trip project package. Paths are relative to the project; csdb/ holds data modules, CSDB objects and ICNs. project.settings holds the project configuration and both SNS systems (restored only when the package starts a new project).']);
+  man.project.settings = settingsOf(projectId);
+  await z.addBuffer('manifest.json', Buffer.from(JSON.stringify(man, null, 1)));
   for (const f of files) await z.addFile(f.path, f.abs, { store: f.kind === 'asset' });
   await z.finish();
   return { files: files.length };
@@ -164,7 +167,7 @@ export async function exportDeliveryPackage(projectId: string, out: Writable, o:
 
 // ── Import ──────────────────────────────────────────────────────────────────
 
-export interface ImportOptions { overwrite?: boolean; partial?: boolean; skipChecks?: boolean; replacePm?: boolean; validate?: boolean }
+export interface ImportOptions { overwrite?: boolean; partial?: boolean; skipChecks?: boolean; replacePm?: boolean; validate?: boolean; /** Called with the package's manifest when it can be read (the new-project import takes the project settings from it). */ onManifest?: (m: Manifest) => void }
 export type ItemStatus = 'accepted' | 'unchanged' | 'skipped' | 'rejected';
 export interface ImportItem { path: string; as: FileKind; status: ItemStatus; message: string; schema?: string; xsdErrors?: number; xsdFirst?: string[]; sha256?: string; action?: 'create' | 'replace' }
 export interface ImportReport { source: string; startedAt: string; finishedAt: string; applied: boolean; counts: Record<ItemStatus, number>; items: ImportItem[]; notes: string[]; manifest: { present: boolean; checked: number; mismatches: string[] } }
@@ -187,7 +190,7 @@ export async function importPackage(projectId: string, zipPath: string, sourceNa
     const man = staged.find((s) => classify(s.rel) === 'manifest'); const mm: ImportReport['manifest'] = { present: !!man, checked: 0, mismatches: [] };
     if (man) {
       try {
-        const m = JSON.parse(fs.readFileSync(man.abs, 'utf8')) as Manifest;
+        const m = JSON.parse(fs.readFileSync(man.abs, 'utf8')) as Manifest; o.onManifest?.(m);
         for (const f of m.files ?? []) { const hit = staged.find((s) => s.rel.toLowerCase() === String(f.path).toLowerCase() || path.basename(s.rel).toLowerCase() === path.basename(String(f.path)).toLowerCase()); if (!hit) { mm.mismatches.push(`${f.path}: listed in the manifest but not in the package`); continue; } mm.checked++; if (sha256File(hit.abs) !== f.sha256) mm.mismatches.push(`${f.path}: content differs from the manifest (SHA-256)`); }
       } catch { mm.mismatches.push('manifest.json could not be read'); }
     }

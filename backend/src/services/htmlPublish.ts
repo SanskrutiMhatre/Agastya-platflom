@@ -179,10 +179,14 @@ function tocOf(pmXml: string, resolve: (n: MNode) => string | null, extRefs: (n:
   return content.children.filter((c) => c.name === 'pmEntry').map(walkE);
 }
 
-export interface HtmlResult { name: string; dir: string; zip: string; pages: number; assets: number; missing: string[]; configured?: string }
+export interface HtmlResult { name: string; dir: string; zip: string; pages: number; assets: number; missing: string[]; configured?: string; /** Business-rule breaks the author chose to build past. */ ruleBreaks: string[]; /** What the gate let through: a recorded BREX waiver, a rule this engine cannot run. */ warnings: string[] }
 
-export async function buildHtmlPublication(projectId: string, input?: ConfigInput): Promise<HtmlResult> {
-  const gate = await assertPublishable(projectId, 'publication');
+/**
+ * The HTML publication stands behind the SAME gate as the PDF, with the same two ways past it, both explicit and both written on the page:
+ * `allowRuleBreaks` (the author chose to build although modules break business rules) and a recorded BREX waiver (a draft only: a released publication never).
+ */
+export async function buildHtmlPublication(projectId: string, input?: ConfigInput, opts: { allowRuleBreaks?: boolean } = {}): Promise<HtmlResult> {
+  const gate = await assertPublishable(projectId, 'publication', { allowRuleBreaks: opts.allowRuleBreaks, waivable: !releaseStateOf(projectId).released });
   const dir = projectDirFor(projectId); const pj = readProjectJson(projectId);
   const csdbDir = path.join(dir, csdbRel(pj)); const pmAbs = path.join(dir, pmRel(pj));
   if (!fs.existsSync(pmAbs)) throw bad('This project has no publication module.', 'NO_PM');
@@ -232,17 +236,21 @@ export async function buildHtmlPublication(projectId: string, input?: ConfigInpu
 
   // index: title, markings, contents, LOI, LOA
   const meta = pmMeta(pmXml); const rel = releaseStateOf(projectId);
+  // What the gate let through is written on the front page, so nobody takes this build for a clean one.
+  const notice = gate.ruleBreaks.length || gate.warnings.length
+    ? `<div class="banner" role="note"><strong>Built with exceptions.</strong>${gate.ruleBreaks.length ? ` ${gate.ruleBreaks.length} business rule break${gate.ruleBreaks.length === 1 ? '' : 's'} not fixed.` : ''}<ul>${[...gate.warnings, ...gate.ruleBreaks].map((w) => `<li>${esc(w)}</li>`).join('')}</ul></div>`
+    : '';
   const tocHtml = (list: TocNode[]): string => `<ul class="toc">${list.map((t) => `<li>${t.title ? `<strong>${esc(t.title)}</strong>` : ''}${t.files.length ? `<ul class="toc">${t.files.map((f) => `<li><a href="${esc(pages.get(f)!)}">${esc(titles.get(f) ?? f)}</a></li>`).join('')}</ul>` : ''}${t.notes.map((n) => `<div class="mut">${esc(n)}</div>`).join('')}${t.children.length ? tocHtml(t.children) : ''}</li>`).join('')}</ul>`;
   const loi = figs.length ? `<h2>List of illustrations</h2><ul>${figs.map((f) => `<li><a href="${esc(pages.get(f.dm)!)}#${esc(f.id)}">${esc(f.title)}</a></li>`).join('')}</ul>` : '';
   const loa = acr.length ? `<h2>List of abbreviations</h2><table><tr><th>Abbreviation</th><th>Meaning</th></tr>${dedupe(acr).map((a) => `<tr><td>${esc(a.term)}</td><td>${esc(a.def)}</td></tr>`).join('')}</table>` : '';
   fs.writeFileSync(path.join(out, 'index.html'), page(meta.title || name, `<link rel="stylesheet" href="style.css"/>`,
-    `<main><h1>${esc(meta.title || name)}</h1><div class="banner">Security classification: ${esc(meta.security)} &middot; ${rel.released ? `Release ${esc(String(rel.approved?.release_number ?? ''))}` : 'NOT RELEASED'}</div><p class="mut">${esc(meta.code)} &middot; issue ${esc(meta.issue)} &middot; ${esc(meta.date)}${label ? ` &middot; configuration: ${esc(label)}` : ''} &middot; built ${esc(nowIso().slice(0, 10))}</p><h2>Contents</h2>${tocHtml(toc)}${loi}${loa}${missing.size ? `<h2 class="missing">Missing graphics</h2><ul>${[...missing].map((m) => `<li>${esc(m)}</li>`).join('')}</ul>` : ''}</main>`));
+    `<main><h1>${esc(meta.title || name)}</h1><div class="banner">Security classification: ${esc(meta.security)} &middot; ${rel.released ? `Release ${esc(String(rel.approved?.release_number ?? ''))}` : 'NOT RELEASED'}</div><p class="mut">${esc(meta.code)} &middot; issue ${esc(meta.issue)} &middot; ${esc(meta.date)}${label ? ` &middot; configuration: ${esc(label)}` : ''} &middot; built ${esc(nowIso().slice(0, 10))}</p>${notice}<h2>Contents</h2>${tocHtml(toc)}${loi}${loa}${missing.size ? `<h2 class="missing">Missing graphics</h2><ul>${[...missing].map((m) => `<li>${esc(m)}</li>`).join('')}</ul>` : ''}</main>`));
 
   const zip = path.join(dir, 'html', `${name}.zip`);
   const z = new ZipStreamWriter(fs.createWriteStream(zip));
   const addDir = async (abs: string, rp: string) => { for (const e of fs.readdirSync(abs, { withFileTypes: true })) { const a = path.join(abs, e.name); if (e.isDirectory()) await addDir(a, `${rp}${e.name}/`); else await z.addFile(`${rp}${e.name}`, a, { store: !!formatOf(e.name) && !/\.svg$/i.test(e.name) }); } };
   await addDir(out, `${name}/`); await z.finish();
-  return { name, dir: out, zip, pages: order.length, assets: used.size, missing: [...missing], configured: label || undefined };
+  return { name, dir: out, zip, pages: order.length, assets: used.size, missing: [...missing], configured: label || undefined, ruleBreaks: gate.ruleBreaks, warnings: gate.warnings };
 }
 
 const dedupe = (a: Array<{ term: string; def: string }>) => { const m = new Map<string, { term: string; def: string }>(); for (const x of a) if (!m.has(`${x.term}|${x.def}`)) m.set(`${x.term}|${x.def}`, x); return [...m.values()].sort((x, y) => x.term.localeCompare(y.term)); };

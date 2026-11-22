@@ -10,7 +10,7 @@
 // so two builds of one project would overwrite each other's PDF mid-view.
 // =============================================================================
 
-import { furnitureParams as defaultFurnitureParams, mergeParams } from './sideText';
+import { furnitureParams as defaultFurnitureParams, publisherLogoParams, mergeParams } from './sideText';
 import fs from 'fs';
 import path from 'path';
 import { config, vendor } from '../config';
@@ -179,14 +179,14 @@ export function syncFrontMatter(projectId: string): void {
  * Only the "xignal" layout profile uses them, so every other project is untouched. Nothing here can stop a
  * build: a missing logo or company line is logged and left out (see engine/brand.js for the precedence).
  */
-function brandFurnitureParams(project: any, effective: any, dir: string, log: (m: string) => void): Array<[string, string]> {
+function brandFurnitureParams(project: any, effective: any, dir: string, log: (m: string) => void, released?: boolean): Array<[string, string]> {
   if (effective.layout?.profile !== 'xignal') return [];
   try {
     const pmAbs = path.join(dir, project.input?.pm || 'publication.xml');
     const pmText = fs.existsSync(pmAbs) ? fs.readFileSync(pmAbs, 'utf8') : '';
     const brand = effective.brandPack ? brandEngine.loadBrandPack(path.join(workspaceDir, 'templates'), effective.brandPack) : null;
     if (effective.brandPack && !brand) log(`Brand pack "${effective.brandPack}" not found - building without its logo and company line`);
-    const r = brandEngine.resolveMarkings({ layout: effective.layout, pmText, brand, now: new Date() });
+    const r = brandEngine.resolveMarkings({ layout: effective.layout, pmText, brand, now: new Date(), released });
     if (r.logo?.from) {
       const dest = path.join(dir, r.logo.rel);
       fs.mkdirSync(path.dirname(dest), { recursive: true });
@@ -207,7 +207,7 @@ function brandFurnitureParams(project: any, effective: any, dir: string, log: (m
  * Never both: two mechanisms that both draw the rotated margin text and the logo would print every mark twice.
  */
 function furnitureFor(projectId: string, project: any, effective: any, released: boolean, dir: string, base: Array<[string, string]>, log: (m: string) => void): Array<[string, string]> {
-  if (effective.layout?.profile === 'xignal') return [...base, ...brandFurnitureParams(project, effective, dir, log)];
+  if (effective.layout?.profile === 'xignal') return [...base, ...brandFurnitureParams(project, effective, dir, log, released), ...publisherLogoParams(projectId, dir)];
   return mergeParams(base, defaultFurnitureParams(projectId, { released, dir }));
 }
 

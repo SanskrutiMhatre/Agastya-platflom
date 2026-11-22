@@ -72,7 +72,7 @@ export interface ProjectCard {
   /** New data modules join the publication automatically (default true). */
   autoAddToPublication: boolean;
   /** Page furniture of S1000D publications: rotated side text in the left margin, and the default header logo. On by default. */
-  sideText: { enabled: boolean; publisher: string; draftNote: boolean }; headerLogo: boolean;
+  sideText: { enabled: boolean; publisher: string; draftNote: boolean }; headerLogo: boolean; publisherLogo: boolean;
   folder: string; status: string; role: string; accessVia: 'project' | 'folder' | 'admin';
   dmCount: number; hasPdf: boolean; createdAt: string; updatedAt: string; lastOpened: string | null;
   owners: string[];
@@ -95,6 +95,7 @@ export function projectCard(row: any, role: string, via: ProjectCard['accessVia'
     autoAddToPublication: pj.autoAddToPublication !== false,
     sideText: { enabled: pj.sideText?.enabled !== false, publisher: pj.sideText?.publisher ?? '', draftNote: pj.sideText?.draftNote !== false },
     headerLogo: pj.headerLogo !== false,
+    publisherLogo: pj.publisherLogo !== false,
     format: pj.format || ((pj.type || row.type) === 'JSS' || pj.templateRef === 'uhb' ? 'jss' : 's1000d'),
     domain: pj.domain ?? null,
     manualType: pj.manualType ?? (pj.templateRef === 'uhb' ? 'uhb' : null),
@@ -253,7 +254,7 @@ export async function createProject(user: User, input: CreateProjectInput): Prom
   return projectCard(store.getProjectRow(id), 'owner', user.role === 'admin' ? 'admin' : 'project');
 }
 
-export async function updateProject(user: User, id: string, patch: { name?: string; folder?: string; pipeline?: string; autoAddToPublication?: boolean; sideText?: { enabled?: boolean; publisher?: string; draftNote?: boolean }; headerLogo?: boolean }): Promise<ProjectCard> {
+export async function updateProject(user: User, id: string, patch: { name?: string; folder?: string; pipeline?: string; autoAddToPublication?: boolean; sideText?: { enabled?: boolean; publisher?: string; draftNote?: boolean }; headerLogo?: boolean; publisherLogo?: boolean }): Promise<ProjectCard> {
   const row = store.getProjectRow(id);
   if (!row) throw notFound();
   assertNotCir(id, 'change');
@@ -269,6 +270,7 @@ export async function updateProject(user: User, id: string, patch: { name?: stri
   }
   if (patch.sideText && typeof patch.sideText === 'object') updateProjectJson(id, (pj) => { const s = patch.sideText!; pj.sideText = { ...(pj.sideText ?? {}), ...(s.enabled !== undefined ? { enabled: s.enabled === true } : {}), ...(s.draftNote !== undefined ? { draftNote: s.draftNote === true } : {}), ...(s.publisher !== undefined ? { publisher: String(s.publisher).slice(0, 120) } : {}) }; });
   if (patch.headerLogo !== undefined) updateProjectJson(id, (pj) => { pj.headerLogo = patch.headerLogo === true; });
+  if (patch.publisherLogo !== undefined) updateProjectJson(id, (pj) => { pj.publisherLogo = patch.publisherLogo === true; });
   if (patch.autoAddToPublication !== undefined) updateProjectJson(id, (pj) => { pj.autoAddToPublication = patch.autoAddToPublication === true; });
   if (patch.pipeline !== undefined) {
     updateProjectJson(id, (pj) => { pj.pipeline = patch.pipeline === 's1000dtofo' ? 's1000dtofo' : 's1000dtojss'; });

@@ -3,8 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const path = require('node:path'); const os = require('node:os');
-const { execFileSync } = require('node:child_process');
-const { boot } = require('./helpers');
+const { boot, verifyZip } = require('./helpers');
 // The services open the workspace store when first required, so they are required AFTER boot() has pointed it at a throwaway workspace.
 let h; let H;
 test.before(async () => { h = await boot(); H = require('../dist/services/htmlPublish'); });
@@ -67,7 +66,7 @@ test('built folder + zip: index with contents, pages, copied graphics, links; se
     const dm1 = fs.readFileSync(path.join(out, 'dm', pages.sort()[0]), 'utf8'); assert.match(dm1, /href="\.\.\/index\.html"/); assert.ok(!/<script/i.test(dm1 + index));
     if (/<img /.test(pages.map((p) => fs.readFileSync(path.join(out, 'dm', p), 'utf8')).join(''))) assert.ok(fs.readdirSync(path.join(out, 'assets')).length >= 1);
     // zip is valid
-    const z = path.join(dir, 'html', `${r.json.name}.zip`); execFileSync('python3', ['-m', 'zipfile', '-t', z], { stdio: 'pipe' });
+    const z = path.join(dir, 'html', `${r.json.name}.zip`); verifyZip(z);
     // downloads + preview
     assert.equal((await w.get(`${U}/publish/html/${r.json.name}.zip`)).status, 200);
     const pv = await w.get(`${U}/publish/html/${r.json.name}/index.html`); assert.equal(pv.status, 200); assert.match(pv.headers.get('content-security-policy'), /default-src 'none'/);
