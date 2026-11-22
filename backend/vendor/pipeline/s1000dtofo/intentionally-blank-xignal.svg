@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The blank-page legend of the Xignal profile: "Intentionally left blank." in 10 pt regular, centred, its baseline 433.6 pt above the foot
+     of the sheet — measured on the reference (RDR-1671Y-00039-00) on both its A4 and its A3 blank pages. The engine's own legend is
+     intentionally-blank.svg ("This page is intentionally left blank.", 11.3 pt bold); the profile swaps this one in (see $blank.page.bg).
+     Like the other, it is a background of the blank page master, centred on the page body: a 170 x 20 mm strip, so the baseline sits
+     6.24 mm below its top edge. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="170mm" height="20mm" viewBox="0 0 170 20">
+  <text x="85" y="6.24" font-family="Arial, Liberation Sans, Helvetica" font-size="3.528"
+        text-anchor="middle" fill="#000000">Intentionally left blank.</text>
+</svg>

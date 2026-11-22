@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Same construction as hazard-band-warning.svg (read its comment), yellow/black for CAUTION. The black stripes sit where the warning's
+     red ones do (measured on the reference). -->
+<svg xmlns="http://www.w3.org/2000/svg" width="70.7107pt" height="70.7107pt" viewBox="0 0 70.7107 70.7107">
+  <rect x="0" y="0" width="70.7107" height="70.7107" fill="#FFFF00"/>
+  <polygon points="35.3553,0 70.7107,0 0,70.7107 0,35.3553" fill="#000000"/>
+  <polygon points="70.7107,35.3553 70.7107,70.7107 35.3553,70.7107" fill="#000000"/>
+</svg>

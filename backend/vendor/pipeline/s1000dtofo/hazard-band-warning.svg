@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Tile for the 'band' notice style (the Xignal reference's WARNING frame): red/white diagonal stripes at 45 degrees, rising to the right,
+     the two colours covering equal areas. Measured on the reference: red 35.35 pt wide along any horizontal line, repeating every 70.71 pt
+     (a 50 pt stripe pair seen at 45 degrees), the pattern starting white at the top-left corner of the area it fills.
+
+     The tile is exactly one period square, so stripes continue across tile edges with no seam. A pixel is red when (x + y) mod 70.71 is in
+     the upper half of the period: the main band (x + y in 35.36 .. 70.71) and the small triangle in the bottom-right corner that completes
+     the band running into the next tile. hazard-band-caution.svg is the same drawing in yellow and black. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="70.7107pt" height="70.7107pt" viewBox="0 0 70.7107 70.7107">
+  <rect x="0" y="0" width="70.7107" height="70.7107" fill="#FFFFFF"/>
+  <polygon points="35.3553,0 70.7107,0 0,70.7107 0,35.3553" fill="#FF0000"/>
+  <polygon points="70.7107,35.3553 70.7107,70.7107 35.3553,70.7107" fill="#FF0000"/>
+</svg>

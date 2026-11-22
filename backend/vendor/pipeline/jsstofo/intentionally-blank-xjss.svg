@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The blank-page legend of the xignal-jss profile: "This page is intentionally left blank." in Arial Bold 12 pt, centred, its baseline 431.9 pt above
+     the foot of the sheet - measured on the Xignal JSS-0251 reference (A4, 595.3 x 841.9 pt), where the weight follows from the glyph widths (the
+     line is 202.5 pt wide; Arial Bold gives 202.7 pt, Arial Regular 179.4 pt). The stencil's own legend is intentionally-blank.svg (Helvetica bold
+     11.3 pt); the profile swaps this one in (see $blank.page.bg in jsstofo.xsl).
+     Like the other it is a background of the blank page master, centred in the body region, so the baseline's offset inside the strip depends on
+     where that region is. The numbers below are for templates/xignal-jss.house.json (body region from 78.3 pt to 794.0 pt from the top, centre
+     436.2 pt): a 170 x 40 mm strip centred there has its top at 133.87 mm, so the baseline (409.99 pt from the top) sits 10.77 mm below the strip's top edge. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="170mm" height="40mm" viewBox="0 0 170 40">
+  <text x="85" y="10.77" font-family="Arial, Liberation Sans, Helvetica" font-size="4.2333" font-weight="bold"
+        text-anchor="middle" fill="#000000">This page is intentionally left blank.</text>
+</svg>
