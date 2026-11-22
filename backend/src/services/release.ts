@@ -1,0 +1,161 @@
+// =============================================================================
+// Release maintenance and watermark.
+//
+// Ported from JSS Publisher (server.js "RELEASE MAINTENANCE & WATERMARK"). The
+// publication module IS the document that gets published, so its release is the
+// one the built PDF reports and the one the NOT RELEASED watermark answers to.
+//
+// A project is RELEASED when it has an approved release whose moment has
+// arrived AND whose content fingerprint still matches the publication as it
+// stands. The second half is what makes an approval cover the content that was
+// approved, not the project forever after.
+// =============================================================================
+
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
+import { nowIso, vendor } from '../config';
+import { store, docIndex, projectDirFor } from '../context';
+import { bad, conflict, notFound } from './http';
+import { readProjectJson, updateProjectJson, pmRel } from './projects';
+import { publicationSources } from './pm';
+
+const watermarkEngine = vendor('engine/watermark');
+const { newId } = require('../core/auth/crypto');
+
+export const WATERMARK_STYLES: string[] = watermarkEngine.STYLES;
+
+/** Settings that shape what the PDF says. Compression and other "how it is written" settings are excluded on purpose. */
+const RELEASE_SETTING_KEYS = ['name', 'type', 'pipeline', 'input', 'publication', 'frontMatter', 's1000dFrontMatter', 'layout', 'pageSetup'];
+
+/**
+ * One definition of the fingerprint, with no caller-supplied input: JSS found
+ * that two callers hashing different views of project.json made an approved
+ * release unable to ever match its own content.
+ */
+export function publicationFingerprint(projectId: string): string {
+  const dir = projectDirFor(projectId);
+  const project = readProjectJson(projectId);
+  const h = crypto.createHash('sha256');
+  for (const rel of publicationSources(projectId)) {
+    h.update(rel, 'utf8');
+    h.update('\0');
+    try { h.update(crypto.createHash('sha256').update(fs.readFileSync(path.join(dir, rel))).digest()); }
+    catch { h.update('MISSING'); }
+    h.update('\n');
+  }
+  const settings: Record<string, unknown> = {};
+  for (const k of RELEASE_SETTING_KEYS) if (project[k] !== undefined) settings[k] = project[k];
+  h.update(JSON.stringify(settings));
+  return h.digest('hex');
+}
+
+export interface WatermarkSettings { enabled: boolean; text: string; style: string }
+
+export function readWatermark(projectId: string): WatermarkSettings {
+  const w = readProjectJson(projectId).watermark || {};
+  return {
+    enabled: !!w.enabled,
+    text: typeof w.text === 'string' ? w.text : '',
+    style: WATERMARK_STYLES.includes(w.style) ? w.style : 'diagonal',
+  };
+}
+
+export function writeWatermark(projectId: string, body: Partial<WatermarkSettings>): WatermarkSettings {
+  const next: WatermarkSettings = {
+    enabled: !!body.enabled,
+    text: String(body.text == null ? '' : body.text).slice(0, 120),
+    style: WATERMARK_STYLES.includes(String(body.style)) ? String(body.style) : 'diagonal',
+  };
+  updateProjectJson(projectId, (pj) => { pj.watermark = next; });
+  return next;
+}
+
+// Page geometry defaults, matching each pipeline's own xsl:param values.
+const PAGE_DEFAULTS: Record<string, Record<string, number>> = {
+  s1000dtofo: { width: 210, height: 297, marginTop: 11, marginBottom: 12, marginInner: 25, marginOuter: 15, bodyMarginTop: 25, bodyMarginBottom: 30, headerExtent: 15, footerExtent: 25 },
+  s1000dtojss: { width: 210, height: 297, marginTop: 12, marginBottom: 12, marginInner: 25, marginOuter: 18, bodyMarginTop: 14, bodyMarginBottom: 14, headerExtent: 14, footerExtent: 14 },
+};
+
+/** The real printable box (mm) a watermark must fit inside, from the SAME geometry the stylesheets read. */
+export function printableBoxMm(effective: any, pipeline: string): { w: number; h: number } {
+  const d = PAGE_DEFAULTS[pipeline] || PAGE_DEFAULTS.s1000dtojss;
+  const p = (effective && effective.layout && effective.layout.page) || {};
+  const get = (k: string): number => { const n = parseFloat(p[k]); return Number.isFinite(n) ? n : d[k]; };
+  const width = get('width') - get('marginInner') - get('marginOuter');
+  const height = get('height') - get('marginTop') - get('marginBottom') - get('headerExtent') - get('footerExtent') - get('bodyMarginTop') - get('bodyMarginBottom');
+  const fw = d.width - d.marginInner - d.marginOuter;
+  const fh = d.height - d.marginTop - d.marginBottom - d.headerExtent - d.footerExtent - d.bodyMarginTop - d.bodyMarginBottom;
+  return { w: width > 40 ? width : fw, h: height > 40 ? height : fh };
+}
+
+function pmDocument(projectId: string): any {
+  return docIndex.resolve(projectId, pmRel(readProjectJson(projectId)));
+}
+
+export function releaseStateOf(projectId: string) {
+  const now = nowIso();
+  const fingerprint = publicationFingerprint(projectId);
+  const approved = store.currentRelease(projectId, now);
+  const matches = !!approved && approved.content_hash === fingerprint;
+  return {
+    fingerprint, approved, released: matches,
+    staleRelease: !!approved && !matches,
+    scheduled: store.scheduledRelease(projectId, now),
+    pending: store.pendingRelease(projectId),
+  };
+}
+
+const releaseView = (r: any) => ({
+  id: r.id, releaseNumber: r.release_number, scheduledAt: r.scheduled_at, status: r.status, note: r.note,
+  requestedAt: r.requested_at, requestedBy: r.requested_by_username || null, decidedAt: r.decided_at,
+});
+
+export function releaseOverview(projectId: string, canSubmit: boolean) {
+  const st = releaseStateOf(projectId);
+  const view = (r: any) => (r ? { number: r.release_number, scheduledAt: r.scheduled_at, note: r.note } : null);
+  return {
+    release: st.released ? view(st.approved) : null,
+    staleRelease: st.staleRelease ? view(st.approved) : null,
+    scheduled: st.scheduled ? view(st.scheduled) : null,
+    pending: st.pending ? releaseView(st.pending) : null,
+    sources: publicationSources(projectId).length,
+    publicationRel: pmRel(readProjectJson(projectId)),
+    history: store.listReleasesForProject(projectId).map(releaseView),
+    watermark: readWatermark(projectId),
+    watermarkStyles: WATERMARK_STYLES,
+    canSubmit,
+  };
+}
+
+export function requestRelease(projectId: string, userId: string, body: { scheduledAt?: string; note?: string }) {
+  const pmDoc = pmDocument(projectId);
+  if (!pmDoc) throw bad('This project has no publication module to release.', 'NO_PUBLICATION');
+  // Submitting for review takes effect on approval; a later date is optional.
+  const when = body.scheduledAt ? new Date(String(body.scheduledAt)) : new Date();
+  if (Number.isNaN(when.getTime())) throw bad('A valid release date and time is required.');
+  // A release date is a claim about when the document became authoritative: never back-dated (a minute absorbs clock skew).
+  if (when.getTime() < Date.now() - 60_000) throw bad('The release date and time cannot be in the past.', 'RELEASE_IN_PAST');
+
+  const contentHash = publicationFingerprint(projectId);
+  const r = store.createRelease({
+    id: newId(), documentId: pmDoc.id, projectId, scheduledAt: when.toISOString(),
+    note: String(body.note || '').slice(0, 500) || null, requestedBy: userId, contentHash, now: nowIso(),
+  });
+  if (!r.created) throw conflict('This publication already has a release awaiting approval.');
+  return { scheduledAt: when.toISOString(), contentHash };
+}
+
+export function withdrawRelease(projectId: string, relId: string): void {
+  const row = store.getRelease(relId);
+  if (!row || row.project_id !== projectId) throw notFound();
+  if (!store.withdrawRelease(row.id, row.document_id)) throw notFound();
+}
+
+export function decideRelease(projectId: string, relId: string, approve: boolean, adminId: string) {
+  const row = store.getRelease(relId);
+  if (!row || row.project_id !== projectId) throw notFound();
+  const out = approve ? store.approveRelease(row.id, adminId, nowIso()) : store.rejectRelease(row.id, adminId, nowIso());
+  if (!out) throw conflict('That release request has already been decided.');
+  return out;
+}

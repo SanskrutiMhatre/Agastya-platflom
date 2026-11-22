@@ -1,0 +1,39 @@
+{
+  "name": "agastya-platform-v2-backend",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Agastya Platform v2 - offline, on-premises S1000D authoring and publishing server.",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test test/*.test.js",
+    "reset-admin": "node scripts/reset-admin.js",
+    "doctor": "node scripts/doctor.js",
+    "test:verify": "node scripts/test-verify.js"
+  },
+  "engines": {
+    "node": ">=22.5"
+  },
+  "dependencies": {
+    "@xmldom/xmldom": "^0.9.10",
+    "express": "^4.19.2",
+    "jpeg-js": "^0.4.4",
+    "multer": "^2.0.2",
+    "ws": "^8.18.3",
+    "xmllint-wasm": "^5.1.0",
+    "xpath": "^0.0.34"
+  },
+  "optionalDependencies": {
+    "argon2": "^0.41.1"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^22.10.0",
+    "@types/ws": "^8.18.1",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.5.3"
+  }
+}
