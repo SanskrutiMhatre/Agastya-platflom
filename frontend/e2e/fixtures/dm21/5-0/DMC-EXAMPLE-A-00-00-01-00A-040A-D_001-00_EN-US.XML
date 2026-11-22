@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE dmodule [
+  <!NOTATION svg SYSTEM "svg">
+  <!ENTITY ICN-S1KSTUDIO-A-291000-A-00001-00001-A-001-01 SYSTEM "ICN-S1KSTUDIO-A-291000-A-00001-00001-A-001-01.svg" NDATA svg>
+]>
+<dmodule xmlns:dc="http://www.purl.org/dc/elements/1.1/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.s1000d.org/S1000D_5-0/xml_schema_flat/descript.xsd">
+  <identAndStatusSection>
+    <dmAddress>
+      <dmIdent>
+        <dmCode modelIdentCode="EXAMPLE" systemDiffCode="A" systemCode="00" subSystemCode="0" subSubSystemCode="0" assyCode="01" disassyCode="00" disassyCodeVariant="A" infoCode="040" infoCodeVariant="A" itemLocationCode="D"/>
+        <language languageIsoCode="en" countryIsoCode="US"/>
+        <issueInfo issueNumber="001" inWork="00"/>
+      </dmIdent>
+      <dmAddressItems>
+        <issueDate year="2026" month="11" day="17"/>
+        <dmTitle>
+          <techName>Example system</techName>
+          <infoName>Description of how it is made and its function</infoName>
+        </dmTitle>
+      </dmAddressItems>
+    </dmAddress>
+    <dmStatus issueType="new">
+      <security securityClassification="01"/>
+      <responsiblePartnerCompany enterpriseCode="00000">
+        <enterpriseName>Example Company</enterpriseName>
+      </responsiblePartnerCompany>
+      <originator enterpriseCode="00000">
+        <enterpriseName>Example Company</enterpriseName>
+      </originator>
+      <applic>
+        <displayText>
+          <simplePara>All</simplePara>
+        </displayText>
+      </applic>
+      <brexDmRef>
+        <dmRef>
+          <dmRefIdent>
+            <dmCode modelIdentCode="S1000D" systemDiffCode="G" systemCode="04" subSystemCode="1" subSubSystemCode="0" assyCode="0301" disassyCode="00" disassyCodeVariant="A" infoCode="022" infoCodeVariant="A" itemLocationCode="D"/>
+          </dmRefIdent>
+        </dmRef>
+      </brexDmRef>
+      <qualityAssurance>
+        <unverified/>
+      </qualityAssurance>
+    </dmStatus>
+  </identAndStatusSection>
+  <content>
+<description>
+  <levelledPara id="lp-0001">
+    <title>Overview</title>
+    <warning>
+      <warningAndCautionPara>Hazardous voltage.</warningAndCautionPara>
+    </warning>
+    <caution>
+      <warningAndCautionPara>Do not over-tighten.</warningAndCautionPara>
+    </caution>
+    <para>The unit is <emphasis emphasisType="em01">bold</emphasis>, <emphasis emphasisType="em02">italic</emphasis> and see <internalRef internalRefId="fig-0001" internalRefTargetType="irtt01"/> and <internalRef internalRefId="tbl-0001" internalRefTargetType="irtt02"/>.</para>
+    <para>
+      <randomList>
+        <listItem><para>First item</para></listItem>
+        <listItem><para>Second item</para></listItem>
+      </randomList>
+    </para>
+    <para>
+      <sequentialList>
+        <listItem><para>Step one</para></listItem>
+        <listItem><para>Step two</para></listItem>
+      </sequentialList>
+    </para>
+    <figure id="fig-0001">
+      <title>System layout</title>
+      <graphic infoEntityIdent="ICN-S1KSTUDIO-A-291000-A-00001-00001-A-001-01"/>
+    </figure>
+    <table id="tbl-0001" frame="all">
+      <title>Specifications</title>
+      <tgroup cols="2">
+        <colspec colname="c1" colwidth="40*"/>
+        <colspec colname="c2" colwidth="60*"/>
+        <thead>
+          <row><entry><para>Item</para></entry><entry><para>Value</para></entry></row>
+        </thead>
+        <tbody>
+          <row><entry><para>Mass</para></entry><entry><para>12 kg</para></entry></row>
+          <row><entry><para>Voltage</para></entry><entry><para>28 V</para></entry></row>
+        </tbody>
+      </tgroup>
+    </table>
+    <note>
+      <notePara>Keep the area clean.</notePara>
+    </note>
+    <levelledPara id="lp-0002">
+      <title>Details</title>
+      <para>Nested levelled paragraph.</para>
+      <levelledPara>
+        <title>Deeper</title>
+        <para>Third level.</para>
+      </levelledPara>
+    </levelledPara>
+  </levelledPara>
+  <levelledPara>
+    <title>Second section</title>
+    <para>More text.</para>
+  </levelledPara>
+</description>
+  </content>
+</dmodule>

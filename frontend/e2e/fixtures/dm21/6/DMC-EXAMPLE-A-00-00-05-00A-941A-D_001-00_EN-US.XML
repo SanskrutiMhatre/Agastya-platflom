@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE dmodule [
+  <!NOTATION svg SYSTEM "svg">
+  <!ENTITY ICN-S1KSTUDIO-A-291000-A-00001-00001-A-001-01 SYSTEM "ICN-S1KSTUDIO-A-291000-A-00001-00001-A-001-01.svg" NDATA svg>
+]>
+<dmodule xmlns:dc="http://www.purl.org/dc/elements/1.1/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.s1000d.org/S1000D_6/xml_schema_flat/ipd.xsd">
+  <identAndStatusSection>
+    <dmAddress>
+      <dmIdent>
+        <dmCode modelIdentCode="EXAMPLE" systemDiffCode="A" systemCode="00" subSystemCode="0" subSubSystemCode="0" assyCode="05" disassyCode="00" disassyCodeVariant="A" infoCode="941" infoCodeVariant="A" itemLocationCode="D"/>
+        <language languageIsoCode="en" countryIsoCode="US"/>
+        <issueInfo issueNumber="001" inWork="00"/>
+      </dmIdent>
+      <dmAddressItems>
+        <issueDate year="2026" month="11" day="17"/>
+        <dmTitle>
+          <techName>Example system</techName>
+          <infoName>Illustrated parts data</infoName>
+        </dmTitle>
+      </dmAddressItems>
+    </dmAddress>
+    <dmStatus issueType="new">
+      <security securityClassification="01"/>
+      <responsiblePartnerCompany enterpriseCode="00000">
+        <enterpriseName>Example Company</enterpriseName>
+      </responsiblePartnerCompany>
+      <originator enterpriseCode="00000">
+        <enterpriseName>Example Company</enterpriseName>
+      </originator>
+      <applic>
+        <displayText>
+          <simplePara>All</simplePara>
+        </displayText>
+      </applic>
+      <brexDmRef>
+        <dmRef>
+          <dmRefIdent>
+            <dmCode modelIdentCode="S1000D" systemDiffCode="H" systemCode="04" subSystemCode="1" subSubSystemCode="0" assyCode="0301" disassyCode="00" disassyCodeVariant="A" infoCode="022" infoCodeVariant="A" itemLocationCode="D"/>
+          </dmRefIdent>
+        </dmRef>
+      </brexDmRef>
+      <qualityAssurance>
+        <unverified/>
+      </qualityAssurance>
+    </dmStatus>
+  </identAndStatusSection>
+  <content>
+<illustratedPartsCatalog>
+  <figure id="fig-0001">
+    <title>Unit assembly</title>
+    <graphic infoEntityIdent="ICN-S1KSTUDIO-A-291000-A-00001-00001-A-001-01"/>
+  </figure>
+  <catalogSeqNumber figureNumber="01" item="001" indenture="1">
+    <itemSeqNumber itemSeqNumberValue="00A">
+      <quantityPerNextHigherAssy>1</quantityPerNextHigherAssy>
+      <partRef manufacturerCodeValue="00000" partNumberValue="PN-0001"/>
+    </itemSeqNumber>
+  </catalogSeqNumber>
+  <catalogSeqNumber figureNumber="01" item="002" indenture="2">
+    <itemSeqNumber itemSeqNumberValue="00A">
+      <quantityPerNextHigherAssy>4</quantityPerNextHigherAssy>
+      <partRef manufacturerCodeValue="00000" partNumberValue="PN-0002"/>
+    </itemSeqNumber>
+    <itemSeqNumber itemSeqNumberValue="00B">
+      <quantityPerNextHigherAssy>4</quantityPerNextHigherAssy>
+      <partRef manufacturerCodeValue="00000" partNumberValue="PN-0002-ALT"/>
+    </itemSeqNumber>
+  </catalogSeqNumber>
+</illustratedPartsCatalog>
+  </content>
+</dmodule>
