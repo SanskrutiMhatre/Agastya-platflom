@@ -1,0 +1,55 @@
+# ---- dependencies --------------------------------------------------------------------------------------------------------------
+node_modules/
+
+# ---- build output (rebuilt by `npm run build` / `npm run package:win`) ---------------------------------------------------------
+/backend/dist/
+/frontend/dist/
+/release/
+/packaging/host/bin/
+/packaging/host/obj/
+
+# ---- runtime data: the real database, projects, backups, templates and session secret. NEVER versioned -------------------------
+/workspace/
+.session-secret
+# written beside projects at run time
+.validation.json
+
+# ---- test and verification output ------------------------------------------------------------------------------------------------
+test-results/
+playwright-report/
+verification-results/
+coverage/
+.nyc_output/
+*.log
+npm-debug.log*
+
+# ---- secrets and signing material -----------------------------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+*.pem
+*.key
+*.snk
+
+# ---- customer reference documents ---------------------------------------------------------------------------------------------
+# The sample publications and their reference PDFs belong to the customer, are about 580 MB (one PDF is over GitHub's 100 MB file
+# limit) and are not ours to publish. Tests that read them skip themselves when the folder is absent; see the README in it.
+/SAMPLE PROJECTS/*
+!/SAMPLE PROJECTS/README.md
+
+# ---- proprietary fonts ---------------------------------------------------------------------------------------------------------
+# Arial may only be redistributed by a party that holds a licence for it, and pushing to a remote is distribution. Copy the four
+# files from C:\Windows\Fonts into backend/vendor/tools/fonts/ on a machine that holds the licence, or build with --no-arial
+# (Liberation Sans, metric-compatible, is used instead). See backend/vendor/tools/fonts/README.md.
+/backend/vendor/tools/fonts/arial*.ttf
+
+# ---- editors and operating systems ---------------------------------------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*~
+Thumbs.db
+desktop.ini
+.DS_Store

@@ -1,0 +1,43 @@
+# Source and documents: git normalises line endings to LF in the repository and gives each checkout its platform's endings.
+* text=auto
+
+# Data the product reads, hashes or compares byte for byte (S1000D schemas and BREX, reference data and its stored SHA-256 values,
+# the vendored publishing engine and stylesheets, house templates, test fixtures, the Studio's schemas and grammars): stored exactly
+# as they are, with no line-ending conversion in either direction.
+/backend/schemas/**          -text
+/backend/brex/**             -text
+/backend/reference/**        -text
+/backend/templates/**        -text
+/backend/templates-optional/** -text
+/backend/vendor/**           -text
+/backend/samples/**          -text
+/backend/test/fixtures/**    -text
+/frontend/public/**          -text
+/frontend/e2e/fixtures/**    -text
+
+# Windows scripts want CRLF on every checkout.
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+
+# Never touched, never diffed as text.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.bmp   binary
+*.tif   binary
+*.tiff  binary
+*.webp  binary
+*.pdf   binary
+*.zip   binary
+*.gz    binary
+*.7z    binary
+*.ttf   binary
+*.otf   binary
+*.woff  binary
+*.woff2 binary
+*.exe   binary
+*.dll   binary
+*.jar   binary
+*.node  binary
