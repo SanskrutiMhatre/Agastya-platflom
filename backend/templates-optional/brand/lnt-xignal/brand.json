@@ -1,0 +1,7 @@
+﻿{
+  "id": "lnt-xignal",
+  "name": "L&T / Xignal S1000D",
+  "description": "Logo and company line used by the Xignal S1000D reference publication RDR-1671Y-00039-00. The logo was extracted from that PDF; the company line is the text of its second margin mark. Replace both for another organisation.",
+  "company": "L&T Precision Engineering and Systems",
+  "logo": "logo.png"
+}

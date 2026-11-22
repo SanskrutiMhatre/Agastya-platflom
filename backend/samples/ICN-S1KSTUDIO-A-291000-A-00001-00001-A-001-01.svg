@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" width="640" height="360" font-family="Arial, sans-serif">
+  <rect width="640" height="360" fill="#ffffff"/>
+  <g stroke="#1b1f27" stroke-width="3" fill="none">
+    <rect x="200" y="110" width="220" height="140" rx="18"/>
+    <circle cx="310" cy="180" r="48"/>
+    <path d="M310 132 L310 228 M262 180 L358 180"/>
+    <rect x="420" y="160" width="90" height="40"/>
+    <path d="M110 180 L200 180 M510 180 L590 180"/>
+    <path d="M150 250 L150 300 L470 300 L470 250"/>
+    <rect x="120" y="150" width="60" height="60" rx="6"/>
+  </g>
+  <g fill="#1b1f27" font-size="16">
+    <text x="150" y="140" text-anchor="middle">1</text>
+    <text x="310" y="100" text-anchor="middle">2</text>
+    <text x="465" y="150" text-anchor="middle">3</text>
+    <text x="555" y="170" text-anchor="middle">4</text>
+    <text x="310" y="325" text-anchor="middle">5</text>
+  </g>
+  <text x="630" y="352" font-size="11" text-anchor="end" fill="#5b6372">ICN-S1KSTUDIO-A-291000-A-00001-00001-A-001-01</text>
+</svg>

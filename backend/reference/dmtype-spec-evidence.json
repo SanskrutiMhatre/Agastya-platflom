@@ -1,0 +1,116 @@
+{
+  "provenance": {
+    "document": "S1000D Issue 4.2 (PDF as supplied to this project: S1000D_Issue_4.2.pdf)",
+    "method": "Read directly from the specification text: the content-section chapters (Chap 3.9.5.2.x) that define each schema, the information-set chapters (Chap 5.x) that code data modules, and the information-code definitions (Chap 8.4.1 / 8.4.2). The three catalogues were compared with the default BREX of each issue.",
+    "limitation": "Issue 4.2 text only. Issues 5.0, 6.0 and 7.0 are covered by their default BREX (which lists the same codes), not by specification text. A 'supported' status means the specification corroborates the pairing of schema and code by purpose, without a sentence that names both."
+  },
+  "statuses": {
+    "confirmed": "The specification codes data modules of this schema with this information code.",
+    "supported": "The specification defines the schema's purpose and lists/defines the code for that purpose; it does not name both in one sentence.",
+    "corrected": "The specification codes data modules of this schema with a DIFFERENT code than the one the platform used. The default was changed to the specified code.",
+    "multiple": "The specification pairs this schema with several codes, by content. No single default can be named; the codes are offered as advice.",
+    "unresolved": "The specification does not give a code for this schema. The default stays a flagged placeholder."
+  },
+  "types": {
+    "crew": {
+      "status": "supported",
+      "default": "131",
+      "note": "The crew schema carries crew/operator information such as description and operation of the Product. Information code 131 is defined as the normal operation procedure for crew members, in narrative and checklist form, and is one of the six codes (111, 112, 121, 131, 141, 151) that Chap 5.2.3.2 lists for crew/operator operation data modules.",
+      "refs": [
+        "Chap 3.9.5.2.6 (Content section - Crew/Operator)",
+        "Chap 5.2.3.2 (Crew/Operator operation information, para 2.3.1)",
+        "Chap 8.4.2 (code 131)"
+      ],
+      "codes": [
+        "111",
+        "112",
+        "121",
+        "131",
+        "141",
+        "151"
+      ]
+    },
+    "frontmatter": {
+      "status": "confirmed",
+      "default": "001",
+      "note": "The front matter schema has a title page branch (<frontMatterTitlePage>), and Table 2 of the front matter chapter codes the Title page data module with information code 001 (Title page: the title, issue and change of a publication). The same table codes the other front matter modules: 004, 00R, 00S, 00T, 00U, 005-009, 00V, 00B, 00C.",
+      "refs": [
+        "Chap 3.9.5.2.16 (Content section - Front matter)",
+        "Chap 5.3.1.1 (Table 2, Front matter)",
+        "Chap 8.4.2 (code 001)"
+      ],
+      "codes": [
+        "001",
+        "002",
+        "003",
+        "004",
+        "005",
+        "006",
+        "007",
+        "008",
+        "009",
+        "00B",
+        "00C",
+        "00R",
+        "00S",
+        "00T",
+        "00U",
+        "00V"
+      ]
+    },
+    "schedul": {
+      "status": "confirmed",
+      "default": "000",
+      "note": "The maintenance planning schema (<maintPlanning>) is used for the maintenance planning information set, whose data modules are coded with information code 000 (SNS 05-10 time limits, 05-20 maintenance checks, 05-SS-00 scheduled and unscheduled checks); the introduction uses 018 and the related-task list 916.",
+      "refs": [
+        "Chap 3.9.5.2.5 (Content section - Maintenance planning)",
+        "Chap 5.2.1.6 (Maintenance planning, para 2)"
+      ],
+      "codes": [
+        "000",
+        "018",
+        "916"
+      ]
+    },
+    "wrngflds": {
+      "status": "corrected",
+      "default": "029",
+      "previousDefault": "000",
+      "note": "The wiring data description schema describes, for a project, each element of the wiring data schema (field name, description, references). The specification states that these data modules must be based on the wiring data description schema and coded with information code 029 (catalogue title: Data structure). The platform's earlier default, 000, was a placeholder.",
+      "refs": [
+        "Chap 5.2.1.4 (Wiring data, para 1.4.2 and the wiring data description coding)",
+        "Chap 3.9.5.2.9 (Content section - Wiring data)"
+      ],
+      "codes": [
+        "029"
+      ]
+    },
+    "wrngdata": {
+      "status": "multiple",
+      "default": null,
+      "note": "The specification pairs the wiring data schema with several information codes, depending on what the module holds: electrical standard parts data 031, equipment lists 056, wire lists 057, harness lists 058. Wiring, routing and location diagrams (051, 052, 055) are stated to use the descriptive schema. No single default exists; the platform's placeholder 000 stays flagged until the author chooses the code that fits the content.",
+      "refs": [
+        "Chap 5.2.1.4 (Wiring data)",
+        "Chap 3.9.5.2.9 (Content section - Wiring data)"
+      ],
+      "codes": [
+        "031",
+        "056",
+        "057",
+        "058"
+      ],
+      "catalogueCheck": "Phase 18: the 4.2 information code catalogue confirms 029 Data structure, 051 Wiring diagram, 057 Wire list and 058 Harness list; the choice among 031/056/057/058 depends on the content, so no single default exists. The placeholder 000 stays FLAGGED."
+    },
+    "scocontent": {
+      "status": "unresolved",
+      "default": null,
+      "note": "The SCO content schema aggregates training steps. The specification says only that the granularity of SCO content data modules follows the SNS and the information codes and the necessity of training information; it names no information code. The placeholder 000 stays flagged. (The related generic learning content code 952 is the default of the learning schema, not of this one.)",
+      "refs": [
+        "Chap 3.9.5.2.17 (Content section - SCO content, para 1)",
+        "Chap 4.15 (Learning information)"
+      ],
+      "codes": [],
+      "catalogueCheck": "Phase 18: the 4.2 information code catalogue (Chap 8.x) lists 950 Composite information, 951 Generic process, 952 Generic learning content and 953 'Not available for projects'. No code is named for SCO content data modules, and Chap 3.9.5.2.17 / Chap 4.15.1 name none. The placeholder 000 stays FLAGGED; nothing is invented."
+    }
+  }
+}

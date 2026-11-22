@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE dmodule [
+  <!ENTITY ICN-S1KSTUDIO-A-291000-A-00001-00001-A-001-01 SYSTEM "ICN-S1KSTUDIO-A-291000-A-00001-00001-A-001-01.svg" NDATA svg>
+  <!NOTATION svg PUBLIC "-//W3C//NOTATION Scalable Vector Graphics//EN">
+]>
+<dmodule xmlns:dc="http://www.purl.org/dc/elements/1.1/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.s1000d.org/S1000D_5-0/xml_schema_flat/descript.xsd">
+  <identAndStatusSection>
+    <dmAddress>
+      <dmIdent>
+        <dmCode modelIdentCode="S1KSTUDIO" systemDiffCode="A" systemCode="29" subSystemCode="1" subSubSystemCode="0" assyCode="00" disassyCode="00" disassyCodeVariant="A" infoCode="040" infoCodeVariant="A" itemLocationCode="D"/>
+        <language languageIsoCode="en" countryIsoCode="US"/>
+        <issueInfo issueNumber="001" inWork="00"/>
+      </dmIdent>
+      <dmAddressItems>
+        <issueDate year="2026" month="11" day="06"/>
+        <dmTitle>
+          <techName>Hydraulic pump</techName>
+          <infoName>Description of how it is made and its function</infoName>
+        </dmTitle>
+      </dmAddressItems>
+    </dmAddress>
+    <dmStatus issueType="new">
+      <security securityClassification="01"/>
+      <responsiblePartnerCompany enterpriseCode="S1K01">
+        <enterpriseName>S1000D Studio Sample Data</enterpriseName>
+      </responsiblePartnerCompany>
+      <originator enterpriseCode="S1K01">
+        <enterpriseName>S1000D Studio Sample Data</enterpriseName>
+      </originator>
+      <applic>
+        <displayText>
+          <simplePara>All aircraft</simplePara>
+        </displayText>
+      </applic>
+      <brexDmRef>
+        <dmRef>
+          <dmRefIdent>
+            <dmCode modelIdentCode="S1000D" systemDiffCode="G" systemCode="04" subSystemCode="1" subSubSystemCode="0" assyCode="0301" disassyCode="00" disassyCodeVariant="A" infoCode="022" infoCodeVariant="A" itemLocationCode="D"/>
+          </dmRefIdent>
+        </dmRef>
+      </brexDmRef>
+      <qualityAssurance>
+        <unverified/>
+      </qualityAssurance>
+    </dmStatus>
+  </identAndStatusSection>
+  <content>
+    <description>
+      <levelledPara id="par-0001">
+        <title>General</title>
+        <para>The engine-driven hydraulic pump (EDP) supplies the <emphasis emphasisType="em01">green hydraulic system</emphasis> with fluid at a nominal pressure of 3000 psi (206 bar). The pump is a variable displacement, pressure-compensated axial piston pump. Refer to <internalRef internalRefId="fig-0001" internalRefTargetType="irtt01"/> for the location of the components.</para>
+        <para>The pump has these main characteristics:</para>
+        <para>
+          <randomList>
+            <listItem>
+              <para>Rated flow: 37 US gal/min at 3750 rpm</para>
+            </listItem>
+            <listItem>
+              <para>Case drain flow: less than 1.5 l/min</para>
+            </listItem>
+            <listItem>
+              <para>Fluid: phosphate ester, type <emphasis emphasisType="em02">IV</emphasis></para>
+            </listItem>
+          </randomList>
+        </para>
+        <note>
+          <notePara>The removal and installation procedure is given in <dmRef><dmRefIdent><dmCode modelIdentCode="S1KSTUDIO" systemDiffCode="A" systemCode="29" subSystemCode="1" subSubSystemCode="0" assyCode="00" disassyCode="00" disassyCodeVariant="A" infoCode="520" infoCodeVariant="A" itemLocationCode="A"/></dmRefIdent><dmRefAddressItems><dmTitle><techName>Hydraulic pump</techName><infoName>Remove procedure</infoName></dmTitle></dmRefAddressItems></dmRef>.</notePara>
+        </note>
+      </levelledPara>
+      <levelledPara id="par-0002">
+        <title>Description</title>
+        <levelledPara id="par-0003">
+          <title>Components</title>
+          <para>The pump assembly has the components given in <internalRef internalRefId="tab-0001" internalRefTargetType="irtt02"/>.</para>
+          <figure id="fig-0001">
+            <title>Hydraulic pump - Component location</title>
+            <graphic infoEntityIdent="ICN-S1KSTUDIO-A-291000-A-00001-00001-A-001-01"/>
+          </figure>
+          <table id="tab-0001" frame="all">
+            <title>Pump components</title>
+            <tgroup cols="3">
+              <colspec colname="col1" colwidth="1*"/>
+              <colspec colname="col2" colwidth="3*"/>
+              <colspec colname="col3" colwidth="2*"/>
+              <thead>
+                <row>
+                  <entry colname="col1"><para>Item</para></entry>
+                  <entry colname="col2"><para>Component</para></entry>
+                  <entry colname="col3"><para>Function</para></entry>
+                </row>
+              </thead>
+              <tbody>
+                <row>
+                  <entry colname="col1"><para>1</para></entry>
+                  <entry colname="col2"><para>Pressure compensator</para></entry>
+                  <entry colname="col3" morerows="1"><para>Controls the pump displacement</para></entry>
+                </row>
+                <row>
+                  <entry colname="col1"><para>2</para></entry>
+                  <entry colname="col2"><para>Yoke and piston assembly</para></entry>
+                </row>
+                <row>
+                  <entry colname="col1"><para>3</para></entry>
+                  <entry colname="col2"><para>Depressurization solenoid valve</para></entry>
+                  <entry colname="col3"><para>Off-loads the pump</para></entry>
+                </row>
+                <row>
+                  <entry colname="col1"><para>4</para></entry>
+                  <entry namest="col2" nameend="col3"><para>Pressure outlet port with check valve</para></entry>
+                </row>
+                <row>
+                  <entry colname="col1"><para>5</para></entry>
+                  <entry colname="col2"><para>Case drain line</para></entry>
+                  <entry colname="col3"><para>Returns case flow to the reservoir</para></entry>
+                </row>
+              </tbody>
+            </tgroup>
+          </table>
+        </levelledPara>
+        <levelledPara id="par-0004">
+          <title>Operation</title>
+          <warning>
+            <warningAndCautionPara>Do not touch the pump case during operation. The case temperature can be more than 100 °C and can cause burns.</warningAndCautionPara>
+          </warning>
+          <caution>
+            <warningAndCautionPara>Do not operate the pump without fluid. Operation without fluid causes damage to the pump in less than 30 seconds.</warningAndCautionPara>
+          </caution>
+          <para>When the engine turns, the drive shaft turns the cylinder block. The pistons move in and out of their bores and supply fluid to the pressure port. The sequence of operation is:</para>
+          <para>
+            <sequentialList>
+              <listItem>
+                <para>The compensator senses the outlet pressure.</para>
+              </listItem>
+              <listItem>
+                <para>When the pressure increases, the yoke angle decreases:</para>
+                <para>
+                  <sequentialList>
+                    <listItem>
+                      <para>the piston stroke becomes shorter,</para>
+                    </listItem>
+                    <listItem>
+                      <para>the flow decreases.</para>
+                    </listItem>
+                  </sequentialList>
+                </para>
+              </listItem>
+              <listItem>
+                <para>At full pressure the pump supplies only the internal leakage flow.</para>
+              </listItem>
+            </sequentialList>
+          </para>
+          <para>The output power is calculated with the formula P = p × Q, where p is the pressure in N/m<superScript>2</superScript> and Q is the flow in m<superScript>3</superScript>/s. The fluid temperature T<subScript>max</subScript> must not exceed 107 °C.</para>
+          <para>The pump status message on the maintenance display is:</para>
+          <para>
+            <verbatimText>HYD G EDP 1 PRESS LO</verbatimText>
+          </para>
+        </levelledPara>
+      </levelledPara>
+      <levelledPara id="par-0005">
+        <title>Abbreviations</title>
+        <para>The <acronym><acronymTerm>EDP</acronymTerm><acronymDefinition>Engine-driven pump</acronymDefinition></acronym> is monitored by the <acronym><acronymTerm>HSMU</acronymTerm><acronymDefinition>Hydraulic system monitoring unit</acronymDefinition></acronym>. For the hydraulic system schematic, refer to <internalRef internalRefId="par-0004" internalRefTargetType="irtt07"/>.</para>
+      </levelledPara>
+    </description>
+  </content>
+</dmodule>

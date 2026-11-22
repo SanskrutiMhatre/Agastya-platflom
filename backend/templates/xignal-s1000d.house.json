@@ -1,0 +1,235 @@
+{
+  "schemaVersion": 1,
+  "id": "xignal-s1000d",
+  "name": "Xignal S1000D (data-module-per-page)",
+  "description": "Reproduces the Xignal / Docuneering S1000D PDF page: mirrored 25/15 mm margins, 19 mm header and footer bands with 1.13 pt rules, logo + publication code + classification in the head, applicability + DMC + end-of-data-module + date/page in the foot, three rotated margin marks (draft line, printed stamp, company), Arial. Geometry measured from the reference PDF RDR-1671Y-00039-00; all values are editable.",
+  "layout": {
+    "profile": "xignal",
+    "foldoutSheet": "a3",
+    "page": {
+      "width": "210mm",
+      "height": "297mm",
+      "marginTop": "11mm",
+      "marginBottom": "12mm",
+      "marginInner": "25mm",
+      "marginOuter": "15mm",
+      "bodyMarginTop": "22mm",
+      "bodyMarginBottom": "22mm",
+      "headerExtent": "19mm",
+      "footerExtent": "19mm"
+    },
+    "fonts": {
+      "family": "Arial,Liberation Sans",
+      "bodySize": "10pt",
+      "lineHeight": 1.2,
+      "headerFooterSize": "11pt",
+      "tableSize": "10pt"
+    },
+    "chapterTitleSize": "14pt",
+    "headings": [
+      {
+        "level": 1,
+        "size": "14pt",
+        "spaceBefore": "11.04pt",
+        "spaceAfter": "0mm",
+        "indentLeft": "0mm",
+        "titleGap": 20,
+        "uppercase": false
+      },
+      {
+        "level": 2,
+        "size": "12pt",
+        "spaceBefore": "3mm",
+        "spaceAfter": "0mm",
+        "indentLeft": "0mm",
+        "titleGap": 20,
+        "uppercase": false
+      },
+      {
+        "level": 3,
+        "size": "10pt",
+        "spaceBefore": "3mm",
+        "spaceAfter": "1mm",
+        "indentLeft": "0mm",
+        "titleGap": 20,
+        "uppercase": false
+      },
+      {
+        "level": 4,
+        "size": "10pt",
+        "spaceBefore": "3mm",
+        "spaceAfter": "1mm",
+        "indentLeft": "0mm",
+        "titleGap": 20,
+        "uppercase": false
+      }
+    ],
+    "paragraph": {
+      "spaceAfter": "3mm",
+      "firstLineIndent": "0mm"
+    },
+    "figures": {
+      "captionGap": "2mm",
+      "caps": {
+        "portrait": {
+          "w": 170,
+          "h": 235
+        },
+        "landscape": {
+          "w": 254,
+          "h": 148
+        },
+        "a3landscape": {
+          "w": 368,
+          "h": 215
+        }
+      },
+      "paddingTop": "0pt",
+      "icnSize": "10pt",
+      "icnAlign": "right",
+      "icnA3EndIndent": "10mm",
+      "captionSpaceBefore": "2.9pt",
+      "spaceBefore": "11.3pt",
+      "captionSpaceAfter": "11.3pt",
+      "useFileDpi": true,
+      "xrefLabel": "Fig"
+    },
+    "toc": {
+      "sectionDepth": 3
+    },
+    "lists": {
+      "gapAlpha": 7,
+      "gapRoman": 10,
+      "gapBullet": 5,
+      "indent": 0,
+      "itemSpace": 0.5,
+      "prefixStyle": "xignal",
+      "paraSpaceBefore": "0pt",
+      "paraSpaceMin": "0pt",
+      "paraSpaceMax": "0pt",
+      "blockSpaceBefore": "8.5pt",
+      "nestedPadBottom": "8.5pt",
+      "cellPadTop": "4.3pt",
+      "cellPadBottom": "7pt"
+    },
+    "blankVersos": true,
+    "pages": {
+      "numbering": "chapter"
+    },
+    "header": {
+      "publicationSource": "pmCode",
+      "logoHeight": "41.6pt",
+      "logoEvenOffset": "19pt"
+    },
+    "classification": {
+      "weight": "bold",
+      "align": "center",
+      "map": {
+        "01": "",
+        "02": "RESTRICTED",
+        "03": "RESTRICTED",
+        "04": "RESTRICTED"
+      }
+    },
+    "marks": {
+      "fontSize": "8pt",
+      "draft": {
+        "enabled": true,
+        "text": "This is a draft copy of Issue {issue}",
+        "showWhen": "inWork"
+      },
+      "printed": {
+        "enabled": true,
+        "text": "Printed {printed}",
+        "format": "YYYY-MM-DD HH:mm"
+      },
+      "company": {
+        "enabled": true,
+        "text": ""
+      }
+    },
+    "notices": {
+      "style": "band",
+      "textCaps": false,
+      "noteStyle": "label",
+      "noteSpaceBefore": "8.5pt",
+      "notePadBottom": "5.6pt",
+      "noteTextIndent": "22.6pt"
+    },
+    "body": {
+      "textAlign": "start"
+    },
+    "centerHead1": {
+      "padTop": "17.07pt",
+      "padBottom": "7pt"
+    },
+    "centerHead2": {
+      "size": "14pt",
+      "style": "italic",
+      "padTop": "10pt",
+      "padBottom": "6pt",
+      "topSpace": "padding"
+    },
+    "sideHead0": {
+      "spaceBefore": "16.5pt"
+    },
+    "contents": {
+      "flat": true,
+      "extraEntries": true,
+      "linkColor": "black",
+      "entryLeft": "17mm",
+      "numberWidth": "13.6mm",
+      "entryGap": "0pt",
+      "listGap": "5.1pt",
+      "pageShift": "-0.8pt",
+      "spaceAfter": "7.1pt",
+      "headingSpaceBefore": "10.5pt",
+      "includeSteps": false
+    },
+    "references": {
+      "style": "rules",
+      "headerDoc": "Data module/Technical publication",
+      "cellPad": "2.85pt",
+      "ruleColor": "black",
+      "captionSpaceAfter": "3.05pt",
+      "paddingTop": "14.5pt",
+      "spaceAfter": "6.25pt",
+      "scanBody": false,
+      "captionKeep": true
+    },
+    "captionDoubleSpace": true,
+    "para": {
+      "spaceBefore": "8.5pt",
+      "spaceMin": "8.5pt",
+      "spaceMax": "8.5pt"
+    },
+    "tables": {
+      "paddingTop": "14pt",
+      "rowKeep": "always",
+      "captionKeep": true,
+      "cellPadding": "2.9pt 3.6pt",
+      "captionSpaceAfter": "3.95pt",
+      "continuedCaption": true,
+      "continuedText": "(Continued)",
+      "continuedRowHeight": "15.55pt",
+      "wrapHyphen": false,
+      "rowspanKeep": "always",
+      "wrapMinToken": "12",
+      "paddingBottom": "5.3pt",
+      "topSpace": "padding",
+      "untitledNumbered": false,
+      "rowspanGroupKeep": false
+    }
+  },
+  "brandPack": "neutral",
+  "branding": {
+    "emblem": "",
+    "publishers": []
+  },
+  "frontMatterDefaults": {
+    "style": "s1000d",
+    "s1000d": {
+      "showPageColumn": false
+    }
+  }
+}

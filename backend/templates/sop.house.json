@@ -1,0 +1,222 @@
+{
+  "schemaVersion": 1,
+  "id": "sop",
+  "name": "SOP House Style (Software Documentation)",
+  "description": "House style for internal Standard Operating Procedures covering software tools. Same page/type geometry as the default JSS style; front matter reworded for a software SOP instead of a hardware handbook.",
+  "layout": {
+    "page": {
+      "width": "210mm",
+      "height": "297mm",
+      "marginTop": "12mm",
+      "marginBottom": "12mm",
+      "marginInner": "25mm",
+      "marginOuter": "18mm",
+      "bodyMarginTop": "14mm",
+      "bodyMarginBottom": "14mm",
+      "headerExtent": "14mm",
+      "footerExtent": "14mm"
+    },
+    "fonts": {
+      "family": "Helvetica",
+      "bodySize": "11pt",
+      "lineHeight": 1.35,
+      "headerFooterSize": "9pt",
+      "tableSize": "10pt"
+    },
+    "chapterTitleSize": "16pt",
+    "headings": [
+      {
+        "level": 1,
+        "size": "12pt",
+        "spaceBefore": "5mm",
+        "spaceAfter": "2mm",
+        "indentLeft": "0mm",
+        "titleGap": 15,
+        "uppercase": true,
+        "pageBreakBefore": true
+      },
+      {
+        "level": 2,
+        "size": "11pt",
+        "spaceBefore": "5mm",
+        "spaceAfter": "2mm",
+        "indentLeft": "16mm",
+        "titleGap": 15,
+        "uppercase": false
+      },
+      {
+        "level": 3,
+        "size": "11pt",
+        "spaceBefore": "5mm",
+        "spaceAfter": "2mm",
+        "indentLeft": "16mm",
+        "titleGap": 15,
+        "uppercase": false
+      },
+      {
+        "level": 4,
+        "size": "11pt",
+        "spaceBefore": "5mm",
+        "spaceAfter": "2mm",
+        "indentLeft": "16mm",
+        "titleGap": 15,
+        "uppercase": false
+      }
+    ],
+    "paragraph": {
+      "spaceAfter": "3mm",
+      "firstLineIndent": "8mm"
+    },
+    "figures": {
+      "captionGap": "2mm",
+      "caps": {
+        "portrait": {
+          "w": 167,
+          "h": 235
+        },
+        "landscape": {
+          "w": 254,
+          "h": 148
+        },
+        "a3landscape": {
+          "w": 377,
+          "h": 235
+        }
+      }
+    },
+    "toc": {
+      "sectionDepth": 1
+    },
+    "lists": {
+      "gapAlpha": 8,
+      "gapRoman": 10,
+      "gapBullet": 5,
+      "indent": 0,
+      "itemSpace": 1.5
+    },
+    "blankVersos": true
+  },
+  "branding": {
+    "emblem": "Media/Satya.png",
+    "publishers": [
+      {
+        "name": "L&T Defence,",
+        "addressLines": [
+          "LARSEN & TOUBRO LIMITED"
+        ],
+        "logo": "Media/LT.png"
+      }
+    ]
+  },
+  "frontMatterDefaults": {
+    "titlePageJoint": {
+      "documentType": "STANDARD OPERATING PROCEDURE (SOP)",
+      "disclosureNotice": "THE INFORMATION GIVEN IN THIS DOCUMENT IS INTENDED FOR INTERNAL USE BY AUTHORISED USERS OF THE JSS PUBLISHER SOFTWARE ONLY. IT IS NOT TO BE PUBLISHED OR COMMUNICATED, EITHER DIRECTLY OR INDIRECTLY, TO ANY PERSON OUTSIDE THE ORGANISATION WITHOUT AUTHORISATION.",
+      "repairNotice": "THIS DOCUMENT DESCRIBES THE STANDARD PROCEDURE FOR OPERATING THE JSS PUBLISHER SOFTWARE. IT DOES NOT AUTHORISE MODIFICATION OF THE SOFTWARE ITSELF; CHANGES TO THE APPLICATION ARE MANAGED BY THE DOCUMENTATION/IT TEAM THROUGH THE NORMAL CHANGE-CONTROL PROCESS."
+    },
+    "titlePage": {
+      "documentType": "STANDARD OPERATING PROCEDURE (SOP)",
+      "disclosureNotice": "THE INFORMATION GIVEN IN THIS DOCUMENT IS INTENDED FOR INTERNAL USE BY AUTHORISED USERS OF THE JSS PUBLISHER SOFTWARE ONLY. IT IS NOT TO BE PUBLISHED OR COMMUNICATED, EITHER DIRECTLY OR INDIRECTLY, TO ANY PERSON OUTSIDE THE ORGANISATION WITHOUT AUTHORISATION.",
+      "repairNotice": "THIS DOCUMENT DESCRIBES THE STANDARD PROCEDURE FOR OPERATING THE JSS PUBLISHER SOFTWARE. IT DOES NOT AUTHORISE MODIFICATION OF THE SOFTWARE ITSELF; CHANGES TO THE APPLICATION ARE MANAGED BY THE DOCUMENTATION/IT TEAM THROUGH THE NORMAL CHANGE-CONTROL PROCESS."
+    },
+    "proprietary": {
+      "text": "This document contains proprietary information, which is the sole property of the company submitting the document. The document is submitted to the recipient for his use only. By receiving this document, the recipient undertakes not to duplicate the document or to disclose in part of, or the whole of, any of the information contained herein to any third party without receiving beforehand, written permission from submitting company.",
+      "applicability": "THIS DOCUMENT IS APPLICABLE FOR XXXXXX CLASS OF XXX"
+    },
+    "foreword": {
+      "text": "This Standard Operating Procedure explains, step by step, how to install, configure and use the JSS Publisher software to author and publish S1000D and JSS technical publications. Every care has been taken in the preparation of this document and its technical content has been verified against the software it describes. However, the reader is requested to communicate by E-mail/ Letter/ Telephone/ Fax to Larsen & Toubro, if any error is observed or there are any suggestions to improve this document.",
+      "email": "defence@larsentoubro.com",
+      "postalAddress": [
+        "Head, Documentation & Training,",
+        "L&T Defence, Larsen & Toubro.",
+        "G Building, Gate No. 1,",
+        "Saki Vihar Road, Powai.",
+        "Mumbai - 400 072."
+      ],
+      "telephone": [
+        "022 - 6705 3965"
+      ],
+      "fax": [
+        "022 - 6705 3234",
+        "022 - 6705 5914"
+      ]
+    },
+    "safetyWarning": [
+      {
+        "text": "RUNNING MORE THAN ONE INSTANCE"
+      },
+      {
+        "text": "OF THE JSS PUBLISHER SERVER"
+      },
+      {
+        "text": "CAN CORRUPT A PROJECT'S OUTPUT"
+      },
+      {
+        "text": "IMPORTANT",
+        "strong": true,
+        "spaceBefore": "6mm"
+      },
+      {
+        "text": "RUN ONLY ONE SERVER INSTANCE",
+        "strong": true
+      },
+      {
+        "text": "at a time, on one machine"
+      },
+      {
+        "text": "&",
+        "strong": true
+      },
+      {
+        "text": "SAVE YOUR WORK",
+        "strong": true
+      },
+      {
+        "text": "before closing the browser tab"
+      }
+    ],
+    "cautionsNotes": [
+      "Run only one instance of the server (npm start) at a time; a second instance's file watcher can overwrite a project's generated PDF mid-build.",
+      "Save (or Save & Generate) in the Settings drawer before closing the browser tab; edits made there are not written to disk until saved.",
+      "Back up the workspace/ folder regularly. It holds every project's source files, house templates and the SQLite project registry.",
+      "Do not edit files inside client-dist/ directly. That folder is rebuilt automatically from client/ and any direct changes are lost on the next build.",
+      "Install Java (JRE 11 or later) and confirm it is on the PATH before starting the server, otherwise PDF generation falls back to the slower fop.bat path.",
+      "Uploads always target the currently active project. Confirm the correct project is open before uploading a PMC, a data module, or Media.",
+      "Use Quick Preview to iterate quickly on a single data module. Always run a full Generate before final review, since Quick Preview omits front matter."
+    ],
+    "descriptionOfSymbols": [
+      {
+        "icon": "Media/High_Voltage_Symbol.png",
+        "text": "This symbol indicates that this operation or action involves high voltage."
+      },
+      {
+        "icon": "Media/Flammable_Symbol.png",
+        "text": "This symbol indicates that this operation or action involves Highly Flammable material."
+      },
+      {
+        "icon": "Media/Emergency_Stop_Symbol.png",
+        "text": "This symbol indicates that system operation need to be stopped quickly."
+      },
+      {
+        "icon": "Media/Hot_Surface_Symbol.png",
+        "text": "This symbol indicates that this operation or action involves hot surface areas."
+      },
+      {
+        "icon": "Media/Antistalic_Symbol.png",
+        "text": "This symbol indicates that this operation or action to be carried out using antistatic wears."
+      },
+      {
+        "icon": "Media/Noise_symbol.png",
+        "text": "This symbol indicates that this operation or action involves high level sound noise."
+      }
+    ],
+    "noticeLegends": {
+      "note": "Denotes additional information that helps the reader understand or perform a step.",
+      "warning": "Denotes a step that, if done incorrectly, can cause loss of work or a broken build.",
+      "caution": "Denotes a step that, if skipped, commonly leads to a support request."
+    },
+    "firstAidImage": "Media/stamp1.png",
+    "systemImage": "Media/SystemImage.jpg",
+    "firstAidImageHeight": "140mm"
+  }
+}

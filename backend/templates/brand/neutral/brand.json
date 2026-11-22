@@ -1,0 +1,7 @@
+﻿{
+  "id": "neutral",
+  "name": "Neutral (no logo, no company line)",
+  "description": "Builds never block: with this pack the header logo and the company margin mark are simply omitted.",
+  "company": "",
+  "logo": ""
+}
