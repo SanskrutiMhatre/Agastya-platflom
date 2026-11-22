@@ -33,6 +33,8 @@ Forgot it later? On the server machine: `npm run reset-admin -- <username> <new-
 
 Development: `npm run dev:backend` (port 4040) and `npm run dev:frontend` (port 5174, proxies `/api` and `/ws`).
 
+**From a git checkout:** two things are deliberately not in the repository. The proprietary Arial fonts are left out (copy `arial.ttf`, `arialbd.ttf`, `ariali.ttf` and `arialbi.ttf` from `C:\Windows\Fonts` into `backend/vendor/tools/fonts/` if you hold the licence; without them PDFs are set in Liberation Sans, which has the same character widths - see `backend/vendor/tools/fonts/README.md`). The customer's reference publications in `SAMPLE PROJECTS/` are left out too; the tests that read them skip themselves when the folder is empty - see `SAMPLE PROJECTS/README.md`.
+
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `PORT` | `4040` | HTTP port |
