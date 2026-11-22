@@ -1,0 +1,677 @@
+<?xml version="1.0" ?>
+<!-- agastya-import: reconstructed: synthesised from the data modules and the printed table of contents; reconstructed - verify before use -->
+<pm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <identAndStatusSection>
+    <pmAddress>
+      <pmIdent>
+        <pmCode modelIdentCode="RDR" pmIssuer="1671Y" pmNumber="00039" pmVolume="00"/>
+        <language countryIsoCode="IN" languageIsoCode="en"/>
+        <issueInfo issueNumber="001" inWork="01"/>
+      </pmIdent>
+      <pmAddressItems>
+        <issueDate year="2026" month="09" day="04"/>
+        <pmTitle>User Handbook  For Search Radar</pmTitle>
+        <shortPmTitle>L&amp;T User Handbook SR</shortPmTitle>
+      </pmAddressItems>
+    </pmAddress>
+    <pmStatus>
+      <security securityClassification="04"/>
+      <responsiblePartnerCompany enterpriseCode="1671Y">
+        <enterpriseName>LNTDEFENCE</enterpriseName>
+      </responsiblePartnerCompany>
+      <originator enterpriseCode="1671Y">
+        <enterpriseName>LNTDEFENCE</enterpriseName>
+      </originator>
+      <qualityAssurance>
+        <unverified/>
+      </qualityAssurance>
+    </pmStatus>
+  </identAndStatusSection>
+  <content>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A00" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="32" disassyCodeVariant="A" infoCode="001" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>User Handbook for Close-In Weapon System (CIWS) - Search Radar</techName>
+            <infoName>Title page</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="17"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A00" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="00" disassyCodeVariant="A" infoCode="018" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Purpose</techName>
+            <infoName>Introduction</infoName>
+          </dmTitle>
+          <issueDate year="2025" month="09" day="03"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A00" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="01" disassyCodeVariant="A" infoCode="044" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Features</techName>
+            <infoName>Description of function</infoName>
+          </dmTitle>
+          <issueDate year="2025" month="09" day="03"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A00" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="02" disassyCodeVariant="A" infoCode="030" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>System Specifications</techName>
+            <infoName>Technical data</infoName>
+          </dmTitle>
+          <issueDate year="2025" month="09" day="03"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A00" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="03" disassyCodeVariant="A" infoCode="030" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Customer Services</techName>
+            <infoName>Technical data</infoName>
+          </dmTitle>
+          <issueDate year="2025" month="09" day="03"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A00" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="04" disassyCodeVariant="A" infoCode="028" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>System Tree Chart</techName>
+            <infoName>General</infoName>
+          </dmTitle>
+          <issueDate year="2025" month="09" day="03"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A00" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="09" disassyCodeVariant="A" infoCode="040" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>System Overview</techName>
+            <infoName>Description</infoName>
+          </dmTitle>
+          <issueDate year="2025" month="09" day="03"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A07" subSystemCode="5" subSubSystemCode="0" assyCode="00" disassyCode="00" disassyCodeVariant="A" infoCode="800" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Packing Details</techName>
+            <infoName>Package, handling, storage and transportation</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="17"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A07" subSystemCode="5" subSubSystemCode="0" assyCode="00" disassyCode="01" disassyCodeVariant="A" infoCode="820" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Unpacking and Removal of Preservatives</techName>
+            <infoName>Procedure to remove preservation material</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="01" day="14"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A10" subSystemCode="3" subSubSystemCode="0" assyCode="00" disassyCode="00" disassyCodeVariant="A" infoCode="810" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Preservation Instructions</techName>
+            <infoName>Preservation procedure</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="17"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A00" subSystemCode="2" subSubSystemCode="0" assyCode="00" disassyCode="08" disassyCodeVariant="A" infoCode="012" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Precaution and Safety Instructions</techName>
+            <infoName>General warnings and cautions and related safety data</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="01" day="06"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A15" subSystemCode="3" subSubSystemCode="0" assyCode="00" disassyCode="07" disassyCodeVariant="A" infoCode="121" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Pre-requisites for Deployment</techName>
+            <infoName>Pre-operation procedure (crew)</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="16"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A15" subSystemCode="3" subSubSystemCode="0" assyCode="00" disassyCode="11" disassyCodeVariant="A" infoCode="130" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Deployment at Site</techName>
+            <infoName>Normal operation</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="09" day="04"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A15" subSystemCode="3" subSubSystemCode="0" assyCode="00" disassyCode="08" disassyCodeVariant="A" infoCode="131" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Set to Work</techName>
+            <infoName>Normal operation procedure (crew)</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="16"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A15" subSystemCode="3" subSubSystemCode="0" assyCode="00" disassyCode="01" disassyCodeVariant="1" infoCode="130" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Deployment Procedure for SR Trailer</techName>
+            <infoName>Normal operation</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="09" day="04"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A00" subSystemCode="2" subSubSystemCode="0" assyCode="00" disassyCode="09" disassyCodeVariant="A" infoCode="012" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Precaution and Safety Measures</techName>
+            <infoName>General warnings and cautions and related safety data</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="01" day="06"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A00" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="06" disassyCodeVariant="A" infoCode="120" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="000" inWork="02"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Pre-Operation Checks/ Activities</techName>
+            <infoName>Pre-operation</infoName>
+          </dmTitle>
+          <issueDate year="2025" month="05" day="05"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A15" subSystemCode="3" subSubSystemCode="0" assyCode="00" disassyCode="09" disassyCodeVariant="A" infoCode="131" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>SR Powering ON Sequence</techName>
+            <infoName>Normal operation procedure (crew)</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="16"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A15" subSystemCode="3" subSubSystemCode="0" assyCode="00" disassyCode="10" disassyCodeVariant="A" infoCode="131" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="000" inWork="01"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>SR Powering OFF Sequence</techName>
+            <infoName>Normal operation procedure (crew)</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="17"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A00" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="07" disassyCodeVariant="A" infoCode="150" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Post-Operation Checks/ Activities</techName>
+            <infoName>Post-operation</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="02" day="13"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A05" subSystemCode="4" subSubSystemCode="0" assyCode="00" disassyCode="03" disassyCodeVariant="A" infoCode="028" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>General</techName>
+            <infoName>General</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="17"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A05" subSystemCode="4" subSubSystemCode="0" assyCode="00" disassyCode="04" disassyCodeVariant="A" infoCode="913" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Maintenance Tasks for Mechanical Subsystems</techName>
+            <infoName>General maintenance procedure</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="03" day="18"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A05" subSystemCode="4" subSubSystemCode="0" assyCode="00" disassyCode="05" disassyCodeVariant="A" infoCode="913" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Maintenance Tasks for Electrical/ Electronics Subsystems</techName>
+            <infoName>General maintenance procedure</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="03" day="18"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A05" subSystemCode="5" subSubSystemCode="0" assyCode="00" disassyCode="00" disassyCodeVariant="A" infoCode="400" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Fault diagnosis for Search Radar System</techName>
+            <infoName>Fault reports and isolation procedures</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="03" day="18"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A00" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="35" disassyCodeVariant="A" infoCode="001" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Annexure 'A' - Operation Manual For Search Radar (ELM-2138M)</techName>
+            <infoName>-------------------------------</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="18"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <pmEntryTitle>Annexure 'A' - Operation Manual For Search Radar (ELM-2138M)</pmEntryTitle>
+      <pmRef>
+        <pmRefAddressItems>
+          <pmTitle>Operation Manual For Search Radar (ELM-2138M)</pmTitle>
+          <shortPmTitle>Close - In Weapon System</shortPmTitle>
+        </pmRefAddressItems>
+        <pmRefIdent>
+          <issueInfo issueNumber="000" inWork="01"/>
+          <pmCode modelIdentCode="RDR" pmIssuer="1671Y" pmNumber="00010" pmVolume="00"/>
+        </pmRefIdent>
+      </pmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A00" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="36" disassyCodeVariant="A" infoCode="001" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Annexure 'B' - Command and Control (C2) Console Manual</techName>
+            <infoName>-------------------------------</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="18"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <pmEntryTitle>Annexure 'B' - Command and Control (C2) Console Manual</pmEntryTitle>
+      <pmRef>
+        <pmRefAddressItems>
+          <pmTitle>Command and Control (C2) Console Manual</pmTitle>
+          <shortPmTitle>Close-In Weapon System</shortPmTitle>
+        </pmRefAddressItems>
+        <pmRefIdent>
+          <issueInfo issueNumber="000" inWork="01"/>
+          <pmCode modelIdentCode="RDR" pmIssuer="1671Y" pmNumber="00041" pmVolume="00"/>
+        </pmRefIdent>
+      </pmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A00" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="38" disassyCodeVariant="A" infoCode="001" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Annexure 'C' - User Handbook for 30kVA DG Search Radar</techName>
+            <infoName>-------------------------</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="18"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <pmEntryTitle>Annexure 'C' - User Handbook for 30kVA DG Search Radar</pmEntryTitle>
+      <pmRef>
+        <pmRefAddressItems>
+          <pmTitle>30kVA Diesel Generator for Search Radar</pmTitle>
+          <shortPmTitle>Close-In Weapon System</shortPmTitle>
+        </pmRefAddressItems>
+        <pmRefIdent>
+          <issueInfo issueNumber="000" inWork="01"/>
+          <pmCode modelIdentCode="RDR" pmIssuer="1671Y" pmNumber="00043" pmVolume="00"/>
+        </pmRefIdent>
+      </pmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A00" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="39" disassyCodeVariant="A" infoCode="001" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Annexure 'D' - User Handbook for Deployment System Search Radar</techName>
+            <infoName>------------------------</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="18"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <pmEntryTitle>Annexure 'D' - User Handbook for Deployment System Search Radar</pmEntryTitle>
+      <pmRef>
+        <pmRefAddressItems>
+          <pmTitle>User Handbook for Deployment System Search Radar</pmTitle>
+          <shortPmTitle>Close In-Weapon System (CIWS)</shortPmTitle>
+        </pmRefAddressItems>
+        <pmRefIdent>
+          <issueInfo issueNumber="000" inWork="01"/>
+          <pmCode modelIdentCode="RDR" pmIssuer="1671Y" pmNumber="00028" pmVolume="00"/>
+        </pmRefIdent>
+      </pmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A00" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="41" disassyCodeVariant="A" infoCode="001" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Annexure 'E'- User Handbook for Outrigger Assembly</techName>
+            <infoName>-------------------</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="02" day="18"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <pmEntryTitle>Annexure 'E'- User Handbook for Outrigger Assembly</pmEntryTitle>
+      <pmRef>
+        <pmRefAddressItems>
+          <pmTitle>User Handbook for Outrigger Assembly</pmTitle>
+          <shortPmTitle>Search Radar and Fire Control Radar</shortPmTitle>
+        </pmRefAddressItems>
+        <pmRefIdent>
+          <issueInfo issueNumber="000" inWork="01"/>
+          <pmCode modelIdentCode="RDR" pmIssuer="1671Y" pmNumber="00018" pmVolume="00"/>
+        </pmRefIdent>
+      </pmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A00" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="40" disassyCodeVariant="A" infoCode="001" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Annexure 'F' - Manual Winch Driven Telescopic Mast</techName>
+            <infoName>------------------------</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="18"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <pmEntryTitle>Annexure 'F' - Manual Winch Driven Telescopic Mast</pmEntryTitle>
+      <pmRef>
+        <pmRefAddressItems>
+          <pmTitle>Manual Winch Driven Telescopic Mast</pmTitle>
+          <shortPmTitle>Search Radar and Fire Control Radar</shortPmTitle>
+        </pmRefAddressItems>
+        <pmRefIdent>
+          <issueInfo issueNumber="000" inWork="01"/>
+          <pmCode modelIdentCode="RDR" pmIssuer="1671Y" pmNumber="00025" pmVolume="00"/>
+        </pmRefIdent>
+      </pmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GB0" subSystemCode="0" subSubSystemCode="0" assyCode="34" disassyCode="01" disassyCodeVariant="A" infoCode="001" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Annexure 'G' - Operation and Maintenance Manual for Search Radar Trailer</techName>
+            <infoName>-----------------</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="02" day="18"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <pmEntryTitle>Annexure 'G' - Operation and Maintenance Manual for Search Radar Trailer</pmEntryTitle>
+      <pmRef>
+        <pmRefAddressItems>
+          <pmTitle>Operation and  Maintenance Manual for Search Radar Trailer</pmTitle>
+          <shortPmTitle>Close In-Weapon System (CIWS)</shortPmTitle>
+        </pmRefAddressItems>
+        <pmRefIdent>
+          <issueInfo issueNumber="000" inWork="01"/>
+          <pmCode modelIdentCode="RDR" pmIssuer="1671Y" pmNumber="00023" pmVolume="00"/>
+        </pmRefIdent>
+      </pmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A00" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="42" disassyCodeVariant="A" infoCode="001" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Annexure 'H' - User Hand book of MIL Grade 1.5 TR Vertical Slip-on Air Conditioner</techName>
+            <infoName>-------------------------------</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="18"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <pmEntryTitle>Annexure 'H' - User Hand book of MIL Grade 1.5 TR Vertical Slip-on Air Conditioner</pmEntryTitle>
+      <pmRef>
+        <pmRefAddressItems>
+          <pmTitle>User Hand book of MIL Grade 1.5 TR Vertical Slip-on Air Conditioner</pmTitle>
+          <shortPmTitle>Search Radar and Fire Control Radar</shortPmTitle>
+        </pmRefAddressItems>
+        <pmRefIdent>
+          <issueInfo issueNumber="000" inWork="01"/>
+          <pmCode modelIdentCode="RDR" pmIssuer="1671Y" pmNumber="00014" pmVolume="00"/>
+        </pmRefIdent>
+      </pmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A00" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="59" disassyCodeVariant="A" infoCode="001" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Annexure 'I'- 'O'-Level Maintenance Manual for Search Radar(ELM-2138M)</techName>
+            <infoName>------------------------------------</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="29"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <pmEntryTitle>Annexure 'I'- 'O'-Level Maintenance Manual for Search Radar(ELM-2138M)</pmEntryTitle>
+      <pmRef>
+        <pmRefAddressItems>
+          <pmTitle>O-Level Maintenance Manual for Search Radar (ELM-2138M)</pmTitle>
+          <shortPmTitle>Close - In Weapon System</shortPmTitle>
+        </pmRefAddressItems>
+        <pmRefIdent>
+          <issueInfo issueNumber="000" inWork="01"/>
+          <pmCode modelIdentCode="RDR" pmIssuer="1671Y" pmNumber="00009" pmVolume="00"/>
+        </pmRefIdent>
+      </pmRef>
+    </pmEntry>
+  </content>
+</pm>

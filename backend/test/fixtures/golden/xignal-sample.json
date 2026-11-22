@@ -1,0 +1,1592 @@
+{
+ "source": {
+  "reference": "RDR-1671Y-00039-00 (9).pdf",
+  "measured": "2026-11-20",
+  "tolerancePt": {
+   "line": 1,
+   "picture": 0.5
+  },
+  "note": "Reference geometry from the Xignal publication RDR-1671Y-00039-00; \"ratchet\" lists the pages/pictures where the platform build agrees with it."
+ },
+ "modules": [
+  {
+   "code": "RDR-A-A00-00-00-32A-001A-D",
+   "pages": 1,
+   "a3": 0,
+   "sigs": [
+    {
+     "firstT": "UserHandbookforClose-InWeapon",
+     "firstY": 699.5,
+     "lastT": "Publisher:",
+     "lastY": 231.5
+    }
+   ],
+   "ratchet": [
+    1
+   ]
+  },
+  {
+   "code": "RDR-A-A00-00-00-00A-018A-D",
+   "pages": 1,
+   "a3": 0,
+   "sigs": [
+    {
+     "firstT": "Purpose",
+     "firstY": 719.5,
+     "lastT": "ofindependenttargettrackingand",
+     "lastY": 281.5
+    }
+   ],
+   "ratchet": [
+    1
+   ]
+  },
+  {
+   "code": "RDR-A-A00-00-00-01A-044A-D",
+   "pages": 1,
+   "a3": 0,
+   "sigs": [
+    {
+     "firstT": "Features",
+     "firstY": 719.5,
+     "lastT": "8ReferUserHandbookforCIWS-GunS",
+     "lastY": 190
+    }
+   ],
+   "ratchet": [
+    1
+   ]
+  },
+  {
+   "code": "RDR-A-A00-00-00-02A-030A-D",
+   "pages": 6,
+   "a3": 0,
+   "sigs": [
+    {
+     "firstT": "SystemSpecifications",
+     "firstY": 719.5,
+     "lastT": "Surveillancecoverage360deg",
+     "lastY": 132
+    },
+    {
+     "firstT": "Table2PerformanceSpecification",
+     "firstY": 739.5,
+     "lastT": "Targetacquisitiontime6seconds",
+     "lastY": 136
+    },
+    {
+     "firstT": "Table2PerformanceSpecification",
+     "firstY": 739.5,
+     "lastT": "AntennatypePlanararray",
+     "lastY": 107.5
+    },
+    {
+     "firstT": "Table2PerformanceSpecification",
+     "firstY": 739.5,
+     "lastT": "Weight<19T",
+     "lastY": 110.5
+    },
+    {
+     "firstT": "Table3DimensionsandWeight(Cont",
+     "firstY": 739.5,
+     "lastT": "Theelectricalspecificationsare",
+     "lastY": 165
+    },
+    {
+     "firstT": "Table4ElectricalSpecifications",
+     "firstY": 734,
+     "lastT": "(c)Altitude3500m",
+     "lastY": 250.5
+    }
+   ],
+   "ratchet": [
+    1,
+    2,
+    3,
+    4
+   ]
+  },
+  {
+   "code": "RDR-A-A00-00-00-03A-030A-D",
+   "pages": 1,
+   "a3": 0,
+   "sigs": [
+    {
+     "firstT": "CustomerServices",
+     "firstY": 719.5,
+     "lastT": "(c)VSHORADSVeryShortRangeAirDe",
+     "lastY": 229
+    }
+   ],
+   "ratchet": [
+    1
+   ]
+  },
+  {
+   "code": "RDR-A-A00-00-00-04A-028A-D",
+   "pages": 2,
+   "a3": 1,
+   "sigs": [
+    {
+     "firstT": "SystemTreeChart",
+     "firstY": 719.5,
+     "lastT": "ReferFig1forSearchRadartreecha",
+     "lastY": 303
+    },
+    {
+     "firstT": "ICN-RDR-A-A000000-1-1671Y-0222",
+     "firstY": 125,
+     "lastT": "Fig1SearchRadarTreeChart",
+     "lastY": 110
+    }
+   ],
+   "ratchet": [
+    1,
+    2
+   ]
+  },
+  {
+   "code": "RDR-A-A00-00-00-09A-040A-D",
+   "pages": 3,
+   "a3": 0,
+   "sigs": [
+    {
+     "firstT": "SystemOverview",
+     "firstY": 719.5,
+     "lastT": "andAshleshaEarlyWarningRadars.",
+     "lastY": 219
+    },
+    {
+     "firstT": "ICN-RDR-A-A000000-1-1671Y-0221",
+     "firstY": 394.5,
+     "lastT": "EachformationofCIWSsystemiscal",
+     "lastY": 118.5
+    },
+    {
+     "firstT": "•SearchRadarandCommandControlU",
+     "firstY": 740,
+     "lastT": "•AD-Gun(4Nos).",
+     "lastY": 713
+    }
+   ],
+   "ratchet": [
+    1,
+    2,
+    3
+   ]
+  },
+  {
+   "code": "RDR-A-A07-50-00-00A-800A-D",
+   "pages": 2,
+   "a3": 0,
+   "sigs": [
+    {
+     "firstT": "PackingDetails",
+     "firstY": 719.5,
+     "lastT": "•Theantennaisretractedandthesl",
+     "lastY": 101
+    },
+    {
+     "firstT": "•Thecommunicationmastisretract",
+     "firstY": 740,
+     "lastT": "•Repeatprocedurewithtrailerofr",
+     "lastY": 397.5
+    }
+   ],
+   "ratchet": [
+    1,
+    2
+   ]
+  },
+  {
+   "code": "RDR-A-A07-50-00-01A-820A-D",
+   "pages": 2,
+   "a3": 0,
+   "sigs": [
+    {
+     "firstT": "UnpackingandRemovalofPreservat",
+     "firstY": 719.5,
+     "lastT": "it.",
+     "lastY": 116.5
+    },
+    {
+     "firstT": "•Placetheunitsinrespectivewood",
+     "firstY": 740,
+     "lastT": "•Providefragilemarking“Handlew",
+     "lastY": 294.5
+    }
+   ],
+   "ratchet": []
+  },
+  {
+   "code": "RDR-A-A10-30-00-00A-810A-D",
+   "pages": 2,
+   "a3": 0,
+   "sigs": [
+    {
+     "firstT": "PreservationInstructions",
+     "firstY": 719.5,
+     "lastT": "•Makesurethatthatoutriggersare",
+     "lastY": 112
+    },
+    {
+     "firstT": "•Makesurethatallmechanicalsyst",
+     "firstY": 740,
+     "lastT": "theboxes.",
+     "lastY": 225.5
+    }
+   ],
+   "ratchet": [
+    2
+   ]
+  },
+  {
+   "code": "RDR-A-A00-20-00-08A-012A-D",
+   "pages": 3,
+   "a3": 0,
+   "sigs": [
+    {
+     "firstT": "PrecautionandSafetyInstruction",
+     "firstY": 719.5,
+     "lastT": "safestandmostconvenientplaceme",
+     "lastY": 102
+    },
+    {
+     "firstT": "•Besureallofyourhelpersareknow",
+     "firstY": 740,
+     "lastT": "•Makesurethatthebatterytermina",
+     "lastY": 110
+    },
+    {
+     "firstT": "•Donottouchthebatteryterminals",
+     "firstY": 740,
+     "lastT": "•Passthewires/cablesfromcorrec",
+     "lastY": 581.5
+    }
+   ],
+   "ratchet": [
+    2,
+    3
+   ]
+  },
+  {
+   "code": "RDR-A-A15-30-00-07A-121A-D",
+   "pages": 4,
+   "a3": 0,
+   "sigs": [
+    {
+     "firstT": "Pre-requisitesforDeployment",
+     "firstY": 719.5,
+     "lastT": "sedistances,thetypicallayoutis",
+     "lastY": 183
+    },
+    {
+     "firstT": "ICN-RDR-A-A153000-1-1671Y-0196",
+     "firstY": 502,
+     "lastT": "•Earthingpitclosetothedeployme",
+     "lastY": 121.5
+    },
+    {
+     "firstT": "•Designateddeploymentlocations",
+     "firstY": 740,
+     "lastT": "•SearchRadar–50metersfromalldi",
+     "lastY": 107.5
+    },
+    {
+     "firstT": "•FCR-10metersfromalldirectiono",
+     "firstY": 740,
+     "lastT": "•Mutualblankingzone",
+     "lastY": 387.5
+    }
+   ],
+   "ratchet": [
+    1,
+    2,
+    3,
+    4
+   ]
+  },
+  {
+   "code": "RDR-A-A15-30-00-11A-130A-D",
+   "pages": 2,
+   "a3": 0,
+   "sigs": [
+    {
+     "firstT": "DeploymentatSite",
+     "firstY": 719.5,
+     "lastT": "trailer.",
+     "lastY": 129
+    },
+    {
+     "firstT": "Table2DeploymentSequence(Conti",
+     "firstY": 739.5,
+     "lastT": "fromtheGun.",
+     "lastY": 298
+    }
+   ],
+   "ratchet": [
+    1,
+    2
+   ]
+  },
+  {
+   "code": "RDR-A-A15-30-00-08A-131A-D",
+   "pages": 15,
+   "a3": 0,
+   "sigs": [
+    {
+     "firstT": "SettoWork",
+     "firstY": 719.5,
+     "lastT": "22GraphicalUserInterface......",
+     "lastY": 173
+    },
+    {
+     "firstT": "References",
+     "firstY": 736.5,
+     "lastT": "ODU1-S2(Drive2)SlaveAddress(H5",
+     "lastY": 112
+    },
+    {
+     "firstT": "UnitSlaveAddressValue",
+     "firstY": 736,
+     "lastT": "•PLC-M2-3.1(SRconsoleCB)",
+     "lastY": 112.5
+    },
+    {
+     "firstT": "•PLC-M2-3.3(C2consoleCB)",
+     "firstY": 740,
+     "lastT": "showbelowerrormessage.",
+     "lastY": 148
+    },
+    {
+     "firstT": "ICN-RDR-A-GG10040-1-1671Y-0232",
+     "firstY": 508,
+     "lastT": "Fig3Outrigger",
+     "lastY": 113
+    },
+    {
+     "firstT": "•Afterclicking‘OutriggerON’but",
+     "firstY": 740,
+     "lastT": "getsenabled.",
+     "lastY": 115.5
+    },
+    {
+     "firstT": "ICN-RDR-A-GG10040-1-1671Y-0235",
+     "firstY": 503.5,
+     "lastT": "disabled).",
+     "lastY": 120.5
+    },
+    {
+     "firstT": "•Deploymentoperationstatuswill",
+     "firstY": 740,
+     "lastT": "•AboveFig9statuspageisaccessed",
+     "lastY": 128.5
+    },
+    {
+     "firstT": "•Nextpageofmeteringis‘TiltSens",
+     "firstY": 740,
+     "lastT": "varioussensorlocatedinsidedriv",
+     "lastY": 157
+    },
+    {
+     "firstT": "ICN-RDR-A-GG10040-1-1671Y-0235",
+     "firstY": 506.5,
+     "lastT": "Fig13PLCDigitalInputs",
+     "lastY": 154.5
+    },
+    {
+     "firstT": "ICN-RDR-A-GG10040-1-1671Y-0230",
+     "firstY": 512.5,
+     "lastT": "AlertScreen",
+     "lastY": 131
+    },
+    {
+     "firstT": "•Fig16indicatesthealertraisedi",
+     "firstY": 740,
+     "lastT": "‘Outrigger–SemiAuto’and‘Deploy",
+     "lastY": 124.5
+    },
+    {
+     "firstT": "ICN-RDR-A-GG10040-1-1671Y-0230",
+     "firstY": 513.5,
+     "lastT": "Fig19Outrigger–SemiAutoMainten",
+     "lastY": 139.5
+    },
+    {
+     "firstT": "•AsshowninFig20,nextTabinMaint",
+     "firstY": 740,
+     "lastT": "Fig21Linkstatus",
+     "lastY": 126.5
+    },
+    {
+     "firstT": "•InFig22,Detailedinformationab",
+     "firstY": 740,
+     "lastT": "Fig22GraphicalUserInterface",
+     "lastY": 472
+    }
+   ],
+   "ratchet": [
+    1,
+    5,
+    6,
+    7,
+    10,
+    11,
+    12
+   ]
+  },
+  {
+   "code": "RDR-A-A15-30-00-011-130A-D",
+   "pages": 5,
+   "a3": 0,
+   "sigs": [
+    {
+     "firstT": "DeploymentProcedureforSRTraile",
+     "firstY": 719.5,
+     "lastT": "•ReferFig1forSRTrailerinparked",
+     "lastY": 210.5
+    },
+    {
+     "firstT": "ICN-RDR-A-GG10040-1-1671Y-0236",
+     "firstY": 479.5,
+     "lastT": "•SROutriggerDeploymentisshowni",
+     "lastY": 112
+    },
+    {
+     "firstT": "ICN-RDR-A-GG10040-1-1671Y-0236",
+     "firstY": 472,
+     "lastT": "Fig4SlidingRoofMechanism",
+     "lastY": 132.5
+    },
+    {
+     "firstT": "•ReferFig5forSearchRadarAntenn",
+     "firstY": 740,
+     "lastT": "•ReferFig7forSearchRadarDeploy",
+     "lastY": 120
+    },
+    {
+     "firstT": "ICN-RDR-A-A000000-1-1671Y-0238",
+     "firstY": 195,
+     "lastT": "Fig7SearchRadarDeployedStage",
+     "lastY": 180
+    }
+   ],
+   "ratchet": [
+    1,
+    2,
+    5
+   ]
+  },
+  {
+   "code": "RDR-A-A00-20-00-09A-012A-D",
+   "pages": 6,
+   "a3": 0,
+   "sigs": [
+    {
+     "firstT": "PrecautionandSafetyMeasures",
+     "firstY": 719.5,
+     "lastT": "mentionedbelow.",
+     "lastY": 173.5
+    },
+    {
+     "firstT": "1.1GeneralSafetyInstructions",
+     "firstY": 738,
+     "lastT": "•Noperson/equipment/looseitems",
+     "lastY": 110
+    },
+    {
+     "firstT": "•Observetheinterlocks/warnings",
+     "firstY": 740,
+     "lastT": "•Observetheinterlocks/warnings",
+     "lastY": 121
+    },
+    {
+     "firstT": "•Performthenextoperationonlyaf",
+     "firstY": 740,
+     "lastT": "withindication,whichglowsREDwh",
+     "lastY": 109.5
+    },
+    {
+     "firstT": "activated.Thisactionisdonetopr",
+     "firstY": 740,
+     "lastT": "dealswithDeploymentMax.limitre",
+     "lastY": 109
+    },
+    {
+     "firstT": "interlockoccurs.Thisensuressaf",
+     "firstY": 740,
+     "lastT": "platform.",
+     "lastY": 579.5
+    }
+   ],
+   "ratchet": [
+    1,
+    2,
+    3
+   ]
+  },
+  {
+   "code": "RDR-A-A00-00-00-06A-120A-D",
+   "pages": 2,
+   "a3": 0,
+   "sigs": [
+    {
+     "firstT": "Pre-OperationChecks/Activities",
+     "firstY": 719.5,
+     "lastT": "•Propergrounding/earthingofthe",
+     "lastY": 112
+    },
+    {
+     "firstT": "1.2Pre-operationalchecksforDGs",
+     "firstY": 738,
+     "lastT": "noticeablehumidityandotherenvi",
+     "lastY": 224.5
+    }
+   ],
+   "ratchet": [
+    1,
+    2
+   ]
+  },
+  {
+   "code": "RDR-A-A15-30-00-09A-131A-D",
+   "pages": 3,
+   "a3": 0,
+   "sigs": [
+    {
+     "firstT": "SRPoweringONSequence",
+     "firstY": 719.5,
+     "lastT": "2MCB2AC1",
+     "lastY": 107
+    },
+    {
+     "firstT": "Table2MCBforSearchRadarPDU(Con",
+     "firstY": 739.5,
+     "lastT": "•EthernetSwitchwillbeON.",
+     "lastY": 104.5
+    },
+    {
+     "firstT": "•IFFInterrogatorwillbeON.",
+     "firstY": 740,
+     "lastT": "RDR-A-A00-00-00-36A-001A-D).",
+     "lastY": 329.5
+    }
+   ],
+   "ratchet": [
+    1,
+    2,
+    3
+   ]
+  },
+  {
+   "code": "RDR-A-A15-30-00-10A-131A-D",
+   "pages": 2,
+   "a3": 0,
+   "sigs": [
+    {
+     "firstT": "SRPoweringOFFSequence",
+     "firstY": 719.5,
+     "lastT": "•Step15:WhenworkingwithMains:S",
+     "lastY": 100
+    },
+    {
+     "firstT": "WhenworkingwithDGset:SwitchOFF",
+     "firstY": 740,
+     "lastT": "panelfromAMFPanelfromDGSet.",
+     "lastY": 728
+    }
+   ],
+   "ratchet": [
+    1,
+    2
+   ]
+  },
+  {
+   "code": "RDR-A-A00-00-00-07A-150A-D",
+   "pages": 1,
+   "a3": 0,
+   "sigs": [
+    {
+     "firstT": "Post-OperationChecks/Activitie",
+     "firstY": 719.5,
+     "lastT": "•ThebatteryMCB12forDGsetisOFF.",
+     "lastY": 259
+    }
+   ],
+   "ratchet": [
+    1
+   ]
+  },
+  {
+   "code": "RDR-A-A05-40-00-03A-028A-D",
+   "pages": 2,
+   "a3": 0,
+   "sigs": [
+    {
+     "firstT": "General",
+     "firstY": 719.5,
+     "lastT": "islatchedwithastoppertostopthe",
+     "lastY": 117.5
+    },
+    {
+     "firstT": "•Personneltobecarefulwhileonto",
+     "firstY": 740,
+     "lastT": "theoperationandtakeappropriate",
+     "lastY": 650
+    }
+   ],
+   "ratchet": []
+  },
+  {
+   "code": "RDR-A-A05-40-00-05A-913A-D",
+   "pages": 7,
+   "a3": 0,
+   "sigs": [
+    {
+     "firstT": "MaintenanceTasksforElectrical/",
+     "firstY": 719.5,
+     "lastT": "NonePartNo./",
+     "lastY": 118
+    },
+    {
+     "firstT": "Consumables,materialsandexpend",
+     "firstY": 736.5,
+     "lastT": "(i)IFFDriveUnit✓Step8",
+     "lastY": 110.5
+    },
+    {
+     "firstT": "Table6MaintenanceChartforElect",
+     "firstY": 739.5,
+     "lastT": "•Thereshouldnotbeanyobjectkept",
+     "lastY": 105.5
+    },
+    {
+     "firstT": "•CleanthePDUHMIdisplaywithadry",
+     "firstY": 740,
+     "lastT": "•Theconsolescreenwithadrymicro",
+     "lastY": 112
+    },
+    {
+     "firstT": "•Thekeyboardandtrackballwithad",
+     "firstY": 740,
+     "lastT": "Check:",
+     "lastY": 109.5
+    },
+    {
+     "firstT": "•TheconnectorsonORJBconnectorp",
+     "firstY": 740,
+     "lastT": "•Thekeyswitchrotationisfreemov",
+     "lastY": 178
+    },
+    {
+     "firstT": "Requirementsafterjobcompletion",
+     "firstY": 736.5,
+     "lastT": "None",
+     "lastY": 632
+    }
+   ],
+   "ratchet": []
+  },
+  {
+   "code": "RDR-A-A05-50-00-00A-400A-D",
+   "pages": 12,
+   "a3": 0,
+   "sigs": [
+    {
+     "firstT": "FaultdiagnosisforSearchRadarSy",
+     "firstY": 719.5,
+     "lastT": "mentionedinbelowsections.",
+     "lastY": 137.5
+    },
+    {
+     "firstT": "1.1FaultDiagnosisforSearchRada",
+     "firstY": 738,
+     "lastT": "bar.",
+     "lastY": 175.5
+    },
+    {
+     "firstT": "Table2PowerDistributionPanel(C",
+     "firstY": 739.5,
+     "lastT": "Ethernetswitchisconnectedprope",
+     "lastY": 121.5
+    },
+    {
+     "firstT": "Table3TroubleshootingofElectro",
+     "firstY": 739.5,
+     "lastT": "GNSSreceiverisconnectedproperl",
+     "lastY": 165.5
+    },
+    {
+     "firstT": "Table3TroubleshootingofElectro",
+     "firstY": 739.5,
+     "lastT": "connector.",
+     "lastY": 138.5
+    },
+    {
+     "firstT": "Table3TroubleshootingofElectro",
+     "firstY": 739.5,
+     "lastT": "indication.",
+     "lastY": 186.5
+    },
+    {
+     "firstT": "Table4TroubleshootingofSearchR",
+     "firstY": 739.5,
+     "lastT": "insideC2consoleisinONcondition",
+     "lastY": 135
+    },
+    {
+     "firstT": "Table5TroubleshootingofC2Conso",
+     "firstY": 739.5,
+     "lastT": "OFFisOFF.",
+     "lastY": 323
+    },
+    {
+     "firstT": "1.1.6PDUPlatformSR",
+     "firstY": 740,
+     "lastT": "LEDareGreen.",
+     "lastY": 165
+    },
+    {
+     "firstT": "Table7TroubleshootingofPDUPlat",
+     "firstY": 739.5,
+     "lastT": "propertightening.",
+     "lastY": 172.5
+    },
+    {
+     "firstT": "Table8TroubleshootingofDDU(Con",
+     "firstY": 739.5,
+     "lastT": "properlyconnected.",
+     "lastY": 166
+    },
+    {
+     "firstT": "Table9TroubleshootingofODU(Con",
+     "firstY": 739.5,
+     "lastT": "connectedproperly.",
+     "lastY": 432.5
+    }
+   ],
+   "ratchet": [
+    1,
+    2,
+    3,
+    4,
+    6,
+    7,
+    8
+   ]
+  },
+  {
+   "code": "RDR-A-A00-00-00-36A-001A-D",
+   "pages": 1,
+   "a3": 0,
+   "sigs": [
+    {
+     "firstT": "Annexure'B'-Commandand",
+     "firstY": 472.5,
+     "lastT": "------------------------------",
+     "lastY": 406
+    }
+   ],
+   "ratchet": [
+    1
+   ]
+  },
+  {
+   "code": "RDR-A-A00-00-00-38A-001A-D",
+   "pages": 1,
+   "a3": 0,
+   "sigs": [
+    {
+     "firstT": "Annexure'C'-UserHandbook",
+     "firstY": 472.5,
+     "lastT": "-------------------------",
+     "lastY": 406
+    }
+   ],
+   "ratchet": [
+    1
+   ]
+  },
+  {
+   "code": "RDR-A-A00-00-00-39A-001A-D",
+   "pages": 1,
+   "a3": 0,
+   "sigs": [
+    {
+     "firstT": "Annexure'D'-UserHandbookfor",
+     "firstY": 472.5,
+     "lastT": "------------------------",
+     "lastY": 406
+    }
+   ],
+   "ratchet": [
+    1
+   ]
+  },
+  {
+   "code": "RDR-A-A00-00-00-41A-001A-D",
+   "pages": 1,
+   "a3": 0,
+   "sigs": [
+    {
+     "firstT": "Annexure'E'-UserHandbook",
+     "firstY": 472.5,
+     "lastT": "-------------------",
+     "lastY": 406
+    }
+   ],
+   "ratchet": [
+    1
+   ]
+  },
+  {
+   "code": "RDR-A-A00-00-00-40A-001A-D",
+   "pages": 1,
+   "a3": 0,
+   "sigs": [
+    {
+     "firstT": "Annexure'F'-ManualWinch",
+     "firstY": 472.5,
+     "lastT": "------------------------",
+     "lastY": 406
+    }
+   ],
+   "ratchet": [
+    1
+   ]
+  },
+  {
+   "code": "RDR-A-GB0-00-34-01A-001A-D",
+   "pages": 1,
+   "a3": 0,
+   "sigs": [
+    {
+     "firstT": "Annexure'G'-Operation",
+     "firstY": 472.5,
+     "lastT": "-----------------",
+     "lastY": 377
+    }
+   ],
+   "ratchet": [
+    1
+   ]
+  },
+  {
+   "code": "RDR-A-A00-00-00-42A-001A-D",
+   "pages": 1,
+   "a3": 0,
+   "sigs": [
+    {
+     "firstT": "Annexure'H'-UserHand",
+     "firstY": 472.5,
+     "lastT": "------------------------------",
+     "lastY": 377
+    }
+   ],
+   "ratchet": [
+    1
+   ]
+  },
+  {
+   "code": "RDR-A-A00-00-00-59A-001A-D",
+   "pages": 1,
+   "a3": 0,
+   "sigs": [
+    {
+     "firstT": "Annexure'I'-'O'-LevelMaintenan",
+     "firstY": 472.5,
+     "lastT": "------------------------------",
+     "lastY": 406
+    }
+   ],
+   "ratchet": [
+    1
+   ]
+  }
+ ],
+ "known": [
+  {
+   "code": "RDR-A-A05-40-00-04A-913A-D",
+   "reference": {
+    "pages": 4,
+    "a3": 0
+   },
+   "platform": {
+    "pages": 6,
+    "a3": 0
+   },
+   "why": "Not an engine difference: the data module in the sample is a different revision from the one printed in the reference. Its chart has numbered rows (1, 2, 3 ...) with a 30 kVA DG set row that lists module references and a 2.2 in Activity column; the reference prints rows (a) to (g) with different wording and a 1.5 in Activity column. Every other absolute-width table in the reference is drawn at exactly its authored widths."
+  }
+ ],
+ "figures": [
+  {
+   "icn": "ICN-RDR-A-A000000-1-1671Y-02218-A-001-04",
+   "boxes": [
+    {
+     "x0": 42.5,
+     "y0": 406.5,
+     "w": 481.9,
+     "h": 340.5
+    }
+   ]
+  },
+  {
+   "icn": "ICN-RDR-A-A000000-1-1671Y-02228-A-001-04",
+   "boxes": [
+    {
+     "x0": 87.6,
+     "y0": 136.8,
+     "w": 1043.7,
+     "h": 610.3
+    }
+   ]
+  },
+  {
+   "icn": "ICN-RDR-A-A000000-1-1671Y-02377-A-001-04",
+   "boxes": [
+    {
+     "x0": 123.1,
+     "y0": 181.3,
+     "w": 320.7,
+     "h": 247.2
+    },
+    {
+     "x0": 131.8,
+     "y0": 518.7,
+     "w": 303.3,
+     "h": 228.3
+    }
+   ]
+  },
+  {
+   "icn": "ICN-RDR-A-A000000-1-1671Y-02380-A-001-04",
+   "boxes": [
+    {
+     "x0": 70.9,
+     "y0": 206.9,
+     "w": 481.9,
+     "h": 540.2
+    }
+   ]
+  },
+  {
+   "icn": "ICN-RDR-A-A153000-1-1671Y-01966-A-001-04",
+   "boxes": [
+    {
+     "x0": 51.8,
+     "y0": 514,
+     "w": 463.4,
+     "h": 233
+    }
+   ]
+  },
+  {
+   "icn": "ICN-RDR-A-A153000-1-1671Y-02103-A-001-04",
+   "boxes": [
+    {
+     "x0": 158,
+     "y0": 525.1,
+     "w": 250.8,
+     "h": 186.6
+    },
+    {
+     "x0": 160.1,
+     "y0": 263.2,
+     "w": 246.6,
+     "h": 183.6
+    }
+   ]
+  },
+  {
+   "icn": "ICN-RDR-A-A153000-1-1671Y-02104-A-001-04",
+   "boxes": [
+    {
+     "x0": 158,
+     "y0": 525.1,
+     "w": 250.8,
+     "h": 186.6
+    },
+    {
+     "x0": 160.1,
+     "y0": 263.2,
+     "w": 246.6,
+     "h": 183.6
+    }
+   ]
+  },
+  {
+   "icn": "ICN-RDR-A-A153000-1-1671Y-02117-A-001-04",
+   "boxes": [
+    {
+     "x0": 150.5,
+     "y0": 139.8,
+     "w": 322.5,
+     "h": 233.3
+    },
+    {
+     "x0": 159.6,
+     "y0": 519.8,
+     "w": 304.5,
+     "h": 227.2
+    }
+   ]
+  },
+  {
+   "icn": "ICN-RDR-A-GB00000-1-1671Y-00361-A-001-04",
+   "boxes": [
+    {
+     "x0": 102.1,
+     "y0": 345.7,
+     "w": 362.7,
+     "h": 160.2
+    }
+   ]
+  },
+  {
+   "icn": "ICN-RDR-A-GG10040-1-1671Y-02303-A-001-04",
+   "boxes": [
+    {
+     "x0": 170.4,
+     "y0": 525.3,
+     "w": 282.9,
+     "h": 221.8
+    },
+    {
+     "x0": 175.3,
+     "y0": 166.4,
+     "w": 273,
+     "h": 207.2
+    }
+   ]
+  },
+  {
+   "icn": "ICN-RDR-A-GG10040-1-1671Y-02305-A-001-04",
+   "boxes": [
+    {
+     "x0": 171.6,
+     "y0": 524.6,
+     "w": 280.5,
+     "h": 222.4
+    },
+    {
+     "x0": 175.1,
+     "y0": 213.6,
+     "w": 273.3,
+     "h": 212.3
+    }
+   ]
+  },
+  {
+   "icn": "ICN-RDR-A-GG10040-1-1671Y-02321-A-001-04",
+   "boxes": [
+    {
+     "x0": 150.5,
+     "y0": 139.8,
+     "w": 322.5,
+     "h": 233.3
+    },
+    {
+     "x0": 159.6,
+     "y0": 519.8,
+     "w": 304.5,
+     "h": 227.2
+    }
+   ]
+  },
+  {
+   "icn": "ICN-RDR-A-GG10040-1-1671Y-02344-A-001-04",
+   "boxes": [
+    {
+     "x0": 171.6,
+     "y0": 524.6,
+     "w": 280.5,
+     "h": 222.4
+    },
+    {
+     "x0": 175.1,
+     "y0": 213.6,
+     "w": 273.3,
+     "h": 212.3
+    }
+   ]
+  },
+  {
+   "icn": "ICN-RDR-A-GG10040-1-1671Y-02348-A-001-04",
+   "boxes": [
+    {
+     "x0": 146.3,
+     "y0": 198.9,
+     "w": 274.4,
+     "h": 208.2
+    },
+    {
+     "x0": 146.8,
+     "y0": 505.8,
+     "w": 273.3,
+     "h": 205.8
+    }
+   ]
+  },
+  {
+   "icn": "ICN-RDR-A-GG10040-1-1671Y-02349-A-001-04",
+   "boxes": [
+    {
+     "x0": 147,
+     "y0": 451.6,
+     "w": 273,
+     "h": 209.2
+    },
+    {
+     "x0": 147,
+     "y0": 178.9,
+     "w": 273,
+     "h": 206.5
+    }
+   ]
+  },
+  {
+   "icn": "ICN-RDR-A-GG10040-1-1671Y-02350-A-001-04",
+   "boxes": [
+    {
+     "x0": 147,
+     "y0": 451.6,
+     "w": 273,
+     "h": 209.2
+    },
+    {
+     "x0": 147,
+     "y0": 178.9,
+     "w": 273,
+     "h": 206.5
+    }
+   ]
+  },
+  {
+   "icn": "ICN-RDR-A-GG10040-1-1671Y-02352-A-001-04",
+   "boxes": [
+    {
+     "x0": 160.5,
+     "y0": 515.7,
+     "w": 302.6,
+     "h": 231.3
+    },
+    {
+     "x0": 163.9,
+     "y0": 206.6,
+     "w": 295.7,
+     "h": 222.3
+    }
+   ]
+  },
+  {
+   "icn": "ICN-RDR-A-GG10040-1-1671Y-02354-A-001-04",
+   "boxes": [
+    {
+     "x0": 146.3,
+     "y0": 198.9,
+     "w": 274.4,
+     "h": 208.2
+    },
+    {
+     "x0": 146.8,
+     "y0": 505.8,
+     "w": 273.3,
+     "h": 205.8
+    }
+   ]
+  },
+  {
+   "icn": "ICN-RDR-A-GG10040-1-1671Y-02355-A-001-04",
+   "boxes": [
+    {
+     "x0": 170.4,
+     "y0": 525.3,
+     "w": 282.9,
+     "h": 221.8
+    },
+    {
+     "x0": 175.3,
+     "y0": 166.4,
+     "w": 273,
+     "h": 207.2
+    }
+   ]
+  },
+  {
+   "icn": "ICN-RDR-A-GG10040-1-1671Y-02357-A-001-04",
+   "boxes": [
+    {
+     "x0": 123.1,
+     "y0": 181.3,
+     "w": 320.7,
+     "h": 247.2
+    },
+    {
+     "x0": 131.8,
+     "y0": 518.7,
+     "w": 303.3,
+     "h": 228.3
+    }
+   ]
+  },
+  {
+   "icn": "ICN-RDR-A-GG10040-1-1671Y-02358-A-001-04",
+   "boxes": [
+    {
+     "x0": 80.1,
+     "y0": 162.2,
+     "w": 406.8,
+     "h": 262.8
+    },
+    {
+     "x0": 74.7,
+     "y0": 491.3,
+     "w": 417.5,
+     "h": 255.8
+    }
+   ]
+  },
+  {
+   "icn": "ICN-RDR-A-GG10040-1-1671Y-02362-A-001-04",
+   "boxes": [
+    {
+     "x0": 101.9,
+     "y0": 484.2,
+     "w": 419.9,
+     "h": 262.8
+    },
+    {
+     "x0": 133,
+     "y0": 159.3,
+     "w": 357.6,
+     "h": 258.7
+    }
+   ]
+  },
+  {
+   "icn": "ICN-RDR-A-GG10040-1-1671Y-02363-A-001-04",
+   "boxes": [
+    {
+     "x0": 101.9,
+     "y0": 484.2,
+     "w": 419.9,
+     "h": 262.8
+    },
+    {
+     "x0": 133,
+     "y0": 159.3,
+     "w": 357.6,
+     "h": 258.7
+    }
+   ]
+  },
+  {
+   "icn": "ICN-RDR-A-GG10040-1-1671Y-02364-A-001-04",
+   "boxes": [
+    {
+     "x0": 80.1,
+     "y0": 162.2,
+     "w": 406.8,
+     "h": 262.8
+    },
+    {
+     "x0": 74.7,
+     "y0": 491.3,
+     "w": 417.5,
+     "h": 255.8
+    }
+   ]
+  },
+  {
+   "icn": "ICN-RDR-B-A153000-1-1671Y-02141-A-001-04",
+   "boxes": [
+    {
+     "x0": 160.5,
+     "y0": 515.7,
+     "w": 302.6,
+     "h": 231.3
+    },
+    {
+     "x0": 163.9,
+     "y0": 206.6,
+     "w": 295.7,
+     "h": 222.3
+    }
+   ]
+  }
+ ],
+ "figuresKnown": [
+  {
+   "icn": "ICN-RDR-A-A153000-1-1671Y-02068-A-001-04",
+   "boxes": [
+    {
+     "x0": 156.1,
+     "y0": 499,
+     "w": 311.5,
+     "h": 192.2
+    }
+   ],
+   "platform": [
+    {
+     "x0": 156.1,
+     "y0": 531.5,
+     "w": 311.5,
+     "h": 192.2
+    }
+   ]
+  },
+  {
+   "icn": "ICN-RDR-A-A153000-1-1671Y-02075-A-001-04",
+   "boxes": [
+    {
+     "x0": 126.4,
+     "y0": 153.2,
+     "w": 314.2,
+     "h": 196.6
+    },
+    {
+     "x0": 148.6,
+     "y0": 483.9,
+     "w": 269.6,
+     "h": 203.8
+    }
+   ],
+   "platform": [
+    {
+     "x0": 126.4,
+     "y0": 177.2,
+     "w": 314.2,
+     "h": 196.6
+    },
+    {
+     "x0": 148.6,
+     "y0": 507.9,
+     "w": 269.6,
+     "h": 203.8
+    }
+   ]
+  },
+  {
+   "icn": "ICN-RDR-A-GG10040-1-1671Y-02320-A-001-04",
+   "boxes": [
+    {
+     "x0": 101.2,
+     "y0": 222.4,
+     "w": 364.5,
+     "h": 269.5
+    }
+   ],
+   "platform": [
+    {
+     "x0": 101.2,
+     "y0": 209,
+     "w": 364.5,
+     "h": 269.5
+    }
+   ]
+  },
+  {
+   "icn": "ICN-RDR-A-GG10040-1-1671Y-02351-A-001-04",
+   "boxes": [
+    {
+     "x0": 126.4,
+     "y0": 153.2,
+     "w": 314.2,
+     "h": 196.6
+    },
+    {
+     "x0": 148.6,
+     "y0": 483.9,
+     "w": 269.6,
+     "h": 203.8
+    }
+   ],
+   "platform": [
+    {
+     "x0": 126.4,
+     "y0": 177.2,
+     "w": 314.2,
+     "h": 196.6
+    },
+    {
+     "x0": 148.6,
+     "y0": 507.9,
+     "w": 269.6,
+     "h": 203.8
+    }
+   ]
+  },
+  {
+   "icn": "ICN-RDR-A-GG10040-1-1671Y-02353-A-001-04",
+   "boxes": [
+    {
+     "x0": 175.6,
+     "y0": 219.4,
+     "w": 272.3,
+     "h": 206.9
+    },
+    {
+     "x0": 176.2,
+     "y0": 504.5,
+     "w": 271.3,
+     "h": 207.2
+    }
+   ],
+   "platform": [
+    {
+     "x0": 175.6,
+     "y0": 254.8,
+     "w": 272.3,
+     "h": 206.9
+    },
+    {
+     "x0": 176.2,
+     "y0": 539.8,
+     "w": 271.3,
+     "h": 207.2
+    }
+   ]
+  },
+  {
+   "icn": "ICN-RDR-A-GG10040-1-1671Y-02356-A-001-04",
+   "boxes": [
+    {
+     "x0": 175.6,
+     "y0": 219.4,
+     "w": 272.3,
+     "h": 206.9
+    },
+    {
+     "x0": 176.2,
+     "y0": 504.5,
+     "w": 271.3,
+     "h": 207.2
+    }
+   ],
+   "platform": [
+    {
+     "x0": 175.6,
+     "y0": 254.8,
+     "w": 272.3,
+     "h": 206.9
+    },
+    {
+     "x0": 176.2,
+     "y0": 539.8,
+     "w": 271.3,
+     "h": 207.2
+    }
+   ]
+  },
+  {
+   "icn": "ICN-RDR-A-GG10040-1-1671Y-02360-A-001-04",
+   "boxes": [
+    {
+     "x0": 145.7,
+     "y0": 170.2,
+     "w": 275.6,
+     "h": 253
+    },
+    {
+     "x0": 157.9,
+     "y0": 489.4,
+     "w": 251.1,
+     "h": 234.3
+    }
+   ],
+   "platform": [
+    {
+     "x0": 145.7,
+     "y0": 193.5,
+     "w": 275.6,
+     "h": 253
+    },
+    {
+     "x0": 157.9,
+     "y0": 512.8,
+     "w": 251.1,
+     "h": 234.3
+    }
+   ]
+  },
+  {
+   "icn": "ICN-RDR-A-GG10040-1-1671Y-02366-A-001-04",
+   "boxes": [
+    {
+     "x0": 145.7,
+     "y0": 170.2,
+     "w": 275.6,
+     "h": 253
+    },
+    {
+     "x0": 157.9,
+     "y0": 489.4,
+     "w": 251.1,
+     "h": 234.3
+    }
+   ],
+   "platform": [
+    {
+     "x0": 145.7,
+     "y0": 193.5,
+     "w": 275.6,
+     "h": 253
+    },
+    {
+     "x0": 157.9,
+     "y0": 512.8,
+     "w": 251.1,
+     "h": 234.3
+    }
+   ]
+  }
+ ],
+ "markPages": [
+  {
+   "code": "RDR-A-A15-30-00-08A-131A-D",
+   "page": 2,
+   "marks": [
+    {
+     "text": "L&T Precision Engineering and Systems",
+     "rot": 90,
+     "x": 542.6,
+     "y": 96.4,
+     "size": 8,
+     "w": 143.1
+    },
+    {
+     "text": "This is a draft copy of Issue 001-01",
+     "rot": 90,
+     "x": 556.8,
+     "y": 360.2,
+     "size": 8,
+     "w": 124.4
+    }
+   ],
+   "agree": true
+  },
+  {
+   "code": "RDR-A-A15-30-00-08A-131A-D",
+   "page": 3,
+   "marks": [
+    {
+     "text": "L&T Precision Engineering and Systems",
+     "rot": 90,
+     "x": 55.1,
+     "y": 96.4,
+     "size": 8,
+     "w": 143.1
+    },
+    {
+     "text": "This is a draft copy of Issue 001-01",
+     "rot": 90,
+     "x": 32.4,
+     "y": 360.2,
+     "size": 8,
+     "w": 124.4
+    }
+   ],
+   "agree": true
+  }
+ ]
+}

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE dmodule []>
+<dmodule xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:dc="http://www.purl.org/dc/elements/1.1/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:xlink="http://www.w3.org/1999/xlink" xsi:noNamespaceSchemaLocation="http://www.s1000d.org/S1000D_4-2/xml_schema_flat/descript.xsd">
+  <identAndStatusSection>
+    <dmAddress>
+      <dmIdent>
+        <dmCode modelIdentCode="FIXT" systemDiffCode="A" systemCode="00" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="00" disassyCodeVariant="A" infoCode="001" infoCodeVariant="A" itemLocationCode="A" />
+        <language languageIsoCode="en" countryIsoCode="GB" />
+        <issueInfo issueNumber="002" inWork="00" />
+      </dmIdent>
+      <dmAddressItems>
+        <issueDate year="2026" month="11" day="20" />
+        <dmTitle>
+          <techName>Fixture title page</techName>
+          <infoName>Title page</infoName>
+        </dmTitle>
+      </dmAddressItems>
+    </dmAddress>
+    <dmStatus issueType="changed">
+      <security securityClassification="02" />
+      <responsiblePartnerCompany enterpriseCode="12345">
+        <enterpriseName>Fixture Co</enterpriseName>
+      </responsiblePartnerCompany>
+      <originator enterpriseCode="12345">
+        <enterpriseName>Fixture Co</enterpriseName>
+      </originator>
+      <applic>
+        <displayText>
+          <simplePara>All</simplePara>
+        </displayText>
+      </applic>
+      <brexDmRef>
+        <dmRef>
+          <dmRefIdent>
+            <dmCode modelIdentCode="S1000D" systemDiffCode="F" systemCode="04" subSystemCode="1" subSubSystemCode="0" assyCode="0301" disassyCode="00" disassyCodeVariant="A" infoCode="022" infoCodeVariant="A" itemLocationCode="D" />
+          </dmRefIdent>
+        </dmRef>
+      </brexDmRef>
+      <qualityAssurance>
+        <unverified />
+      </qualityAssurance>
+    </dmStatus>
+  </identAndStatusSection>
+  <content>
+    <description>
+      <levelledPara><para>Doc No.: FIX-2026-007</para><para>Rev. No.: B</para><para>Code No.: C-12</para></levelledPara>
+      <levelledPara><para>RESTRICTED - NOT FOR RELEASE</para></levelledPara>
+      <levelledPara><para /></levelledPara>
+      <levelledPara><para>Operator Manual</para><para>For</para><para>Fixture Radar &amp; Display</para></levelledPara>
+      <levelledPara><para>REPAIRS ONLY BY AUTHORISED AGENCIES.</para></levelledPara>
+      <levelledPara><para>NSN: 1234-56-789-0123</para></levelledPara>
+      <levelledPara><para>Contract No: FIX/2026/42</para></levelledPara>
+      <levelledPara><para>SECOND NOTICE</para></levelledPara>
+      <levelledPara><para>Jointly prepared and published by:</para></levelledPara>
+      <levelledPara>
+        <table pgwide="1">
+          <tgroup cols="2">
+            <colspec colname="col1" /><colspec colname="col2" />
+            <tbody>
+              <row>
+                <entry><para>Alpha Systems Ltd</para><para>1 Alpha Road</para><para>Alphaville</para></entry>
+                <entry><para>Beta Works</para><para>2 Beta Street</para></entry>
+              </row>
+            </tbody>
+          </tgroup>
+        </table>
+      </levelledPara>
+    </description>
+  </content>
+</dmodule>

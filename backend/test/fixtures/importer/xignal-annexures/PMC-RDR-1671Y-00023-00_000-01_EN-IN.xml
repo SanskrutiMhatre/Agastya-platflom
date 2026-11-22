@@ -1,0 +1,352 @@
+<?xml version="1.0" ?>
+<!-- agastya-import: reconstructed: synthesised from the data modules and the printed table of contents; reconstructed - verify before use -->
+<pm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <identAndStatusSection>
+    <pmAddress>
+      <pmIdent>
+        <pmCode modelIdentCode="RDR" pmIssuer="1671Y" pmNumber="00023" pmVolume="00"/>
+        <language countryIsoCode="IN" languageIsoCode="en"/>
+        <issueInfo issueNumber="000" inWork="01"/>
+      </pmIdent>
+      <pmAddressItems>
+        <issueDate year="2026" month="10" day="14"/>
+        <pmTitle>Operation and  Maintenance Manual for Search Radar Trailer</pmTitle>
+        <shortPmTitle>Close In-Weapon System (CIWS)</shortPmTitle>
+      </pmAddressItems>
+    </pmAddress>
+    <pmStatus>
+      <security securityClassification="04"/>
+      <responsiblePartnerCompany enterpriseCode="1671Y">
+        <enterpriseName>LNTDEFENCE</enterpriseName>
+      </responsiblePartnerCompany>
+      <originator enterpriseCode="1671Y">
+        <enterpriseName>LNTDEFENCE</enterpriseName>
+      </originator>
+      <qualityAssurance>
+        <unverified/>
+      </qualityAssurance>
+    </pmStatus>
+  </identAndStatusSection>
+  <content>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A00" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="56" disassyCodeVariant="A" infoCode="001" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Operation and Maintenance Manual for Search Radar Trailer</techName>
+            <infoName>Close-In Weapon System</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="30"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GB0" subSystemCode="0" subSubSystemCode="0" assyCode="10" disassyCode="00" disassyCodeVariant="A" infoCode="030" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Technical Specification</techName>
+            <infoName>Technical data</infoName>
+          </dmTitle>
+          <issueDate year="2025" month="12" day="31"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GB0" subSystemCode="0" subSubSystemCode="0" assyCode="10" disassyCode="00" disassyCodeVariant="04" infoCode="075" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>General Arrangement Drawing - Trailer</techName>
+            <infoName>Parts list</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="01"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GB0" subSystemCode="0" subSubSystemCode="0" assyCode="10" disassyCode="01" disassyCodeVariant="A" infoCode="010" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Trailer Parts - Chassis</techName>
+            <infoName>General data</infoName>
+          </dmTitle>
+          <issueDate year="2025" month="12" day="31"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GB3" subSystemCode="7" subSubSystemCode="0" assyCode="00" disassyCode="01" disassyCodeVariant="A" infoCode="913" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Axle</techName>
+            <infoName>General maintenance procedure</infoName>
+          </dmTitle>
+          <issueDate year="2025" month="12" day="31"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GB0" subSystemCode="0" subSubSystemCode="0" assyCode="10" disassyCode="00" disassyCodeVariant="A" infoCode="010" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Trailer Parts Detail</techName>
+            <infoName>General data</infoName>
+          </dmTitle>
+          <issueDate year="2025" month="12" day="31"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GB3" subSystemCode="2" subSubSystemCode="0" assyCode="00" disassyCode="00" disassyCodeVariant="0" infoCode="000" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Trailer Parts</techName>
+            <infoName>Tyre and Wheel Rim</infoName>
+          </dmTitle>
+          <issueDate year="2025" month="12" day="31"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GB3" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="00" disassyCodeVariant="0" infoCode="000" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Trailer Parts</techName>
+            <infoName>Axle Assembly and Suspension Details</infoName>
+          </dmTitle>
+          <issueDate year="2025" month="12" day="31"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GB0" subSystemCode="0" subSubSystemCode="0" assyCode="10" disassyCode="10" disassyCodeVariant="0" infoCode="100" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Operation</techName>
+            <infoName>Trailer Braking System</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="10" day="14"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GB0" subSystemCode="0" subSubSystemCode="0" assyCode="10" disassyCode="11" disassyCodeVariant="0" infoCode="100" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Operation</techName>
+            <infoName>Coupling and De-coupling</infoName>
+          </dmTitle>
+          <issueDate year="2025" month="12" day="31"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A05" subSystemCode="4" subSubSystemCode="0" assyCode="00" disassyCode="23" disassyCodeVariant="A" infoCode="913" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>General Maintenance Instructions</techName>
+            <infoName>General maintenance procedure</infoName>
+          </dmTitle>
+          <issueDate year="2025" month="12" day="30"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GB3" subSystemCode="7" subSubSystemCode="0" assyCode="00" disassyCode="02" disassyCodeVariant="A" infoCode="400" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Bearing Failure</techName>
+            <infoName>Fault reports and isolation procedures</infoName>
+          </dmTitle>
+          <issueDate year="2025" month="12" day="31"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GB3" subSystemCode="1" subSubSystemCode="0" assyCode="00" disassyCode="01" disassyCodeVariant="A" infoCode="913" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Air Suspension Maintenance</techName>
+            <infoName>General maintenance procedure</infoName>
+          </dmTitle>
+          <issueDate year="2025" month="12" day="31"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GB3" subSystemCode="7" subSubSystemCode="0" assyCode="00" disassyCode="03" disassyCodeVariant="0" infoCode="075" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="000" inWork="01"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Axles Exploded View</techName>
+            <infoName>Parts list</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="01"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="A05" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="10" disassyCodeVariant="0" infoCode="913" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Recommended Maintenance Schedule</techName>
+            <infoName>General maintenance procedure</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="01"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GB3" subSystemCode="1" subSubSystemCode="0" assyCode="00" disassyCode="03" disassyCodeVariant="A" infoCode="075" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="000" inWork="01"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Suspension Exploded View</techName>
+            <infoName>Parts list</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="01"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GB0" subSystemCode="0" subSubSystemCode="0" assyCode="10" disassyCode="22" disassyCodeVariant="0" infoCode="010" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Brake Layout</techName>
+            <infoName>General data</infoName>
+          </dmTitle>
+          <issueDate year="2025" month="12" day="31"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GB3" subSystemCode="1" subSubSystemCode="0" assyCode="00" disassyCode="02" disassyCodeVariant="A" infoCode="075" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Air Suspension Circuit</techName>
+            <infoName>Parts list</infoName>
+          </dmTitle>
+          <issueDate year="2025" month="12" day="30"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GD1" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="00" disassyCodeVariant="0" infoCode="010" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Electrical Circuit</techName>
+            <infoName>General data</infoName>
+          </dmTitle>
+          <issueDate year="2025" month="12" day="31"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GB0" subSystemCode="0" subSubSystemCode="0" assyCode="10" disassyCode="13" disassyCodeVariant="0" infoCode="000" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Trailer - Walking Platform</techName>
+            <infoName>Function, data for plans and description</infoName>
+          </dmTitle>
+          <issueDate year="2025" month="12" day="31"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+  </content>
+</pm>

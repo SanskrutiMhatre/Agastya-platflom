@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<pm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:dc="http://www.purl.org/dc/elements/1.1/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:xlink="http://www.w3.org/1999/xlink" xsi:noNamespaceSchemaLocation="http://www.s1000d.org/S1000D_4-2/xml_schema_flat/pm.xsd">
+  <identAndStatusSection>
+    <pmAddress>
+      <pmIdent>
+        <pmCode modelIdentCode="FIXT" pmIssuer="12345" pmNumber="00001" pmVolume="00" />
+        <language languageIsoCode="en" countryIsoCode="GB" />
+        <issueInfo issueNumber="001" inWork="00" />
+      </pmIdent>
+      <pmAddressItems>
+        <issueDate year="2027" month="03" day="05" />
+        <pmTitle>Fixture Operator Manual</pmTitle>
+        <!-- Book Name - Used in header -->
+        <shortPmTitle>Fixture Radar and Display</shortPmTitle>
+        <!-- System Name - Used in header -->
+      </pmAddressItems>
+    </pmAddress>
+    <pmStatus issueType="new">
+      <security securityClassification="02" />
+      <!-- Classification - Used in header and footer -->
+      <responsiblePartnerCompany enterpriseCode="12345"><enterpriseName>Fixture Co</enterpriseName></responsiblePartnerCompany>
+      <applic><displayText><simplePara>All</simplePara></displayText></applic>
+      <brexDmRef><dmRef><dmRefIdent><dmCode modelIdentCode="S1000D" systemDiffCode="F" systemCode="04" subSystemCode="1" subSubSystemCode="0" assyCode="0301" disassyCode="00" disassyCodeVariant="A" infoCode="022" infoCodeVariant="A" itemLocationCode="D" /></dmRefIdent></dmRef></brexDmRef>
+      <qualityAssurance><unverified /></qualityAssurance>
+    </pmStatus>
+  </identAndStatusSection>
+  <content>
+    <pmEntry><pmEntryTitle>Foreword</pmEntryTitle><dmRef><dmRefIdent><dmCode modelIdentCode="FIXT" systemDiffCode="A" systemCode="00" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="00" disassyCodeVariant="A" infoCode="023" infoCodeVariant="A" itemLocationCode="A" /><issueInfo issueNumber="001" inWork="00" /><language languageIsoCode="en" countryIsoCode="GB" /></dmRefIdent></dmRef></pmEntry>
+    <pmEntry><pmEntryTitle>Title</pmEntryTitle><dmRef><dmRefIdent><dmCode modelIdentCode="FIXT" systemDiffCode="A" systemCode="00" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="00" disassyCodeVariant="A" infoCode="001" infoCodeVariant="A" itemLocationCode="A" /><issueInfo issueNumber="002" inWork="00" /><language languageIsoCode="en" countryIsoCode="GB" /></dmRefIdent></dmRef></pmEntry>
+    <pmEntry><pmEntryTitle>Proprietary</pmEntryTitle><dmRef><dmRefIdent><dmCode modelIdentCode="FIXT" systemDiffCode="A" systemCode="00" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="00" disassyCodeVariant="A" infoCode="021" infoCodeVariant="A" itemLocationCode="A" /><issueInfo issueNumber="001" inWork="00" /><language languageIsoCode="en" countryIsoCode="GB" /></dmRefIdent></dmRef></pmEntry>
+    <pmEntry><pmEntryTitle>First aid</pmEntryTitle><dmRef><dmRefIdent><dmCode modelIdentCode="FIXT" systemDiffCode="A" systemCode="00" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="00" disassyCodeVariant="A" infoCode="012" infoCodeVariant="A" itemLocationCode="A" /><issueInfo issueNumber="001" inWork="00" /><language languageIsoCode="en" countryIsoCode="GB" /></dmRefIdent></dmRef></pmEntry>
+    <pmEntry><pmEntryTitle>Chapter 5</pmEntryTitle><dmRef><dmRefIdent><dmCode modelIdentCode="FIXT" systemDiffCode="A" systemCode="05" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="00" disassyCodeVariant="A" infoCode="009" infoCodeVariant="A" itemLocationCode="A" /><issueInfo issueNumber="001" inWork="00" /><language languageIsoCode="en" countryIsoCode="GB" /></dmRefIdent></dmRef></pmEntry>
+  </content>
+</pm>

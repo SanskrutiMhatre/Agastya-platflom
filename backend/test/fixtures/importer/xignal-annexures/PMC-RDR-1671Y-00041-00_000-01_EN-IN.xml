@@ -1,0 +1,416 @@
+<?xml version="1.0" ?>
+<!-- agastya-import: reconstructed: synthesised from the data modules and the printed table of contents; reconstructed - verify before use -->
+<pm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <identAndStatusSection>
+    <pmAddress>
+      <pmIdent>
+        <pmCode modelIdentCode="RDR" pmIssuer="1671Y" pmNumber="00041" pmVolume="00"/>
+        <language countryIsoCode="IN" languageIsoCode="en"/>
+        <issueInfo issueNumber="000" inWork="01"/>
+      </pmIdent>
+      <pmAddressItems>
+        <issueDate year="2026" month="10" day="22"/>
+        <pmTitle>Command and Control (C2) Console Manual</pmTitle>
+        <shortPmTitle>Close-In Weapon System</shortPmTitle>
+      </pmAddressItems>
+    </pmAddress>
+    <pmStatus>
+      <security securityClassification="04"/>
+      <responsiblePartnerCompany enterpriseCode="1671Y">
+        <enterpriseName>LNTDEFENCE</enterpriseName>
+      </responsiblePartnerCompany>
+      <originator enterpriseCode="1671Y">
+        <enterpriseName>LNTDEFENCE</enterpriseName>
+      </originator>
+      <qualityAssurance>
+        <unverified/>
+      </qualityAssurance>
+    </pmStatus>
+  </identAndStatusSection>
+  <content>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GG1" subSystemCode="0" subSubSystemCode="0" assyCode="50" disassyCode="35" disassyCodeVariant="A" infoCode="001" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Command and Control (C2) Console Manual</techName>
+            <infoName>Title page</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="20"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GG1" subSystemCode="0" subSubSystemCode="0" assyCode="50" disassyCode="39" disassyCodeVariant="A" infoCode="131" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Functionality of the Software in C2 Console</techName>
+            <infoName>Normal operation procedure (crew)</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="10" day="22"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GG1" subSystemCode="0" subSubSystemCode="0" assyCode="50" disassyCode="04" disassyCodeVariant="A" infoCode="131" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Screen Design Layout</techName>
+            <infoName>Normal operation procedure (crew)</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="16"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GG1" subSystemCode="0" subSubSystemCode="0" assyCode="50" disassyCode="05" disassyCodeVariant="A" infoCode="131" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>System Overview</techName>
+            <infoName>Normal operation procedure (crew)</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="16"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GG1" subSystemCode="0" subSubSystemCode="0" assyCode="50" disassyCode="06" disassyCodeVariant="A" infoCode="131" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Operation Screen</techName>
+            <infoName>Normal operation procedure (crew)</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="16"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GG1" subSystemCode="0" subSubSystemCode="0" assyCode="50" disassyCode="08" disassyCodeVariant="A" infoCode="131" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Operation Radar Track Details</techName>
+            <infoName>Normal operation procedure (crew)</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="16"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GG1" subSystemCode="0" subSubSystemCode="0" assyCode="50" disassyCode="09" disassyCodeVariant="A" infoCode="131" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>System Health Comm</techName>
+            <infoName>Normal operation procedure (crew)</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="16"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GG1" subSystemCode="0" subSubSystemCode="0" assyCode="50" disassyCode="10" disassyCodeVariant="A" infoCode="131" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Communication System Status</techName>
+            <infoName>Normal operation procedure (crew)</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="16"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GG1" subSystemCode="0" subSubSystemCode="0" assyCode="50" disassyCode="11" disassyCodeVariant="A" infoCode="131" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Software Defined Radio 1 and 2</techName>
+            <infoName>Normal operation procedure (crew)</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="16"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GG1" subSystemCode="0" subSubSystemCode="0" assyCode="50" disassyCode="12" disassyCodeVariant="A" infoCode="131" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Fire Control Radar 1.1 and 1.2</techName>
+            <infoName>Normal operation procedure (crew)</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="16"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GG1" subSystemCode="0" subSubSystemCode="0" assyCode="50" disassyCode="13" disassyCodeVariant="A" infoCode="131" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>GUN111, GUN112, GUN121 and GUN122</techName>
+            <infoName>Normal operation procedure (crew)</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="16"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GG1" subSystemCode="0" subSubSystemCode="0" assyCode="50" disassyCode="36" disassyCodeVariant="A" infoCode="131" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Other CIWS</techName>
+            <infoName>Normal operation procedure (crew)</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="10" day="22"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GG1" subSystemCode="0" subSubSystemCode="0" assyCode="50" disassyCode="14" disassyCodeVariant="A" infoCode="131" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Integrated Air Command and Control System (IACCS)</techName>
+            <infoName>Normal operation procedure (crew)</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="16"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GG1" subSystemCode="0" subSubSystemCode="0" assyCode="50" disassyCode="16" disassyCodeVariant="A" infoCode="131" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>GNSS</techName>
+            <infoName>Normal operation procedure (crew)</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="16"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GG1" subSystemCode="0" subSubSystemCode="0" assyCode="50" disassyCode="15" disassyCodeVariant="A" infoCode="131" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Radar</techName>
+            <infoName>Normal operation procedure (crew)</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="16"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GG1" subSystemCode="0" subSubSystemCode="0" assyCode="50" disassyCode="21" disassyCodeVariant="A" infoCode="131" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>All Sensors Screen</techName>
+            <infoName>Normal operation procedure (crew)</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="16"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GG1" subSystemCode="0" subSubSystemCode="0" assyCode="50" disassyCode="27" disassyCodeVariant="A" infoCode="131" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Programmable Logic Controller (PLC) Health</techName>
+            <infoName>Normal operation procedure (crew)</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="16"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GG1" subSystemCode="0" subSubSystemCode="0" assyCode="50" disassyCode="28" disassyCodeVariant="A" infoCode="131" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Mission Setup</techName>
+            <infoName>Normal operation procedure (crew)</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="16"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GG1" subSystemCode="0" subSubSystemCode="0" assyCode="50" disassyCode="29" disassyCodeVariant="A" infoCode="131" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Maintenance</techName>
+            <infoName>Normal operation procedure (crew)</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="16"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GG1" subSystemCode="0" subSubSystemCode="0" assyCode="50" disassyCode="30" disassyCodeVariant="A" infoCode="131" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Chat Box</techName>
+            <infoName>Normal operation procedure (crew)</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="16"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GG1" subSystemCode="0" subSubSystemCode="0" assyCode="50" disassyCode="31" disassyCodeVariant="A" infoCode="131" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Notification</techName>
+            <infoName>Normal operation procedure (crew)</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="16"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GG1" subSystemCode="0" subSubSystemCode="0" assyCode="50" disassyCode="32" disassyCodeVariant="A" infoCode="131" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Simulator</techName>
+            <infoName>Normal operation procedure (crew)</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="16"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GG1" subSystemCode="0" subSubSystemCode="0" assyCode="50" disassyCode="38" disassyCodeVariant="A" infoCode="131" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Offline</techName>
+            <infoName>Normal operation procedure (crew)</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="10" day="22"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+    <pmEntry>
+      <dmRef>
+        <dmRefIdent>
+          <dmCode modelIdentCode="RDR" systemDiffCode="A" systemCode="GG1" subSystemCode="0" subSubSystemCode="0" assyCode="50" disassyCode="33" disassyCodeVariant="A" infoCode="131" infoCodeVariant="A" itemLocationCode="D"/>
+          <issueInfo issueNumber="001" inWork="00"/>
+          <language languageIsoCode="en" countryIsoCode="IN"/>
+        </dmRefIdent>
+        <dmRefAddressItems>
+          <dmTitle>
+            <techName>Shutdown Screen</techName>
+            <infoName>Normal operation procedure (crew)</infoName>
+          </dmTitle>
+          <issueDate year="2026" month="04" day="16"/>
+        </dmRefAddressItems>
+      </dmRef>
+    </pmEntry>
+  </content>
+</pm>
