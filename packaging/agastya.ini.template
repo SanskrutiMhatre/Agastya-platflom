@@ -1,0 +1,35 @@
+; Agastya Platform - configuration
+;
+; Lines starting with ; are comments. Every setting is optional; the value shown is the default.
+; Changes take effect the next time the application or the Windows service starts.
+; More about each setting: OPERATIONS.md (installed beside this program, in the "docs" folder).
+
+[server]
+; The address in the browser is http://localhost:<Port>/
+Port=@PORT@
+; loopback = reachable from this computer only (recommended).
+; lan      = reachable from other computers too. The Windows firewall still has to allow it (see OPERATIONS.md).
+; Or give one specific IPv4 address of this computer.
+Bind=@BIND@
+
+[storage]
+; Where projects, house templates and the database are kept. Back this folder up.
+; Empty = "workspace" next to this file's data folder.
+DataDir=@DATADIR@
+
+[security]
+; Set to 1 when people reach the server through HTTPS (for example behind a reverse proxy).
+SecureCookies=0
+
+[app]
+; 1 = open the browser when the tray application starts.
+OpenBrowser=1
+
+[logging]
+; Each log file is closed and renamed (.1, .2, ...) when it reaches this size; the oldest beyond KeepFiles are deleted.
+MaxFileMB=10
+KeepFiles=5
+
+[service]
+; The name of the Windows service when the service is installed.
+Name=@SERVICENAME@

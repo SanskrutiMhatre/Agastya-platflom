@@ -1,0 +1,328 @@
+#!/usr/bin/env node
+// =============================================================================
+// Builds the Windows release of Agastya Platform.
+//
+//   npm run package:win                 package what is built (fails if the build is out of date)
+//   npm run package:win -- --build      build the backend and the frontend first
+//   options: --no-installer   skip Setup.exe          --no-zip   skip the portable ZIP
+//            --out <dir>      output folder (default: release)
+//            --node <node.exe>   the Node.js runtime to ship (default: the one running this script; must be 64-bit Windows, Node 22)
+//            --no-arial       leave the four proprietary Arial font files out (Liberation Sans, metric-compatible, is used instead). Use it when
+//                             the party distributing the product does not hold a licence that lets it redistribute Arial.
+//
+// Output (in release/):
+//   Agastya-Platform-<version>-win-x64/                 the staged product (what both packages contain)
+//   Agastya-Platform-<version>-win-x64-portable.zip     unzip anywhere and run AgastyaPlatform.exe
+//   Agastya-Platform-<version>-win-x64-Setup.exe        the installer
+//   SHA256SUMS.txt
+//
+// Code signing: set AGASTYA_SIGN_CMD to a command containing $f where the file name goes, e.g.
+//   signtool sign /fd SHA256 /tr http://timestamp.example/ /td SHA256 /a $f
+// It is run on both executables and handed to the installer compiler to sign Setup.exe and the uninstaller. Without it the output is unsigned
+// and Windows SmartScreen will warn when a user first runs it - see docs/PACKAGING.md.
+// =============================================================================
+
+import { spawnSync } from 'node:child_process';
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const argv = process.argv.slice(2);
+const flag = (n) => argv.includes(n);
+const opt = (n) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] : undefined; };
+
+const log = (m) => console.log(`[package] ${m}`);
+const fail = (m) => { console.error(`[package] ERROR: ${m}`); process.exit(1); };
+
+if (process.platform !== 'win32') fail('This script builds the Windows release and must run on Windows.');
+if (process.arch !== 'x64') fail('Run it with a 64-bit Node.js.');
+
+const product = JSON.parse(fs.readFileSync(path.join(root, 'packaging', 'product.json'), 'utf8'));
+const rootPkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+const version = rootPkg.version;
+if (!/^\d+\.\d+\.\d+$/.test(version)) fail(`package.json version "${version}" must be x.y.z`);
+
+const outDir = path.resolve(opt('--out') || path.join(root, 'release'));
+const stageName = `Agastya-Platform-${version}-win-x64`;
+const stage = path.join(outDir, stageName);
+const zipPath = path.join(outDir, `${stageName}-portable.zip`);
+const setupName = `${stageName}-Setup.exe`;
+const nodeExe = path.resolve(opt('--node') || process.execPath);
+const noArial = flag('--no-arial');
+
+function run(cmd, args, o = {}) {
+  const r = spawnSync(cmd, args, { stdio: 'inherit', cwd: root, ...o });
+  if (r.error) fail(`${cmd}: ${r.error.message}`);
+  if (r.status !== 0) fail(`${path.basename(cmd)} ${args.slice(0, 3).join(' ')} ... exited with ${r.status}`);
+}
+function capture(cmd, args, o = {}) {
+  const r = spawnSync(cmd, args, { encoding: 'utf8', cwd: root, maxBuffer: 256 * 1024 * 1024, ...o });
+  if (r.error) fail(`${cmd}: ${r.error.message}`);
+  return r;
+}
+const newest = (dir) => {
+  let t = 0;
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (e.name === 'node_modules' || e.name === 'dist' || e.name.startsWith('.')) continue;
+    const p = path.join(dir, e.name);
+    t = Math.max(t, e.isDirectory() ? newest(p) : fs.statSync(p).mtimeMs);
+  }
+  return t;
+};
+const sha256 = (file) => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+const rel = (p) => path.relative(root, p).split(path.sep).join('/');
+
+// ---- 1. the build must be current ----------------------------------------------------------------------------------------------------------
+if (flag('--build')) { log('building the backend and the frontend'); const n = npmCmd(); run(n.cmd, [...n.pre, 'run', 'build'], { shell: n.shell }); }
+function npmCmd() {
+  const cli = path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
+  return fs.existsSync(cli) ? { cmd: process.execPath, pre: [cli] } : { cmd: 'npm.cmd', pre: [], shell: true };
+}
+const beDist = path.join(root, 'backend', 'dist', 'index.js');
+const feDist = path.join(root, 'frontend', 'dist', 'index.html');
+if (!fs.existsSync(beDist) || !fs.existsSync(feDist)) fail('There is no build. Run with --build (or npm run build first).');
+if (newest(path.join(root, 'backend', 'src')) > fs.statSync(beDist).mtimeMs) fail('backend/dist is older than backend/src. Run with --build.');
+if (newest(path.join(root, 'frontend', 'src')) > fs.statSync(feDist).mtimeMs) fail('frontend/dist is older than frontend/src. Run with --build.');
+
+// ---- 2. the Node.js runtime ----------------------------------------------------------------------------------------------------------------
+if (!fs.existsSync(nodeExe)) fail(`node.exe not found: ${nodeExe}`);
+const nodeVer = capture(nodeExe, ['--version']).stdout.trim();
+if (!/^v22\./.test(nodeVer)) fail(`The shipped Node.js must be 22.x (the server uses node:sqlite); ${nodeExe} is ${nodeVer}`);
+const nodeArch = capture(nodeExe, ['-p', 'process.arch']).stdout.trim();
+if (nodeArch !== 'x64') fail(`The shipped node.exe must be 64-bit (it is ${nodeArch}).`);
+const nodeLicence = path.join(path.dirname(nodeExe), 'LICENSE');
+if (!fs.existsSync(nodeLicence)) fail(`Refusing to ship node.exe without its licence: ${nodeLicence} is missing (use the official zip distribution).`);
+
+// ---- 3. a clean stage ----------------------------------------------------------------------------------------------------------------------
+log(`staging ${stageName} in ${rel(outDir) || outDir}`);
+if (noArial) log('building WITHOUT the Arial fonts (--no-arial)');
+else log('NOTE: the four proprietary Arial font files are included, as decided for this product. Whoever distributes it must hold a licence that allows redistributing them; build with --no-arial otherwise.');
+fs.rmSync(stage, { recursive: true, force: true });
+fs.mkdirSync(stage, { recursive: true });
+const mk = (...p) => { const d = path.join(stage, ...p); fs.mkdirSync(d, { recursive: true }); return d; };
+
+const SKIP_DIR = new Set(['test', 'tests', '__tests__', 'docs', 'example', 'examples', 'benchmark', 'benchmarks', '.github']);
+// fs.cpSync is deliberately not used: on Node 22.23 / Windows it creates a wrongly named folder (UTF-8 bytes read as Latin-1) and copies nothing
+// where it should when the destination path has non-ASCII characters, e.g. a build folder under a user profile named "José".
+function copyFiltered(from, to, extraSkip) {
+  if (fs.statSync(from).isDirectory()) {
+    fs.mkdirSync(to, { recursive: true });
+    for (const name of fs.readdirSync(from)) {
+      const src = path.join(from, name);
+      if (extraSkip && extraSkip(src, name)) continue;
+      copyFiltered(src, path.join(to, name), extraSkip);
+    }
+  } else fs.copyFileSync(from, to);
+}
+
+// ---- 4. the application --------------------------------------------------------------------------------------------------------------------
+const be = path.join(root, 'backend');
+const appBe = mk('app', 'backend');
+log('copying the backend (compiled), the schemas, templates and the publishing engine');
+// reference/ (S1000D data-module type evidence, the maintained SNS tables) and assets/ (the default header logo) are read at run time: the backend does not start without them
+for (const d of ['dist', 'schemas', 'templates', 'templates-optional', 'brex', 'samples', 'reference', 'assets']) copyFiltered(path.join(be, d), path.join(appBe, d));
+fs.copyFileSync(path.join(be, 'package.json'), path.join(appBe, 'package.json'));
+mk('app', 'backend', 'scripts');
+for (const s of ['doctor.js', 'reset-admin.js', 'recover-structure.js']) fs.copyFileSync(path.join(be, 'scripts', s), path.join(appBe, 'scripts', s));
+// vendor: the engine, the pipelines and the tools. Not used at run time and left out: FOP's javadocs (94 MB of HTML) and its examples, two stray test
+// files that were left in FOP's folder (example.fo, output.pdf), and the HTML documentation of libxslt. They also hold the longest paths in the tree.
+copyFiltered(path.join(be, 'vendor'), path.join(appBe, 'vendor'), (src) => {
+  const r = path.relative(path.join(be, 'vendor'), src).split(path.sep).join('/');
+  return /^tools\/fop-2\.10\/javadocs(\/|$)/.test(r) || /^tools\/fop-2\.10\/fop\/(examples(\/|$)|example\.fo$|output\.pdf$)/.test(r)
+    || /^tools\/libxslt-[^/]+\/share\/doc(\/|$)/.test(r) || /\.(map|log)$/.test(r) || (noArial && /^tools\/fonts\/arial[a-z]*\.ttf$/i.test(r));
+});
+
+log('copying the web client');
+copyFiltered(path.join(root, 'frontend', 'dist'), path.join(mk('app', 'frontend'), 'dist'), (src) => src.endsWith('.map'));
+
+// ---- 5. production dependencies only -------------------------------------------------------------------------------------------------------
+log('collecting the production dependencies of the backend');
+const npm = npmCmd();
+const ls = capture(npm.cmd, [...npm.pre, 'ls', '--omit=dev', '--all', '--parseable', '--prefix', be], { shell: npm.shell });
+const prodDirs = ls.stdout.split(/\r?\n/).map((s) => s.trim()).filter((s) => s && s !== be && s.startsWith(path.join(be, 'node_modules')));
+if (prodDirs.length < 20) fail(`npm ls returned only ${prodDirs.length} production packages; is backend/node_modules installed (npm run install:all)?\n${ls.stderr}`);
+const npmPackages = [];
+for (const dir of prodDirs) {
+  const dest = path.join(appBe, path.relative(be, dir));
+  copyFiltered(dir, dest, (src, base) => {
+    if (src === dir) return false;                                  // never skip the package itself
+    const stat = fs.statSync(src);
+    if (stat.isDirectory()) return SKIP_DIR.has(base) || base === 'node_modules'; // nested node_modules are listed separately by npm ls
+    return /\.(map|md|markdown|ts|mts|cts)$/i.test(base) && !/^(licen[cs]e|copying|notice)/i.test(base);
+  });
+  const pre = path.join(dest, 'prebuilds');
+  if (fs.existsSync(pre)) {
+    for (const d of fs.readdirSync(pre)) if (d !== 'win32-x64') fs.rmSync(path.join(pre, d), { recursive: true, force: true });
+    if (!fs.existsSync(path.join(pre, 'win32-x64'))) fail(`${path.basename(dir)} has native prebuilds but none for win32-x64`);
+  }
+  const pj = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
+  const lic = typeof pj.license === 'string' ? pj.license : pj.license && pj.license.type ? pj.license.type : Array.isArray(pj.licenses) ? pj.licenses.map((l) => l.type).join(' OR ') : 'UNKNOWN';
+  const files = fs.readdirSync(dir).filter((f) => /^(licen[cs]e|copying|notice|unlicense)/i.test(f) && fs.statSync(path.join(dir, f)).isFile());
+  npmPackages.push({ name: pj.name, version: pj.version, license: lic, homepage: pj.homepage || (pj.repository && (pj.repository.url || pj.repository)) || '', dir, files });
+}
+log(`  ${npmPackages.length} packages`);
+
+// ---- 6. the runtime, the host program ------------------------------------------------------------------------------------------------------
+fs.copyFileSync(nodeExe, path.join(mk('runtime'), 'node.exe'));
+
+const csc = path.join(process.env.WINDIR || 'C:\\Windows', 'Microsoft.NET', 'Framework64', 'v4.0.30319', 'csc.exe');
+if (!fs.existsSync(csc)) fail(`The .NET Framework 4 C# compiler was not found at ${csc}`);
+const work = fs.mkdtempSync(path.join(os.tmpdir(), 'agastya-pkg-'));
+const asmInfo = path.join(work, 'AssemblyInfo.cs');
+const q = (s) => String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+const copyright = product.copyright || `Copyright (C) ${new Date().getFullYear()} ${product.publisher}`;
+fs.writeFileSync(asmInfo, [
+  'using System.Reflection;',
+  `[assembly: AssemblyTitle("${q(product.name)}")]`,
+  `[assembly: AssemblyDescription("${q(product.description)}")]`,
+  `[assembly: AssemblyCompany("${q(product.publisher)}")]`,
+  `[assembly: AssemblyCopyright("${q(copyright)}")]`,
+  `[assembly: AssemblyProduct("${q(product.name)}")]`,
+  `[assembly: AssemblyVersion("${version}.0")]`,
+  `[assembly: AssemblyFileVersion("${version}.0")]`,
+  '',
+].join('\r\n'));
+const hostSrc = path.join(root, 'packaging', 'host', 'AgastyaHost.cs');
+const icon = path.join(root, 'packaging', 'assets', 'agastya.ico');
+const common = ['-nologo', '-platform:x64', '-optimize+', `-win32icon:${icon}`, '-r:System.ServiceProcess.dll'];
+log('compiling the host program (AgastyaPlatform.exe, AgastyaCtl.exe)');
+for (const [out, extra] of [
+  ['AgastyaPlatform.exe', ['-target:winexe', '-define:GUI', '-r:System.Windows.Forms.dll', '-r:System.Drawing.dll']],
+  ['AgastyaCtl.exe', ['-target:exe']],
+]) {
+  const r = capture(csc, [...common, ...extra, `-out:${path.join(stage, out)}`, hostSrc, asmInfo]);
+  if (r.status !== 0) fail(`csc failed for ${out}:\n${r.stdout}\n${r.stderr}`);
+  const warn = (r.stdout + r.stderr).split(/\r?\n/).filter((l) => /warning CS/.test(l));
+  if (warn.length) fail(`the host compiles with warnings, fix them:\n${warn.join('\n')}`);
+}
+fs.rmSync(work, { recursive: true, force: true });
+
+// ---- 6b. no path may be so long that an ordinary install folder would hit Windows' 260-character limit --------------------------------------
+{
+  let longest = { len: 0, p: '' };
+  const walk = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); const r = path.relative(stage, p); if (r.length > longest.len) longest = { len: r.length, p: r }; if (e.isDirectory()) walk(p); } };
+  walk(stage);
+  log(`  longest path inside the product: ${longest.len} characters`);
+  if (longest.len > 150) fail(`A path inside the product is ${longest.len} characters long (${longest.p}). Installed under a folder of 100+ characters it would exceed Windows' 260-character limit. Exclude it from the package.`);
+}
+
+// ---- 7. documents, licences, version -------------------------------------------------------------------------------------------------------
+const docs = mk('docs');
+for (const f of ['OPERATIONS.md', 'PACKAGING.md']) { const p = path.join(root, 'docs', f); if (fs.existsSync(p)) fs.copyFileSync(p, path.join(docs, f)); }
+fs.copyFileSync(path.join(root, 'packaging', 'agastya.ini.template'), path.join(docs, 'agastya.ini.template'));
+fs.writeFileSync(path.join(docs, 'README.txt'), [
+  `${product.name} ${version}`,
+  '',
+  'Start it from the Start menu ("Agastya Platform"), or run AgastyaPlatform.exe. It opens in your web browser at http://localhost:4040/ (the port',
+  'can be changed in agastya.ini). The first person to open it creates the administrator account; nothing ships with a default password.',
+  '',
+  'This program needs no internet connection and makes none.',
+  '',
+  'Administrators: see OPERATIONS.md (service, network access, backups, logs, upgrades) and run   AgastyaCtl.exe --doctor   to check the installation.',
+  'Licences of the software included in this product: THIRD-PARTY-NOTICES.txt and the "licenses" folder.',
+  '',
+].join('\r\n'));
+
+const lic = mk('licenses');
+const copyLic = (from, toName) => { fs.mkdirSync(path.dirname(path.join(lic, toName)), { recursive: true }); fs.copyFileSync(from, path.join(lic, toName)); return `licenses/${toName.split(path.sep).join('/')}`; };
+const safe = (s) => s.replace(/[\\/:*?"<>|@]/g, '_');
+const rows = []; // { component, version, licence, files[], note }
+rows.push({ component: 'Node.js', version: nodeVer, licence: 'see file', files: [copyLic(nodeLicence, 'node/LICENSE')], note: 'runtime\\node.exe' });
+const fopHome = path.join(be, 'vendor', 'tools', 'fop-2.10');
+rows.push({ component: 'Apache FOP', version: '2.10', licence: 'Apache-2.0', files: ['LICENSE', 'NOTICE'].map((f) => copyLic(path.join(fopHome, f), `fop/${f}`)), note: 'app\\backend\\vendor\\tools\\fop-2.10 (and the libraries in its lib folder, each under its own licence; their names are listed in fop/lib-listing.txt)' });
+const fopLib = path.join(fopHome, 'fop', 'lib');
+if (fs.existsSync(fopLib)) fs.writeFileSync(path.join(lic, 'fop', 'lib-listing.txt'), fs.readdirSync(fopLib).sort().join('\r\n') + '\r\n');
+const jreHome = path.join(be, 'vendor', 'tools', 'jre');
+const jreRelease = fs.readFileSync(path.join(jreHome, 'release'), 'utf8');
+const jreVer = (jreRelease.match(/JAVA_RUNTIME_VERSION="([^"]+)"/) || jreRelease.match(/JAVA_VERSION="([^"]+)"/) || [, 'unknown'])[1];
+rows.push({ component: 'Eclipse Temurin JRE (jlink image)', version: jreVer, licence: 'GPL-2.0 with Classpath Exception', files: [copyLic(path.join(jreHome, 'NOTICE'), 'jre/NOTICE')], note: 'app\\backend\\vendor\\tools\\jre; the licences of its modules are in its own "legal" folder' });
+for (const f of ['LICENSE_DEJAVU', 'LICENSE_LIBERATION']) rows.push({ component: f === 'LICENSE_DEJAVU' ? 'DejaVu Sans fonts' : 'Liberation Sans fonts', version: '', licence: 'see file', files: [copyLic(path.join(be, 'vendor', 'tools', 'fonts', f), `fonts/${f}`)], note: 'app\\backend\\vendor\\tools\\fonts' });
+if (!noArial) rows.push({ component: 'Arial fonts (arial.ttf, arialbd.ttf, ariali.ttf, arialbi.ttf)', version: '', licence: 'proprietary (Monotype / Microsoft)', files: [], note: 'Copied from a licensed Windows installation. Not open-source software: the party distributing this product must hold a licence that allows it to redistribute these files (see app\\backend\\vendor\\tools\\fonts\\README.md). Without them the product prints in Liberation Sans, which has the same character widths.' });
+else rows.push({ component: 'Arial fonts', version: '', licence: 'not included', files: [], note: 'This build was made with --no-arial; documents are set in Liberation Sans, which has the same character widths.' });
+rows.push({ component: 'xsltproc.exe with libxslt 1.1.28, libxml2 2.9.3, libexslt (MIT); zlib 1.2.8 (zlib licence); libiconv 1.14 and GnuWin32 regex 2.7 (LGPL 2.1); libgcc (GPL 3.0 with the GCC Runtime Library Exception); winpthreads (MIT-style)', version: '', licence: 'see the files named below', files: [], note: 'app\\backend\\vendor\\tools\\libxslt-1.1.28-win32-x86\\bin. The LGPL libraries are separate DLL files and can be replaced by another build of the same library; their source locations are given in their licence file.' });
+// licence texts the vendored third-party tools do not carry themselves (fetched from upstream and recorded with their source)
+const tp = path.join(root, 'packaging', 'third-party');
+if (fs.existsSync(tp)) for (const f of fs.readdirSync(tp).filter((n) => n.endsWith('.txt')).sort()) {
+  const row = rows.find((r) => r.component.startsWith('xsltproc.exe with libxslt'));
+  if (!row) fail('packaging/third-party holds licence texts, but the table has no row for xsltproc/libxslt to list them under - the row was renamed; fix the lookup above.');
+  row.files.push(copyLic(path.join(tp, f), `third-party/${f}`));
+}
+for (const p of npmPackages.sort((a, b) => a.name.localeCompare(b.name))) {
+  const files = p.files.map((f) => copyLic(path.join(p.dir, f), `npm/${safe(p.name)}@${p.version}/${f}`));
+  rows.push({ component: p.name, version: p.version, licence: p.license, files, note: files.length ? '' : 'the package ships no licence file; the licence above is the one it declares in package.json' });
+}
+
+const notices = [];
+notices.push(`${product.name} ${version} - third-party software notices`, '='.repeat(78), '',
+  'This product includes the software listed below. Each component is used under its own licence; the licence texts that accompany the components',
+  'are in the "licenses" folder next to this file, and are reproduced after the list. This file is generated when the product is built from the licence',
+  'files in the build, not written by hand.', '');
+for (const r of rows) {
+  notices.push(`* ${r.component}${r.version ? ' ' + r.version : ''}`, `    licence: ${r.licence}`);
+  if (r.note) notices.push(`    where:   ${r.note}`);
+  if (r.files.length) notices.push(`    texts:   ${r.files.join(', ')}`);
+}
+notices.push('', '='.repeat(78), 'LICENCE TEXTS', '='.repeat(78));
+const seen = new Set();
+for (const r of rows) for (const f of r.files) {
+  const text = fs.readFileSync(path.join(stage, f.split('/').join(path.sep)), 'utf8');
+  const h = crypto.createHash('sha256').update(text).digest('hex');
+  if (seen.has(h)) continue; seen.add(h);
+  notices.push('', '-'.repeat(78), `${r.component}${r.version ? ' ' + r.version : ''}   (${f})`, '-'.repeat(78), text.replace(/\r?\n/g, '\r\n').trimEnd());
+}
+fs.writeFileSync(path.join(stage, 'THIRD-PARTY-NOTICES.txt'), notices.join('\r\n') + '\r\n');
+log(`  notices: ${rows.length} components, ${seen.size} distinct licence texts`);
+
+fs.writeFileSync(path.join(stage, 'version.json'), JSON.stringify({
+  product: product.name, version, platform: 'win-x64', builtAt: new Date().toISOString(),
+  node: nodeVer, java: jreVer, fop: '2.10', packages: npmPackages.length,
+}, null, 2) + '\n');
+
+// ---- 8. signing (optional) -----------------------------------------------------------------------------------------------------------------
+const signCmd = process.env.AGASTYA_SIGN_CMD;
+const signFile = (f) => { const r = spawnSync(signCmd.replace(/\$f/g, `"${f}"`), { shell: true, stdio: 'inherit' }); if (r.status !== 0) fail(`signing ${path.basename(f)} failed`); };
+if (signCmd) { log('signing the executables'); for (const e of ['AgastyaPlatform.exe', 'AgastyaCtl.exe']) signFile(path.join(stage, e)); }
+else log('AGASTYA_SIGN_CMD is not set: the executables and the installer will be UNSIGNED (Windows SmartScreen will warn on first run)');
+
+// ---- 9. the portable ZIP -------------------------------------------------------------------------------------------------------------------
+const outputs = [];
+if (!flag('--no-zip')) {
+  log('building the portable ZIP');
+  fs.writeFileSync(path.join(stage, 'portable.flag'), 'This file makes the program keep its configuration, data and logs next to itself instead of in C:\\ProgramData.\r\n');
+  mk('config');
+  fs.writeFileSync(path.join(stage, 'config', 'agastya.ini'), fs.readFileSync(path.join(root, 'packaging', 'agastya.ini.template'), 'utf8')
+    .replace('@PORT@', String(product.defaultPort)).replace('@BIND@', 'loopback').replace('@DATADIR@', '').replace('@SERVICENAME@', product.defaultServiceName));
+  fs.rmSync(zipPath, { force: true });
+  const tar = path.join(process.env.WINDIR || 'C:\\Windows', 'System32', 'tar.exe');
+  if (!fs.existsSync(tar)) fail('tar.exe (bsdtar, part of Windows 10 and later) is needed to build the ZIP.');
+  run(tar, ['-a', '-c', '-f', zipPath, '-C', outDir, stageName]);
+  outputs.push(zipPath);
+}
+
+// ---- 10. the installer ---------------------------------------------------------------------------------------------------------------------
+if (!flag('--no-installer')) {
+  const iscc = [process.env.ISCC_PATH, path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Inno Setup 6', 'ISCC.exe'),
+    'C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe', 'C:\\Program Files\\Inno Setup 6\\ISCC.exe'].filter(Boolean).find((p) => fs.existsSync(p));
+  if (!iscc) fail('Inno Setup 6 was not found. Install it from https://jrsoftware.org/isinfo.php (or set ISCC_PATH to ISCC.exe), or run with --no-installer.');
+  log(`building the installer with ${iscc}`);
+  const args = ['/Q', `/DAppVersion=${version}`, `/DSourceDir=${stage}`, `/DOutputDir=${outDir}`, `/DRepoRoot=${root}`, `/DSetupIcon=${icon}`,
+    `/DAppGuid=${product.appId}`, `/DAppPublisher=${product.publisher}`, `/DAppCopyright=${copyright}`, `/DAppUrl=${product.url || ''}`, `/DFirewallRule=${product.firewallRuleName}`];
+  if (signCmd) args.push('/DSigned=1', `/Sagastyasign=${signCmd.replace(/\$f/g, '$f')}`);
+  args.push(path.join(root, 'packaging', 'installer', 'agastya.iss'));
+  run(iscc, args);
+  const setup = path.join(outDir, setupName);
+  if (!fs.existsSync(setup)) fail(`The installer compiler finished but ${setupName} is not there.`);
+  outputs.push(setup);
+}
+
+// ---- 11. checksums -------------------------------------------------------------------------------------------------------------------------
+const sums = outputs.map((f) => `${sha256(f)} *${path.basename(f)}`);
+fs.writeFileSync(path.join(outDir, 'SHA256SUMS.txt'), sums.join('\n') + '\n');
+log('done:');
+for (const f of outputs) log(`  ${path.basename(f)}   ${(fs.statSync(f).size / 1048576).toFixed(1)} MB`);
+log(`  staged folder: ${stage}`);
+log('  SHA256SUMS.txt written');
+if (!signCmd) log('NOTE: unsigned build. For distribution, sign it (AGASTYA_SIGN_CMD) - see docs/PACKAGING.md.');
