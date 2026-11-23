@@ -7,8 +7,21 @@ export const JSS_CSS = `
 .jss-root { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--bg); color: var(--text); font-size: 13px; }
 .jss-root * { box-sizing: border-box; }
 .jss-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; padding: 5px 10px; border-bottom: 1px solid var(--border); background: var(--bg-elev); flex: none; }
-.jss-tgroup { display: inline-flex; align-items: center; gap: 1px; padding: 0 6px 0 0; margin-right: 4px; border-right: 1px solid var(--border); }
-.jss-tgroup:last-child { border-right: 0; }
+.jss-toolbar { flex-direction: column; align-items: stretch; flex-wrap: nowrap; gap: 0; padding: 0; }
+.jss-tabs { display: flex; align-items: flex-end; gap: 2px; padding: 4px 10px 0; border-bottom: 1px solid var(--border); }
+.jss-quick { display: inline-flex; gap: 1px; margin: 0 10px 3px 0; padding-right: 10px; border-right: 1px solid var(--border); }
+.jss-tab { height: 30px; padding: 0 14px; border: 1px solid transparent; border-bottom: 0; border-radius: 6px 6px 0 0; background: none; color: var(--text-muted); font: inherit; font-size: 12.5px; cursor: pointer; margin-bottom: -1px; }
+.jss-tab:hover { color: var(--text); background: var(--bg-hover); }
+.jss-tab.on { background: var(--bg); color: var(--accent); font-weight: 600; border-color: var(--border); border-bottom: 1px solid var(--bg); }
+.jss-panels { background: var(--bg); }
+.jss-panel { display: flex; flex-wrap: wrap; align-items: stretch; gap: 2px 0; padding: 6px 10px 4px; min-height: 60px; }
+.jss-panel[hidden] { display: none; }
+.jss-tgroup { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 0 10px; border-right: 1px solid var(--border); }
+.jss-tgroup:first-child { padding-left: 0; }
+.jss-tgroup:last-of-type { border-right: 0; }
+.jss-tbtns { display: flex; align-items: center; flex-wrap: wrap; gap: 1px; }
+.jss-tlabel { font-size: 10.5px; color: var(--text-faint); letter-spacing: .03em; }
+.jss-thint { align-self: center; max-width: 52ch; font-size: 11.5px; color: var(--text-faint); padding: 0 12px; }
 .jss-tb { min-width: 28px; height: 28px; padding: 0 7px; border: 1px solid transparent; border-radius: 6px; background: none; color: var(--text); cursor: pointer; font: inherit; font-size: 12.5px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; }
 .jss-tb:hover:not(:disabled) { background: var(--bg-hover); }
 .jss-tb:disabled { color: var(--text-faint); cursor: default; opacity: .55; }

@@ -145,7 +145,8 @@ export function EditorSide({ ctx, refreshKey, width, onCollapse }: { ctx: Projec
             </div>)}
           <span className="spacer" />
           {writable ? <>
-            <button className="icon-btn" title="New data module" aria-label="New data module" onClick={() => studio.newDocument()}><Icon name="plus" size={14} /></button>
+            <button className="btn btn-sm btn-primary" title="Write a new data module" aria-label="New data module" data-testid="new-dm" onClick={() => studio.newDocument()}><Icon name="plus" size={13} />New</button>
+            <span className="v2-vsep" aria-hidden="true" />
             <button className="icon-btn" title="Import data modules (.xml) and graphics" aria-label="Import data modules and graphics" onClick={() => fileInput.current?.click()}><Icon name="upload" size={14} /></button>
             <button className="icon-btn" title="Import without validation: brings in every file as it is (enterprise and content checks skipped)" aria-label="Import without validation" data-testid="import-raw" onClick={() => rawInput.current?.click()}><Icon name="warn" size={14} /></button>
             {canImportPackage(ctx.role) && !isCir ? <button className="icon-btn" title="Import a package: a folder, a .zip or files from another S1000D tool, scanned and repaired first" aria-label="Import package" data-testid="import-package" onClick={() => setPackageOpen(true)}><Icon name="package" size={14} /></button> : null}
@@ -155,7 +156,15 @@ export function EditorSide({ ctx, refreshKey, width, onCollapse }: { ctx: Projec
           </> : null}
           <button className="icon-btn" title="Refresh" aria-label="Refresh list" onClick={() => { list.reload(); explore.reload(); }}><Icon name="refresh" size={14} /></button>
         </header>
-        <div style={{ padding: '0 10px 6px' }}><input className="v2-input" style={{ height: 28 }} placeholder="Filter…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Filter data modules" /></div>
+        <div className="v2-filter">
+          <Icon name="search" size={13} />
+          <input className="v2-input" placeholder="Search by title, code or file…" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Escape') setQ(''); }} aria-label="Filter data modules" />
+          {q ? <button className="icon-btn" aria-label="Clear the filter" title="Clear (Esc)" onClick={() => setQ('')}><span aria-hidden="true">×</span></button> : null}
+        </div>
+        <div className="v2-hint v2-dmcount" aria-live="polite">
+          {q ? `${rows.length} of ${list.data?.length ?? 0} data modules match` : `${list.data?.length ?? 0} data module${(list.data?.length ?? 0) === 1 ? '' : 's'}`}
+          {docs.some((d) => d.dirty) ? <> · <span style={{ color: 'var(--warning)' }}>{docs.filter((d) => d.dirty).length} unsaved</span></> : null}
+        </div>
         <div className="v2-dmlist" data-testid="dm-list">
           {untitled.map((d) => (
             <button key={d.key} className={`v2-dm ${d.active ? 'active' : ''}`} onClick={() => studio.focusEditor()}>
@@ -179,7 +188,7 @@ export function EditorSide({ ctx, refreshKey, width, onCollapse }: { ctx: Projec
           ) : (
             <>
               {rows.map((d) => row({ file: d.file, title: d.techName, sub: d.infoName || d.dmc }))}
-              {!list.loading && rows.length === 0 && !untitled.length ? <div className="v2-hint" style={{ padding: 10 }}>{q ? 'No data module matches.' : 'No data modules yet. Use + to write one, or the upload button to import.'}</div> : null}
+              {!list.loading && rows.length === 0 && !untitled.length ? <div className="v2-hint" style={{ padding: 10 }}>{q ? <>No data module matches “{q}”. <button className="v2-link" onClick={() => setQ('')}>Clear the search</button></> : <>No data modules yet. Press <b>New</b> to write one, or use the upload button to import existing files.</>}</div> : null}
             </>
           )}
         </div>

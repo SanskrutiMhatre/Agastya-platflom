@@ -154,10 +154,8 @@ export function PdfPane({ ctx, savedTick, onOpenAt, onPopped }: { ctx: ProjectCt
           <button className={`btn btn-sm ${popped.build ? 'is-on' : ''}`} onClick={() => pop('build')} title="Open Generate in its own window" aria-label="Open Generate in a separate window" data-testid="popout-build"><Icon name="external" size={12} /></button>
         </span>}
         <span className="spacer" />
+        <label className="v2-row" style={{ fontSize: 12, gap: 4 }} title="Re-render the Quick preview every time you save"><input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} />Refresh on save</label>
         {summary.build && summary.project.type !== 'CIR' ? <a className="btn btn-sm" href={contentApi.pdfUrl(id, true)} title="Download the last built publication"><Icon name="download" size={12} />PDF</a> : null}
-      </div>
-      <div className="v2-pdfbar" style={{ paddingTop: 0 }} aria-label="Quick preview options">
-        <label className="v2-row" style={{ fontSize: 12, gap: 4 }}><input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} />Refresh on save</label>
       </div>
       {problem?.refusal ? (
         <div style={{ margin: 8 }}><PublishRefusal refusal={problem.refusal} projectId={id} role={role} mode="draft" onDismiss={() => setProblem(null)}
@@ -175,7 +173,15 @@ export function PdfPane({ ctx, savedTick, onOpenAt, onPopped }: { ctx: ProjectCt
       {shown ? <div className="v2-hint v2-trunc" style={{ padding: '4px 10px' }} title={shown} data-testid="pdf-shown">{shown}</div> : null}
       <div style={{ flex: 1, minHeight: 0, position: 'relative' }} data-testid="pdf-pane">
         <LazyPdfViewer autoFit src={src} downloadName={`${summary.project.name}.pdf`}
-          placeholder={<div className="v2-center"><div style={{ textAlign: 'center', padding: 16 }}><Icon name="pdf" size={30} /><p>Press <strong>Quick preview</strong> to see the data module you are editing, or <strong>Generate</strong> to build the whole publication.</p></div></div>} />
+          placeholder={<div className="v2-center"><div className="v2-empty">
+            <Icon name="pdf" size={30} />
+            <h3>No PDF yet</h3>
+            <ol>
+              <li>{active ? <>Press <strong>Quick preview</strong> to proof <em>{active.title}</em>.</> : <>Open a data module from the list on the left.</>}</li>
+              {summary.project.type === 'CIR' ? null : <li>Press <strong>Generate</strong> to build the whole publication.</li>}
+              <li>Tip: <strong>Ctrl+S</strong> saves, and with “Refresh on save” the preview updates itself.</li>
+            </ol>
+          </div></div>} />
       </div>
       {note || (busy === 'build' && progress.lines.length) ? (
         <div className="v2-log" aria-live="polite">{busy === 'build' ? progress.lines.slice(-4).map((l, i) => <div key={i}>{l}</div>) : <div>{note}</div>}</div>

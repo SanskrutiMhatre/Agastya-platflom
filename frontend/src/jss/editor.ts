@@ -151,38 +151,88 @@ export class JssEditor {
 
   private buildToolbar(): void {
     const ro = this.opts.readOnly;
-    const group = (...btns: HTMLElement[]) => this.toolbar.append(h('div', { class: 'jss-tgroup' }, ...btns));
+    // The tools are sorted into tabs by what the author is doing: write, insert, arrange, or look after the document. Every button stays in the page
+    // (a tab only hides its panel), so keyboard shortcuts and tests reach them whichever tab is open.
+    const tabs: Array<{ id: string; label: string; panel: HTMLElement; tab: HTMLButtonElement }> = [];
+    const strip = h('div', { class: 'jss-tabs', role: 'tablist', 'aria-label': 'Toolbar sections' });
+    const panels = h('div', { class: 'jss-panels' });
+    this.toolbar.append(strip, panels);
+    const pick = (id: string) => { for (const t of tabs) { const on = t.id === id; t.panel.hidden = !on; t.tab.classList.toggle('on', on); t.tab.setAttribute('aria-selected', String(on)); } try { localStorage.setItem('agastya.jss.tab', id); } catch { /* private mode */ } };
+    const tab = (id: string, label: string): HTMLElement => {
+      const panel = h('div', { class: 'jss-panel', role: 'tabpanel', 'aria-label': label });
+      const t = h('button', { class: 'jss-tab', type: 'button', role: 'tab', 'data-tab': id, on: { click: () => pick(id) } }, label) as HTMLButtonElement;
+      tabs.push({ id, label, panel, tab: t }); strip.append(t); panels.append(panel); return panel;
+    };
+    let current: HTMLElement = this.toolbar;
+    const group = (label: string, ...btns: HTMLElement[]) => current.append(h('div', { class: 'jss-tgroup', role: 'group', 'aria-label': label }, h('div', { class: 'jss-tbtns' }, ...btns), h('span', { class: 'jss-tlabel' }, label)));
     const btn = (id: string, label: string | Node, title: string, run: (b: HTMLButtonElement) => void, writes = true): HTMLButtonElement => {
       const b = h('button', { class: 'jss-tb', type: 'button', title, 'aria-label': title, 'data-cmd': id, disabled: ro && writes }, label as string);
       b.addEventListener('mousedown', (e) => e.preventDefault());                 // keep the caret where it is
       b.addEventListener('click', () => run(b));
       this.toolButtons.set(id, b); return b;
     };
-    group(btn('undo', 'Undo', 'Undo (Ctrl+Z)', () => this.undo()), btn('redo', 'Redo', 'Redo (Ctrl+Y)', () => this.redo()));
-    group(
+
+    // Undo and Redo are always in reach, left of the tabs.
+    strip.prepend(h('div', { class: 'jss-quick' }, btn('undo', 'Undo', 'Undo (Ctrl+Z)', () => this.undo()), btn('redo', 'Redo', 'Redo (Ctrl+Y)', () => this.redo())));
+
+    current = tab('write', 'Write');
+    group('Text style',
       btn('bold', h('b', {}, 'B'), 'Bold (Ctrl+B)', () => this.format('bold')), btn('italic', h('i', {}, 'I'), 'Italic (Ctrl+I)', () => this.format('italic')),
       btn('underline', h('u', {}, 'U'), 'Underline (Ctrl+U)', () => this.format('underline')),
-      btn('sup', 'x²', 'Superscript', () => this.format('superscript')), btn('sub', 'x₂', 'Subscript', () => this.format('subscript')),
+      btn('sup', 'x²', 'Superscript', () => this.format('superscript')), btn('sub', 'x₂', 'Subscript', () => this.format('subscript')));
+    group('Paragraph',
       btn('align', 'Align ▾', 'Paragraph alignment', (b) => openMenu(b, ALIGNS.map(([a, label]) => ({ label, run: () => this.setAlign(a) })))),
-    );
-    group(
+      btn('noindent', 'No indent', 'Start this paragraph flush with the margin (switch on or off)', () => this.toggleNoIndent()),
+      btn('linebreak', 'Line break', 'Break the line here without starting a new paragraph (Shift+Enter)', () => this.lineBreak()));
+    group('Links',
+      btn('xref', 'Cross-reference…', 'Refer to a table, figure or section', () => void this.insertXrefDialog()),
+      btn('link', 'Link…', 'Link to a web address', () => void this.insertLinkDialog()));
+
+    current = tab('insert', 'Insert');
+    group('Text',
       btn('para', 'Paragraph', 'Add a paragraph after the current block', () => this.insertBlock(newPara())),
       btn('section', 'Section ▾', 'Add a section', (b) => openMenu(b, this.sectionMenu())),
-      btn('list', 'List ▾', 'Add or change a list', (b) => openMenu(b, this.listMenu())),
+      btn('list', 'List ▾', 'Add or change a list', (b) => openMenu(b, this.listMenu())));
+    group('Objects',
       btn('table', 'Table…', 'Insert a table', () => void this.insertTableDialog()),
       btn('figure', 'Figure…', 'Insert a picture with a caption', () => void this.insertFigureDialog()),
-      btn('notice', 'Notice ▾', 'Insert a note, warning or caution', (b) => openMenu(b, (['note', 'warning', 'caution'] as NoticeKind[]).map((k) => ({ label: NOTICE_LABEL[k][0] + NOTICE_LABEL[k].slice(1).toLowerCase(), run: () => this.insertBlock(newNotice(k)) })))),
-      btn('pagebreak', 'Page break', 'Start a new page here', () => this.insertBlock({ k: 'pageBreak' })),
-      btn('xref', 'Cross-reference…', 'Refer to a table, figure or section', () => void this.insertXrefDialog()),
-      btn('link', 'Link…', 'Link to a web address', () => void this.insertLinkDialog()),
-    );
-    group(btn('up', 'Move up', 'Move the current block up', () => this.moveBlock(-1)), btn('down', 'Move down', 'Move the current block down', () => this.moveBlock(1)), btn('delete', 'Delete block', 'Delete the current block', () => void this.deleteBlock()));
-    group(
+      btn('notice', 'Notice ▾', 'Insert a note, warning or caution', (b) => openMenu(b, (['note', 'warning', 'caution'] as NoticeKind[]).map((k) => ({ label: NOTICE_LABEL[k][0] + NOTICE_LABEL[k].slice(1).toLowerCase(), run: () => this.insertBlock(newNotice(k)) })))));
+    group('Page',
+      btn('pagebreak', 'Page break', 'Start a new page here', () => this.insertBlock({ k: 'pageBreak' })));
+
+    current = tab('arrange', 'Arrange');
+    group('Move the current block',
+      btn('up', 'Move up', 'Move the current block up', () => this.moveBlock(-1)), btn('down', 'Move down', 'Move the current block down', () => this.moveBlock(1)));
+    group('Remove',
+      btn('delete', 'Delete block', 'Delete the current block', () => void this.deleteBlock()));
+    current.append(h('span', { class: 'jss-thint' }, 'Sections have their own move, indent and page-orientation controls beside their heading; tables and figures show theirs when you click inside them.'));
+
+    current = tab('document', 'Document');
+    group('Document',
       btn('details', 'Document details…', 'Title, system name, Code No., Rev No. and the other details printed on the cover', () => void this.detailsDialog()),
-      btn('check', 'Check', 'Check the document against the schema and the stencil', () => this.opts.host.onCheckRequested(), false),
-      btn('source', 'XML', 'Show the XML that will be saved', () => this.setView(this.view === 'edit' ? 'source' : 'edit'), false),
-    );
+      btn('check', 'Check', 'Check the document against the schema and the stencil', () => this.opts.host.onCheckRequested(), false));
+    group('View',
+      btn('outline', 'Outline', 'Show or hide the outline on the left', () => { this.outlineEl.hidden = !this.outlineEl.hidden; this.toolButtons.get('outline')?.classList.toggle('on', !this.outlineEl.hidden); }, false),
+      btn('source', 'XML', 'Show the XML that will be saved', () => this.setView(this.view === 'edit' ? 'source' : 'edit'), false));
+    this.toolButtons.get('outline')?.classList.add('on');
+
+    let saved: string | null = null; try { saved = localStorage.getItem('agastya.jss.tab'); } catch { /* private mode */ }
+    pick(tabs.some((t) => t.id === saved) ? (saved as string) : 'write');
     this.updateToolbar();
+  }
+
+  /** Switch the "no first-line indent" setting of the paragraph under the caret. */
+  private toggleNoIndent(): void {
+    const sel = selection(); const el = this.editableOf(sel?.anchorNode ?? null); const p = el && (this.elNode.get(el) as Para | undefined);
+    if (!p || p.k !== 'para') return this.opts.host.notify('Click in a paragraph first.');
+    this.mutate(() => { p.indentNone = p.indentNone ? undefined : true; }, () => p);
+  }
+
+  /** A line break inside the paragraph (what Shift+Enter does), for authors who do not know the shortcut. */
+  private lineBreak(): void {
+    const sel = selection(); const el = this.editableOf(sel?.anchorNode ?? null); const bind = el && this.binds.get(el);
+    if (!el || !bind || bind.kind === 'plain') return this.opts.host.notify('Click in the text where the line should break.');
+    document.execCommand('insertLineBreak'); bind.sync(); this.setDirty(true);
   }
 
   private updateToolbar(): void {
@@ -190,7 +240,7 @@ export class JssEditor {
     const dis = (id: string, d: boolean) => { const b = this.toolButtons.get(id); if (b) b.disabled = d || (this.opts.readOnly && !['check', 'source'].includes(id)); };
     dis('undo', !this.undoStack.length); dis('redo', !this.redoStack.length);
     const editing = this.view === 'edit';
-    for (const id of ['bold', 'italic', 'underline', 'sup', 'sub', 'align', 'para', 'section', 'list', 'table', 'figure', 'notice', 'pagebreak', 'xref', 'link', 'up', 'down', 'delete', 'details']) dis(id, !editing);
+    for (const id of ['bold', 'italic', 'underline', 'sup', 'sub', 'align', 'noindent', 'linebreak', 'para', 'section', 'list', 'table', 'figure', 'notice', 'pagebreak', 'xref', 'link', 'up', 'down', 'delete', 'details']) dis(id, !editing);
     if (typeof document.queryCommandState === 'function' && editing) {
       const q = (c: string) => { try { return document.queryCommandState(c); } catch { return false; } };
       set('bold', q('bold')); set('italic', q('italic')); set('underline', q('underline')); set('sup', q('superscript')); set('sub', q('subscript'));
@@ -199,7 +249,7 @@ export class JssEditor {
 
   private setView(v: 'edit' | 'source'): void {
     this.view = v;
-    this.scrollEl.hidden = v === 'source'; this.outlineEl.hidden = v === 'source'; this.sourceEl.hidden = v === 'edit';
+    this.scrollEl.hidden = v === 'source'; this.outlineEl.hidden = v === 'source' || !this.toolButtons.get('outline')?.classList.contains('on'); this.sourceEl.hidden = v === 'edit';
     if (v === 'source') this.sourceEl.textContent = this.getXml();
     this.toolButtons.get('source')?.classList.toggle('on', v === 'source');
     this.updateToolbar();

@@ -45,6 +45,17 @@ export function JssEditorPage() {
 
   useEffect(() => { localStorage.setItem(VIEW_KEY, view); }, [view]);
 
+  // On a narrow window two panes side by side are unusable: show one at a time.
+  const [narrow, setNarrow] = useState(() => window.matchMedia('(max-width: 900px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 900px)');
+    const on = () => setNarrow(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  const shown: View = narrow && view === 'split' ? 'edit' : view;
+  const [checking, setChecking] = useState(false);
+
   const load = useCallback(async () => {
     setError(''); setLoaded(null);
     try { const d = await jssApi.read(id); hashRef.current = d.hash; setLoaded(d); setStale(false); }
@@ -100,8 +111,10 @@ export function JssEditorPage() {
 
   const check = useCallback(async () => {
     const ed = editorRef.current; if (!ed) return;
+    setChecking(true);
     try { const r = await jssApi.validate(id, ed.getXml()); applyFindings(r.findings); toast(r.errors ? `${r.errors} error${r.errors === 1 ? '' : 's'}, ${r.warnings} warning${r.warnings === 1 ? '' : 's'}.` : r.warnings ? `No errors; ${r.warnings} warning${r.warnings === 1 ? '' : 's'}.` : 'No problems found.', r.errors ? 'error' : 'success'); }
     catch (e) { toast(errText(e), 'error'); }
+    finally { setChecking(false); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -113,7 +126,7 @@ export function JssEditorPage() {
       const out = await contentApi.build(id);
       setSrc(`${contentApi.pdfUrl(id)}?t=${Date.now()}`);
       setNote(`Built in ${((out.totalMs ?? 0) / 1000).toFixed(1)} s${out.releaseLabel ? ` · ${out.releaseLabel}` : ' · stamped NOT RELEASED'}`);
-      if (view === 'edit') setView('split');
+      if (view === 'edit') setView(window.matchMedia('(max-width: 900px)').matches ? 'pdf' : 'split');
       ctx.reload();
     } catch (e) {
       if (e instanceof ApiError && e.status === 422) {
@@ -146,14 +159,15 @@ export function JssEditorPage() {
       <header className="v2-top" style={{ height: 42 }}>
         <h1 style={{ fontSize: 14 }} className="v2-trunc">{summary.project.name}</h1>
         {loaded ? <span className="v2-badge accent" title={`Document type ${loaded.docType}, from the stencil ${loaded.stencil}`}>{loaded.label}</span> : null}
-        <span className={`v2-badge ${dirty ? 'warn' : 'ok'}`} data-testid="jss-state" aria-live="polite">{saving ? 'Saving…' : dirty ? 'Unsaved changes' : savedAt ? `Saved ${ago(savedAt.toISOString())}` : 'Saved'}</span>
+        <span className={`v2-badge ${dirty ? 'warn' : 'ok'}`} data-testid="jss-state" aria-live="polite">{saving ? 'Saving…' : dirty ? '● Unsaved changes' : savedAt ? `✓ Saved ${ago(savedAt.toISOString())}` : '✓ All changes saved'}</span>
         <span className="spacer" />
-        <button className="btn btn-sm" onClick={() => void save()} disabled={!writable || !dirty || saving} data-testid="jss-save" title="Save the document (Ctrl+S)">{saving ? <Spinner /> : <Icon name="check" size={12} />}Save</button>
-        <button className="btn btn-sm btn-primary" onClick={() => void generate()} disabled={!canBuild(role) || building || !loaded} data-testid="jss-generate" title="Save, then build the whole publication as a PDF">{building ? <Spinner /> : <Icon name="play" size={12} />}Generate PDF</button>
+        <button className="btn btn-sm" onClick={() => void check()} disabled={!loaded || checking} data-testid="jss-check" title="Check the document for problems without saving or building">{checking ? <Spinner /> : <Icon name="search" size={12} />}Check</button>
+        <button className="btn btn-sm" onClick={() => void save()} disabled={!writable || !dirty || saving} data-testid="jss-save" title={!writable ? 'You have read-only access' : !dirty ? 'Nothing to save' : 'Save the document (Ctrl+S)'}>{saving ? <Spinner /> : <Icon name="check" size={12} />}Save</button>
+        <button className="btn btn-sm btn-primary" onClick={() => void generate()} disabled={!canBuild(role) || building || !loaded} data-testid="jss-generate" title={!canBuild(role) ? 'Reviewers, editors and owners can build the PDF' : 'Save, then build the whole publication as a PDF'}>{building ? <Spinner /> : <Icon name="play" size={12} />}{building ? 'Building…' : 'Generate PDF'}</button>
         <div className="v2-seg" role="group" aria-label="Editor layout">
-          <button className={view === 'edit' ? 'on' : ''} onClick={() => setView('edit')} aria-pressed={view === 'edit'}>Editor</button>
-          <button className={view === 'split' ? 'on' : ''} onClick={() => setView('split')} aria-pressed={view === 'split'}>Split</button>
-          <button className={view === 'pdf' ? 'on' : ''} onClick={() => setView('pdf')} aria-pressed={view === 'pdf'}>PDF</button>
+          <button className={view === 'edit' ? 'on' : ''} onClick={() => setView('edit')} aria-pressed={view === 'edit'} title="Write only">Editor</button>
+          {narrow ? null : <button className={view === 'split' ? 'on' : ''} onClick={() => setView('split')} aria-pressed={view === 'split'} title="Write and see the PDF side by side">Split</button>}
+          <button className={view === 'pdf' ? 'on' : ''} onClick={() => setView('pdf')} aria-pressed={view === 'pdf'} title="PDF only">PDF</button>
         </div>
         <ThemeToggle />
       </header>
@@ -162,11 +176,11 @@ export function JssEditorPage() {
       {error ? <Alert tone="bad">{error}</Alert> : null}
       {!loaded && !error ? <Loading label="Opening the document…" /> : null}
       <div className="v2-split" data-testid="jss-split" ref={splitRef} style={{ display: loaded ? undefined : 'none', ...(dragging ? { userSelect: 'none' } : {}) }}>
-        <div className="a" style={{ display: view === 'pdf' ? 'none' : 'flex', flex: view === 'edit' ? '1 1 0' : `0 0 ${pct}%`, minWidth: 0 }}>
+        <div className="a" style={{ display: shown === 'pdf' ? 'none' : 'flex', flex: shown === 'edit' ? '1 1 0' : `0 0 ${pct}%`, minWidth: 0 }}>
           <div ref={hostRef} style={{ flex: 1, minWidth: 0, minHeight: 0, position: 'relative' }} data-testid="jss-host" />
         </div>
-        {view === 'split' ? <div className={`v2-divider ${dragging ? 'drag' : ''}`} role="separator" aria-orientation="vertical" aria-label="Resize editor and PDF" onPointerDown={startDrag} /> : null}
-        <div className="b" style={{ flex: '1 1 0', display: view === 'edit' ? 'none' : 'flex', flexDirection: 'column', minWidth: 0, borderLeft: view === 'pdf' ? 0 : undefined }}>
+        {shown === 'split' ? <div className={`v2-divider ${dragging ? 'drag' : ''}`} role="separator" aria-orientation="vertical" aria-label="Resize editor and PDF" onPointerDown={startDrag} /> : null}
+        <div className="b" style={{ flex: '1 1 0', display: shown === 'edit' ? 'none' : 'flex', flexDirection: 'column', minWidth: 0, borderLeft: shown === 'pdf' ? 0 : undefined }}>
           <div className="v2-pdfbar">
             <span className="v2-hint">{src ? 'The PDF built by the server from the saved document' : 'Press Generate PDF to build the publication'}</span>
             <span className="spacer" />
@@ -174,7 +188,15 @@ export function JssEditorPage() {
           </div>
           <div style={{ flex: 1, minHeight: 0, position: 'relative' }} data-testid="pdf-pane">
             <LazyPdfViewer autoFit src={src} downloadName={`${summary.project.name}.pdf`}
-              placeholder={<div className="v2-center"><div style={{ textAlign: 'center', padding: 16 }}><Icon name="pdf" size={30} /><p>Press <strong>Generate PDF</strong> to build the whole publication from this document.</p></div></div>} />
+              placeholder={<div className="v2-center"><div className="v2-empty">
+                <Icon name="pdf" size={30} />
+                <h3>No PDF yet</h3>
+                <ol>
+                  <li>Write in the editor on the left. <strong>Ctrl+S</strong> saves.</li>
+                  <li>Press <strong>Check</strong> to find problems early.</li>
+                  <li>Press <strong>Generate PDF</strong> to save and build the whole publication here.</li>
+                </ol>
+              </div></div>} />
           </div>
           {note || (building && progress.lines.length) ? <div className="v2-log" aria-live="polite" data-testid="jss-note">{building ? progress.lines.slice(-4).map((l, i) => <div key={i}>{l}</div>) : <div>{note}</div>}</div> : null}
         </div>

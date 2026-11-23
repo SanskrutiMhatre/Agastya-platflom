@@ -9,7 +9,7 @@ import { Icon } from '../../components/Icon';
 import { ThemeToggle } from '../../components/ThemeToggle';
 import { Alert, errText } from '../../components/ui';
 import { canWrite, useProject } from '../../layouts/ProjectShell';
-import { studio } from '../../lib/studioSession';
+import { studio, useStudio } from '../../lib/studioSession';
 import { useUi } from '../../store/ui';
 import { EditorSide } from './editor/EditorSide';
 import { PdfPane } from './editor/PdfPane';
@@ -37,7 +37,20 @@ export function EditorPage() {
   const splitRef = useRef<HTMLDivElement>(null);
   const reload = ctx.reload;
   // With both previews in their own windows the editor takes the whole width.
-  const shown: View = bothPopped && view === 'split' ? 'edit' : view;
+  // On a narrow window two panes side by side are unusable: show one at a time.
+  const [narrow, setNarrow] = useState(() => window.matchMedia('(max-width: 900px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 900px)');
+    const on = () => { setNarrow(mq.matches); studio.relayout(); };
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  const shown: View = (bothPopped || narrow) && view === 'split' ? 'edit' : view;
+  const docs = useStudio((s) => s.docs);
+  const dirtyCount = docs.filter((d) => d.dirty).length;
+  const activeDoc = docs.find((d) => d.active);
+  const [saving, setSaving] = useState(false);
+  const saveNow = async () => { setSaving(true); try { await studio.saveActive(); } catch (e) { toast(errText(e), 'error'); } finally { setSaving(false); } };
   const setSide = (open: boolean) => { setSideOpen(open); localStorage.setItem('agastya.editor.side', open ? '1' : '0'); studio.relayout(); };
 
   useEffect(() => { localStorage.setItem(VIEW_KEY, view); studio.relayout(); }, [view, bothPopped]);
@@ -108,11 +121,17 @@ export function EditorPage() {
       <header className="v2-top" style={{ height: 42 }}>
         <button className="icon-btn" onClick={() => setSide(!sideOpen)} title={sideOpen ? 'Hide the data module panel' : 'Show the data module panel'} aria-label={sideOpen ? 'Hide the data module panel' : 'Show the data module panel'} aria-pressed={sideOpen} data-testid="toggle-side"><Icon name="panel" size={17} /></button>
         <h1 style={{ fontSize: 14 }} className="v2-trunc">{ctx.summary.project.name}</h1>
+        {activeDoc ? <span className="v2-hint v2-trunc v2-crumb" title={activeDoc.file ?? activeDoc.title}>/ {activeDoc.title || activeDoc.file}</span> : null}
         <span className="spacer" />
+        {ready && canWrite(ctx.role) ? (
+          dirtyCount > 0
+            ? <button className="btn btn-sm btn-primary" onClick={() => void saveNow()} disabled={saving || !activeDoc} title="Save the open data module (Ctrl+S)" data-testid="save-now"><Icon name="check" size={12} />{saving ? 'Saving…' : `Save${dirtyCount > 1 ? ` (${dirtyCount} unsaved)` : ''}`}</button>
+            : <span className="v2-hint v2-saved" aria-live="polite" data-testid="save-state"><Icon name="check" size={12} /> All changes saved</span>
+        ) : null}
         <div className="v2-seg" role="group" aria-label="Editor layout">
-          <button className={view === 'edit' ? 'on' : ''} onClick={() => setView('edit')} aria-pressed={view === 'edit'}>Editor</button>
-          <button className={view === 'split' ? 'on' : ''} onClick={() => setView('split')} aria-pressed={view === 'split'}>Split</button>
-          <button className={view === 'pdf' ? 'on' : ''} onClick={() => setView('pdf')} aria-pressed={view === 'pdf'}>PDF</button>
+          <button className={view === 'edit' ? 'on' : ''} onClick={() => setView('edit')} aria-pressed={view === 'edit'} title="Write only">Editor</button>
+          {narrow ? null : <button className={view === 'split' ? 'on' : ''} onClick={() => setView('split')} aria-pressed={view === 'split'} title="Write and see the PDF side by side">Split</button>}
+          <button className={view === 'pdf' ? 'on' : ''} onClick={() => setView('pdf')} aria-pressed={view === 'pdf'} title="PDF only">PDF</button>
         </div>
         <ThemeToggle />
       </header>

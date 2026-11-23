@@ -156,6 +156,14 @@ describe('the toolbar', () => {
     press(h, 'para'); expect(body(h).children.map((c) => c.k)).toEqual(['para', 'para', 'para', 'list', 'table']);
   });
 
+  it('switches "no indent" on and off for the paragraph under the caret, and groups the tools into tabs', () => {
+    const h = mount(); placeCaret(paraEls(h.root)[0], 0);
+    press(h, 'noindent'); expect((body(h).children[0] as Para).indentNone).toBe(true);
+    placeCaret(paraEls(h.root)[0], 0); press(h, 'noindent'); expect((body(h).children[0] as Para).indentNone).toBeFalsy();
+    expect(all(h.root, '[role="tab"]').map((t) => t.textContent)).toEqual(['Write', 'Insert', 'Arrange', 'Document']);
+    expect(all(h.root, '[role="tabpanel"]').filter((p) => !p.hasAttribute('hidden'))).toHaveLength(1);
+  });
+
   it('inserts lists, notices, a page break, and keeps blocks ahead of sections', () => {
     const h = mount(); placeCaret(paraEls(h.root)[0], 0);
     h.ed.exec('list', 'roman'); h.ed.exec('notice', 'warning'); h.ed.exec('pageBreak');
