@@ -376,6 +376,14 @@
                 <xsl:otherwise><xsl:value-of select="$heading.4.bodyIndent"/></xsl:otherwise>
             </xsl:choose>
         </xsl:variable>
+        <xsl:variable name="hfont">
+            <xsl:choose>
+                <xsl:when test="$lvl = 1"><xsl:value-of select="$heading.1.font"/></xsl:when>
+                <xsl:when test="$lvl = 2"><xsl:value-of select="$heading.2.font"/></xsl:when>
+                <xsl:when test="$lvl = 3"><xsl:value-of select="$heading.3.font"/></xsl:when>
+                <xsl:otherwise><xsl:value-of select="$heading.4.font"/></xsl:otherwise>
+            </xsl:choose>
+        </xsl:variable>
         <xsl:variable name="hupper">
             <xsl:choose>
                 <xsl:when test="$lvl = 1"><xsl:value-of select="$heading.1.uppercase"/></xsl:when>
@@ -434,11 +442,24 @@
           $hbody, the same start-indent the paragraphs below use, regardless
           of how wide the number is.
         -->
+        <xsl:variable name="hgapset">
+            <xsl:choose>
+                <xsl:when test="$lvl = 1"><xsl:value-of select="$heading.1.gap"/></xsl:when>
+                <xsl:when test="$lvl = 2"><xsl:value-of select="$heading.2.gap"/></xsl:when>
+                <xsl:when test="$lvl = 3"><xsl:value-of select="$heading.3.gap"/></xsl:when>
+                <xsl:otherwise><xsl:value-of select="$heading.4.gap"/></xsl:otherwise>
+            </xsl:choose>
+        </xsl:variable>
         <xsl:variable name="hgap">
-            <xsl:call-template name="mm-diff">
-                <xsl:with-param name="a" select="$hbody"/>
-                <xsl:with-param name="b" select="$hindent"/>
-            </xsl:call-template>
+            <xsl:choose>
+                <xsl:when test="$hgapset != ''"><xsl:value-of select="$hgapset"/></xsl:when>
+                <xsl:otherwise>
+                    <xsl:call-template name="mm-diff">
+                        <xsl:with-param name="a" select="$hbody"/>
+                        <xsl:with-param name="b" select="$hindent"/>
+                    </xsl:call-template>
+                </xsl:otherwise>
+            </xsl:choose>
         </xsl:variable>
         <fo:list-block id="{generate-id(.)}"
                        space-before="{$hsb}"
@@ -453,11 +474,13 @@
             <fo:list-item>
                 <fo:list-item-label end-indent="label-end()">
                     <fo:block font-weight="bold" font-size="{$hsize}">
+                        <xsl:if test="$hfont != ''"><xsl:attribute name="font-family"><xsl:value-of select="$hfont"/></xsl:attribute></xsl:if>
                         <xsl:call-template name="section-number"/>
                     </fo:block>
                 </fo:list-item-label>
                 <fo:list-item-body start-indent="body-start()">
                     <fo:block font-weight="bold" font-size="{$hsize}">
+                        <xsl:if test="$hfont != ''"><xsl:attribute name="font-family"><xsl:value-of select="$hfont"/></xsl:attribute></xsl:if>
                         <!-- Anchor the heading so an internalRef/dmRef to this
                              section (or a data module) links straight to it. Only
                              the CANONICAL holder of an @id is anchored: when the

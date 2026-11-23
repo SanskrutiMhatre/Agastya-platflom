@@ -39,10 +39,15 @@ npm-debug.log*
 /SAMPLE PROJECTS/*
 !/SAMPLE PROJECTS/README.md
 
+# The JSS-0251 stencils (the customer's Word files that the JSS authoring work is modelled on, about 6 MB). The tests that read them skip themselves, saying why,
+# when the folder is absent (backend/test/helpers-stencil.js). Ignored so that `git add -A` can never publish them by accident.
+/manual format/
+
 # ---- proprietary fonts ---------------------------------------------------------------------------------------------------------
-# Arial may only be redistributed by a party that holds a licence for it, and pushing to a remote is distribution. Copy the four
-# files from C:\Windows\Fonts into backend/vendor/tools/fonts/ on a machine that holds the licence, or build with --no-arial
-# (Liberation Sans, metric-compatible, is used instead). See backend/vendor/tools/fonts/README.md.
+# Arial (and Arial Narrow, which the JSS stencil headings use) may only be redistributed by a party that holds a licence for it, and pushing to a
+# remote is distribution. Copy the four Arial files from C:\Windows\Fonts (and the four Arial Narrow files, which come with Microsoft Office) into
+# backend/vendor/tools/fonts/ on a machine that holds the licence, or build with --no-arial (Liberation Sans, metric-compatible, is used instead).
+# See backend/vendor/tools/fonts/README.md.
 /backend/vendor/tools/fonts/arial*.ttf
 
 # ---- editors and operating systems ---------------------------------------------------------------------------------------------

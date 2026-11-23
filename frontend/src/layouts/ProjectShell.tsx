@@ -41,13 +41,14 @@ export function ProjectShell() {
   const v = summary.validation;
   const rel = summary.release;
   const isCir = summary.project.type === 'CIR';
+  const jssDoc = summary.project.authoring === 'jss-xml';                      // a JSS document has no S1000D publication tree to explore
   const s1000d = (summary.project.format ?? 's1000d') === 's1000d';           // validation (schemas, BREX) and the CSDB belong to S1000D only
   const items: Item[] = isCir ? [
     { to: `/projects/${id}/editor`, label: 'Editor', icon: 'editor' },
     { to: `/projects/${id}/graphics`, label: 'Graphics', icon: 'image' },
   ] : [
     { to: `/projects/${id}/editor`, label: 'Editor', icon: 'editor' },
-    { to: `/projects/${id}/explore`, label: 'Explore', icon: 'explore' },
+    ...(jssDoc ? [] : [{ to: `/projects/${id}/explore`, label: 'Explore', icon: 'explore' as const }]),
     { to: `/projects/${id}/publication`, label: 'Publication', icon: 'book' },
     { to: `/projects/${id}/graphics`, label: 'Graphics', icon: 'image' },
     ...(s1000d ? [

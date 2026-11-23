@@ -8,8 +8,10 @@
 // server refuses to create it. The catalogue is data, so a new manual type is one line here and nothing else in the platform changes.
 // Names follow the stencil files the owner supplied (JSS-0251 land stencils DTF0025-29, NAval_stencil, JSG-0308).
 
+import { JSS_TYPES } from './jss/registry';
+
 export type FormatId = 's1000d' | 'jss' | 'jsg';
-export interface ManualType { id: string; label: string; ready: boolean; /** The starting-outline profile (services/profiles) this type uses, when it has one. */ profile?: string }
+export interface ManualType { id: string; label: string; ready: boolean; /** The starting-outline profile (services/profiles) this type uses, when it has one. */ profile?: string; /** The JSS document type (services/jss/registry) a project of this type is authored as. */ jssType?: string; /** Why it cannot be created yet. */ notReady?: string }
 export interface Domain { id: string; label: string; manualTypes: ManualType[] }
 export interface FormatInfo { id: FormatId; label: string; description: string; ready: boolean; domains: Domain[] }
 
@@ -32,13 +34,8 @@ export const FORMATS: FormatInfo[] = [
     id: 'jss', label: 'JSS', description: 'Joint Services Specification manuals.', ready: true,
     domains: [
       {
-        id: 'land', label: 'Land', manualTypes: [
-          { id: 'uhb', label: 'User Handbook', ready: true, profile: 'uhb' },
-          { id: 'tm-pi', label: 'Technical Manual - Part I', ready: false },
-          { id: 'tm-pi-v1-td', label: 'Technical Manual - Part I Vol 1 Technical Description', ready: false },
-          { id: 'tm-pi-v2-drg', label: 'Technical Manual - Part I Vol 2 Drawings', ready: false },
-          { id: 'tm-pii-mm', label: 'Technical Manual - Part II Maintenance Manual', ready: false },
-        ],
+        // one entry per JSS-0251 land stencil: the registry (services/jss/registry) is the only list, so the wizard cannot offer what the engine does not have
+        id: 'land', label: 'Land', manualTypes: JSS_TYPES.map((t) => ({ id: t.id, label: t.label, ready: t.ready, notReady: t.notReady, jssType: t.id })),
       },
       { id: 'naval', label: 'Naval', manualTypes: NAVAL },
     ],
@@ -51,7 +48,7 @@ export const FORMATS: FormatInfo[] = [
 
 export const formatById = (id: unknown): FormatInfo | undefined => FORMATS.find((f) => f.id === id);
 
-export interface ResolvedFormat { format: FormatId; domain: string | null; manualType: string | null; profile?: string; pipeline: 's1000dtofo' | 's1000dtojss'; type: 'S1000D' | 'JSS' }
+export interface ResolvedFormat { format: FormatId; domain: string | null; manualType: string | null; profile?: string; jssType?: string; pipeline: 's1000dtofo' | 's1000dtojss'; type: 'S1000D' | 'JSS' }
 
 /** Check a format / domain / manual-type choice and say what it means for the project; throws a plain message when it cannot be created. */
 export function resolveFormat(input: { format?: unknown; domain?: unknown; manualType?: unknown }): ResolvedFormat {
@@ -64,6 +61,6 @@ export function resolveFormat(input: { format?: unknown; domain?: unknown; manua
   if (!d) throw new Error(`Choose the domain of the ${f.label} manual (${f.domains.map((x) => x.label).join(' or ')}).`);
   const m = d.manualTypes.find((x) => x.id === input.manualType);
   if (!m) throw new Error(`Choose the type of ${f.label} ${d.label} manual.`);
-  if (!f.ready || !m.ready) throw new Error(`${f.label} ${d.label} - ${m.label} is not available yet: its stencil is received but the engine for it is still to be built.`);
-  return { format: f.id, domain: d.id, manualType: m.id, profile: m.profile, pipeline: 's1000dtojss', type: 'JSS' };
+  if (!f.ready || !m.ready) throw new Error(`${f.label} ${d.label} - ${m.label} is not available yet: ${m.notReady ?? 'its stencil is received but the engine for it is still to be built.'}`);
+  return { format: f.id, domain: d.id, manualType: m.id, profile: m.profile, jssType: d.id === 'land' && f.id === 'jss' ? m.jssType : undefined, pipeline: 's1000dtojss', type: 'JSS' };
 }

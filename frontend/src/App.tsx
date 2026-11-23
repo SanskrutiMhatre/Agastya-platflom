@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { useSession } from './store/session';
 import { Loading, Toasts } from './components/ui';
@@ -25,8 +25,8 @@ import { ReleasePage } from './pages/project/ReleasePage';
 import { CsdbPage } from './pages/project/CsdbPage';
 import { ProjectSettingsPage } from './pages/project/ProjectSettingsPage';
 
-// The editor (CodeMirror, pdfmake, the schema engine) is large and only this route needs it.
-const EditorPage = lazy(() => import('./pages/project/EditorPage').then((m) => ({ default: m.EditorPage })));
+// The editors (the S1000D Studio: CodeMirror, pdfmake, the schema engine; the JSS editor) are large and only this route needs them: EditorRoute loads the one that fits.
+import { EditorRoute } from './pages/project/EditorRoute';
 
 export function App() {
   const status = useSession((s) => s.status);
@@ -69,7 +69,7 @@ export function App() {
       <Route path="preview/:id/:mode" element={<PreviewWindow />} />
       <Route path="projects/:id" element={<ProjectShell />}>
         <Route index element={<Navigate to="editor" replace />} />
-        <Route path="editor" element={<Suspense fallback={<Loading label="Loading the editor…" />}><EditorPage /></Suspense>} />
+        <Route path="editor" element={<EditorRoute />} />
         <Route path="explore" element={<ExplorePage />} />
         <Route path="publication" element={<PublicationPage />} />
         <Route path="validation" element={<ValidationPage />} />

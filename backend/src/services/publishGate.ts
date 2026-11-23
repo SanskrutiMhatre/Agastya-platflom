@@ -20,11 +20,12 @@ import crypto from 'crypto';
 import path from 'path';
 import { projectDirFor } from '../context';
 import { HttpError, conflict } from './http';
-import { readProjectJson, csdbRel } from './projects';
+import { readProjectJson, csdbRel, pmRel } from './projects';
 import { publicationSources, pmRefsOf } from './pm';
 import { runValidation, type Issue } from './validation';
 import { checkModuleBrex } from './brex';
 import { isS1000dProject } from './projects';
+import { isJssAuthored, assertJssPublishable } from './jss/service';
 import { waiverFor } from './publishWaivers';
 
 export interface GateFinding { file: string; kind: 'malformed' | 'schema' | 'unchecked' | 'brex' | 'brex-source' | 'applic' | 'revision'; title: string; detail: string; line: number }
@@ -47,6 +48,12 @@ export function gateTargets(projectId: string, scope: 'publication' | { file: st
 }
 
 export async function assertPublishable(projectId: string, scope: 'publication' | { file: string }, opts: GateOptions = {}): Promise<GatePass> {
+  // A JSS document has its own schema and the stencil's rules, not S1000D's: the same fresh check, run by the JSS service.
+  if (isJssAuthored(projectId)) {
+    if (scope !== 'publication') throw conflict('A single-module preview is an S1000D feature; a JSS document is built as a whole.', 'NOT_S1000D');
+    const g = await assertJssPublishable(projectId);
+    return { validatedAt: g.validatedAt, files: [pmRel(readProjectJson(projectId))], warnings: g.warnings, ruleBreaks: [], verifyUnchanged: g.verifyUnchanged };
+  }
   const dir = projectDirFor(projectId);
   const files = gateTargets(projectId, scope);
   const want = new Set(files.map((f) => f.toLowerCase()));

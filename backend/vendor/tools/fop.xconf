@@ -46,6 +46,23 @@
           <font-triplet name="Arial" style="italic" weight="bold"/>
         </font>
         <!--
+          Arial Narrow: the face the JSS stencils set their section headings in (Heading 2). Proprietary like Arial, copied from the build machine's own
+          Windows fonts and git-ignored (arial*.ttf); see fonts/README.md. A missing file is left out by engine/fontconf.js, and a font-family of
+          "Arial Narrow,Arial,Liberation Sans" then falls through to the next name. Used only where a stylesheet asks for "Arial Narrow".
+        -->
+        <font embed-url="arialn.ttf">
+          <font-triplet name="Arial Narrow" style="normal" weight="normal"/>
+        </font>
+        <font embed-url="arialnb.ttf">
+          <font-triplet name="Arial Narrow" style="normal" weight="bold"/>
+        </font>
+        <font embed-url="arialni.ttf">
+          <font-triplet name="Arial Narrow" style="italic" weight="normal"/>
+        </font>
+        <font embed-url="arialnbi.ttf">
+          <font-triplet name="Arial Narrow" style="italic" weight="bold"/>
+        </font>
+        <!--
           Liberation Sans: the free (SIL OFL), metric-compatible stand-in. Same
           advance widths as Arial, so line breaks and pagination are identical;
           only glyph shapes differ. Listed after Arial in the stylesheets' font

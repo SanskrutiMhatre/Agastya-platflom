@@ -69,6 +69,8 @@ export interface ProjectCard {
   id: string; name: string; type: string; pipeline: string; templateRef: string;
   /** s1000d | jss | jsg, and for the document formats the domain (land / naval) and manual type (uhb ...). Projects made before formats existed: s1000d, or jss for a document-type project. */
   format: string; domain: string | null; manualType: string | null;
+  /** 'jss-xml' when the project's source is a JSS document written in the JSS editor (services/jss); null otherwise. */
+  authoring: 'jss-xml' | null; jssDocType: string | null;
   /** New data modules join the publication automatically (default true). */
   autoAddToPublication: boolean;
   /** Page furniture of S1000D publications: rotated side text in the left margin, and the default header logo. On by default. */
@@ -99,6 +101,8 @@ export function projectCard(row: any, role: string, via: ProjectCard['accessVia'
     format: pj.format || ((pj.type || row.type) === 'JSS' || pj.templateRef === 'uhb' ? 'jss' : 's1000d'),
     domain: pj.domain ?? null,
     manualType: pj.manualType ?? (pj.templateRef === 'uhb' ? 'uhb' : null),
+    authoring: pj.authoring === 'jss-xml' ? 'jss-xml' : null,
+    jssDocType: pj.authoring === 'jss-xml' ? (pj.jssDocType ?? null) : null,
     folder: String(pj.group || '').trim(),
     status: row.status || 'active',
     role, accessVia: via,
@@ -197,7 +201,7 @@ export async function createProject(user: User, input: CreateProjectInput): Prom
 
   const id: string = workspace.createProject(workspaceDir, {
     name, fromId, type: fmt ? fmt.type : input.type === 'JSS' ? 'JSS' : 'S1000D',
-    templateRef: profile?.templateRef || input.templateRef || 'default',
+    templateRef: fmt?.jssType ? 'jss-stencil' : profile?.templateRef || input.templateRef || 'default',
     // the format wizard decides first; otherwise the starting-outline profile may name its own engine (the xignal-s1000d document type uses the direct S1000D one)
     pipeline: fmt ? fmt.pipeline : profile ? (profile.pipeline ?? 's1000dtojss') : input.pipeline === 's1000dtofo' ? 's1000dtofo' : 's1000dtojss',
     group: folder,
@@ -208,7 +212,12 @@ export async function createProject(user: User, input: CreateProjectInput): Prom
   const dir = projectDirFor(id);
   const pj = readProjectJson(id);
   const pmFile = path.join(dir, pmRel(pj));
-  if (!fromId && !fs.existsSync(pmFile)) fs.writeFileSync(pmFile, EMPTY_PM(name, profile ? chapterEntries(profile) : ''), 'utf8');
+  if (!fromId && fmt?.jssType) {
+    // a JSS document is authored as JSS XML (services/jss): the stencil's chapters, not an S1000D publication module
+    const { createInitialDocument } = require('./jss/service');
+    const { jssTypeById } = require('./jss/registry');
+    createInitialDocument(id, jssTypeById(fmt.jssType), {});
+  } else if (!fromId && !fs.existsSync(pmFile)) fs.writeFileSync(pmFile, EMPTY_PM(name, profile ? chapterEntries(profile) : ''), 'utf8');
   if (!fromId && cfgPatch?.mic && fs.existsSync(pmFile)) {
     // the publication module's own code: model code - issuer (the responsible partner) - number - volume, and the language and partner it names
     const rpcCode = String(cfgPatch.responsiblePartner?.code ?? '').toUpperCase(); const rpcName = String(cfgPatch.responsiblePartner?.name ?? '');

@@ -33,6 +33,7 @@ const { injectJssFrontMatter } = vendor('engine/frontmatterInject');
 const brandEngine = vendor('engine/brand');
 
 import { assertPublishable, type GatePass } from './publishGate';
+import { isJssAuthored, jssTypeOfProject, composeBook, layoutParamsFor, COMPOSED_NAME } from './jss/service';
 import { buildSelection, planConfiguration, assertResolved, type ConfigInput } from './applicEval';
 import { readSidecar } from './jssdm/sidecar';
 import { dropConsumedModules } from './jssdm/prune';
@@ -110,6 +111,23 @@ function injectDirectFrontMatter(projectId: string, pmText: string, effective: a
 }
 
 function prepareInput(projectId: string, project: any, effective: any, useDirect: boolean, log: (m: string) => void, dir: string = projectDirFor(projectId)) {
+  if (isJssAuthored(projectId)) {
+    // A JSS document is rendered as authored: only the shared frame is added (from Settings), then it goes straight to the JSS stylesheets.
+    // The cover names the document as its stencil does ("TECHNICAL MANUAL" / "PART II MAINTENANCE"), unless Settings word it themselves.
+    const jt = jssTypeOfProject(projectId);
+    if (jt && !project.frontMatter?.titlePage?.documentType) effective.frontMatter = { ...(effective.frontMatter ?? {}), titlePage: { ...(effective.frontMatter?.titlePage ?? {}), documentType: jt.coverTitle.join(String.fromCharCode(10)) } };      // one title line per line: the cover sets MM and ORM on two lines
+    // wording that differs between the stencils (the Foreword's address and the symbols legends in MM and ORM), unless Settings word it themselves
+    for (const [key, value] of Object.entries(jt?.frontMatter ?? {})) {
+      if (project.frontMatter?.[key]) continue;
+      effective.frontMatter = { ...(effective.frontMatter ?? {}), [key]: { ...(effective.frontMatter?.[key] ?? {}), ...(value as object) } };
+    }
+    const book = composeBook(projectId, effective);
+    fs.writeFileSync(path.join(dir, COMPOSED_NAME), book.text, 'utf8');
+    // Code No. and Rev No. are the author's, written on the document; they reach the cover as the same layout parameters Settings would set.
+    if (book.codeNo || book.revNo) effective.frontMatter = { ...(effective.frontMatter ?? {}), ...(book.codeNo ? { codeNo: book.codeNo } : {}), ...(book.revNo ? { revNo: book.revNo } : {}) };
+    log(`JSS document (${project.jssDocType ?? 'jss'}): added ${book.pages} frame pages from Settings; the body is rendered as written`);
+    return { input: COMPOSED_NAME, isS1000D: false };
+  }
   const pm = project.input?.pm || 'publication.xml';
   const pmAbs = path.join(dir, pm);
   if (!fs.existsSync(pmAbs)) throw bad(`Publication module not found: ${pm}`, 'NO_PM');
@@ -260,7 +278,7 @@ export function buildPublication(projectId: string, opts: { compression?: number
   return serial(`${projectId}:full`, async () => {
     const log = (m: string) => { console.log(`[build:${projectId}] ${m}`); broadcast(projectId, { type: 'progress', message: m }); };
     // A PDF is only built from modules that have JUST been checked against their schema (a draft that does not match blocks it).
-    log('Validating the publication against the S1000D schemas...');
+    log(isJssAuthored(projectId) ? 'Validating the JSS document against its schema and stencil rules...' : 'Validating the publication against the S1000D schemas...');
     let gate;
     // `waivable`: a draft build may stand on a recorded waiver for a BREX the project lacks; a build of a released publication never does.
     try { gate = await assertPublishable(projectId, 'publication', { allowRuleBreaks: opts.allowRuleBreaks, waivable: !releaseStateOf(projectId).released }); }
@@ -304,6 +322,11 @@ async function renderFull(projectId: string, gate: GatePass, log: (m: string) =>
       watermarkUri: wm ? wm.uri : undefined, watermarkRepeat: wm ? wm.repeat : undefined, releaseLabel,
       onMessage: log,
     };
+    // A JSS-authored document sends the stencils' layout settings (spacing, heading font, indent, cover title lines, no foreword document number, and no INBR No. line
+    // on covers that do not have one). Each is a parameter whose stylesheet default is the old behaviour, so every other build (S1000D direct, S1000D through JSS, an
+    // imported JSS book) sends none of them and is unchanged. See docs/JSS_VENDOR_EXCEPTIONS.md.
+    const jssType = isJssAuthored(projectId) ? jssTypeOfProject(projectId) : undefined;
+    if (jssType) common.layoutParams = layoutParamsFor(jssType, common.layoutParams);
     try {
       const result = useDirect
         ? await engineBuild.buildS1000dToFo({ ...common,

@@ -1,0 +1,17 @@
+{
+  "_about": "Fingerprints of the XSL-FO of three builds (see canon() in jss-cover-isolation.test.js: the checkout location and the attribute order are ignored, so the value is the same in every folder on every machine). Re-captured 2026-11-23 at the merge of the JSS authoring work (Videos copy) with the S1000D Phase 20-22d work. Both pre-merge trees, measured separately before any file was combined, gave exactly these values - so neither the JSS edits nor the S1000D edits moved any of these three builds - and the merged tree must give them again. The earlier values were captured with the checkout location inside them and could not be reproduced in any other folder. Update only when a change to these pipelines is intended and reviewed.",
+  "cases": {
+    "legacy-jss-uhb": {
+      "chars": 179554,
+      "sha256": "aeea3f4d57624e32ac9f521b8d0b8507e8b4552715c6640d7bd4bd67733e864f"
+    },
+    "s1000d-direct": {
+      "chars": 177708,
+      "sha256": "794e3aaa8b3f7388d923ecc37f2a40efe5352a75234ef379d223cb3601e7651d"
+    },
+    "s1000d-via-jss": {
+      "chars": 154544,
+      "sha256": "b3fcb03485bae9968f1df978e6a6c1fc02825765b544ac5b30436a88bb93afc3"
+    }
+  }
+}

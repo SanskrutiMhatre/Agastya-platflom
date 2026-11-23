@@ -1,0 +1,283 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  AGASTYA JSS document schema, version 1.0.
+
+  The authored form of a Joint Services Specification (JSS) publication. It is the project's source of truth: the JSS
+  editor writes it, the server validates it against this schema and renders it to PDF through the JSS pipeline
+  (jsstofo -> XSL-FO -> FOP). It shares nothing with the S1000D schemas.
+
+  The element names are those the JSS publishing stylesheets (backend/vendor/pipeline/jsstofo) already read, so an authored
+  document IS a <jssbook>: the stylesheets are third-party and are not edited, and the schema follows them rather than
+  inventing a second vocabulary that would need translating.
+
+  What the server adds at build time, and the author therefore does not write: the shared frame (title pages, notices,
+  foreword, record of changes, contents, lists, symbols - taken from the project's Settings), the emblem and publishers,
+  running heads and feet, and the folios.
+
+  Scope of 1.0: body kind A, the chapter manual (stencils UHB, MM, ORM). The other stencil kinds (parts list, illustrations,
+  single-table list) are added to this file as they are implemented; a document type that is not in JssDocType is refused.
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="unqualified">
+
+  <!-- ===== Simple types ===== -->
+  <xs:simpleType name="JssDocType">
+    <xs:restriction base="xs:token">
+      <xs:enumeration value="uhb"/>
+      <xs:enumeration value="mm"/>
+      <xs:enumeration value="orm"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="Orientation">
+    <xs:restriction base="xs:token">
+      <xs:enumeration value="portrait"/>
+      <xs:enumeration value="landscape"/>
+      <xs:enumeration value="a3-landscape"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="ListType">
+    <xs:restriction base="xs:token">
+      <xs:enumeration value="alpha"/>
+      <xs:enumeration value="roman"/>
+      <xs:enumeration value="number"/>
+      <xs:enumeration value="bullet"/>
+      <xs:enumeration value="dash"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="Align">
+    <xs:restriction base="xs:token">
+      <xs:enumeration value="left"/>
+      <xs:enumeration value="center"/>
+      <xs:enumeration value="right"/>
+      <xs:enumeration value="justify"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- "20mm 1* 2*": absolute widths in mm, or proportions with a star -->
+  <xs:simpleType name="ColumnWidths">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="\s*(\d+(\.\d+)?(mm|\*))(\s+\d+(\.\d+)?(mm|\*))*\s*"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="Dimension">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="\d+(\.\d+)?(mm|cm|in|pt|px)"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="Heading">
+    <xs:restriction base="xs:string">
+      <xs:minLength value="1"/>
+      <xs:pattern value=".*\S.*"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- ===== Inline text (shared by paragraphs, list items, table cells, notices) ===== -->
+  <xs:complexType name="InlineText" mixed="true">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="b" type="InlineText"/>
+      <xs:element name="i" type="InlineText"/>
+      <xs:element name="u" type="InlineText"/>
+      <xs:element name="sup" type="InlineText"/>
+      <xs:element name="sub" type="InlineText"/>
+      <xs:element name="br">
+        <xs:complexType/>
+      </xs:element>
+      <xs:element name="xref" type="CrossReference"/>
+    </xs:choice>
+  </xs:complexType>
+
+  <!-- A cross-reference: to an element of this document (to), or to an address outside it (href). -->
+  <xs:complexType name="CrossReference" mixed="true">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="b" type="InlineText"/>
+      <xs:element name="i" type="InlineText"/>
+    </xs:choice>
+    <xs:attribute name="to" type="xs:IDREF"/>
+    <xs:attribute name="href" type="xs:anyURI"/>
+  </xs:complexType>
+
+  <xs:complexType name="Paragraph" mixed="true">
+    <xs:complexContent mixed="true">
+      <xs:extension base="InlineText">
+        <xs:attribute name="align" type="Align"/>
+        <xs:attribute name="indent" type="xs:token" fixed="none"/>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <!-- ===== Lists ===== -->
+  <xs:complexType name="ListItem" mixed="true">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="b" type="InlineText"/>
+      <xs:element name="i" type="InlineText"/>
+      <xs:element name="u" type="InlineText"/>
+      <xs:element name="sup" type="InlineText"/>
+      <xs:element name="sub" type="InlineText"/>
+      <xs:element name="br"><xs:complexType/></xs:element>
+      <xs:element name="xref" type="CrossReference"/>
+      <xs:element name="para" type="Paragraph"/>
+      <xs:element name="list" type="ListBlock"/>
+    </xs:choice>
+  </xs:complexType>
+
+  <xs:complexType name="ListBlock">
+    <xs:sequence>
+      <xs:element name="item" type="ListItem" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="type" type="ListType"/>
+  </xs:complexType>
+
+  <!-- ===== Tables ===== -->
+  <xs:complexType name="Cell" mixed="true">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="b" type="InlineText"/>
+      <xs:element name="i" type="InlineText"/>
+      <xs:element name="u" type="InlineText"/>
+      <xs:element name="sup" type="InlineText"/>
+      <xs:element name="sub" type="InlineText"/>
+      <xs:element name="br"><xs:complexType/></xs:element>
+      <xs:element name="xref" type="CrossReference"/>
+      <xs:element name="para" type="Paragraph"/>
+      <xs:element name="list" type="ListBlock"/>
+    </xs:choice>
+    <xs:attribute name="colspan" type="xs:positiveInteger"/>
+    <xs:attribute name="rowspan" type="xs:positiveInteger"/>
+    <xs:attribute name="align" type="Align"/>
+  </xs:complexType>
+
+  <xs:complexType name="Row">
+    <xs:sequence>
+      <xs:element name="cell" type="Cell" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="RowGroup">
+    <xs:sequence>
+      <xs:element name="row" type="Row" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="Table">
+    <xs:sequence>
+      <xs:element name="title" type="Heading" minOccurs="0"/>
+      <xs:element name="thead" type="RowGroup" minOccurs="0"/>
+      <xs:element name="tbody" type="RowGroup"/>
+    </xs:sequence>
+    <xs:attribute name="id" type="xs:ID"/>
+    <xs:attribute name="widths" type="ColumnWidths"/>
+  </xs:complexType>
+
+  <!-- ===== Figures ===== -->
+  <xs:complexType name="Graphic">
+    <xs:attribute name="src" type="xs:string" use="required"/>
+    <xs:attribute name="width" type="Dimension"/>
+    <xs:attribute name="height" type="Dimension"/>
+  </xs:complexType>
+
+  <xs:complexType name="KeyItem">
+    <xs:simpleContent>
+      <xs:extension base="xs:string">
+        <xs:attribute name="num" type="xs:string" use="required"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+
+  <xs:complexType name="Legend">
+    <xs:sequence>
+      <xs:element name="keyitem" type="KeyItem" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="Figure">
+    <xs:sequence>
+      <xs:element name="title" type="Heading" minOccurs="0"/>
+      <xs:element name="graphic" type="Graphic" maxOccurs="unbounded"/>
+      <xs:element name="legend" type="Legend" minOccurs="0"/>
+    </xs:sequence>
+    <xs:attribute name="id" type="xs:ID"/>
+  </xs:complexType>
+
+  <!-- ===== Notices: the label (NOTE / WARNING / CAUTION) and band are the stencil's, not authored ===== -->
+  <xs:complexType name="Notice">
+    <xs:sequence>
+      <xs:element name="para" type="Paragraph" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- ===== Body content ===== -->
+  <xs:group name="block">
+    <xs:choice>
+      <xs:element name="para" type="Paragraph"/>
+      <xs:element name="list" type="ListBlock"/>
+      <xs:element name="table" type="Table"/>
+      <xs:element name="figure" type="Figure"/>
+      <xs:element name="note" type="Notice"/>
+      <xs:element name="warning" type="Notice"/>
+      <xs:element name="caution" type="Notice"/>
+      <xs:element name="pageBreak"><xs:complexType/></xs:element>
+    </xs:choice>
+  </xs:group>
+
+  <xs:complexType name="Section">
+    <xs:sequence>
+      <xs:element name="title" type="Heading"/>
+      <!-- A section's own content comes first, then its sub-sections: the order the pipeline prints them in, so the file never says one thing and the PDF another. -->
+      <xs:group ref="block" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:element name="section" type="Section" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="id" type="xs:ID"/>
+    <xs:attribute name="orientation" type="Orientation"/>
+  </xs:complexType>
+
+  <xs:complexType name="Chapter">
+    <xs:sequence>
+      <xs:element name="title" type="Heading"/>
+      <!-- A section's own content comes first, then its sub-sections: the order the pipeline prints them in, so the file never says one thing and the PDF another. -->
+      <xs:group ref="block" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:element name="section" type="Section" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <xs:attribute name="number" type="xs:positiveInteger" use="required"/>
+    <xs:attribute name="id" type="xs:ID"/>
+  </xs:complexType>
+
+  <!-- ===== Identity of the publication (what the stencil's cover and running heads carry) ===== -->
+  <xs:complexType name="BookMeta">
+    <xs:all>
+      <xs:element name="bookName" type="Heading"/>
+      <xs:element name="systemName" type="xs:string" minOccurs="0"/>
+      <xs:element name="security" type="xs:string" minOccurs="0"/>
+      <xs:element name="publicationNo" type="xs:string" minOccurs="0"/>
+      <xs:element name="codeNo" type="xs:string" minOccurs="0"/>
+      <xs:element name="revNo" type="xs:string" minOccurs="0"/>
+      <xs:element name="inbrNo" type="xs:string" minOccurs="0"/>
+      <xs:element name="nsn" type="xs:string" minOccurs="0"/>
+      <xs:element name="contractNo" type="xs:string" minOccurs="0"/>
+      <xs:element name="projectCode" type="xs:string" minOccurs="0"/>
+      <xs:element name="ltDocumentNo" type="xs:string" minOccurs="0"/>
+      <xs:element name="month" type="xs:string" minOccurs="0"/>
+      <xs:element name="year" type="xs:string" minOccurs="0"/>
+    </xs:all>
+  </xs:complexType>
+
+  <xs:complexType name="Body">
+    <xs:sequence>
+      <xs:element name="chapter" type="Chapter" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- ===== Root ===== -->
+  <xs:element name="jssbook">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="bookmeta" type="BookMeta"/>
+        <xs:element name="body" type="Body"/>
+      </xs:sequence>
+      <xs:attribute name="docType" type="JssDocType" use="required"/>
+      <xs:attribute name="schemaVersion" type="xs:token" use="required" fixed="1.0"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

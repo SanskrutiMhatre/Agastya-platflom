@@ -3,6 +3,7 @@
 | Files | Family | Used for | Licence |
 |---|---|---|---|
 | `arial.ttf`, `arialbd.ttf`, `ariali.ttf`, `arialbi.ttf` | Arial | the face the Xignal / S1000D reference publications are set in; the `xignal-s1000d` house template asks for it first | **proprietary** (Monotype / Microsoft) - see below |
+| `arialn.ttf`, `arialnb.ttf`, `arialni.ttf`, `arialnbi.ttf` | Arial Narrow | the section headings (Heading 2) of the JSS stencils (UHB, MM, ORM), requested only by JSS-authored documents | **proprietary** (Monotype / Microsoft), same terms as Arial; git-ignored by the same `arial*.ttf` rule. Without them those headings use Arial / Liberation Sans, which is wider |
 | `LiberationSans-{Regular,Bold,Italic,BoldItalic}.ttf` | Liberation Sans | the stand-in for Arial: metric-compatible (every glyph has Arial's advance width), so line breaks and page breaks do not move; only the shapes differ | SIL Open Font License 1.1 - `LICENSE_LIBERATION` |
 | `DejaVuSans{,-Bold,-Oblique,-BoldOblique}.ttf` | DejaVu Sans | characters the faces above do not have (e.g. U+01A5, many symbols) | DejaVu Fonts License (Bitstream Vera + Arev; permissive) - `LICENSE_DEJAVU` |
 

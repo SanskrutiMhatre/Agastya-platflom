@@ -31,6 +31,13 @@ export const projectDirFor = (id: string): string => wsEngine.projectDir(workspa
 wsEngine.ensureWorkspace(workspaceDir);
 seedTemplates();
 
+/** The `revision` a house template declares, or null (a template without one is never replaced). */
+function revisionOf(file: string): number | null {
+  try { const r = JSON.parse(fs.readFileSync(file, 'utf8')).revision; return typeof r === 'number' ? r : null; } catch { return null; }
+}
+// function declarations, not consts: seedTemplates() below runs while this module is still loading
+function newerRevision(src: string, target: string): boolean { const s = revisionOf(src); return s !== null && s > (revisionOf(target) ?? 0); }
+
 function seedTemplates(): void {
   const dest = wsEngine.templatesDir(workspaceDir);
   if (!fs.existsSync(config.seedTemplatesDir)) return;
@@ -45,6 +52,11 @@ function seedTemplates(): void {
         fs.mkdirSync(target, { recursive: true });
         seed(src, target);
       } else if (!fs.existsSync(target)) {
+        fs.copyFileSync(src, target);
+      } else if (newerRevision(src, target)) {
+        // Only a template that declares a `revision` is ever replaced, and only by a higher one: the old copy is kept beside it. No template that existed
+        // before this mechanism declares one, so none of them is touched.
+        fs.copyFileSync(target, `${target}.rev${revisionOf(target) ?? 0}.bak`);
         fs.copyFileSync(src, target);
       }
     }

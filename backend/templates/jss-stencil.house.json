@@ -1,0 +1,310 @@
+{
+  "schemaVersion": 1,
+  "id": "jss-stencil",
+  "name": "JSS stencil (authored documents)",
+  "description": "Page geometry and typography read from the JSS-0251 stencils (UHB, MM, ORM share them): A4, mirrored margins 25 mm inner / 15 mm outer, top 20 mm and bottom 13.5 mm with the header at 10 mm and the footer at 2.5 mm; Arial 12 pt at 1.15, chapter title 18 pt, section headings 14 pt capitals and 12 pt below. See docs/JSS_STENCIL_ANALYSIS.md.",
+  "layout": {
+    "page": {
+      "width": "210mm",
+      "height": "297mm",
+      "marginTop": "10mm",
+      "marginBottom": "2.5mm",
+      "marginInner": "25mm",
+      "marginOuter": "15mm",
+      "bodyMarginTop": "10mm",
+      "bodyMarginBottom": "11mm",
+      "headerExtent": "10mm",
+      "footerExtent": "11mm"
+    },
+    "fonts": {
+      "family": "Arial,Liberation Sans",
+      "bodySize": "12pt",
+      "lineHeight": 1.15,
+      "headerFooterSize": "9pt",
+      "tableSize": "10pt"
+    },
+    "chapterTitleSize": "18pt",
+    "headings": [
+      {
+        "level": 1,
+        "size": "14pt",
+        "spaceBefore": "4.2mm",
+        "spaceAfter": "2.1mm",
+        "indentLeft": "0mm",
+        "titleGap": 8,
+        "uppercase": true
+      },
+      {
+        "level": 2,
+        "size": "12pt",
+        "spaceBefore": "4.2mm",
+        "spaceAfter": "2.1mm",
+        "indentLeft": "8mm",
+        "titleGap": 12.7,
+        "uppercase": false
+      },
+      {
+        "level": 3,
+        "size": "12pt",
+        "spaceBefore": "4.2mm",
+        "spaceAfter": "2.1mm",
+        "indentLeft": "8mm",
+        "titleGap": 17,
+        "uppercase": false
+      },
+      {
+        "level": 4,
+        "size": "12pt",
+        "spaceBefore": "4.2mm",
+        "spaceAfter": "2.1mm",
+        "indentLeft": "8mm",
+        "titleGap": 20,
+        "uppercase": false
+      }
+    ],
+    "figures": {
+      "captionGap": "2mm",
+      "caps": {
+        "portrait": {
+          "w": 167,
+          "h": 235
+        },
+        "landscape": {
+          "w": 254,
+          "h": 148
+        },
+        "a3landscape": {
+          "w": 377,
+          "h": 235
+        }
+      }
+    },
+    "toc": {
+      "sectionDepth": 1
+    },
+    "lists": {
+      "gapAlpha": 6.3,
+      "gapRoman": 8,
+      "gapBullet": 5,
+      "indent": 0,
+      "itemSpace": 1.1
+    },
+    "blankVersos": true,
+    "header": {
+      "publicationText": ""
+    },
+    "notices": {
+      "style": "boxed"
+    }
+  },
+  "branding": {
+    "emblem": "Media/Satya.png",
+    "publishers": [
+      {
+        "name": "L&T Defence,",
+        "addressLines": [
+          "LARSEN & TOUBRO LIMITED"
+        ],
+        "logo": "Media/JACKSON.png"
+      }
+    ]
+  },
+  "frontMatterDefaults": {
+    "titlePageJoint": {
+      "documentType": "Technical Description",
+      "disclosureNotice": "THE INFORMATION GIVEN IN THIS DOCUMENT IS NOT TO BE PUBLISHED OR COMMUNICATED EITHER DIRECTLY OR INDIRECTLY TO THE PRESS OR TO ANY PERSON NOT HOLDING AN OFFICIAL POSITION IN THE SERVICE OF GOVERNMENT OF INDIA.",
+      "repairNotice": "THIS MANUAL DOES NOT CONSTITUTE AUTHORITY FOR REPAIRS OR REPLACEMENT OF COMPONENTS BY USERS. REPAIRS BY DIFFERENT AGENCIES WILL ONLY BE CARRIED OUT AS LAID DOWN IN PERMISSIBLE REPAIR SCHEDULES PUBLISHED AS EMERs OR EQUIVALENT FROM TIME TO TIME."
+    },
+    "titlePage": {
+      "documentType": "USER HANDBOOK",
+      "disclosureNotice": "THE INFORMATION GIVEN IN THIS DOCUMENT IS NOT TO BE PUBLISHED OR COMMUNICATED, EITHER DIRECTLY OR INDIRECTLY TO THE PRESS OR TO ANY PERSON NOT HOLDING AN OFFICIAL POSITION IN THE SERVICE OF GOVERNMENT OF INDIA.",
+      "repairNotice": "THIS HANDBOOK DOES NOT CONSTITUTE AUTHORITY FOR REPAIRS OR REPLACEMENT OF COMPONENTS BY USERS. REPAIRS BY DIFFERENT AGENCIES WILL ONLY BE CARRIED OUT AS LAID DOWN IN PERMISSIBLE REPAIR SCHEDULES PUBLISHED AS EMERs OR EQUIVALENT FROM TIME TO TIME."
+    },
+    "proprietary": {
+      "text": "This document contains proprietary information, which is the sole property of the company submitting the document. The document is submitted to the recipient for his use only. By receiving this document, the recipient undertakes not to duplicate the document or to disclose in part of, or the whole of, any of the information contained herein to any third party without receiving beforehand, written permission from submitting company.",
+      "applicability": "THIS DOCUMENT IS APPLICABLE FOR XXXXXX CLASS OF XXX"
+    },
+    "foreword": {
+      "text": "Every care has been taken in the preparation of this document. The technical content has been authenticated. However, the reader is requested to communicate by E-mail/ Letter/ Telephone/ Fax to Larsen & Toubro, if any error is observed or there are any suggestions to improve this document.",
+      "email": "defence@larsentoubro.com",
+      "postalAddress": [
+        "Head, Documentation & Training,",
+        "L&T Defence, Larsen & Toubro.",
+        "G Building, Gate No. 1,",
+        "Saki Vihar Road, Powai.",
+        "Mumbai - 400 072."
+      ],
+      "telephone": [
+        "022 - 6705 3965"
+      ],
+      "fax": [
+        "022 - 6705 3234",
+        "022 - 6705 5914"
+      ]
+    },
+    "safetyWarning": [
+      {
+        "text": "The voltages employed in this Equipment are"
+      },
+      {
+        "text": "sufficiently high to endanger human life"
+      },
+      {
+        "text": "POWER",
+        "strong": true,
+        "spaceBefore": "6mm"
+      },
+      {
+        "text": "MUST BE SWITCHED OFF",
+        "strong": true
+      },
+      {
+        "text": "before servicing the equipment"
+      },
+      {
+        "text": "&",
+        "strong": true
+      },
+      {
+        "text": "GREAT CARE",
+        "strong": true
+      },
+      {
+        "text": "taken when making internal adjustments etc."
+      }
+    ],
+    "cautionsNotes": [],
+    "descriptionOfSymbols": [
+      {
+        "icon": "Media/High_Voltage_Symbol.png",
+        "text": "This symbol indicates that this operation or action involves high voltage."
+      },
+      {
+        "icon": "Media/Flammable_Symbol.png",
+        "text": "This symbol indicates that this operation or action involves Highly Flammable material."
+      },
+      {
+        "icon": "Media/Emergency_Stop_Symbol.png",
+        "text": "This symbol indicates that system operation need to be stopped quickly."
+      },
+      {
+        "icon": "Media/Hot_Surface_Symbol.png",
+        "text": "This symbol indicates that this operation or action involves hot surface areas."
+      },
+      {
+        "icon": "Media/Antistalic_Symbol.png",
+        "text": "This symbol indicates that this operation or action to be carried out using antistatic wears."
+      },
+      {
+        "icon": "Media/Noise_symbol.png",
+        "text": "This symbol indicates that this operation or action involves high level sound noise."
+      }
+    ],
+    "noticeLegends": {
+      "note": "Denotes additional information.",
+      "warning": "Denotes possibility of danger to personnel due to improper use of equipment.",
+      "caution": "Denotes possibility of damage to equipment."
+    },
+    "firstAidImage": "Media/stamp1.png",
+    "systemImage": "",
+    "firstAidImageWidth": "58mm",
+    "firstAidImageHeight": "115mm",
+    "systemImages": [
+      "Media/Screenshot 2026-09-05 160259.png",
+      ""
+    ],
+    "style": "s1000d",
+    "labels": {
+      "handbooks": {
+        "colSr": "Sl. No.",
+        "colInbr": "Code No."
+      },
+      "safety": {
+        "footer": "FOR FIRST AID IN CASE OF ELECTRIC SHOCK SEE OVERLEAF"
+      }
+    },
+    "associatedHandbooks": [
+      {
+        "sr": "",
+        "title": "",
+        "inbr": ""
+      },
+      {
+        "sr": "",
+        "title": "",
+        "inbr": ""
+      },
+      {
+        "sr": "",
+        "title": "",
+        "inbr": ""
+      },
+      {
+        "sr": "",
+        "title": "",
+        "inbr": ""
+      },
+      {
+        "sr": "",
+        "title": "",
+        "inbr": ""
+      },
+      {
+        "sr": "",
+        "title": "",
+        "inbr": ""
+      },
+      {
+        "sr": "",
+        "title": "",
+        "inbr": ""
+      },
+      {
+        "sr": "",
+        "title": "",
+        "inbr": ""
+      },
+      {
+        "sr": "",
+        "title": "",
+        "inbr": ""
+      },
+      {
+        "sr": "",
+        "title": "",
+        "inbr": ""
+      },
+      {
+        "sr": "",
+        "title": "",
+        "inbr": ""
+      }
+    ],
+    "demolition": {
+      "parts": [
+        {
+          "title": "General",
+          "paras": [
+            "The demolition procedure outlined below will be used to prevent the enemy from using or salvaging this equipment. DEMOLITION OF THE EQUIPMENT WILL BE DONE ONLY ON ORDER OF THE COMMANDER."
+          ]
+        },
+        {
+          "title": "Methods of Destruction",
+          "paras": [
+            "Use any or all the following methods to destroy the equipment."
+          ],
+          "listType": "roman",
+          "items": [
+            "Smash - Smash the Crystals, Controls, Semiconductors, Coils, Switches, Transformers and Headsets, use Sledges, Hand-axes, Pickaxes, Hammers crowbars or heavy tools, if applicable.",
+            "Cut - Cut the Cords, Headsets and Wiring: use axes, hand-axes or hatchets, if applicable.",
+            "Burn - Burn the Cords, Resistors, Capacitors, Coils, Wiring, and Technical Manuals, use Gasoline, Kerosene, Oil, Flamethrowers or Incendiary, if applicable.",
+            "Bend - Bend the panels, cabinet and chassis, if applicable.",
+            "Explosives - If explosives are necessary, use firearms, grenades or TNT, if applicable.",
+            "Disposal - Bury or scatter the destroyed parts in slits trenches, fox holes or other holes or throw them into streams, if applicable."
+          ]
+        }
+      ]
+    }
+  },
+  "revision": 2
+}

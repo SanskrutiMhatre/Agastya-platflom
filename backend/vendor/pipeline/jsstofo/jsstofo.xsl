@@ -205,6 +205,17 @@
     <xsl:param name="heading.4.indent">18mm</xsl:param>
     <xsl:param name="heading.4.bodyIndent">24mm</xsl:param>
     <xsl:param name="heading.4.uppercase">0</xsl:param>
+    <!-- Font family for a heading level, e.g. "Arial Narrow,Arial,Liberation Sans" (the stencils set Heading 2 in Arial Narrow). Empty = the body font, as before. -->
+    <xsl:param name="heading.1.font"/>
+    <xsl:param name="heading.2.font"/>
+    <xsl:param name="heading.3.font"/>
+    <xsl:param name="heading.4.font"/>
+    <!-- Distance from a heading's number to its text, in mm, e.g. 8mm. Empty = derived from the body indent, as before (the heading text and the text under it then start together).
+         The stencils start Heading 2's text at 8 mm and the paragraphs under it at 7 mm, so a JSS document type can set the two apart. -->
+    <xsl:param name="heading.1.gap"/>
+    <xsl:param name="heading.2.gap"/>
+    <xsl:param name="heading.3.gap"/>
+    <xsl:param name="heading.4.gap"/>
     <xsl:param name="heading.4.pageBreakBefore">0</xsl:param>
 
     <!-- ==================================================================== -->
@@ -242,7 +253,8 @@
     <xsl:variable name="xjss" select="$layout.profile = 'xignal-jss'"/>
     <!-- Space after a paragraph, and how far a first-level non-bullet list steps in from its heading's text: 3mm / 0 everywhere but the Xignal
          reference, whose paragraphs are 2mm apart and whose "(a)" lists start 3mm in (measured, RDR-1671Y-00061-00.pdf p. 37). -->
-    <xsl:variable name="para.after"><xsl:choose><xsl:when test="$xjss">2mm</xsl:when><xsl:otherwise>3mm</xsl:otherwise></xsl:choose></xsl:variable>
+    <!-- A parameter since 2026-11-23 so a JSS document type can set it (the stencils put no space after a paragraph); the default is the value it always had. -->
+    <xsl:param name="para.after"><xsl:choose><xsl:when test="$xjss">2mm</xsl:when><xsl:otherwise>3mm</xsl:otherwise></xsl:choose></xsl:param>
     <xsl:variable name="list.base"><xsl:choose><xsl:when test="$xjss">3mm</xsl:when><xsl:otherwise>0mm</xsl:otherwise></xsl:choose></xsl:variable>
     <!-- The legend actually used: the profile's own (Arial Bold 12 pt, measured) when it is on and the path is the standard one. -->
     <xsl:variable name="blank.page.bg">

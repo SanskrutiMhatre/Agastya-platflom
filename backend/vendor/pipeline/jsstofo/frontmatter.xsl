@@ -12,6 +12,17 @@
 <xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0"
   xmlns:fo="http://www.w3.org/1999/XSL/Format">
 
+    <!-- Whether the single title page prints the "INBR No.:" line. Declared here, in the file both the JSS and the S1000D direct engine include, with the
+         historical behaviour as the default; only the JSS authoring build sets it to 0, and only for the stencils that have no INBR line (see services/jss/registry.ts). -->
+    <xsl:param name="cover.inbr.show">1</xsl:param>
+
+    <!-- Whether the Foreword prints its "L&T Document No.:" line. The stencil forewords (UHB, MM, ORM) have none. Default 1 = as before; only the JSS authoring build sets 0. -->
+    <xsl:param name="foreword.documentNo.show">1</xsl:param>
+
+    <!-- Whether a cover title that contains line breaks is set one line per row (the MM and ORM stencil covers have a two-line title). Default 0 = the title is
+         one block exactly as before; only the JSS authoring build sets 1. -->
+    <xsl:param name="cover.title.split">0</xsl:param>
+
     <!--
       Everything from the proprietary page onward is grouped into "parts",
       each its own page-sequence that opens on an odd (right-hand) page and
@@ -149,6 +160,18 @@
 
     <!-- ==================================================================== -->
     <!--                        2. TITLE PAGE (SINGLE)                         -->
+    <!-- One block per line of a cover title that contains line breaks (used only when cover.title.split = 1). -->
+    <xsl:template name="cover-title-lines">
+        <xsl:param name="text"/>
+        <xsl:choose>
+            <xsl:when test="contains($text, '&#10;')">
+                <fo:block><xsl:value-of select="substring-before($text, '&#10;')"/></fo:block>
+                <xsl:call-template name="cover-title-lines"><xsl:with-param name="text" select="substring-after($text, '&#10;')"/></xsl:call-template>
+            </xsl:when>
+            <xsl:otherwise><fo:block><xsl:value-of select="$text"/></fo:block></xsl:otherwise>
+        </xsl:choose>
+    </xsl:template>
+
     <!-- ==================================================================== -->
     <xsl:template match="titlePage">
         <xsl:variable name="content">
@@ -160,9 +183,13 @@
             <xsl:if test="normalize-space($cover.revNo) != ''">
                 <fo:block text-align="left" font-weight="bold" space-after="4mm">Rev No.: <xsl:value-of select="$cover.revNo"/></fo:block>
             </xsl:if>
-            <fo:block text-align="right" font-weight="bold" space-after="4mm">
-                <xsl:call-template name="fm-label"><xsl:with-param name="override" select="$fm.label.title.inbrNo"/><xsl:with-param name="default">INBR No.:</xsl:with-param></xsl:call-template><xsl:value-of select="$meta/inbrNo"/>
-            </fo:block>
+            <!-- The stencil covers of UHB, MM and ORM carry Code No. and Rev No. but no INBR No.: a JSS document of such a type turns this line off with cover.inbr.show = 0.
+                 Every other book keeps it (the default is 1), and so does every S1000D build, which shares this file but never sets the parameter. -->
+            <xsl:if test="$cover.inbr.show != '0'">
+                <fo:block text-align="right" font-weight="bold" space-after="4mm">
+                    <xsl:call-template name="fm-label"><xsl:with-param name="override" select="$fm.label.title.inbrNo"/><xsl:with-param name="default">INBR No.:</xsl:with-param></xsl:call-template><xsl:value-of select="$meta/inbrNo"/>
+                </fo:block>
+            </xsl:if>
 
             <xsl:call-template name="red-box">
                 <xsl:with-param name="content">
@@ -175,7 +202,12 @@
             <fo:block text-align="center" font-weight="bold"
                       font-family="{$cover.title.font-family}" font-size="{$cover.title.font-size}"
                       text-decoration="underline" space-after="8mm">
-                <xsl:value-of select="documentType"/>
+                <xsl:choose>
+                    <xsl:when test="$cover.title.split = '1' and contains(documentType, '&#10;')">
+                        <xsl:call-template name="cover-title-lines"><xsl:with-param name="text" select="string(documentType)"/></xsl:call-template>
+                    </xsl:when>
+                    <xsl:otherwise><xsl:value-of select="documentType"/></xsl:otherwise>
+                </xsl:choose>
             </fo:block>
             <fo:block text-align="center" font-weight="bold"
                       font-family="{$cover.title.font-family}" font-size="{$cover.title.font-size}"
@@ -490,10 +522,12 @@
                       space-after="4mm">
                 <xsl:call-template name="fm-heading"><xsl:with-param name="override" select="$fm.title.foreword"/><xsl:with-param name="default">FOREWORD</xsl:with-param></xsl:call-template>
             </fo:block>
-            <fo:block space-after="4mm">
-                <xsl:call-template name="fm-label"><xsl:with-param name="override" select="$fm.label.foreword.documentNo"/><xsl:with-param name="default">L&amp;T Document No.: </xsl:with-param></xsl:call-template>
-                <xsl:value-of select="$meta/ltDocumentNo"/>
-            </fo:block>
+            <xsl:if test="$foreword.documentNo.show != '0'">
+                <fo:block space-after="4mm">
+                    <xsl:call-template name="fm-label"><xsl:with-param name="override" select="$fm.label.foreword.documentNo"/><xsl:with-param name="default">L&amp;T Document No.: </xsl:with-param></xsl:call-template>
+                    <xsl:value-of select="$meta/ltDocumentNo"/>
+                </fo:block>
+            </xsl:if>
             <xsl:apply-templates select="para"/>
             <xsl:apply-templates select="deflist"/>
         </fo:block>
@@ -795,6 +829,9 @@
                               space-after="4mm" text-decoration="underline">
                         <xsl:call-template name="fm-label"><xsl:with-param name="override" select="$fm.label.cautions.heading"/><xsl:with-param name="default">CAUTIONS/ NOTES</xsl:with-param></xsl:call-template>
                     </fo:block>
+                    <!-- A page with no items (the MM and ORM stencils' Cautions / Notes page is a title only) has no list: fo:list-block must contain a list-item, so an empty one
+                         used to fail the whole build. Pages that have items are unchanged. -->
+                    <xsl:if test="item">
                     <fo:list-block provisional-distance-between-starts="10mm"
                                    provisional-label-separation="2mm">
                         <xsl:for-each select="item">
@@ -810,6 +847,7 @@
                             </fo:list-item>
                         </xsl:for-each>
                     </fo:list-block>
+                    </xsl:if>
                 </xsl:with-param>
             </xsl:call-template>
         </fo:block>

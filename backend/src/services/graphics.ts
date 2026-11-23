@@ -32,6 +32,14 @@ const stem = (name: string) => name.replace(/\.[^.]+$/, '');
 /** Which data modules mention each graphic: by file name, or by the entity name (the file name without its extension). */
 function usage(projectId: string, names: string[]): Map<string, string[]> {
   const out = new Map<string, string[]>(names.map((n) => [n, []]));
+  // a JSS document (services/jss) holds its figures in the one source file
+  const pjj = readProjectJson(projectId);
+  if (pjj.authoring === 'jss-xml') {
+    const src = path.join(projectDirFor(projectId), (pjj.input && pjj.input.pm) || 'publication.xml');
+    let xml = ''; try { xml = fs.readFileSync(src, 'utf8'); } catch { /* no document yet */ }
+    const title = (pjj.input && pjj.input.pm) || 'publication.xml';
+    for (const n of names) if (xml.includes(`/${n}"`)) out.get(n)!.push(title);
+  }
   const dir = csdbDir(projectId);
   if (!fs.existsSync(dir)) return out;
   for (const f of fs.readdirSync(dir)) {

@@ -166,7 +166,7 @@ export function CreateProjectModal({ folders, defaultFolder = '', onClose, onCre
       {fi && fi.domains.length ? (
         <div className="v2-grid cols-2">
           <Field label="Domain"><select className="v2-select" value={domain} onChange={(e) => { setDomain(e.target.value); setManualType(''); }} data-testid="wiz-domain"><option value="">(choose)</option>{fi.domains.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</select></Field>
-          <Field label="Type of manual"><select className="v2-select" value={manualType} disabled={!dom} onChange={(e) => setManualType(e.target.value)} data-testid="wiz-manual-type"><option value="">(choose)</option>{(dom?.manualTypes ?? []).map((m) => <option key={m.id} value={m.id} disabled={!m.ready}>{m.label}{m.ready ? '' : ' - coming soon'}</option>)}</select></Field>
+          <Field label="Type of manual"><select className="v2-select" value={manualType} disabled={!dom} onChange={(e) => setManualType(e.target.value)} data-testid="wiz-manual-type"><option value="">(choose)</option>{(dom?.manualTypes ?? []).map((m) => <option key={m.id} value={m.id} disabled={!m.ready} title={m.ready ? undefined : m.notReady}>{m.label}{m.ready ? '' : ' - coming soon'}</option>)}</select></Field>
         </div>
       ) : null}
     </>
