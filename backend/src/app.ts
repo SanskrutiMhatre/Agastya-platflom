@@ -24,6 +24,7 @@ import { registerSnsRoutes } from './routes/sns';
 import { registerJssdmRoutes } from './routes/jssdm';
 import { registerJssRoutes } from './routes/jss';
 import { registerJsgRoutes } from './routes/jsg';
+import { registerJssRwiRoutes } from './routes/jss-rwi';
 import { registerWaiverRoutes } from './routes/waivers';
 import { registerBrandRoutes } from './routes/brand';
 import { notifyAccess } from './services/access-notify';
@@ -83,6 +84,7 @@ export function createApp(): express.Express {
   registerJssdmRoutes(app);
   registerJssRoutes(app);
   registerJsgRoutes(app);
+  registerJssRwiRoutes(app);
   registerWaiverRoutes(app);
   registerBrandRoutes(app);
 
