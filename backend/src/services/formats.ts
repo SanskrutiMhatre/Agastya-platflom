@@ -9,9 +9,10 @@
 // Names follow the stencil files the owner supplied (JSS-0251 land stencils DTF0025-29, NAval_stencil, JSG-0308).
 
 import { JSS_TYPES } from './jss/registry';
+import { JSG_TYPES } from './jsg/registry';
 
 export type FormatId = 's1000d' | 'jss' | 'jsg';
-export interface ManualType { id: string; label: string; ready: boolean; /** The starting-outline profile (services/profiles) this type uses, when it has one. */ profile?: string; /** The JSS document type (services/jss/registry) a project of this type is authored as. */ jssType?: string; /** Why it cannot be created yet. */ notReady?: string }
+export interface ManualType { id: string; label: string; ready: boolean; /** The starting-outline profile (services/profiles) this type uses, when it has one. */ profile?: string; /** The JSS document type (services/jss/registry) a project of this type is authored as. */ jssType?: string; /** The JSG document type (services/jsg/registry) a project of this type is authored as. */ jsgType?: string; /** Why it cannot be created yet. */ notReady?: string }
 export interface Domain { id: string; label: string; manualTypes: ManualType[] }
 export interface FormatInfo { id: FormatId; label: string; description: string; ready: boolean; domains: Domain[] }
 
@@ -41,14 +42,15 @@ export const FORMATS: FormatInfo[] = [
     ],
   },
   {
-    id: 'jsg', label: 'JSG', description: 'Joint Services Guide manuals.', ready: false,
-    domains: [{ id: 'land', label: 'Land', manualTypes: [{ id: 'uhb', label: 'User Handbook', ready: false }] }],
+    id: 'jsg', label: 'JSG', description: 'Joint Services Guide manuals.', ready: true,
+    // one entry per JSG stencil: the registry (services/jsg/registry) is the only list, so the wizard cannot offer what the JSG engine does not have
+    domains: [{ id: 'land', label: 'Land', manualTypes: JSG_TYPES.map((t) => ({ id: t.id, label: t.label, ready: t.ready, notReady: t.notReady, jsgType: t.id })) }],
   },
 ];
 
 export const formatById = (id: unknown): FormatInfo | undefined => FORMATS.find((f) => f.id === id);
 
-export interface ResolvedFormat { format: FormatId; domain: string | null; manualType: string | null; profile?: string; jssType?: string; pipeline: 's1000dtofo' | 's1000dtojss'; type: 'S1000D' | 'JSS' }
+export interface ResolvedFormat { format: FormatId; domain: string | null; manualType: string | null; profile?: string; jssType?: string; jsgType?: string; pipeline: 's1000dtofo' | 's1000dtojss'; type: 'S1000D' | 'JSS' | 'JSG' }
 
 /** Check a format / domain / manual-type choice and say what it means for the project; throws a plain message when it cannot be created. */
 export function resolveFormat(input: { format?: unknown; domain?: unknown; manualType?: unknown }): ResolvedFormat {
@@ -62,5 +64,7 @@ export function resolveFormat(input: { format?: unknown; domain?: unknown; manua
   const m = d.manualTypes.find((x) => x.id === input.manualType);
   if (!m) throw new Error(`Choose the type of ${f.label} ${d.label} manual.`);
   if (!f.ready || !m.ready) throw new Error(`${f.label} ${d.label} - ${m.label} is not available yet: ${m.notReady ?? 'its stencil is received but the engine for it is still to be built.'}`);
+  // a JSG document is authored and built by the JSG engine alone (services/jsg); `pipeline` is inert for it, nothing in the S1000D / JSS build reads a JSG project
+  if (f.id === 'jsg') return { format: 'jsg', domain: d.id, manualType: m.id, jsgType: m.jsgType, pipeline: 's1000dtojss', type: 'JSG' };
   return { format: f.id, domain: d.id, manualType: m.id, profile: m.profile, jssType: d.id === 'land' && f.id === 'jss' ? m.jssType : undefined, pipeline: 's1000dtojss', type: 'JSS' };
 }

@@ -23,7 +23,7 @@ test('the catalogue: three formats; JSS has Land and Naval with manual types; on
   assert.deepEqual(f.map((x) => x.id), ['s1000d', 'jss', 'jsg']);
   assert.deepEqual(f.find((x) => x.id === 'jss').domains.map((d) => d.id), ['land', 'naval']);
   assert.equal(f.find((x) => x.id === 'jss').domains[0].manualTypes.find((m) => m.id === 'uhb').ready, true);
-  assert.equal(f.find((x) => x.id === 'jsg').ready, false);
+  assert.equal(f.find((x) => x.id === 'jsg').ready, true, 'JSG has its own engine now (backend/test/jsg-engine.test.js); a JSG type the registry does not have is refused below');
 });
 
 test('creating by format: S1000D uses the direct S1000D engine; JSS Land UHB the JSS book engine; a format without an engine is refused plainly', async () => {
@@ -32,7 +32,7 @@ test('creating by format: S1000D uses the direct S1000D engine; JSS Land UHB the
   assert.equal(a.json.project.templateRef, 'xignal-s1000d', 'an S1000D publication is printed in the reference (Xignal) layout');
   const b = await w.post('/api/projects', { name: 'Fmt JSS Land UHB', format: 'jss', domain: 'land', manualType: 'uhb' });
   assert.equal(b.status, 201, JSON.stringify(b.json)); assert.equal(b.json.project.format, 'jss'); assert.equal(b.json.project.domain, 'land'); assert.equal(b.json.project.manualType, 'uhb'); assert.equal(b.json.project.pipeline, 's1000dtojss'); assert.equal(b.json.project.templateRef, 'jss-stencil', 'a JSS document starts on the stencil house style');
-  for (const body of [{ format: 'jss', domain: 'naval', manualType: 'uhb' }, { format: 'jsg', domain: 'land', manualType: 'uhb' }, { format: 'jss', domain: 'land' }, { format: 'jss' }]) {
+  for (const body of [{ format: 'jss', domain: 'naval', manualType: 'uhb' }, { format: 'jsg', domain: 'land', manualType: 'no-such-type' }, { format: 'jss', domain: 'land' }, { format: 'jss' }]) {
     const r = await w.post('/api/projects', { name: `Fmt bad ${JSON.stringify(body)}`.slice(0, 60), ...body });
     assert.equal(r.status, 400, JSON.stringify([body, r.json])); assert.equal(r.json.code, 'FORMAT_NOT_READY');
   }

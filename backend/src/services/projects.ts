@@ -217,6 +217,11 @@ export async function createProject(user: User, input: CreateProjectInput): Prom
     const { createInitialDocument } = require('./jss/service');
     const { jssTypeById } = require('./jss/registry');
     createInitialDocument(id, jssTypeById(fmt.jssType), {});
+  } else if (!fromId && fmt?.jsgType) {
+    // a JSG document is authored as JSG XML (services/jsg), in its own file: no S1000D publication module
+    const { createInitialDocument } = require('./jsg/service');
+    const { jsgTypeById } = require('./jsg/registry');
+    createInitialDocument(id, jsgTypeById(fmt.jsgType), { projectName: name.toUpperCase() });
   } else if (!fromId && !fs.existsSync(pmFile)) fs.writeFileSync(pmFile, EMPTY_PM(name, profile ? chapterEntries(profile) : ''), 'utf8');
   if (!fromId && cfgPatch?.mic && fs.existsSync(pmFile)) {
     // the publication module's own code: model code - issuer (the responsible partner) - number - volume, and the language and partner it names

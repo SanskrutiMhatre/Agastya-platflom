@@ -1,0 +1,19 @@
+// Calls for JSG authoring and publishing (backend/src/routes/jsg.ts). The document is one XML file per project; the server validates it against jsg-1.0.xsd
+// and builds the PDF with the JSG engine.
+
+import { get, post, put } from './client';
+
+export interface JsgFinding { severity: 'error' | 'warning'; rule: string; message: string; line: number; location: string }
+export interface JsgReport { docType: string | null; valid: boolean; errors: number; warnings: number; findings: JsgFinding[]; validatedAt: string }
+export interface JsgDocument { docType: string | null; label: string | null; stencil: string | null; xml: string; hash: string; report: JsgReport }
+export interface JsgBuild { ok: boolean; totalMs: number; bytes: number; warnings: string[]; pdfUrl: string }
+
+const P = (id: string) => `/api/projects/${id}/jsg`;
+
+export const jsgApi = {
+  read: (id: string) => get<JsgDocument>(P(id)),
+  save: (id: string, xml: string, baseHash?: string) => put<{ hash: string; report: JsgReport }>(P(id), { xml, baseHash }),
+  validate: (id: string, xml?: string) => post<JsgReport>(`${P(id)}/validate`, xml === undefined ? {} : { xml }),
+  build: (id: string) => post<JsgBuild>(`${P(id)}/build`, {}),
+  pdfUrl: (id: string, download = false) => `${P(id)}/pdf${download ? '?download=1' : ''}`,
+};

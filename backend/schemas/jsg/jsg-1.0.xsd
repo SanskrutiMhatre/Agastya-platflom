@@ -1,0 +1,298 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  JSG 1.0 - the source format of a Joint Services Guide document (User Handbook, Illustrated Spare Parts List).
+
+  It is NOT JSS (<jssbook>) and NOT S1000D (<dmodule>/<pm>): a JSG document is ONE file of its own vocabulary, edited by the JSG editor and rendered by the
+  JSG engine (schemas/jsg/engine). Nothing in this schema is shared with the other two formats.
+
+  Design: the document holds only what the author writes. The stencil's fixed frame (the "intentionally left blank" versos, CONTENTS, LIST OF FIGURES /
+  TABLES, running head and foot, the first-aid and demolition pages) is produced by the engine from the document type.
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="unqualified">
+
+  <!-- ===== simple types ===== -->
+  <xs:simpleType name="DocType">
+    <xs:restriction base="xs:string"><xs:enumeration value="uhb"/><xs:enumeration value="ispl"/></xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="Align">
+    <xs:restriction base="xs:string"><xs:enumeration value="left"/><xs:enumeration value="center"/><xs:enumeration value="right"/><xs:enumeration value="justify"/></xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="Orientation">
+    <xs:restriction base="xs:string"><xs:enumeration value="portrait"/><xs:enumeration value="landscape"/><xs:enumeration value="a3-landscape"/></xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="ListType">
+    <xs:restriction base="xs:string">
+      <!-- alpha: (a) (b) ...   number: 1. 2. ...   step: "Step 1)" ...   bullet / dash: unnumbered -->
+      <xs:enumeration value="alpha"/><xs:enumeration value="number"/><xs:enumeration value="step"/><xs:enumeration value="bullet"/><xs:enumeration value="dash"/>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="Indent">
+    <!-- the stencil's paragraph levels L2 .. L5 (left indent 454, 1174, 1304, 1474 twips) -->
+    <xs:restriction base="xs:integer"><xs:minInclusive value="2"/><xs:maxInclusive value="5"/></xs:restriction>
+  </xs:simpleType>
+  <xs:simpleType name="Id"><xs:restriction base="xs:ID"/></xs:simpleType>
+
+  <!-- ===== inline text ===== -->
+  <xs:complexType name="Inline" mixed="true">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="b" type="Inline"/>
+      <xs:element name="i" type="Inline"/>
+      <xs:element name="u" type="Inline"/>
+      <xs:element name="sup" type="Inline"/>
+      <xs:element name="sub" type="Inline"/>
+      <xs:element name="br"/>
+      <xs:element name="xref">
+        <xs:complexType mixed="true"><xs:attribute name="to" type="xs:IDREF" use="required"/></xs:complexType>
+      </xs:element>
+    </xs:choice>
+  </xs:complexType>
+
+  <!-- ===== blocks ===== -->
+  <xs:complexType name="Para" mixed="true">
+    <xs:complexContent>
+      <xs:extension base="Inline">
+        <xs:attribute name="indent" type="Indent" default="2"/>
+        <xs:attribute name="align" type="Align"/>
+      </xs:extension>
+    </xs:complexContent>
+  </xs:complexType>
+
+  <xs:complexType name="ListItem">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="text" type="Inline"/>
+      <xs:element name="para" type="Para"/>
+      <xs:element name="list" type="List"/>
+    </xs:choice>
+  </xs:complexType>
+  <xs:complexType name="List">
+    <xs:sequence><xs:element name="item" type="ListItem" maxOccurs="unbounded"/></xs:sequence>
+    <xs:attribute name="type" type="ListType" default="number"/>
+    <xs:attribute name="indent" type="Indent" default="2"/>
+  </xs:complexType>
+
+  <xs:complexType name="Cell">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="text" type="Inline"/>
+      <xs:element name="para" type="Para"/>
+      <xs:element name="list" type="List"/>
+      <xs:element name="graphic" type="Graphic"/>
+    </xs:choice>
+    <xs:attribute name="colspan" type="xs:positiveInteger"/>
+    <xs:attribute name="rowspan" type="xs:positiveInteger"/>
+    <xs:attribute name="align" type="Align"/>
+    <xs:attribute name="bold" type="xs:boolean"/>
+  </xs:complexType>
+  <xs:complexType name="Row"><xs:sequence><xs:element name="cell" type="Cell" maxOccurs="unbounded"/></xs:sequence></xs:complexType>
+  <xs:complexType name="Table">
+    <xs:sequence>
+      <xs:element name="head" minOccurs="0"><xs:complexType><xs:sequence><xs:element name="row" type="Row" maxOccurs="unbounded"/></xs:sequence></xs:complexType></xs:element>
+      <xs:element name="body"><xs:complexType><xs:sequence><xs:element name="row" type="Row" maxOccurs="unbounded"/></xs:sequence></xs:complexType></xs:element>
+    </xs:sequence>
+    <xs:attribute name="id" type="Id"/>
+    <!-- no title = an uncaptioned table (it does not enter the LIST OF TABLES) -->
+    <xs:attribute name="title" type="xs:string"/>
+    <!-- relative column widths, space separated (e.g. "1 3 2") -->
+    <xs:attribute name="widths" type="xs:string"/>
+  </xs:complexType>
+
+  <xs:complexType name="Graphic">
+    <xs:attribute name="src" type="xs:string" use="required"/>
+    <xs:attribute name="width" type="xs:string"/>
+    <xs:attribute name="height" type="xs:string"/>
+    <!-- text printed under the picture (ISPL: the plate reference of an item) -->
+    <xs:attribute name="label" type="xs:string"/>
+  </xs:complexType>
+  <xs:complexType name="Figure">
+    <xs:sequence><xs:element name="graphic" type="Graphic" maxOccurs="unbounded"/></xs:sequence>
+    <xs:attribute name="id" type="Id"/>
+    <xs:attribute name="title" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <xs:complexType name="Notice">
+    <xs:sequence><xs:element name="para" type="Para" minOccurs="1" maxOccurs="unbounded"/></xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="Empty"/>
+
+  <xs:group name="Block">
+    <xs:choice>
+      <xs:element name="para" type="Para"/>
+      <xs:element name="list" type="List"/>
+      <xs:element name="table" type="Table"/>
+      <xs:element name="figure" type="Figure"/>
+      <xs:element name="note" type="Notice"/>
+      <xs:element name="warning" type="Notice"/>
+      <xs:element name="caution" type="Notice"/>
+      <xs:element name="pageBreak" type="Empty"/>
+    </xs:choice>
+  </xs:group>
+
+  <!-- a numbered clause: 1.1 (level 2) .. 1.1.1.1 (level 4/5); the level is its depth below the SECTION -->
+  <xs:complexType name="Clause">
+    <xs:sequence>
+      <xs:choice minOccurs="0" maxOccurs="unbounded">
+        <xs:group ref="Block"/>
+        <xs:element name="clause" type="Clause"/>
+      </xs:choice>
+    </xs:sequence>
+    <xs:attribute name="id" type="Id"/>
+    <xs:attribute name="title" type="xs:string" use="required"/>
+  </xs:complexType>
+
+  <!-- ===== the User Handbook ===== -->
+  <xs:complexType name="Section">
+    <xs:sequence>
+      <xs:choice minOccurs="0" maxOccurs="unbounded">
+        <xs:group ref="Block"/>
+        <xs:element name="clause" type="Clause"/>
+      </xs:choice>
+    </xs:sequence>
+    <xs:attribute name="id" type="Id"/>
+    <xs:attribute name="title" type="xs:string" use="required"/>
+    <xs:attribute name="orientation" type="Orientation" default="portrait"/>
+  </xs:complexType>
+  <xs:complexType name="Chapter">
+    <xs:sequence><xs:element name="section" type="Section" minOccurs="0" maxOccurs="unbounded"/></xs:sequence>
+    <xs:attribute name="id" type="Id"/>
+    <xs:attribute name="title" type="xs:string" use="required"/>
+  </xs:complexType>
+  <xs:complexType name="Appendix">
+    <xs:sequence><xs:group ref="Block" minOccurs="0" maxOccurs="unbounded"/></xs:sequence>
+    <xs:attribute name="id" type="Id"/>
+    <!-- the letter as printed: "A1", "H", "AA" ... -->
+    <xs:attribute name="label" type="xs:string" use="required"/>
+    <xs:attribute name="title" type="xs:string" use="required"/>
+    <xs:attribute name="orientation" type="Orientation" default="portrait"/>
+  </xs:complexType>
+
+  <!-- ===== the Illustrated Spare Parts List ===== -->
+  <xs:complexType name="Part">
+    <xs:attribute name="item" type="xs:string" use="required"/>
+    <xs:attribute name="plateRef" type="xs:string"/>
+    <xs:attribute name="provide" type="xs:string"/>
+    <xs:attribute name="nsn" type="xs:string"/>
+    <xs:attribute name="designation" type="xs:string" use="required"/>
+    <xs:attribute name="qty" type="xs:string"/>
+    <xs:attribute name="qtySet" type="xs:string"/>
+    <xs:attribute name="drg" type="xs:string"/>
+    <xs:attribute name="firmPart" type="xs:string"/>
+    <xs:attribute name="price" type="xs:string"/>
+    <xs:attribute name="remark" type="xs:string"/>
+  </xs:complexType>
+  <xs:complexType name="View">
+    <xs:sequence>
+      <xs:element name="graphic" type="Graphic" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:element name="part" type="Part" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <!-- the red caption under the picture: "100M INFANTRY FOOT BRIDGE FLOATING (ISOMETRIC VIEW 1)" -->
+    <xs:attribute name="caption" type="xs:string"/>
+  </xs:complexType>
+  <xs:complexType name="Plate">
+    <xs:sequence>
+      <xs:element name="view" type="View" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+    <!-- the caption line of the plate when it is not "PLATE - <ref> <title>" (the first plate: "GENERAL ASSY OF ...") -->
+    <xs:attribute name="caption" type="xs:string"/>
+    <xs:attribute name="id" type="Id"/>
+    <!-- "I", "I-A", "I-B/2/9": printed as PLATE - <ref> -->
+    <xs:attribute name="ref" type="xs:string" use="required"/>
+    <xs:attribute name="title" type="xs:string" use="required"/>
+    <xs:attribute name="divider" type="xs:boolean" default="false"/>
+    <!-- "has the parts table a "for 1 set" column" (the top-level plates) -->
+    <xs:attribute name="setColumn" type="xs:boolean" default="false"/>
+  </xs:complexType>
+
+  <!-- ===== front matter ===== -->
+  <xs:complexType name="Lines"><xs:sequence><xs:element name="line" type="xs:string" minOccurs="0" maxOccurs="unbounded"/></xs:sequence></xs:complexType>
+  <xs:complexType name="Meta">
+    <xs:all>
+      <xs:element name="docNo" type="xs:string" minOccurs="0"/>
+      <!-- the cover title: "USER HANDBOOK" / "ILLUSTRATED SPARE PARTS LIST (ISPL)" -->
+      <xs:element name="title" type="xs:string"/>
+      <!-- the line under it, e.g. "(VOLUME I-BRIDGING SYSTEM)" -->
+      <xs:element name="subtitle" type="xs:string" minOccurs="0"/>
+      <xs:element name="projectName" type="xs:string" minOccurs="0"/>
+      <xs:element name="atNo" type="xs:string" minOccurs="0"/>
+      <xs:element name="dated" type="xs:string" minOccurs="0"/>
+      <xs:element name="nsn" type="xs:string" minOccurs="0"/>
+      <xs:element name="supplier" type="Lines" minOccurs="0"/>
+      <xs:element name="issuedBy" type="Lines" minOccurs="0"/>
+      <xs:element name="issueDate" type="xs:string" minOccurs="0"/>
+      <xs:element name="equipmentLife" type="xs:string" minOccurs="0"/>
+      <!-- ISPL: the unit named in the header of the first quantity column, e.g. "for 100m" -> "No. Off (for 100m)" -->
+      <xs:element name="qtyUnit" type="xs:string" minOccurs="0"/>
+      <xs:element name="classification" type="xs:string" minOccurs="0"/>
+      <xs:element name="emblem" type="xs:string" minOccurs="0"/>
+      <xs:element name="logo" type="xs:string" minOccurs="0"/>
+    </xs:all>
+  </xs:complexType>
+  <xs:complexType name="Items"><xs:sequence><xs:element name="item" type="Inline" minOccurs="0" maxOccurs="unbounded"/></xs:sequence></xs:complexType>
+  <xs:complexType name="Front">
+    <xs:all>
+      <xs:element name="amendments" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence><xs:element name="row" minOccurs="0" maxOccurs="unbounded">
+            <xs:complexType>
+              <xs:attribute name="no" type="xs:string"/><xs:attribute name="page" type="xs:string"/><xs:attribute name="para" type="xs:string"/>
+              <xs:attribute name="required" type="xs:string"/><xs:attribute name="authority" type="xs:string"/>
+              <xs:attribute name="date" type="xs:string"/><xs:attribute name="by" type="xs:string"/>
+            </xs:complexType></xs:element></xs:sequence>
+          <!-- empty rows printed after the filled ones, so the page looks like the stencil's 21-row table -->
+          <xs:attribute name="minRows" type="xs:nonNegativeInteger" default="20"/>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="warning" type="Items" minOccurs="0"/>
+      <xs:element name="associated" minOccurs="0">
+        <xs:complexType><xs:sequence><xs:element name="doc" minOccurs="0" maxOccurs="unbounded">
+          <xs:complexType><xs:attribute name="title" type="xs:string" use="required"/><xs:attribute name="docNo" type="xs:string"/><xs:attribute name="remark" type="xs:string"/></xs:complexType>
+        </xs:element></xs:sequence></xs:complexType>
+      </xs:element>
+      <xs:element name="abbreviations" minOccurs="0">
+        <xs:complexType><xs:sequence><xs:element name="abbr" minOccurs="0" maxOccurs="unbounded">
+          <xs:complexType><xs:attribute name="short" type="xs:string" use="required"/><xs:attribute name="long" type="xs:string" use="required"/></xs:complexType>
+        </xs:element></xs:sequence></xs:complexType>
+      </xs:element>
+      <xs:element name="preface" minOccurs="0">
+        <xs:complexType><xs:choice minOccurs="0" maxOccurs="unbounded"><xs:element name="para" type="Para"/><xs:element name="list" type="List"/></xs:choice></xs:complexType>
+      </xs:element>
+      <xs:element name="dos" type="Items" minOccurs="0"/>
+      <xs:element name="donts" type="Items" minOccurs="0"/>
+      <xs:element name="important" type="Items" minOccurs="0"/>
+      <xs:element name="photos" minOccurs="0">
+        <xs:complexType><xs:sequence><xs:element name="graphic" type="Graphic" minOccurs="0" maxOccurs="unbounded"/></xs:sequence></xs:complexType>
+      </xs:element>
+      <!-- ISPL -->
+      <xs:element name="certificate" type="Inline" minOccurs="0"/>
+      <xs:element name="supplied" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence><xs:element name="row" minOccurs="0" maxOccurs="unbounded">
+            <xs:complexType><xs:attribute name="no" type="xs:string"/><xs:attribute name="dcan" type="xs:string"/><xs:attribute name="name" type="xs:string"/><xs:attribute name="order" type="xs:string"/></xs:complexType>
+          </xs:element></xs:sequence>
+          <xs:attribute name="equipment" type="xs:string"/>
+        </xs:complexType>
+      </xs:element>
+    </xs:all>
+  </xs:complexType>
+
+  <!-- ===== the document ===== -->
+  <xs:element name="jsgdoc">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="meta" type="Meta"/>
+        <xs:element name="front" type="Front" minOccurs="0"/>
+        <xs:choice>
+          <!-- uhb -->
+          <xs:sequence>
+            <xs:element name="chapter" type="Chapter" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:element name="appendices" minOccurs="0">
+              <xs:complexType><xs:sequence><xs:element name="appendix" type="Appendix" minOccurs="0" maxOccurs="unbounded"/></xs:sequence></xs:complexType>
+            </xs:element>
+          </xs:sequence>
+          <!-- ispl -->
+          <xs:element name="plates"><xs:complexType><xs:sequence><xs:element name="plate" type="Plate" minOccurs="0" maxOccurs="unbounded"/></xs:sequence></xs:complexType></xs:element>
+        </xs:choice>
+      </xs:sequence>
+      <xs:attribute name="version" type="xs:string" fixed="1.0" use="required"/>
+      <xs:attribute name="type" type="DocType" use="required"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

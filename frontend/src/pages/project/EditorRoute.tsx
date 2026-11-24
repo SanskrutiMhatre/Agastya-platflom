@@ -8,9 +8,11 @@ import { useProject } from '../../layouts/ProjectShell';
 // Both are large and only this route needs them.
 const StudioEditor = lazy(() => import('./EditorPage').then((m) => ({ default: m.EditorPage })));
 const JssEditor = lazy(() => import('./JssEditorPage').then((m) => ({ default: m.JssEditorPage })));
+const JsgEditor = lazy(() => import('./JsgEditorPage').then((m) => ({ default: m.JsgEditorPage })));
 
 export function EditorRoute() {
   const { summary } = useProject();
   const jss = summary.project.authoring === 'jss-xml';
-  return <Suspense fallback={<Loading label="Loading the editor…" />}>{jss ? <JssEditor /> : <StudioEditor />}</Suspense>;
+  const jsg = summary.project.format === 'jsg';          // a JSG document has its own editor and its own engine (src/jsg): the other two editors never see it
+  return <Suspense fallback={<Loading label="Loading the editor…" />}>{jsg ? <JsgEditor /> : jss ? <JssEditor /> : <StudioEditor />}</Suspense>;
 }
