@@ -15,6 +15,7 @@ import { requireAuth, requireProject, store, audit, workspace, workspaceDir, cli
 import { wrap, param, bad } from '../services/http';
 import * as P from '../services/projects';
 import { createSampleProject } from '../services/sample';
+import { createJsgSampleProject } from '../services/jsg/sample';
 import { PROFILES } from '../services/profiles';
 import { csdbDir, listDms } from '../services/csdb';
 import { explore } from '../services/pm';
@@ -94,6 +95,11 @@ export function registerWorkspaceRoutes(app: Express): void {
   // A ready-made project (three real data modules, a figure, a three-chapter publication) for trying the platform.
   app.post('/api/projects/sample', requireAuth(), wrap(async (req, res) => {
     res.status(201).json({ project: await createSampleProject(req.auth.user, req.body?.folder) });
+  }));
+
+  // A ready-made JSG document (kind "uhb": the filled Modular Bridge handbook; "ispl": the filled foot-bridge spare parts list), imported from Word, to try the editor, the ancillary pages and the PDF on a real document.
+  app.post('/api/projects/sample-jsg', requireAuth(), wrap(async (req, res) => {
+    res.status(201).json({ project: await createJsgSampleProject(req.auth.user, req.body?.folder, req.body?.kind === 'ispl' ? 'ispl' : 'uhb') });
   }));
 
   app.get('/api/projects/:id', requireProject('viewer', { from: 'param', cap: 'project.read' }), wrap((req, res) => {

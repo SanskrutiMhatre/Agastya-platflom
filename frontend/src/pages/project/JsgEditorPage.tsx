@@ -38,6 +38,9 @@ export function JsgEditorPage() {
   const [building, setBuilding] = useState(false);
   const [checking, setChecking] = useState(false);
   const [stale, setStale] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [autosave, setAutosave] = useState(() => { try { return localStorage.getItem('agastya.jsg.autosave') === '1'; } catch { return false; } });
+  const wordInput = useRef<HTMLInputElement>(null);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [src, setSrc] = useState<string | null>(null);
   const [note, setNote] = useState('');
@@ -117,6 +120,29 @@ export function JsgEditorPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded, id, writable]);
 
+  // Auto-save: a minute after the last change, when the author has asked for it. A save that fails (someone else saved, or the document is broken) is not repeated by it.
+  useEffect(() => { try { localStorage.setItem('agastya.jsg.autosave', autosave ? '1' : '0'); } catch { /* private mode */ } }, [autosave]);
+  useEffect(() => {
+    if (!autosave || !dirty || !writable || saving) return;
+    const t = setTimeout(() => { void save(); }, 60_000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autosave, dirty, writable, saving, savedAt]);
+
+  /** Replace the handbook with a Word file written in the JSG styles. */
+  const importWord = async (file: File | undefined) => {
+    if (wordInput.current) wordInput.current.value = '';
+    if (!file) return;
+    if (!window.confirm(`Replace this handbook with "${file.name}"?\n\nThe whole document and its front matter are replaced by what the Word file contains (its pictures are added to the project). The handbook as it is now is kept in the project folder as jsg-document.before-import.bak.`)) return;
+    setImporting(true);
+    try {
+      const r = await jsgApi.importDocx(id, file);
+      toast(`Imported ${r.import.chapters} chapters, ${r.import.sections} sections, ${r.import.tables} tables and ${r.pictures} pictures from Word${r.import.skipped.length ? ` (${r.import.skipped.length} item${r.import.skipped.length === 1 ? '' : 's'} could not be imported)` : ''}.`, 'success');
+      if (r.report.errors) toast(`The imported handbook has ${r.report.errors} error${r.report.errors === 1 ? '' : 's'} to fix before a PDF can be built.`, 'info');
+      await load(); ctx.reload();
+    } catch (e) { toast(errText(e), 'error'); } finally { setImporting(false); }
+  };
+
   const generate = useCallback(async () => {
     if (!canBuild(role)) return;
     setBuilding(true); setNote(''); progress.clear();
@@ -162,6 +188,11 @@ export function JsgEditorPage() {
         {loaded ? <span className="v2-badge accent" title={`JSG document type ${loaded.docType}, from the stencil ${loaded.stencil}`}>JSG · {loaded.label}</span> : null}
         <span className={`v2-badge ${dirty ? 'warn' : 'ok'}`} data-testid="jsg-state" aria-live="polite">{saving ? 'Saving…' : dirty ? '● Unsaved changes' : savedAt ? `✓ Saved ${ago(savedAt.toISOString())}` : '✓ All changes saved'}</span>
         <span className="spacer" />
+        {loaded?.docType === 'uhb' && writable ? <>
+          <input ref={wordInput} type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden data-testid="jsg-word-input" onChange={(e) => void importWord(e.target.files?.[0])} />
+          <button className="btn btn-sm" onClick={() => wordInput.current?.click()} disabled={importing || saving || building} data-testid="jsg-import-word" title="Replace this handbook with a Word file written in the JSG styles (Section, Heading 1-5, L2-L5 paragraphs, Caption ...)">{importing ? <Spinner /> : <Icon name="upload" size={12} />}Import Word…</button>
+        </> : null}
+        {writable ? <label className="v2-row" style={{ gap: 4, fontSize: 12 }} title="Save by itself a minute after the last change"><input type="checkbox" checked={autosave} onChange={(e) => setAutosave(e.target.checked)} data-testid="jsg-autosave" />Auto-save</label> : null}
         <button className="btn btn-sm" onClick={() => void check()} disabled={!loaded || checking} data-testid="jsg-check" title="Check the document for problems without saving or building">{checking ? <Spinner /> : <Icon name="search" size={12} />}Check</button>
         <button className="btn btn-sm" onClick={() => void save()} disabled={!writable || !dirty || saving} data-testid="jsg-save" title={!writable ? 'You have read-only access' : !dirty ? 'Nothing to save' : 'Save the document (Ctrl+S)'}>{saving ? <Spinner /> : <Icon name="check" size={12} />}Save</button>
         <button className="btn btn-sm btn-primary" onClick={() => void generate()} disabled={!canBuild(role) || building || !loaded} data-testid="jsg-generate" title={!canBuild(role) ? 'Reviewers, editors and owners can build the PDF' : 'Save, then build the document as a PDF'}>{building ? <Spinner /> : <Icon name="play" size={12} />}{building ? 'Building…' : 'Generate PDF'}</button>

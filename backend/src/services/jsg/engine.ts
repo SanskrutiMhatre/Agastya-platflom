@@ -41,6 +41,16 @@ function run(file: string, args: string[], cwd: string): Promise<{ stdout: strin
   });
 }
 
+/** The number of pages of a PDF FOP wrote: the largest /Count of its page tree (FOP writes the page tree as plain objects). Null when it cannot be read. */
+export function pdfPageCount(file: string): number | null {
+  try {
+    const text = fs.readFileSync(file).toString('latin1');
+    let best = 0; for (const m of text.matchAll(/\/Type\s*\/Pages[^>]*?\/Count\s+(\d+)|\/Count\s+(\d+)[^>]*?\/Type\s*\/Pages/g)) best = Math.max(best, Number(m[1] ?? m[2]));
+    if (best) return best;
+    const kids = text.match(/\/Type\s*\/Page\b(?!s)/g); return kids ? kids.length : null;
+  } catch { return null; }
+}
+
 const forward = (p: string): string => p.replace(/\\/g, '/');
 
 /** What FOP said, boiled down to the first line that names the cause. */
@@ -71,24 +81,32 @@ export function buildJsgPdf(projectId: string): Promise<JsgBuild> {
     const assetsUrl = pathToFileURL(path.join(JSG_ENGINE_DIR, 'assets')).href;
 
     try {
-      log('Rendering XSL-FO (JSG engine)...');
-      const x = await run(paths.XSLTPROC, ['--nonet', '--stringparam', 'classification', classification, '--stringparam', 'assets.url', assetsUrl, '-o', FO_NAME, stylesheet, SOURCE_NAME], dir);
-      for (const l of x.stderr.split(/\r?\n/)) if (l.trim()) warnings.push(l.trim());
-
-      gate.verifyUnchanged();                       // what is rendered is what was validated
-
-      log('Generating PDF (FOP)...');
-      const fopArgs: string[] = paths.FOP_ARGS.slice();
-      const conf = fontConf.fopConf();
-      if (conf) fopArgs.push('-c', conf);
-      fopArgs.push('-fo', FO_NAME, '-pdf', PDF_NAME);
-      await run(paths.JAVA, fopArgs, dir);
+      const sourceXml = readSource(projectId).xml;
+      const render = async (total?: number): Promise<void> => {
+        log('Rendering XSL-FO (JSG engine)...');
+        const params = ['--stringparam', 'classification', classification, '--stringparam', 'assets.url', assetsUrl, ...(total ? ['--stringparam', 'pages.total', String(total)] : [])];
+        const x = await run(paths.XSLTPROC, ['--nonet', ...params, '-o', FO_NAME, stylesheet, SOURCE_NAME], dir);
+        for (const l of x.stderr.split(/\r?\n/)) if (l.trim()) warnings.push(l.trim());
+        gate.verifyUnchanged();                       // what is rendered is what was validated
+        log('Generating PDF (FOP)...');
+        const fopArgs: string[] = paths.FOP_ARGS.slice();
+        const conf = fontConf.fopConf();
+        if (conf) fopArgs.push('-c', conf);
+        fopArgs.push('-fo', FO_NAME, '-pdf', PDF_NAME);
+        await run(paths.JAVA, fopArgs, dir);
+      };
+      await render();
+      // the certificate may say how many pages the book has ({total}): the first render counts them, the second prints the number. (Every other page number is a citation FOP resolves itself.)
+      if (/\{total\}/.test(sourceXml)) {
+        const counted = pdfPageCount(path.join(dir, PDF_NAME));
+        if (counted) { log(`The certificate cites the page count: ${counted} pages. Rendering again...`); await render(counted); }
+      }
     } catch (e) {
       if (e instanceof HttpError) { log(e.message, { error: true, done: true }); throw e; }
       const message = `Build failed: ${why(e)}`;
       console.error(`[jsg:${projectId}] ${message}\n${(e as any)?.stderr ?? ''}`);
       log(message, { error: true, done: true });
-      throw new HttpError(500, message, 'BUILD_FAILED', { details: String((e as any)?.stderr ?? '').slice(0, 4000) });
+      throw new HttpError(500, message, 'BUILD_FAILED', { details: String((e as any)?.stderr ?? '').slice(-4000) });
     }
 
     const abs = path.join(dir, PDF_NAME);

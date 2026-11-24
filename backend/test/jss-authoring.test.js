@@ -367,3 +367,38 @@ test('ancillary pages: choose which are printed, edit one by hand, keep the edit
   assert.equal((await w.get(`${A}/listOfContents`)).json.code, 'NOT_EDITABLE');
   assert.equal((await w.get(`${A}/nope`)).status, 404);
 });
+
+test('default artwork: a project with no emblem, logo or first-aid picture of its own prints the stencil\'s; its own files win', { timeout: 600000 }, async () => {
+  const images = (f) => spawnSync('pdfimages', ['-list', f], { encoding: 'utf8' }).stdout.split('\n').slice(2).filter((l) => l.trim()).length;
+  const fo = (p) => fs.readFileSync(path.join(p.dir, 'jss-output.fo'), 'utf8');
+
+  const bare = await create('uhb', 'UHB artwork bare');
+  const pdf = await build(bare.U); const f1 = fo(bare);
+  if (process.env.JSS_SAVE_PDF) fs.copyFileSync(pdf, process.env.JSS_SAVE_PDF);                        // debugging aid: keep the PDF to look at
+  const srcs = [...f1.matchAll(/src="([^"]*)"/g)].map((m) => m[1]);
+  assert.match(f1, /artwork\/emblem\.png/, `the emblem (pictures in the FO: ${srcs.join(' | ')})`); assert.match(f1, /artwork\/lt-logo\.png/, 'the Larsen & Toubro logo'); assert.match(f1, /artwork\/first-aid\.png/, 'the first-aid figures');
+  assert.ok(!fs.existsSync(path.join(bare.dir, 'Media', 'default-emblem.png')) && !fs.readdirSync(path.join(bare.dir)).includes('artwork'), 'nothing is copied into the project');
+  const bareImages = images(pdf); assert.ok(bareImages >= 3, `the PDF carries the pictures (${bareImages})`);
+
+  const own = await create('uhb', 'UHB artwork own');
+  fs.mkdirSync(path.join(own.dir, 'Media'), { recursive: true });
+  for (const n of ['Satya.png', 'JACKSON.png', 'stamp1.png']) fs.writeFileSync(path.join(own.dir, 'Media', n), PNG);          // the names the UHB template uses
+  await build(own.U); const f2 = fo(own);
+  assert.ok(!/artwork\/(emblem|lt-logo|first-aid)\.png/.test(f2), 'the project\'s own files are used, not the defaults');
+  assert.match(f2, /Media\/Satya\.png/); assert.match(f2, /Media\/stamp1\.png/);
+});
+
+test('default artwork reaches every JSS book: one built from S1000D modules too; the direct S1000D engine is left alone', { timeout: 600000 }, async () => {
+  const dm = fs.readdirSync(h.SAMPLES).find((f) => /-040A-D_/.test(f));
+  const make = async (body) => {
+    const r = await w.post('/api/projects', body); assert.equal(r.status, 201, JSON.stringify(r.json).slice(0, 200)); const id = r.json.project.id;
+    assert.equal((await w.post(`/api/projects/${id}/dms`, { file: dm, xml: h.sample(dm) })).status, 201);
+    const U = `/api/projects/${id}`; const pdf = await build(U);
+    return { fo: fs.readFileSync(path.join(h.ws, 'projects', id, 'jss-output.fo'), 'utf8'), pdf };
+  };
+  const viaJss = await make({ name: 'Legacy JSS art', profile: 'uhb' });
+  assert.match(viaJss.fo, /artwork\/emblem\.png/, 'a JSS book built from S1000D modules prints the stencil emblem');
+  assert.match(viaJss.fo, /artwork\/lt-logo\.png/, 'and the Larsen & Toubro logo');
+  const direct = await make({ name: 'Direct S1000D art', pipeline: 's1000dtofo', profile: 'xignal-s1000d' });
+  assert.ok(!/artwork\/(emblem|lt-logo|first-aid)\.png/.test(direct.fo), 'the direct S1000D engine never gets the JSS artwork');
+});

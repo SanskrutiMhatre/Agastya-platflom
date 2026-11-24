@@ -1,8 +1,8 @@
 // The stencil-style page preview of the JSG Illustrated Spare Parts List editor.
 //
-// It draws the pages of one plate the way the JSG engine sets them (backend/schemas/jsg/engine/jsg-ispl.xsl): landscape A4 (296.9 x 210 mm, margins 20 / 20 / 15 / 15), RESTRICTED in
-// the head with the page number under it and RESTRICTED in the foot, the red bold 14 pt plate caption, the picture(s) with their labels, the red view caption, the index of sub-plates on
-// the first plate, and the parts table with the stencil's column widths (11 columns with a "for 1 set" column, else 10) in Times New Roman 10 pt.
+// It draws the pages of one plate the way the JSG engine sets them (backend/schemas/jsg/engine/jsg-ispl.xsl): landscape A4 (296.9 x 210 mm, margins 24 / 25 / 15 / 15), RESTRICTED in
+// the head and the page number over RESTRICTED in the foot, the red bold 14 pt plate caption, the picture(s) with their labels, the red view caption, the index of sub-plates on
+// the first plate, and the parts table with the stencil's column widths (11 columns with a "for 1 set" column, else 10) in Times New Roman 12 pt.
 //
 // It is a PREVIEW, not the PDF: where a long table breaks onto the next page is ESTIMATED here from the length of the cells; the PDF beside the editor is the exact result.
 // Pictures are shown as they are - the item numbers (callouts) of an exploded view are part of the picture file, as in the Word stencil; the preview does not draw its own.
@@ -16,12 +16,12 @@ import { escH, injectCss } from './shared';
 export const W11 = [704, 992, 708, 2411, 2551, 1135, 1132, 1843, 1135, 1419, 1098];
 export const W10 = [705, 1132, 711, 2411, 3119, 850, 1985, 1147, 1262, 1806];
 const TABLE_MM = 266.9;           // the body width of a landscape page: 296.9 - 15 - 15
-const BODY_MM = 170;              // its height: 210 - 20 - 20
+const BODY_MM = 161;              // its height: 210 - 24 - 25
 const CAPTION_MM = 14;            // the plate caption and its space
-const HEADER_ROW_MM = 11;         // the two-line header row
-const ROW_MM = 5.3;               // one line of 10 pt text in a cell
-const LINE_MM = 3.9;              // each further line a long cell wraps to
-const CHAR_MM = 1.75;             // an average Times New Roman 10 pt character
+const HEADER_ROW_MM = 19;        // the three-line header row (12 pt)
+const ROW_MM = 8.2;               // one line of 12 pt text in a cell with its padding
+const LINE_MM = 5.6;              // each further line a long cell wraps to
+const CHAR_MM = 2.0;              // an average Times New Roman 12 pt character
 
 export type PageKind = 'divider' | 'picture' | 'table';
 export interface PageSpec {
@@ -86,9 +86,9 @@ const CSS = `
 .jsg-pv-tag{color:#e5e7eb;font-size:11px;margin:10px 0 3px}
 .jsg-pv-wrap{position:relative;margin:0 auto}
 .jsg-pv-page{position:absolute;left:0;top:0;width:296.9mm;height:210mm;background:#fff;color:#000;box-shadow:0 2px 8px rgba(0,0,0,.45);transform-origin:top left;overflow:hidden;font:12pt "Times New Roman",Times,serif}
-.jsg-pv-page .h{position:absolute;left:0;right:0;top:10mm;text-align:center;font-size:9pt;line-height:1.15}
+.jsg-pv-page .h{position:absolute;left:0;right:0;top:15mm;text-align:center;font-size:9pt;line-height:1.15}
 .jsg-pv-page .h span{display:block;font-size:10pt}
-.jsg-pv-page .f{position:absolute;left:0;right:0;bottom:10mm;text-align:center;font-size:10pt}
+.jsg-pv-page .f span{display:block}.jsg-pv-page .f{position:absolute;left:0;right:0;bottom:15mm;text-align:center;font-size:10pt}
 .jsg-pv-page .b{position:absolute;left:15mm;right:15mm;top:20mm;bottom:20mm;overflow:hidden}
 .jsg-pv-page .cap{color:#f00;font-weight:bold;font-size:14pt;text-align:center;margin:0 0 12pt}
 .jsg-pv-page .vcap{color:#f00;font-weight:bold;font-size:14pt;text-align:center;margin-top:8pt}
@@ -96,8 +96,8 @@ const CSS = `
 .jsg-pv-page .pic{text-align:center}.jsg-pv-page .pic img{object-fit:contain}
 .jsg-pv-page .grid{display:grid;gap:2mm;justify-items:center}
 .jsg-pv-page .grid div{font-size:10pt;text-align:center}
-.jsg-pv-page table{border-collapse:collapse;width:100%;table-layout:fixed;font-size:10pt}
-.jsg-pv-page td,.jsg-pv-page th{border:.5pt solid #000;padding:1.4pt 3pt;line-height:11.5pt;vertical-align:middle;overflow:hidden;word-wrap:break-word}
+.jsg-pv-page table{border-collapse:collapse;width:100%;table-layout:fixed;font-size:12pt}
+.jsg-pv-page td,.jsg-pv-page th{border:.5pt solid #000;padding:3.7pt 5.4pt;line-height:15.8pt;vertical-align:middle;overflow:hidden;word-wrap:break-word}
 .jsg-pv-page th{font-weight:bold;text-align:center}.jsg-pv-page th small{display:block;font-size:6.5pt}
 .jsg-pv-empty{color:#9ca3af;text-align:center;margin-top:30mm;font-size:12pt}
 `;
@@ -135,7 +135,7 @@ function partsTable(rows: PartRow[], set: boolean, unit: string): string {
 /** One landscape page, at its real size (296.9 x 210 mm); the caller scales it. */
 export function renderPage(spec: PageSpec, doc: JsgDoc, classification: string, imageUrl: (src: string) => string): HTMLElement {
   const page = document.createElement('div'); page.className = 'jsg-pv-page'; page.dataset.kind = spec.kind; page.dataset.n = String(spec.n);
-  page.innerHTML = `<div class="h">${escH(classification)}<span>(${spec.n})</span></div><div class="b"></div><div class="f">${escH(classification)}</div>`;
+  page.innerHTML = `<div class="h">${escH(classification)}</div><div class="b"></div><div class="f"><span>(${spec.n})</span>${escH(classification)}</div>`;
   const body = page.querySelector('.b') as HTMLElement; const p = spec.plate;
   if (spec.kind === 'divider') {
     body.innerHTML = `<div class="big">PLATE – ${escH(p.ref)}<br>${escH(p.title.toUpperCase())}<div style="margin-top:8pt">${escH((doc.meta.projectName ?? '').toUpperCase())}</div></div>`;

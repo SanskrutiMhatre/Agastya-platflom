@@ -212,7 +212,7 @@ test('front matter: the Foreword has no document-number line; the address and th
 // ── branding stays in Settings ─────────────────────────────────────────────────────────────────────────────────────────────────
 
 test('branding: the emblem and the publishers still come from Settings; a second publisher turns on the jointly-prepared cover', { timeout: 300000 }, async () => {
-  const b = built.uhb; assert.match(b.book, /<emblem src="Media\/Satya\.png"\/>/, 'the emblem is the house template\'s (Settings > Branding)');
+  const b = built.uhb; assert.match(b.book, /<emblem src="[^"]*artwork\/emblem\.png"\/>/, 'the project has no Media/Satya.png (the house template\'s emblem), so the stencil\'s emblem is printed; a project\'s own file wins (jss-authoring: default artwork)');
   assert.equal((b.book.match(/<publisher>/g) ?? []).length, 1); assert.ok(!composedPages(b.book).includes('titlePageJoint'));
   const cfg = (await w.get(`${b.U}/settings`)).json; const project = { ...cfg.project, publishers: [{ name: 'L&T Defence,', addressLines: ['LARSEN & TOUBRO LIMITED'], logo: 'Media/JACKSON.png' }, { name: 'Partner Ltd', addressLines: ['Pune'], logo: 'Media/partner.png' }] };
   assert.equal((await w.put(`${b.U}/settings`, { project })).status, 200);

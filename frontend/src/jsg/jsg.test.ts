@@ -36,10 +36,20 @@ describe('JSG model and XML', () => {
     expect(await check(xml)).toEqual([]);
   });
 
-  it('a figure without a picture is a draft error (the author is told to choose one), not silently accepted', async () => {
+  it('a figure without a picture is the stencil\'s captioned placeholder: the schema accepts it (the checker warns until one is chosen)', async () => {
     const d = sample(); const c = d.chapters[0].sections[0].children[0] as { children: Block[] };
     c.children = [newFigure('No picture yet')];
-    expect((await check(serializeJsg(d))).join(' ')).toMatch(/figure/);
+    expect(await check(serializeJsg(d))).toEqual([]);
+  });
+
+  it('a clause on its own landscape page, a section\'s orientation and the abbreviations\' numbered rows survive a round trip', () => {
+    const d = sample(); const cl = d.chapters[0].sections[0].children[0] as { orientation?: string };
+    cl.orientation = 'landscape'; d.front.abbreviationsMinRows = 37; d.front.has.abbreviations = true;
+    const xml = serializeJsg(d);
+    expect(xml).toMatch(/<clause[^>]*orientation="landscape"/); expect(xml).toMatch(/<abbreviations minRows="37"/);
+    const back = parseJsg(xml);
+    expect((back.chapters[0].sections[0].children[0] as { orientation?: string }).orientation).toBe('landscape'); expect(back.front.abbreviationsMinRows).toBe(37);
+    expect(serializeJsg(back)).toBe(xml);
   });
 
   it('a document survives a round trip unchanged', () => {

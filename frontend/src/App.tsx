@@ -22,7 +22,7 @@ import { ExplorePage } from './pages/project/ExplorePage';
 import { PublicationPage } from './pages/project/PublicationPage';
 import { ValidationPage } from './pages/project/ValidationPage';
 import { ReleasePage } from './pages/project/ReleasePage';
-import { AncillaryPage } from './pages/project/AncillaryPage';
+import { AncillaryRoute } from './pages/project/AncillaryRoute';
 import { CsdbPage } from './pages/project/CsdbPage';
 import { ProjectSettingsPage } from './pages/project/ProjectSettingsPage';
 
@@ -75,7 +75,7 @@ export function App() {
         <Route path="publication" element={<PublicationPage />} />
         <Route path="validation" element={<ValidationPage />} />
         <Route path="graphics" element={<ProjectGraphicsPage />} />
-        <Route path="ancillary" element={<AncillaryPage />} />
+        <Route path="ancillary" element={<AncillaryRoute />} />
         <Route path="release" element={<ReleasePage />} />
         <Route path="csdb" element={<CsdbPage />} />
         <Route path="settings/*" element={<ProjectSettingsPage />} />
