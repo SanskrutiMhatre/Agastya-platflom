@@ -35,7 +35,8 @@
         <xsl:param name="label"/>
         <xsl:param name="band-color"/>
         <xsl:param name="italic">0</xsl:param>
-        <fo:block space-before="4mm" space-after="4mm" keep-together.within-page="always">
+        <!-- A notice spans the full text width wherever it sits (1.1.2.1 as much as 1.1): the indents of the enclosing section are reset, as for a table. -->
+        <fo:block space-before="4mm" space-after="4mm" keep-together.within-page="always" start-indent="0mm" end-indent="0mm">
             <!-- Title band -->
             <fo:block background-color="{$band-color}"
                       color="white"
@@ -70,9 +71,12 @@
         </fo:block>
     </xsl:template>
 
-    <!-- Paragraphs inside a notice box are flush left, not indented -->
+    <!-- Paragraphs inside a notice box are flush left, not indented. They keep their own alignment when they have one. -->
     <xsl:template match="note/para | warning/para | caution/para">
-        <fo:block space-after="1.5mm"><xsl:apply-templates/></fo:block>
+        <fo:block space-after="1.5mm">
+            <xsl:if test="@align"><xsl:attribute name="text-align"><xsl:value-of select="@align"/></xsl:attribute></xsl:if>
+            <xsl:apply-templates/>
+        </fo:block>
     </xsl:template>
 
 </xsl:stylesheet>

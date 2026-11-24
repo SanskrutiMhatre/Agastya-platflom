@@ -408,3 +408,21 @@ html.v2-compact .v2-card-pad { padding: 12px; }
   .jss-toolbar { overflow-x: auto; flex-wrap: nowrap; }
   .jss-scroll { padding: 12px 8px 60px; }
 }
+
+/* ------------------------------------------------------------ ancillary pages */
+.v2-anc { display: grid; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: 14px; align-items: start; }
+.v2-anc-list { overflow: hidden; }
+.v2-anc-row { display: flex; align-items: center; gap: 8px; padding: 4px 10px 4px 12px; border-left: 3px solid transparent; border-bottom: 1px solid var(--border); }
+.v2-anc-row:last-child { border-bottom: 0; }
+.v2-anc-row:hover { background: var(--bg-hover); }
+.v2-anc-row.sel { background: var(--accent-soft); border-left-color: var(--accent); }
+.v2-anc-row.off .t { color: var(--text-faint); text-decoration: line-through; text-decoration-color: var(--border-strong); }
+.v2-anc-row input[type="checkbox"] { accent-color: var(--accent); flex: none; width: 16px; height: 16px; }
+.v2-anc-name { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; padding: 7px 0; border: 0; background: none; color: var(--text); cursor: pointer; font: inherit; text-align: left; flex-wrap: wrap; }
+.v2-anc-name .n { flex: none; width: 18px; color: var(--text-faint); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.v2-anc-name .t { font-weight: 550; min-width: 0; }
+.v2-anc-field { display: flex; flex-direction: column; gap: 4px; }
+.v2-anc-field > span { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.v2-anc-field .v2-input { width: 100%; }
+@media (max-width: 900px) { .v2-anc { grid-template-columns: 1fr; } }
+.v2-anc-field textarea.v2-input { height: auto; padding: 7px 10px; line-height: 1.45; resize: vertical; }

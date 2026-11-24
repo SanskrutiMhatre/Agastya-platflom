@@ -4,7 +4,7 @@
 // the editor can only fill chapters and manage the sections inside them.
 
 import {
-  isSection, newCell, newRow, type Block, type Cell, type Chapter, type JssDoc, type List, type ListItem, type ListType, type Part, type Row, type Section, type Table,
+  isNotice, isSection, newCell, newRow, type Block, type Cell, type Chapter, type JssDoc, type List, type ListItem, type ListType, type Para, type Part, type Row, type Section, type Table,
 } from './model';
 
 export type Children = Array<Block | Section>;
@@ -19,6 +19,19 @@ export function locate(doc: JssDoc, node: Block | Section): Located | null {
     return null;
   };
   for (const ch of doc.chapters) { const r = search(ch); if (r) return r; }
+  return null;
+}
+
+/** Where a list or paragraph that lives inside a notice sits: the notice's own parts. Null when it is not inside a notice. */
+export function locateInNotice(doc: JssDoc, node: object): { list: Array<Para | List>; index: number } | null {
+  const search = (children: Children): { list: Array<Para | List>; index: number } | null => {
+    for (const c of children) {
+      if (isSection(c)) { const r = search(c.children); if (r) return r; }
+      else if (isNotice(c)) { const i = (c.parts as object[]).indexOf(node); if (i >= 0) return { list: c.parts, index: i }; }
+    }
+    return null;
+  };
+  for (const ch of doc.chapters) { const r = search(ch.children); if (r) return r; }
   return null;
 }
 

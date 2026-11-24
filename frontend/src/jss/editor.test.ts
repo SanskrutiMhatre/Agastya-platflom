@@ -56,7 +56,7 @@ function mount(xml = DOC, readOnly = false): Harness {
     imageUrl: (s) => `/m/${s.split('/').pop()}`,
     onDirty: (d) => h.dirty.push(d), onSaveRequested: () => { h.saves += 1; }, onCheckRequested: () => { h.checks += 1; }, notify: (m) => h.notes.push(m),
   };
-  h.ed = new JssEditor(container, { doc: parseJss(xml), maxDepth: 5, readOnly, host }); mounted.push(h.ed);
+  h.ed = new JssEditor(container, { doc: parseJss(xml), maxDepth: 6, readOnly, host }); mounted.push(h.ed);
   return h;
 }
 afterEach(() => { while (mounted.length) mounted.pop()!.destroy(); document.body.textContent = ''; });
@@ -304,6 +304,67 @@ describe('what the editor writes stays valid against the real schema', () => {
     key(paraEls(h.root)[0], 'Enter'); h.ed.exec('list', 'bullet'); h.ed.exec('table', { rows: 3, cols: 3, title: 'Readings' }); h.ed.exec('notice', 'caution'); h.ed.exec('pageBreak');
     h.ed.exec('subsection'); h.ed.exec('section');
     const li = all(h.root, '.jss-li [data-edit]')[1]; placeCaret(li, 0); key(li, 'Tab');
+    const r = (await validateXML({ xml: [{ fileName: 'd.xml', contents: h.ed.getXml() }], schema: [{ fileName: 'jss-1.0.xsd', contents: fs.readFileSync(xsd, 'utf8') }] })) as { valid: boolean; errors: Array<{ message: string }> };
+    expect(r.errors.map((e) => e.message)).toEqual([]); expect(r.valid).toBe(true);
+  });
+});
+
+describe('lists in notices, nested lists, and table alignment', () => {
+  const root = path.resolve(__dirname, '..', '..', '..', 'backend');
+  const xsd = path.join(root, 'schemas', 'jss', 'jss-1.0.xsd');
+  const available = fs.existsSync(xsd) && fs.existsSync(path.join(root, 'node_modules', 'xmllint-wasm'));
+  const WITH_NOTICE = DOC.replace('<para>Second paragraph</para>', '<para>Second paragraph</para>\n        <warning><para>Mind the edge</para><list type="bullet"><item>One</item><item>Two</item></list></warning>');
+
+  it('a notice can hold a list: it is read, drawn, written back, and an empty last item leaves the list for a paragraph of the notice', () => {
+    const h = mount(WITH_NOTICE);
+    expect(all(h.root, '.jss-notice .jss-li-label').map((e) => e.textContent)).toEqual(['•', '•']);
+    expect(h.ed.getXml()).toMatch(/<warning>\s*<para>Mind the edge<\/para>\s*<list type="bullet">\s*<item>One<\/item>\s*<item>Two<\/item>\s*<\/list>\s*<\/warning>/);
+    const items = all(h.root, '.jss-notice .jss-li [data-edit]'); placeCaret(items[1], 3); key(items[1], 'Enter');
+    const fresh = all(h.root, '.jss-notice .jss-li [data-edit]'); placeCaret(fresh[2], 0); key(fresh[2], 'Enter');
+    const notice = body(h).children.find((c) => c.k === 'warning') as { parts: Array<{ k: string }> };
+    expect(notice.parts.map((p) => p.k)).toEqual(['para', 'list', 'para']);
+  });
+
+  it('the List menu inside a notice adds the list to that notice, not after it', () => {
+    const h = mount(WITH_NOTICE); const p = q(h.root, '.jss-notice .jss-para [data-edit], .jss-notice .jss-para');
+    placeCaret(p as HTMLElement, 0);
+    (h.ed as unknown as { insertListHere(t: string): void }).insertListHere('number');
+    const notice = body(h).children.find((c) => c.k === 'warning') as { parts: Array<{ k: string }> };
+    expect(notice.parts.map((x) => x.k)).toEqual(['para', 'list', 'list']);
+  });
+
+  it('the Nest and Un-nest buttons do what Tab and Shift+Tab do, and say why when they cannot', () => {
+    const h = mount(); const items = all(h.root, '.jss-li [data-edit]');
+    placeCaret(items[0], 0); q<HTMLButtonElement>(h.root, '[data-cmd="nest"]').click();
+    expect(h.notes.pop()).toMatch(/no item above/);
+    placeCaret(items[1], 0); q<HTMLButtonElement>(h.root, '[data-cmd="nest"]').click();
+    expect((body(h).children[2] as List).items).toHaveLength(1);
+    const nested = all(h.root, '.jss-list .jss-list .jss-li [data-edit]')[0]; placeCaret(nested, 0); q<HTMLButtonElement>(h.root, '[data-cmd="unnest"]').click();
+    expect((body(h).children[2] as List).items).toHaveLength(2);
+  });
+
+  it('notices and tables step out of their section\'s indent so they span the full width', () => {
+    const h = mount(WITH_NOTICE);
+    expect(all(h.root, '.jss-block.jss-wide').map((e) => e.getAttribute('data-kind')).sort()).toEqual(['table', 'warning']);
+  });
+
+  it('table alignment: a cell, a column or the whole table, and Equal columns', () => {
+    const h = mount(); const table = body(h).children[3] as Table; const tools = q(h.root, '.jss-ttools');
+    const press = (label: string) => all(tools, 'button').find((b) => b.textContent === label)!.click();
+    const pick = (label: string) => { press('Align ▾'); all(document.body, '.jss-menu button').find((b) => b.textContent?.startsWith(label))!.click(); };
+    const cells = all(h.root, 'td [data-edit]');
+    placeCaret(cells[0], 0); pick('This column: Right');
+    expect([...table.head, ...table.body].map((r) => r.cells[0].align)).toEqual(['right', 'right']); expect(table.body[0].cells[1].align).toBeUndefined();
+    placeCaret(all(h.root, 'td [data-edit]')[1], 0); pick('This cell: Centre'); expect(table.head[0].cells[1].align).toBe('center');
+    pick('Whole table: Left'); expect([...table.head, ...table.body].flatMap((r) => r.cells.map((c) => c.align))).toEqual(['left', 'left', 'left', 'left']);
+    pick('Whole table: Default'); expect(table.head[0].cells[0].align).toBeUndefined();
+    press('Equal columns'); expect(table.widths).toBe('1* 1*'); expect(h.ed.getXml()).toContain('widths="1* 1*"');
+  });
+
+  (available ? it : it.skip)('a notice with lists, nested lists and aligned cells is valid against the schema', async () => {
+    const { validateXML } = createRequire(path.join(root, 'package.json'))('xmllint-wasm');
+    const h = mount(WITH_NOTICE);
+    const second = all(h.root, '.jss-list:not(.jss-notice .jss-list) .jss-li [data-edit]')[1]; placeCaret(second, 0); q<HTMLButtonElement>(h.root, '[data-cmd="nest"]').click();
     const r = (await validateXML({ xml: [{ fileName: 'd.xml', contents: h.ed.getXml() }], schema: [{ fileName: 'jss-1.0.xsd', contents: fs.readFileSync(xsd, 'utf8') }] })) as { valid: boolean; errors: Array<{ message: string }> };
     expect(r.errors.map((e) => e.message)).toEqual([]); expect(r.valid).toBe(true);
   });

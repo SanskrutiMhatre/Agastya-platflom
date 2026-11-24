@@ -184,6 +184,9 @@ export class JssEditor {
       btn('align', 'Align ▾', 'Paragraph alignment', (b) => openMenu(b, ALIGNS.map(([a, label]) => ({ label, run: () => this.setAlign(a) })))),
       btn('noindent', 'No indent', 'Start this paragraph flush with the margin (switch on or off)', () => this.toggleNoIndent()),
       btn('linebreak', 'Line break', 'Break the line here without starting a new paragraph (Shift+Enter)', () => this.lineBreak()));
+    group('List',
+      btn('nest', 'Nest ▸', 'Make this list item a sub-item of the item above, a list inside a list (Tab)', () => this.nestItem(false)),
+      btn('unnest', '◂ Un-nest', 'Move this sub-item back out one level (Shift+Tab)', () => this.nestItem(true)));
     group('Links',
       btn('xref', 'Cross-reference…', 'Refer to a table, figure or section', () => void this.insertXrefDialog()),
       btn('link', 'Link…', 'Link to a web address', () => void this.insertLinkDialog()));
@@ -203,6 +206,9 @@ export class JssEditor {
     current = tab('arrange', 'Arrange');
     group('Move the current block',
       btn('up', 'Move up', 'Move the current block up', () => this.moveBlock(-1)), btn('down', 'Move down', 'Move the current block down', () => this.moveBlock(1)));
+    group('Heading level',
+      btn('demote', 'Demote ▸', 'Make the current heading one level lower (a sub-heading of the heading above it)', () => this.changeLevel(1)),
+      btn('promote', '◂ Promote', 'Make the current heading one level higher', () => this.changeLevel(-1)));
     group('Remove',
       btn('delete', 'Delete block', 'Delete the current block', () => void this.deleteBlock()));
     current.append(h('span', { class: 'jss-thint' }, 'Sections have their own move, indent and page-orientation controls beside their heading; tables and figures show theirs when you click inside them.'));
@@ -219,6 +225,47 @@ export class JssEditor {
     let saved: string | null = null; try { saved = localStorage.getItem('agastya.jss.tab'); } catch { /* private mode */ }
     pick(tabs.some((t) => t.id === saved) ? (saved as string) : 'write');
     this.updateToolbar();
+  }
+
+  /** Move the heading the caret is in one level down (inside the heading above) or up. The stencil allows `maxDepth` levels, the chapter being level 1. */
+  private changeLevel(dir: 1 | -1): void {
+    const cur = this.activeSection();
+    if (cur.k === 'chapter') return this.opts.host.notify('Click in a section heading first: chapters are fixed by the stencil.');
+    const s = cur as Section; const level = ops.headingLevel(this.doc, s);
+    if (dir === 1) {
+      if (!ops.canIndentSection(this.doc, s, this.opts.maxDepth)) return this.opts.host.notify(level >= this.opts.maxDepth ? `Heading level ${this.opts.maxDepth} is the deepest this document type has.` : 'A heading needs a heading above it, at the same level, to go under.');
+      this.mutate(() => ops.indentSection(this.doc, s, this.opts.maxDepth), () => s);
+    } else {
+      if (!ops.canOutdentSection(this.doc, s)) return this.opts.host.notify('This heading is already at the top level of its chapter.');
+      this.mutate(() => ops.outdentSection(this.doc, s), () => s);
+    }
+  }
+
+  /** The list item under the caret, if any. */
+  private itemUnderCaret(): ItemRef | null {
+    const sel = selection(); const n = sel?.anchorNode; const li = n && (n.nodeType === 1 ? (n as Element) : n.parentElement)?.closest('.jss-li');
+    return (li && this.itemRefs.get(li)) || null;
+  }
+
+  /** Nest the item under the caret inside the item above it (a list inside a list), or bring a nested item back out. The same as Tab and Shift+Tab. */
+  private nestItem(out: boolean): void {
+    const ref = this.itemUnderCaret(); if (!ref) return this.opts.host.notify('Click in a list item first.');
+    const target = ref.item; const idx = ref.list.items.indexOf(target);
+    if (!out) {
+      if (idx < 1) return this.opts.host.notify('The first item has no item above it to go under. Add an item first, then nest the second one.');
+      this.mutate(() => ops.indentItem(ref.list, idx), () => target); return;
+    }
+    if (!ref.parentList || !ref.parentItem) return this.opts.host.notify('This item is not nested.');
+    const parentList = ref.parentList; const pi = parentList.items.indexOf(ref.parentItem);
+    this.mutate(() => ops.outdentItem(parentList, pi, ref.list, idx), () => target);
+  }
+
+  /** A new list at the caret: after the paragraph when the caret is in a notice (the list then belongs to the notice), else after the current block. */
+  private insertListHere(type: ListType): void {
+    const sel = selection(); const el = this.editableOf(sel?.anchorNode ?? null); const node = el && this.elNode.get(el);
+    const inNotice = node ? ops.locateInNotice(this.doc, node) : null;
+    if (inNotice) { const l = newList(type, 1); this.mutate(() => ops.insertAt(inNotice.list, inNotice.index + 1, l), () => l); return; }
+    this.insertBlock(newList(type, 1));
   }
 
   /** Switch the "no first-line indent" setting of the paragraph under the caret. */
@@ -240,7 +287,7 @@ export class JssEditor {
     const dis = (id: string, d: boolean) => { const b = this.toolButtons.get(id); if (b) b.disabled = d || (this.opts.readOnly && !['check', 'source'].includes(id)); };
     dis('undo', !this.undoStack.length); dis('redo', !this.redoStack.length);
     const editing = this.view === 'edit';
-    for (const id of ['bold', 'italic', 'underline', 'sup', 'sub', 'align', 'noindent', 'linebreak', 'para', 'section', 'list', 'table', 'figure', 'notice', 'pagebreak', 'xref', 'link', 'up', 'down', 'delete', 'details']) dis(id, !editing);
+    for (const id of ['bold', 'italic', 'underline', 'sup', 'sub', 'align', 'noindent', 'linebreak', 'nest', 'unnest', 'demote', 'promote', 'para', 'section', 'list', 'table', 'figure', 'notice', 'pagebreak', 'xref', 'link', 'up', 'down', 'delete', 'details']) dis(id, !editing);
     if (typeof document.queryCommandState === 'function' && editing) {
       const q = (c: string) => { try { return document.queryCommandState(c); } catch { return false; } };
       set('bold', q('bold')); set('italic', q('italic')); set('underline', q('underline')); set('sup', q('superscript')); set('sub', q('subscript'));
@@ -326,7 +373,7 @@ export class JssEditor {
   }
 
   private blockEl(b: Block): HTMLElement {
-    const w = this.reg(b, h('div', { class: 'jss-block', 'data-kind': b.k }));
+    const w = this.reg(b, h('div', { class: `jss-block${b.k === 'table' || b.k === 'note' || b.k === 'warning' || b.k === 'caution' ? ' jss-wide' : ''}`, 'data-kind': b.k }));
     switch (b.k) {
       case 'para': { const p = h('div', { class: 'jss-para', 'data-ph': 'Type here' }); this.paraEditable(p, b); w.append(p); break; }
       case 'list': w.append(this.listEl(b, 1)); break;
@@ -430,6 +477,20 @@ export class JssEditor {
       this.mutate(() => ops.mergeCells(t, c.group, c.row, c.col, dir), () => t);
     };
     const col = (where: 'before' | 'after') => { const c = cell(); if (!c) return this.opts.host.notify('Click in a cell first.'); this.mutate(() => ops.addColumn(t, c.col, where), () => t); };
+    // Text alignment of this cell, its column or the whole table (left, centre, right or justified). "Default" clears it.
+    const allCells = (): Cell[] => [...t.head, ...t.body].flatMap((r) => r.cells);
+    const setAlign = (scope: 'cell' | 'column' | 'table', a: Align | undefined) => {
+      const c = cell();
+      if (scope !== 'table' && !c) return this.opts.host.notify('Click in a cell first.');
+      const targets = scope === 'table' ? allCells() : scope === 'cell' ? [(c as CellRef).cell] : [...t.head, ...t.body].map((r) => r.cells[(c as CellRef).col]).filter(Boolean);
+      this.mutate(() => { for (const x of targets) x.align = a; }, () => t);
+    };
+    const A: Array<[Align | undefined, string]> = [['left', 'Left'], ['center', 'Centre'], ['right', 'Right'], ['justify', 'Justified'], [undefined, 'Default']];
+    const alignBtn = mk('Align ▾', 'Align the text of a cell, a column or the whole table', () => openMenu(alignBtn, [
+      ...A.map(([a, label]): MenuItem => ({ label: `This cell: ${label}`, run: () => setAlign('cell', a) })),
+      ...A.map(([a, label]): MenuItem => ({ label: `This column: ${label}`, run: () => setAlign('column', a), disabled: spans })),
+      ...A.map(([a, label]): MenuItem => ({ label: `Whole table: ${label}`, run: () => setAlign('table', a) })),
+    ]));
     return h('div', { class: 'jss-ttools' },
       mk('+ Row above', 'Add a row above the current one', () => row('above'), !spans), mk('+ Row below', 'Add a row below the current one', () => row('below'), !spans),
       mk('− Row', 'Delete the current row', () => { const c = cell(); if (c) this.mutate(() => ops.deleteRow(t, c.group, c.row), () => t); else this.opts.host.notify('Click in a cell first.'); }, !spans),
@@ -438,7 +499,9 @@ export class JssEditor {
       mk(t.head.length ? 'Header row: on' : 'Header row: off', 'Show the first row as a header', () => this.mutate(() => ops.toggleHeader(t), () => t)),
       mk('Merge right', 'Merge this cell with the one to its right', () => merge('right')), mk('Merge down', 'Merge this cell with the one below it', () => merge('down')),
       mk('Split cell', 'Split a merged cell back into single cells', () => { const c = cell(); if (!c) return this.opts.host.notify('Click in a cell first.'); if ((c.cell.colspan ?? 1) === 1 && (c.cell.rowspan ?? 1) === 1) return this.opts.host.notify('This cell is not merged.'); this.mutate(() => ops.splitCell(t, c.group, c.row, c.col), () => t); }),
-      mk('Widths…', 'Set the column widths', () => void this.widthsDialog(t)),
+      alignBtn,
+      mk('Equal columns', 'Give every column the same width; the table always fills the full text width', () => this.mutate(() => { t.widths = Array.from({ length: ops.columnCount(t) }, () => '1*').join(' '); }, () => t)),
+      mk('Widths…', 'Set the column widths (the table always fills the full text width, so these only divide it)', () => void this.widthsDialog(t)),
       mk('Delete table', 'Delete this table', () => this.removeBlock(t)),
       spans ? h('span', { class: 'hint' }, 'This table has merged cells: split them to add or remove rows and columns.') : null,
     );
@@ -487,10 +550,13 @@ export class JssEditor {
     return el;
   }
 
-  private noticeEl(n: Block & { k: NoticeKind; paras: Para[] }): HTMLElement {
+  private noticeEl(n: Block & { k: NoticeKind; parts: Array<Para | List> }): HTMLElement {
     const el = h('div', { class: `jss-notice ${n.k}` }, h('div', { class: 'band' }, `! ${NOTICE_LABEL[n.k]}`));
     const txt = h('div', { class: 'txt' });
-    for (const p of n.paras) { const d = h('div', { class: 'jss-para' }); this.paraEditable(d, p); txt.append(d); }
+    for (const part of n.parts) {
+      if (part.k === 'list') txt.append(this.listEl(part, 1));
+      else { const d = h('div', { class: 'jss-para' }); this.paraEditable(d, part); txt.append(d); }
+    }
     el.append(txt); return el;
   }
 
@@ -689,8 +755,9 @@ export class JssEditor {
         if (ref.parentList && ref.parentItem) {
           ops.outdentItem(ref.parentList, ref.parentList.items.indexOf(ref.parentItem), ref.list, idx); this.afterStructural(ref.item.parts[0]); return;
         }
-        const blockEl = el.closest('.jss-block'); const blk = blockEl ? (this.elNode.get(blockEl) as List) : null; const at = blk && ops.locate(this.doc, blk);
-        if (blk && at) {
+        // the list sits among a section's blocks, or inside a notice
+        const blk = ref.list; const at = (ops.locate(this.doc, blk) ?? ops.locateInNotice(this.doc, blk)) as { list: Array<Block | Para | List>; index: number } | null;
+        if (at) {
           const p = newPara();
           if (blk.items.length === 1) { ops.removeAt(at.list, at.index); ops.insertAt(at.list, at.index, p); } else { ops.removeItem(blk, idx); ops.insertAt(at.list, at.index + 1, p); }
           this.afterStructural(p); return;
@@ -705,7 +772,7 @@ export class JssEditor {
       node.inline = before; const np = newPara(); np.inline = after; np.align = node.align;
       const blockEl = el.closest('.jss-block'); const blk = blockEl ? (this.elNode.get(blockEl) as Block) : null;
       if (blk === node) { const at = ops.locate(this.doc, blk); if (at) { ops.insertAt(at.list, at.index + 1, np); this.afterStructural(np); return; } }
-      if (blk && isNotice(blk)) { ops.insertAt(blk.paras, blk.paras.indexOf(node) + 1, np); this.afterStructural(np); return; }
+      if (blk && isNotice(blk)) { ops.insertAt(blk.parts, blk.parts.indexOf(node) + 1, np); this.afterStructural(np); return; }
       if (ref) { ops.insertAt(ref.item.parts, ref.item.parts.indexOf(node) + 1, np); this.afterStructural(np); return; }
     }
     // not something that can be split: put the text back as it was
@@ -811,8 +878,8 @@ export class JssEditor {
     };
     const level = isCh ? 1 : ops.headingLevel(this.doc, cur as Section);
     return [
-      { label: isCh ? 'Add a section to this chapter' : 'Add a section after this one', disabled: !isCh && false, run: () => make(isCh ? cur : (ops.locate(this.doc, cur as Section)?.owner ?? cur), isCh ? 'end' : 'after') },
-      { label: 'Add a sub-section inside this one', disabled: level + 1 > this.opts.maxDepth, hint: level + 1 > this.opts.maxDepth ? 'deepest level' : '', run: () => make(cur, 'end') },
+      { label: isCh ? 'Add a section to this chapter (heading level 2)' : `Add a heading after this one (level ${level})`, disabled: !isCh && false, run: () => make(isCh ? cur : (ops.locate(this.doc, cur as Section)?.owner ?? cur), isCh ? 'end' : 'after') },
+      { label: `Add a sub-heading inside this one (level ${level + 1})`, disabled: level + 1 > this.opts.maxDepth, hint: level + 1 > this.opts.maxDepth ? `level ${this.opts.maxDepth} is the deepest` : `of ${this.opts.maxDepth}`, run: () => make(cur, 'end') },
     ];
   }
 
@@ -825,9 +892,11 @@ export class JssEditor {
     const sel = selection(); const li = (sel?.anchorNode && (sel.anchorNode.nodeType === 1 ? (sel.anchorNode as Element) : sel.anchorNode.parentElement))?.closest('.jss-li');
     const ref = li ? this.itemRefs.get(li) : undefined;
     const types: Array<[ListType, string]> = [['alpha', '(a) (b) (c) lettered'], ['roman', '(i) (ii) (iii) roman'], ['number', '1. 2. 3. numbered'], ['bullet', '• bullets'], ['dash', '– dashes']];
-    const items: MenuItem[] = types.map(([t, label]) => ({ label: `New list: ${label}`, run: () => { const l = newList(t, 1); this.insertBlock(l); } }));
+    const items: MenuItem[] = types.map(([t, label]) => ({ label: `New list: ${label}`, run: () => this.insertListHere(t) }));
     if (ref) {
       items.push(...types.map(([t, label]): MenuItem => ({ label: `Change this list to ${label}`, run: () => this.mutate(() => { ref.list.type = t; }, () => ref.item) })));
+      items.push({ label: 'Nest this item under the one above (Tab)', run: () => this.nestItem(false) });
+      items.push({ label: 'Move this item out one level (Shift+Tab)', run: () => this.nestItem(true), disabled: !ref.parentList });
       items.push({ label: 'Add an item below', run: () => { const it = ops.addItem(ref.list, ref.list.items.indexOf(ref.item)); this.afterStructural(it.parts[0]); } });
       items.push({ label: 'Remove this item', run: () => this.mutate(() => ops.removeItem(ref.list, ref.list.items.indexOf(ref.item)), () => null), disabled: ref.list.items.length < 2 });
     }

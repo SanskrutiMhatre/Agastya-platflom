@@ -121,6 +121,11 @@ export const JSS_CSS = `
 .jss-ftools input { width: 90px; }
 
 .jss-notice { margin: 4mm 0; }
+/* A notice or a table spans the full text width wherever it sits: it steps back out of its section's indent, as it prints. */
+.jss-sec.d1 > .jss-sec-body > .jss-wide { margin-left: -8mm; }
+.jss-sec.d2 > .jss-sec-body > .jss-wide { margin-left: -20.7mm; }
+.jss-sec.d3 > .jss-sec-body > .jss-wide { margin-left: -25mm; }
+.jss-sec.d4 > .jss-sec-body > .jss-wide, .jss-sec.d5 > .jss-sec-body > .jss-wide { margin-left: -28mm; }
 .jss-notice .band { color: #fff; font-weight: 700; font-size: 9pt; padding: 1mm 2mm; text-align: left; font-family: Arial, sans-serif; }
 .jss-notice.note .band { background: #8db4d8; font-style: italic; } .jss-notice.warning .band, .jss-notice.caution .band { background: #ee0000; }
 .jss-notice .txt { padding: 1mm 2mm; border-bottom: 0.8pt solid #000; font-weight: 700; text-transform: uppercase; text-align: left; }

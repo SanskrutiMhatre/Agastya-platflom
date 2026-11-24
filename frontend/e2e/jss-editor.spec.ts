@@ -36,11 +36,13 @@ test.afterAll(async () => { await page.context().close(); });
 
 const sheet = () => page.getByTestId('jss-paper');
 const state = () => page.getByTestId('jss-state');
+/** The toolbar is in tabs (Write, Insert, Arrange, Document): open the one that holds the button. */
+const tab = (name: string) => page.getByRole('tab', { name, exact: true }).click();
 const saved = async () => (await (await api.get(`${U}/jss`)).json());
 
-test('the catalogue offers the 15 stencil types: three ready, and the rest explained', async () => {
+test('the catalogue offers the 14 stencil types: three ready, and the rest explained', async () => {
   const types = (await (await api.get('/api/formats')).json()).formats.find((f: any) => f.id === 'jss').domains.find((d: any) => d.id === 'land').manualTypes;
-  expect(types).toHaveLength(15); expect(types.filter((t: any) => t.ready).map((t: any) => t.id)).toEqual(['uhb', 'mm', 'orm']);
+  expect(types).toHaveLength(14); expect(types.filter((t: any) => t.ready).map((t: any) => t.id)).toEqual(['uhb', 'mm', 'orm']);
   for (const t of types.filter((x: any) => !x.ready)) expect(t.notReady.length).toBeGreaterThan(20);
 });
 
@@ -53,7 +55,7 @@ test('opening a JSS project opens the JSS editor, with the stencil chapters lock
   await expect(page.locator('.jss-ol').first()).toContainText('Leading Particulars');
   await expect(page.locator('[data-testid="studio-host"]')).toHaveCount(0);           // not the S1000D Studio
   await expect(page.getByRole('link', { name: 'Explore' })).toHaveCount(0);            // an S1000D publication tree has no place here
-  await expect(state()).toHaveText('Saved');
+  await expect(state()).toHaveText(/All changes saved/);
   await page.screenshot({ path: path.join(SHOTS, '1-opened.png') });
 });
 
@@ -63,10 +65,10 @@ test('writing: a paragraph with bold text, a list that nests, a captioned table,
   await page.keyboard.type('The system gives ');
   await page.keyboard.press('Control+b'); await page.keyboard.type('early warning'); await page.keyboard.press('Control+b');
   await page.keyboard.type(' of low-level threats.');
-  await expect(state()).toHaveText('Unsaved changes');
+  await expect(state()).toHaveText(/Unsaved changes/);
 
   // a lettered list: Enter adds items, Tab nests one
-  await page.getByRole('button', { name: 'Add or change a list' }).click();
+  await tab('Insert'); await page.getByRole('button', { name: 'Add or change a list' }).click();
   await page.getByRole('menuitem', { name: /New list: \(a\) \(b\) \(c\) lettered/ }).click();
   await page.keyboard.type('Search radar'); await page.keyboard.press('Enter'); await page.keyboard.type('Tracks 8 targets'); await page.keyboard.press('Enter');
   await page.keyboard.type('in all weather'); await page.keyboard.press('Tab');
@@ -91,7 +93,7 @@ test('writing: a paragraph with bold text, a list that nests, a captioned table,
   // a cross-reference to the table, inserted inside the first paragraph
   await sheet().locator('.jss-para').first().click({ position: { x: 20, y: 6 } });
   await page.keyboard.press('End');
-  await page.getByRole('button', { name: 'Refer to a table, figure or section' }).click();
+  await tab('Write'); await page.getByRole('button', { name: 'Refer to a table, figure or section' }).click();
   await page.locator('.jss-dialog .list button', { hasText: 'Table 1-1' }).click();
   await page.locator('.jss-dialog').getByRole('button', { name: 'Insert' }).click();
   await expect(sheet().locator('.jss-xref').first()).toHaveText('Table 1-1');
@@ -100,7 +102,7 @@ test('writing: a paragraph with bold text, a list that nests, a captioned table,
 
 test('saving writes the XML: it is the project\'s source, valid against the schema, and holds exactly what was written', async () => {
   await page.keyboard.press('Control+s');
-  await expect(state()).toHaveText(/^Saved/, { timeout: 15_000 });
+  await expect(state()).toHaveText(/Saved/, { timeout: 15_000 });
   const d = await saved();
   expect(d.report.errors).toBe(0);
   expect(d.xml).toContain('<jssbook docType="uhb" schemaVersion="1.0">');
@@ -173,7 +175,7 @@ test('merging cells: Merge right and Merge down in the browser, saved as colspan
   await sheet().locator('tbody tr').first().locator('td').nth(1).locator('[data-edit]').click();
   await page.getByRole('button', { name: 'Merge down', exact: true }).click();
   await expect(sheet().locator('tbody tr').first().locator('td').nth(1)).toHaveAttribute('rowspan', '2');
-  await page.keyboard.press('Control+s'); await expect(state()).toHaveText(/^Saved/, { timeout: 15_000 });
+  await page.keyboard.press('Control+s'); await expect(state()).toHaveText(/Saved/, { timeout: 15_000 });
   const d = await saved(); expect(d.report.errors).toBe(0);
   expect(d.xml).toContain('colspan="2"'); expect(d.xml).toContain('rowspan="2"');
   await page.getByTestId('jss-generate').click(); await expect(page.getByTestId('jss-note')).toContainText(/Built in/, { timeout: 120_000 });
@@ -197,12 +199,12 @@ test('content order: a document whose content follows a sub-section opens as uns
   const put = await api.put(`${U}/jss`, { data: { xml: late, baseHash: d.hash } }); expect(put.ok()).toBeTruthy();
   expect((await put.json()).report.findings.some((f: { rule: string }) => f.rule === 'JSS-ORDER')).toBe(true);
   await page.reload(); await expect(page.getByTestId('jss-editor')).toBeVisible({ timeout: 30_000 });
-  await expect(state()).toHaveText('Unsaved changes');
+  await expect(state()).toHaveText(/Unsaved changes/);
   await expect(page.getByText(/had content after a sub-section/)).toBeVisible();
   const paras = await sheet().locator('.jss-sec').filter({ has: page.locator('.jss-sec-title', { hasText: 'Purpose' }) }).first().locator('.jss-para').allTextContents();
   expect(paras.join(' ')).toContain('Content after the sub-section');                       // drawn in the section's own content, ahead of the sub-section
   await page.keyboard.press('Control+s').catch(() => undefined); await sheet().locator('.jss-para').first().click(); await page.keyboard.press('Control+s');
-  await expect(state()).toHaveText(/^Saved/, { timeout: 15_000 });
+  await expect(state()).toHaveText(/Saved/, { timeout: 15_000 });
   const after = await saved(); expect(after.report.errors).toBe(0);
   expect(after.xml.indexOf('Content after the sub-section')).toBeLessThan(after.xml.indexOf('Zeta sub-section'));
   expect(after.xml.indexOf('Content after the sub-section')).toBeGreaterThan(0);
@@ -218,7 +220,7 @@ test('a second author\'s save is not overwritten silently: the stale save is ref
   page.once('dialog', (dlg) => void dlg.accept());
   await page.getByRole('button', { name: 'Reload the saved document' }).click();
   await expect(sheet().locator('.jss-li').first()).toContainText('Search radar (long range)');
-  await expect(state()).toHaveText('Saved');
+  await expect(state()).toHaveText(/All changes saved/);
 });
 
 test('the S1000D Studio is untouched: an S1000D project still opens the Studio', async () => {
@@ -226,4 +228,52 @@ test('the S1000D Studio is untouched: an S1000D project still opens the Studio',
   await page.goto(`/projects/${(await s.json()).project.id}/editor`);
   await expect(page.getByTestId('studio-host')).toBeVisible({ timeout: 60_000 });
   await expect(page.getByTestId('jss-editor')).toHaveCount(0);
+});
+
+test('ancillary pages: a rail item, tick which pages print, edit the words of one, and give it back to Settings', async () => {
+  await page.goto(`/projects/${pid}/editor`);
+  await expect(page.getByTestId('jss-editor')).toBeVisible({ timeout: 30_000 });
+  await page.getByRole('link', { name: 'Ancillary pages' }).click();
+  await expect(page).toHaveURL(new RegExp(`/projects/${pid}/ancillary`));
+  const rows = page.getByTestId('anc-row');
+  await expect(rows.first()).toBeVisible({ timeout: 15_000 });
+  expect(await rows.count()).toBeGreaterThan(10);
+  await expect(page.locator('[data-page="titlePage"] [data-testid="anc-print"]')).toBeDisabled();          // the title page is always printed
+  await expect(page.locator('[data-page="cautionsNotes"]')).toHaveCount(0);                                  // the UHB stencil has no such page
+
+  // which pages print
+  const demolition = page.locator('[data-page="demolition"] [data-testid="anc-print"]');
+  await expect(demolition).toBeChecked(); await demolition.uncheck();
+  await expect.poll(async () => ((await (await api.get(`${U}/ancillary`)).json()).pages as any[]).find((p) => p.id === 'demolition').enabled).toBe(false);
+  await demolition.check();
+  await expect.poll(async () => ((await (await api.get(`${U}/ancillary`)).json()).pages as any[]).find((p) => p.id === 'demolition').enabled).toBe(true);
+
+  // edit the words of the foreword
+  await page.locator('[data-page="foreword"] .v2-anc-name').click();
+  const fields = page.getByTestId('anc-fields').locator('[data-testid="anc-field"]');
+  await expect(fields.first()).toBeVisible();
+  await expect(page.getByTestId('anc-save')).toBeDisabled();                                                 // nothing changed yet
+  await fields.first().fill('E2EFOREWORD every care has been taken.');
+  await expect(page.getByTestId('anc-save')).toBeEnabled();
+  await page.screenshot({ path: path.join(SHOTS, '9-ancillary.png') });
+  await page.getByTestId('anc-save').click();
+  await expect(page.locator('[data-page="foreword"]')).toContainText('edited');
+  const saved = (await (await api.get(`${U}/ancillary/foreword`)).json());
+  expect(saved.xml).toContain('E2EFOREWORD every care has been taken.'); expect(saved.page.edited).toBe(true);
+  expect(saved.xml).toContain('<deflist>');                                                                   // the structure around the words is untouched
+
+  // the XML view shows the page; a broken page is refused with the server's reason
+  await page.getByRole('button', { name: 'XML', exact: true }).click();
+  const xmlBox = page.getByTestId('anc-xml');
+  await expect(xmlBox).toHaveValue(/<foreword>/);
+  await xmlBox.fill('<foreword><para>unclosed</foreword>');
+  await page.getByTestId('anc-save').click();
+  await expect(page.getByText(/not well-formed XML/)).toBeVisible();
+
+  // give it back to Settings
+  await page.getByRole('button', { name: 'Undo my changes' }).click();
+  await page.getByTestId('anc-reset').click();
+  await page.getByRole('button', { name: 'Give back', exact: true }).click();
+  await expect(page.locator('[data-page="foreword"]')).not.toContainText('edited');
+  expect((await (await api.get(`${U}/ancillary/foreword`)).json()).xml).not.toContain('E2EFOREWORD');
 });

@@ -32,7 +32,8 @@ export interface KeyItem { num: string; text: string }
 export interface Figure { k: 'figure'; id?: string; title?: string; graphics: Graphic[]; legend: KeyItem[] }
 
 export type NoticeKind = 'note' | 'warning' | 'caution';
-export interface Notice { k: NoticeKind; paras: Para[] }
+/** A notice holds paragraphs and lists, in any order. */
+export interface Notice { k: NoticeKind; parts: Array<Para | List> }
 export interface PageBreak { k: 'pageBreak' }
 
 export type Block = Para | List | Table | Figure | Notice | PageBreak;
@@ -84,7 +85,7 @@ export function newTable(rows: number, cols: number, id?: string): Table {
   return { k: 'table', id, title: '', head: [newRow(cols)], body: Array.from({ length: Math.max(1, rows) }, () => newRow(cols)) };
 }
 export const newList = (type: ListType | undefined, items = 1): List => ({ k: 'list', type, items: Array.from({ length: items }, () => ({ parts: [inlinePart()] })) });
-export const newNotice = (kind: NoticeKind): Notice => ({ k: kind, paras: [para()] });
+export const newNotice = (kind: NoticeKind): Notice => ({ k: kind, parts: [para()] });
 export const newFigure = (src: string, id?: string): Figure => ({ k: 'figure', id, title: '', graphics: [{ src }], legend: [] });
 export const newSection = (title: string, id?: string): Section => ({ k: 'section', id, title, children: [] });
 

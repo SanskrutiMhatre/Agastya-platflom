@@ -133,7 +133,7 @@ function figureOf(e: Element): Figure {
 
 function noticeOf(e: Element): Notice {
   attrs(e, []);
-  return { k: e.localName as NoticeKind, paras: els(e).map((p) => { if (p.localName !== 'para') throw new JssParseError(`<${p.localName}> is not allowed in a ${e.localName}`); return paraOf(p); }) };
+  return { k: e.localName as NoticeKind, parts: els(e).map((p) => { if (p.localName === 'para') return paraOf(p); if (p.localName === 'list') return listOf(p); throw new JssParseError(`<${p.localName}> is not allowed in a ${e.localName}`); }) };
 }
 
 let reorderedSeen = false;
@@ -229,7 +229,7 @@ function blockXml(b: Block, pad: string): string {
     case 'para': return `${pad}${paraXml(b)}`;
     case 'list': return `${pad}${listXml(b, pad)}`;
     case 'pageBreak': return `${pad}<pageBreak/>`;
-    case 'note': case 'warning': case 'caution': return `${pad}<${b.k}>\n${b.paras.map((p) => `${pad}  ${paraXml(p)}`).join('\n')}\n${pad}</${b.k}>`;
+    case 'note': case 'warning': case 'caution': return `${pad}<${b.k}>\n${b.parts.map((p) => (p.k === 'para' ? `${pad}  ${paraXml(p)}` : `${pad}  ${listXml(p, pad + '  ')}`)).join('\n')}\n${pad}</${b.k}>`;
     case 'table': {
       const parts = [b.title !== undefined && b.title !== '' ? `${pad}  <title>${esc(b.title)}</title>` : '', b.head.length ? `${pad}  <thead>\n${rowsXml(b.head, pad + '    ')}\n${pad}  </thead>` : '', `${pad}  <tbody>\n${rowsXml(b.body, pad + '    ')}\n${pad}  </tbody>`].filter(Boolean);
       return `${pad}<table${at('id', b.id)}${at('widths', b.widths)}>\n${parts.join('\n')}\n${pad}</table>`;

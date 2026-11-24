@@ -78,7 +78,7 @@ a two-column table of first-level sections, then a page break, and closes with "
 | 10 | **ROTABLE** | List | One chapter, one landscape table: Item No / Designation / Section & Cat/Part No. for future demand / Qty / Mandatory & Non-Mandatory Spares / Norms of Consumption / Remarks | Only stencil with a single landscape A4 section (12.7 mm margins) |
 | 11 | **Vol_1_PL** | Parts list | Chapters per subsystem family (Mechanical / Electrical-Electronic / Hydraulic / Pneumatic), each: "This chapter contains parts list of following assemblies", then one parts table per assembly | Landscape tables; the parts table has 10 columns (below) |
 | 12 | **Vol_2_Illustrations** | Illustrations | Same chapters; each assembly = one figure with caption | Landscape pages |
-| 13 | **Manufacturer's Part List** | Parts list + figures | Vol 1 + Vol 2 together: per assembly a parts table and its figure | |
+| 13 | ~~**Manufacturer's Part List**~~ | Parts list + figures | Vol 1 + Vol 2 together: per assembly a parts table and its figure | Analysed, then **removed from the catalogue** (not offered under Land; Vol 1 / Vol 2 cover it). The stencil file stays in `manual format/`. |
 | 14 | **ISPL** | Illustrated parts list | Chapters per subsystem family; per assembly: figure(s) with caption(s) followed by the parts table; "Figure" captions with views | Landscape; 3 + 2 landscape sections |
 | 15 | **ISPL_wrt_JSS** | Illustrated parts list | Same as ISPL (1594 vs 1592 paragraphs; differs in a few fields only) | Treat as the JSS-conformant variant of ISPL; diff to be confirmed |
 | 16 | **Cover_page** | Frame part | The cover on its own: title block, notice boxes, "Publication No", L&T block | Source of truth for the cover |

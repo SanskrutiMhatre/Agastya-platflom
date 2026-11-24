@@ -283,7 +283,7 @@ test('unwrapChapterFolders: a ">" inside an attribute value, comments, and self-
 // ---------------------------------------------------------------------------------------------------------------------------------
 // The body: chapter dividers
 // ---------------------------------------------------------------------------------------------------------------------------------
-test('a chapter opens on a centred 18 pt divider followed by a blank verso, with no end-of-chapter marker', async () => {
+test('a chapter opens on a centred 21 pt divider (20-22 pt by decision; the reference is 18) followed by a blank verso, with no end-of-chapter marker', async () => {
   const { doc } = pdfs['xignal-jss'];
   let divider = 0;
   for (let n = 1; n <= doc.numPages && !divider; n++) {
@@ -294,7 +294,7 @@ test('a chapter opens on a centred 18 pt divider followed by a blank verso, with
   const t = await texts(doc, divider);
   const word = t.find((i) => /^Chapter( \d+)?$/.test(i.s));
   assert.ok(word, 'the page says "Chapter"');
-  near(word.size, 18, 0.05, 'the chapter heading is 18 pt');
+  near(word.size, 21, 0.05, 'the chapter heading is 21 pt: authors set chapter titles at 20-22 pt, the reference at 18');
   const line = t.filter((i) => Math.abs(i.y - word.y) < 0.5);
   const centre = (Math.min(...line.map((i) => i.x)) + Math.max(...line.map((i) => i.x + i.w))) / 2;
   const column = divider % 2 === 1 ? (70.9 + 552.8) / 2 : (42.5 + 524.4) / 2;
