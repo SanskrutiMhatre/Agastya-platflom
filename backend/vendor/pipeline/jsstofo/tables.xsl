@@ -38,9 +38,9 @@
              enclosing section is indented, as they do in the stencil. Without
              resetting the indents a 100%-wide table overflows the page by
              whatever start-indent the section contributed. -->
-        <!-- The Xignal reference sets a table in its section's own indent (table 1-1 under an "(a)" heading starts 10mm in) and 6.2mm below the text. -->
-        <fo:block space-before="4mm" space-after="5mm" end-indent="0mm">
-            <xsl:attribute name="start-indent"><xsl:choose><xsl:when test="$xjss">inherited-property-value(start-indent)</xsl:when><xsl:otherwise>0mm</xsl:otherwise></xsl:choose></xsl:attribute>
+        <!-- Full text width at every heading level, in every profile. (The Xignal reference set a table in its section's own indent; the authors asked for full
+             width instead, so the table no longer follows that indent.) The Xignal profile keeps its 6.2mm of space above. -->
+        <fo:block space-before="4mm" space-after="5mm" end-indent="0mm" start-indent="0mm">
             <xsl:if test="$xjss"><xsl:attribute name="space-before">6.2mm</xsl:attribute></xsl:if>
             <xsl:if test="title">
                 <fo:block text-align="center"

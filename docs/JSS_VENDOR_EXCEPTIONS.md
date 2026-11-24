@@ -122,3 +122,20 @@ block (`NAVAL_PUBLISHER`, copied into the project as `Media/publisher-logo.png` 
 head check ignores it: the MRLS "Recommended Nos. for 52 Systems for Two Years").
 
 **To undo** a parameter: remove its `xsl:param`, the branch that uses it, its entry in `layoutParamsFor` and its row in this table and in the isolation test.
+
+## Changes made by the owner, not parameterised (commit eb43711, 2026-11-24; merged with the Naval work the same day)
+
+These are **not** exceptions of the kind above: the owner changed the shared stylesheets for every profile, on purpose, so there is no parameter and no old behaviour to fall back to.
+They are listed so that nobody mistakes the changed S1000D-through-JSS and old-UHB fingerprints for a regression.
+
+| File | What changed, for every build that goes through `jsstofo` |
+|---|---|
+| `vendor/pipeline/jsstofo/pagesetup.xsl` | the pad pages that close a chapter (`body-before-blank` / `body-after-blank`) and a front-matter part carry the running head, the foot and the page number, in every profile (before: the prelim ones only in `xignal-jss`, the body ones not at all) |
+| `vendor/pipeline/jsstofo/tables.xsl` | a table spans the full text width at every heading level (the Xignal profile used to set it in its section's indent) |
+| `vendor/pipeline/jsstofo/warnings.xsl` | a note, warning or caution spans the full text width at every heading level; a paragraph in it keeps its own alignment |
+| `templates/uhb.house.json`, `jss-stencil.house.json`, `xignal-jss.house.json` | chapter titles 21 pt (20-22 pt by decision); `clampChapterTitleSize()` in `publisher.ts` brings an older value into range for every JSS-authored build |
+
+**Isolation after the merge** (`backend/test/jss-cover-isolation.test.js`). The S1000D direct engine does not include these files and did not move: its fingerprint still equals the 2026-11-23 value.
+The other two baselines (`legacy-jss-uhb`, `s1000d-via-jss`) were **re-captured on 2026-11-24**, because both run `jsstofo`. Shown to be the whole cause, not assumed: with exactly the four files above
+(the three stylesheets and `uhb.house.json`) put back to their content before the merge, all three builds gave the 2026-11-23 values again, byte for byte. The Naval parameters of the section above
+were in the tree for that measurement, so they too are shown to change none of the three builds.

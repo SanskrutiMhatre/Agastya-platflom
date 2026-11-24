@@ -215,10 +215,12 @@
   </xs:complexType>
 
   <!-- ===== Notices: the label (NOTE / WARNING / CAUTION) and band are the stencil's, not authored ===== -->
+  <!-- A notice holds paragraphs and lists, in any order (a list may itself hold lists). -->
   <xs:complexType name="Notice">
-    <xs:sequence>
-      <xs:element name="para" type="Paragraph" maxOccurs="unbounded"/>
-    </xs:sequence>
+    <xs:choice maxOccurs="unbounded">
+      <xs:element name="para" type="Paragraph"/>
+      <xs:element name="list" type="ListBlock"/>
+    </xs:choice>
   </xs:complexType>
 
   <!-- ===== Body content ===== -->

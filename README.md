@@ -140,6 +140,21 @@ waiver above), then compares geometry - page counts, first/last body lines of th
 reference. It only ratchets forward: after a layout improvement run `node scripts/golden-xignal.js <reference.pdf> <platform-build.pdf>` and review the diff.
 It skips, saying why, when the sample is not at `SAMPLE PROJECTS/S1000D/...` (override with `GOLDEN_SAMPLE_DIR`).
 
+### JSS editor: what an author can do, and what the PDF does with it
+
+The JSS editor's toolbar is in four tabs (**Write**, **Insert**, **Arrange**, **Document**); Undo and Redo stay beside them.
+
+* **Headings:** six levels, the chapter being level 1 (`maxDepth: 6` for the chapter manuals). The Arrange tab has **Demote / Promote**; a seventh level is refused (`JSS-DEPTH`).
+* **Chapter titles** print at **20-22 pt** (21 pt unless Settings give a size in that range): `clampChapterTitleSize()` in `publisher.ts` applies it to every JSS build, so an older template that says 18 pt is brought into range. The seeded JSS templates say 21 pt.
+* **Notices** hold paragraphs **and lists** (a list may hold lists); a list put in from the caret inside a notice goes into that notice. A notice and a **table** span the **full text width at every heading level** (1.1.2.1 as much as 1.1): `warnings.xsl` and `tables.xsl` reset the section's indent.
+* **Lists in lists:** Tab / Shift+Tab, or the **Nest / Un-nest** buttons, or the List menu.
+* **Tables:** **Align** a cell, a column or the whole table (left, centre, right, justified); **Equal columns** and **Widths...** divide the full width.
+* **Blank pages** (the pad pages that close a chapter or a front-matter part) carry the running head, the foot and the page number in every profile (`pagesetup.xsl`). The cover's own blank verso keeps only the classification banner, as the cover does.
+* **Ancillary pages** (project rail, JSS projects): the pages before the body, in print order, each with a checkbox for whether it prints and an editor for what it says (the words as text fields; the XML for the structure). Backend: `GET/PUT /api/projects/:id/ancillary`, `GET/PUT /api/projects/:id/ancillary/:page`, `POST .../:page/reset`. A page edited here is kept when Settings change (the engine rewrites only a file that is still exactly what it wrote); **Give back to Settings** removes the edit. The saved page list is always written whole, in catalogue order, because the engine prints in the order of that list.
+* The **Manufacturer's Part List** type is no longer in the Land catalogue.
+
+Three vendored stylesheets changed for this (`warnings.xsl`, `tables.xsl`, `pagesetup.xsl`, in `backend/vendor/pipeline/jsstofo/`), at the owner's request.
+
 ### Xignal-style JSS handbook (best effort)
 
 The `xignal-jss` document type (`backend/templates/xignal-jss.house.json`, `layout.profile = "xignal-jss"`) is the User Handbook with the page furniture of the
@@ -147,8 +162,8 @@ Xignal reference RDR-1671Y-00061-00 (JSS-0251, 50 pages): mirrored 25 / 15 mm ma
 outer edge) over a 1.13 pt rule, the foot rule with the "Page | n" box on the outer edge, running head and foot also on the blank pad pages, and the blank-page
 legend in Arial Bold 12 pt. Head and foot lines, rules, the folio box and the legend are within 0.1 pt of the reference; `test/jss-xignal-look.test.js` holds them.
 It prints one title page and no classification on the running pages, as the reference does. The body follows the reference too: each chapter opens on a centred
-18 pt divider ("None" when it has no sub-sections) and a blank verso so its text starts on a right-hand page, a data module has no heading of its own, first-level
-headings are bold upper case and unnumbered, second-level ones are "(a)"-lettered, and tables sit in their section's indent with 0.708 pt rules (measured on pp. 35-50;
+21 pt divider (20-22 pt by decision; the reference's 18 pt) ("None" when it has no sub-sections) and a blank verso so its text starts on a right-hand page, a data module has no heading of its own, first-level
+headings are bold upper case and unnumbered, second-level ones are "(a)"-lettered, and tables span the full text width (the reference sets them in their section's indent; the authors asked for full width) with 0.708 pt rules (measured on pp. 35-50;
 chapter 1 is 7 body pages and chapter 3 is 4 in both books). The default User Handbook type is untouched.
 
 Xignal's publication wrapper (the book entry with a "Front matter" folder and a "Chapter" folder holding folders named "1", "3") is unwrapped on import:

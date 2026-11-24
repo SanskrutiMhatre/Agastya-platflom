@@ -51,6 +51,7 @@ export function ProjectShell() {
     ...(jssDoc ? [] : [{ to: `/projects/${id}/explore`, label: 'Explore', icon: 'explore' as const }]),
     { to: `/projects/${id}/publication`, label: 'Publication', icon: 'book' },
     { to: `/projects/${id}/graphics`, label: 'Graphics', icon: 'image' },
+    ...(jssDoc ? [{ to: `/projects/${id}/ancillary`, label: 'Ancillary pages', icon: 'file' as const }] : []),
     ...(s1000d ? [
       { to: `/projects/${id}/validation`, label: 'Validation', icon: 'shield' as const, badge: v && v.error > 0 ? { text: String(v.error), tone: 'bad' as const } : null },
       { to: `/projects/${id}/csdb`, label: 'Files (CSDB)', icon: 'layers' as const },

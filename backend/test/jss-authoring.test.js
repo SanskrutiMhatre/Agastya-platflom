@@ -86,9 +86,9 @@ const norm = (t) => { let s = t.toLowerCase().replace(/\s*\/\s*/g, '/').replace(
 
 // ── the catalogue ───────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
-test('the catalogue lists all 15 stencil document types; only the three of this slice are ready, and the others say why not', async () => {
+test('the catalogue lists all 14 stencil document types; only the three of this slice are ready, and the others say why not', async () => {
   const t = (await w.get('/api/jss/types')).json.types.filter((x) => x.domain === 'land');       // the Naval stencils are in test/jss-naval.test.js
-  assert.deepEqual(t.map((x) => x.id), ['uhb', 'mm', 'orm', 'uhb2', 'tm-pi', 'ds', 'tote-cs', 'prs', 'mrls', 'rotable', 'vol-1-pl', 'vol-2-illustrations', 'mpl', 'ispl', 'ispl-wrt-jss']);
+  assert.deepEqual(t.map((x) => x.id), ['uhb', 'mm', 'orm', 'uhb2', 'tm-pi', 'ds', 'tote-cs', 'prs', 'mrls', 'rotable', 'vol-1-pl', 'vol-2-illustrations', 'ispl', 'ispl-wrt-jss']);
   assert.deepEqual(t.filter((x) => x.ready).map((x) => x.id), ['uhb', 'mm', 'orm']);
   for (const x of t.filter((y) => !y.ready)) assert.ok(x.notReady && x.notReady.length > 20, `${x.id} gives a reason`);
   assert.ok(t.find((x) => x.id === 'uhb2'), 'UHB2 stays its own type');
@@ -253,7 +253,7 @@ test('UHB end to end: what the author writes is what the PDF prints, in the sten
     const pg = await doc.getPage(n); const vp = pg.getViewport({ scale: 1 }); const items = (await pg.getTextContent()).items.filter((i) => i.str.trim());
     assert.ok(Math.abs(vp.width / 72 * 25.4 - 210) < 0.5 && Math.abs(vp.height / 72 * 25.4 - 297) < 0.5, `page ${n} is A4 portrait`);
     const sz = (i) => Math.round(Math.hypot(i.transform[2], i.transform[3]) * 10) / 10;
-    if (!bodyStarted && items.some((i) => sz(i) === 18 && /Leading Particulars/.test(i.str))) bodyStarted = true;
+    if (!bodyStarted && items.some((i) => sz(i) >= 20 && sz(i) <= 22 && /Leading Particulars/.test(i.str))) bodyStarted = true;     // chapter titles are 20-22 pt (21), not the stencil's 18
     if (!bodyStarted) continue;                                             // the frame has its own page setups (the stencil's front matter sections)
     const body = items.filter((i) => sz(i) >= 11 && sz(i) < 30 && !/intentionally left blank/.test(i.str)); if (!body.length) continue;
     const left = Math.min(...body.map((i) => i.transform[4])) / 72 * 25.4;
@@ -268,7 +268,7 @@ test('UHB end to end: what the author writes is what the PDF prints, in the sten
     for (const l of geo.verso) near(l, page.outer, 0.6, 'verso left margin = the stencil outer margin');
     for (const y of headerTop) near(y, page.header, 1.2, 'running head distance from the top');
     const sz = await stencilHeadingSizes(path.join(STENCILS, 'UHB.docx'));
-    for (const want of [sz.Heading1, sz.Heading2, sz.Normal]) assert.ok(sizes.has(want), `the PDF sets type at ${want} pt as the stencil does (saw ${[...sizes]})`);
+    for (const want of [21 /* the chapter title: 20-22 pt by decision, the stencil's Heading 1 is 18 */, sz.Heading2, sz.Normal]) assert.ok(sizes.has(want), `the PDF sets type at ${want} pt as the stencil does (saw ${[...sizes]})`);
     assert.equal(page.w, 210); assert.ok(Math.abs(page.h - 297) < 0.3);
   }
 });
@@ -284,4 +284,86 @@ test('MM and ORM build from their own stencil chapters, with their own cover tit
     assert.match(flat, /Chapter 1\b/); assert.match(flat, new RegExp(`Authored paragraph for ${id}\\.`));
     for (const c of g.chapters) assert.ok(flat.toUpperCase().includes(c.toUpperCase().slice(0, 25)), `${id}: chapter "${c}" is in the book`);
   }
+});
+
+test('six heading levels, a notice holding nested lists, and full-width notices and tables at the deepest level; every blank page keeps its running head and foot', { timeout: 600000 }, async () => {
+  const p = await create('uhb', 'UHB deep');
+  const g = (await w.get(`${p.U}/jss`)).json;
+  assert.equal(g.maxDepth, 6, 'the stencil allows six heading levels (the chapter is level 1)');
+  const deep = '<section id="l3"><title>Level three</title><para>Text at level three.</para><section id="l4"><title>Level four</title><section id="l5"><title>Level five</title>'
+    + '<section id="l6"><title>Level six</title><para>Deepest text.</para>'
+    + '<warning><para>DEEPMARK danger</para><list type="bullet"><item>first<list type="alpha"><item>nested a</item><item>nested b</item></list></item><item>second</item></list></warning>'
+    + '<table id="tdeep"><title>Deep table</title><thead><row><cell>H1</cell><cell align="right">H2</cell></row></thead><tbody><row><cell>DEEPCELL</cell><cell align="center">x</cell></row></tbody></table>'
+    + '</section></section></section></section>';
+  const xml = into(g.xml, 'Purpose', '<para>Opening.</para>').replace('<title>Purpose</title><para>Opening.</para>', '<title>Purpose</title><para>Opening.</para>' + deep);
+  const saved = await w.put(`${p.U}/jss`, { xml });
+  assert.equal(saved.status, 200); assert.equal(saved.json.report.errors, 0, JSON.stringify(saved.json.report.findings.filter((f) => f.severity === 'error')));
+  const tooDeep = xml.replace('<para>Deepest text.</para>', '<para>Deepest text.</para><section><title>Level seven</title></section>');
+  const refused = await w.put(`${p.U}/jss`, { xml: tooDeep });
+  assert.ok(JSON.stringify(refused.json).includes('JSS-DEPTH') || refused.json.report?.errors > 0, 'a seventh level is still refused');
+  assert.equal((await w.put(`${p.U}/jss`, { xml })).status, 200);
+
+  const f = await build(p.U); const { doc } = await G.openPdf(f);
+  const mm = (v) => v / 72 * 25.4;
+  let sawNotice = false; let sawTable = false; const blanks = [];
+  for (let n = 1; n <= doc.numPages; n++) {
+    const pg = await doc.getPage(n); const vp = pg.getViewport({ scale: 1 }); const items = (await pg.getTextContent()).items.filter((i) => i.str.trim());
+    const size = (i) => Math.round(Math.hypot(i.transform[2], i.transform[3]) * 10) / 10;
+    const mark = items.find((i) => /DEEPMARK/.test(i.str)); const cell = items.find((i) => /DEEPCELL/.test(i.str));
+    // body text starts at the page's inner/outer margin (25 / 15 mm); a notice or table that kept its heading's indent would start 28 mm further in
+    if (mark) { sawNotice = true; const band = items.find((i) => /WARNING/.test(i.str)); assert.ok(band, 'the notice band is printed'); assert.ok(mm(band.transform[4]) < 33, `the notice spans the full width (band at ${mm(band.transform[4]).toFixed(1)} mm)`); }
+    if (cell) { sawTable = true; assert.ok(mm(cell.transform[4]) < 33, `the table spans the full width (first cell at ${mm(cell.transform[4]).toFixed(1)} mm)`); }
+    if (items.some((i) => /intentionally left blank/.test(i.str))) blanks.push({ n, head: items.filter((i) => size(i) === 9).length, y: items.filter((i) => size(i) === 9).map((i) => Math.round(mm(vp.height - i.transform[5]))) });
+  }
+  assert.ok(sawNotice && sawTable, 'the deep notice and table were found in the PDF');
+  const flat = text(f).replace(/\s+/g, ' ');
+  assert.match(flat, /first/i); assert.match(flat, /nested a/i); assert.match(flat, /nested b/i); assert.match(flat, /second/i);      // a notice prints in capitals
+  if (process.env.JSS_DUMP_BLANKS) console.log(JSON.stringify(blanks));
+  assert.ok(blanks.length > 0, 'the document has blank pad pages');
+  for (const b of blanks) assert.ok(b.head >= 2, `blank page ${b.n} carries its running head and foot (9 pt lines found: ${b.head})`);
+});
+
+test('ancillary pages: choose which are printed, edit one by hand, keep the edit through a rebuild, and reset it', { timeout: 600000 }, async () => {
+  const p = await create('uhb', 'UHB ancillary'); const A = `${p.U}/ancillary`;
+  const list = (await w.get(A)); assert.equal(list.status, 200);
+  const ids = list.json.pages.map((x) => x.id);
+  assert.deepEqual(ids.slice(0, 3), ['titlePage', 'proprietary', 'foreword'], 'in print order');
+  assert.ok(!ids.includes('titlePageJoint'), 'the jointly-prepared cover exists only for more than one publisher');
+  assert.ok(!ids.includes('cautionsNotes'), 'the UHB stencil has no Cautions / Notes page');
+  assert.ok(ids.includes('systemNamePage') && ids.includes('listOfContents') && ids.includes('demolition'));
+  const byId = Object.fromEntries(list.json.pages.map((x) => [x.id, x]));
+  assert.equal(byId.titlePage.required, true); assert.equal(byId.listOfContents.file, null, 'a list made from the document has no file to edit');
+  assert.ok(byId.foreword.file && !byId.foreword.edited && byId.foreword.enabled);
+
+  // which pages are printed
+  assert.equal((await w.put(A, { pages: [{ id: 'titlePage', enabled: false }] })).status, 400, 'the title page cannot be switched off');
+  assert.equal((await w.put(A, { pages: [{ id: 'nonsense', enabled: false }] })).status, 400);
+  const off = await w.put(A, { pages: [{ id: 'demolition', enabled: false }, { id: 'firstAid', enabled: false }, { id: 'foreword', title: 'PREFACE' }] });
+  assert.equal(off.status, 200); assert.deepEqual(off.json.pages.map((x) => x.id), ids, 'choosing a page does not change the order the pages print in');
+  assert.equal(off.json.pages.find((x) => x.id === 'demolition').enabled, false); assert.equal(off.json.pages.find((x) => x.id === 'foreword').customTitle, 'PREFACE');
+  let flat = text(await build(p.U)).replace(/\s+/g, ' ');
+  assert.ok(!/DEMOLITION OF MATERIAL/.test(flat) && !/FIRST AID IN CASE/.test(flat.replace(/FOR FIRST AID IN CASE OF ELECTRIC SHOCK SEE OVERLEAF/, '')), 'a page that is switched off is not printed');
+  assert.match(flat, /PREFACE/); assert.match(flat, /RECORD OF CHANGES/, 'the others still are');
+  assert.ok(flat.indexOf('USER HANDBOOK FOR') < flat.indexOf('PREFACE'), 'the title page still comes first');
+
+  // edit one page by hand
+  const page = (await w.get(`${A}/foreword`)).json; assert.match(page.xml, /<foreword>/);
+  const edited = page.xml.replace('Every care has been taken', 'ANCILLARYEDIT care has been taken');
+  assert.equal((await w.put(`${A}/foreword`, { xml: edited })).status, 200);
+  assert.equal((await w.get(A)).json.pages.find((x) => x.id === 'foreword').edited, true);
+  flat = text(await build(p.U)).replace(/\s+/g, ' '); assert.match(flat, /ANCILLARYEDIT care has been taken/, 'the edit is printed');
+  // a change to Settings must not overwrite a page that was edited by hand
+  const s = (await w.get(`${p.U}/settings`)).json.project; s.frontMatter = { ...(s.frontMatter ?? {}), foreword: { ...(s.frontMatter?.foreword ?? {}), text: 'SETTINGSTEXT replaced' } };
+  assert.equal((await w.put(`${p.U}/settings`, { project: s })).status, 200);
+  flat = text(await build(p.U)).replace(/\s+/g, ' '); assert.match(flat, /ANCILLARYEDIT/, 'the hand edit survives a rebuild'); assert.ok(!/SETTINGSTEXT/.test(flat));
+  // reset gives the page back to Settings
+  const reset = await w.post(`${A}/foreword/reset`, {}); assert.equal(reset.status, 200); assert.equal(reset.json.page.edited, false); assert.match(reset.json.xml, /SETTINGSTEXT replaced/);
+  flat = text(await build(p.U)).replace(/\s+/g, ' '); assert.match(flat, /SETTINGSTEXT/); assert.ok(!/ANCILLARYEDIT/.test(flat));
+
+  // what a page may not be
+  assert.equal((await w.put(`${A}/foreword`, { xml: '<foreword><para>unclosed</foreword>' })).status, 400, 'malformed XML is refused');
+  assert.equal((await w.put(`${A}/foreword`, { xml: '<other><para>x</para></other>' })).json.code, 'BAD_ROOT');
+  assert.equal((await w.put(`${A}/foreword`, { xml: '<!DOCTYPE foreword [<!ENTITY x "y">]><foreword/>' })).status, 400, 'no DOCTYPE or entities');
+  assert.equal((await w.get(`${A}/listOfContents`)).json.code, 'NOT_EDITABLE');
+  assert.equal((await w.get(`${A}/nope`)).status, 404);
 });

@@ -354,6 +354,20 @@ export function layoutParamsFor(type: JssDocType, base: Array<[string, string]>)
 }
 
 /**
+ * The folder of the project's front-matter page files, filled in: the hand-edited stencil pages that ship with the app are copied in once, and the
+ * settings-driven pages are written from Settings (a page the author edited by hand is kept, see engine/frontmatter.js). Used by the build and by the
+ * Ancillary pages editor, so both look at the same files.
+ */
+export function prepareFrontMatterFiles(projectId: string, effective: any): string {
+  const fmAbs = path.join(projectDirFor(projectId), 'jss', 'frontmatter');
+  fs.mkdirSync(fmAbs, { recursive: true });
+  const statics = path.join(config.pipelineDir, 'jss', 'frontmatter');
+  if (fs.existsSync(statics)) for (const f of fs.readdirSync(statics)) { const dest = path.join(fmAbs, f); if (!fs.existsSync(dest)) fs.copyFileSync(path.join(statics, f), dest); }
+  generateFrontMatter(effective?.frontMatter, fmAbs, 's1000dtojss');
+  return fmAbs;
+}
+
+/**
  * The authored document with the shared frame added: <bookmeta> (the author's identity over Settings' defaults, with the emblem and publishers
  * from Settings) and <frontmatter> (the pages Settings turns on, in Settings' order). The body is the author's, unchanged.
  * Code No. and Rev No. travel as layout parameters, so they are returned for the build to apply rather than written into the book.
@@ -373,12 +387,7 @@ export function composeBook(projectId: string, effective: any): { text: string; 
   // The stencil has ONE cover. The "jointly prepared" cover (stencil Cover_page) is printed only when the book really has more than one publisher.
   const joint = ((effective?.branding?.publishers as unknown[] | undefined)?.length ?? 0) > 1;
   const fmRel = 'jss/frontmatter';
-  const fmAbs = path.join(dir, fmRel);
-  fs.mkdirSync(fmAbs, { recursive: true });
-  // the hand-edited stencil pages ship with the app and are copied in once; the settings-driven pages are written from Settings (an edited page is kept)
-  const statics = path.join(config.pipelineDir, 'jss', 'frontmatter');
-  if (fs.existsSync(statics)) for (const f of fs.readdirSync(statics)) { const dest = path.join(fmAbs, f); if (!fs.existsSync(dest)) fs.copyFileSync(path.join(statics, f), dest); }
-  generateFrontMatter(effective?.frontMatter, fmAbs, 's1000dtojss');
+  const fmAbs = prepareFrontMatterFiles(projectId, effective);
   const have = new Set(fs.readdirSync(fmAbs));
   const rows: string[] = [];
   for (const page of enabledPages(effective?.frontMatter) as any[]) {

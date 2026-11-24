@@ -110,19 +110,37 @@ function injectDirectFrontMatter(projectId: string, pmText: string, effective: a
   }
 }
 
+/** The chapter-title size of a JSS document: 20-22 pt. A size already in that range is kept; anything else (the stencil's 18 pt, a value not in points, none) becomes 21 pt. */
+export function clampChapterTitleSize(v: unknown): string {
+  const m = /^\s*(\d+(?:\.\d+)?)\s*pt\s*$/i.exec(String(v ?? ''));
+  const n = m ? Number(m[1]) : NaN;
+  return `${n >= 20 && n <= 22 ? n : 21}pt`;
+}
+
+/**
+ * What a JSS document's frame says, beyond Settings: the cover names the document as its stencil does ("TECHNICAL MANUAL" / "PART II MAINTENANCE"), and the wording
+ * that differs between the stencils (the Foreword's address and the symbols legends in MM and ORM) applies, unless Settings word it themselves.
+ * The build and the Ancillary pages editor both use it, so the editor shows what the build prints.
+ */
+export function applyJssFrontMatter(projectId: string, project: any, effective: any): void {
+  const jt = jssTypeOfProject(projectId);
+  if (jt && !project.frontMatter?.titlePage?.documentType) effective.frontMatter = { ...(effective.frontMatter ?? {}), titlePage: { ...(effective.frontMatter?.titlePage ?? {}), documentType: jt.coverTitle.join(String.fromCharCode(10)) } };      // one title line per line: the cover sets MM and ORM on two lines
+  // wording that differs between the stencils (the Foreword's address and the symbols legends in MM and ORM), unless Settings word it themselves
+  // (an object is laid over the Settings' own; a list - the safety warning's lines, the page order - replaces it: spreading a list into an object would turn it into {0:..., 1:...})
+  for (const [key, value] of Object.entries(jt?.frontMatter ?? {})) {
+    if (project.frontMatter?.[key]) continue;
+    const layered = Array.isArray(value) ? value : { ...(effective.frontMatter?.[key] ?? {}), ...(value as object) };
+    effective.frontMatter = { ...(effective.frontMatter ?? {}), [key]: layered };
+  }
+}
+
 function prepareInput(projectId: string, project: any, effective: any, useDirect: boolean, log: (m: string) => void, dir: string = projectDirFor(projectId)) {
   if (isJssAuthored(projectId)) {
     // A JSS document is rendered as authored: only the shared frame is added (from Settings), then it goes straight to the JSS stylesheets.
     // The cover names the document as its stencil does ("TECHNICAL MANUAL" / "PART II MAINTENANCE"), unless Settings word it themselves.
-    const jt = jssTypeOfProject(projectId);
-    if (jt && !project.frontMatter?.titlePage?.documentType) effective.frontMatter = { ...(effective.frontMatter ?? {}), titlePage: { ...(effective.frontMatter?.titlePage ?? {}), documentType: jt.coverTitle.join(String.fromCharCode(10)) } };      // one title line per line: the cover sets MM and ORM on two lines
-    // wording that differs between the stencils (the Foreword's address and the symbols legends in MM and ORM), unless Settings word it themselves
-    // (an object is laid over the Settings' own; a list - the safety warning's lines, the page order - replaces it: spreading a list into an object would turn it into {0:..., 1:...})
-    for (const [key, value] of Object.entries(jt?.frontMatter ?? {})) {
-      if (project.frontMatter?.[key]) continue;
-      const layered = Array.isArray(value) ? value : { ...(effective.frontMatter?.[key] ?? {}), ...(value as object) };
-      effective.frontMatter = { ...(effective.frontMatter ?? {}), [key]: layered };
-    }
+    applyJssFrontMatter(projectId, project, effective);
+    // Chapter titles are set at 20-22 pt in a JSS document, whatever an older template or Settings say.
+    effective.layout = { ...(effective.layout ?? {}), chapterTitleSize: clampChapterTitleSize(effective.layout?.chapterTitleSize) };
     const book = composeBook(projectId, effective);
     fs.writeFileSync(path.join(dir, COMPOSED_NAME), book.text, 'utf8');
     // Code No. and Rev No. are the author's, written on the document; they reach the cover as the same layout parameters Settings would set.

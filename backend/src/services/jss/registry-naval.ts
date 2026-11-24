@@ -247,7 +247,7 @@ const SMT_CHAPTERS: OutlineNode[] = [{ title: 'List of SMTs and STEs', table: SM
 // ── The ten types ────────────────────────────────────────────────────────────────────────────────────────
 
 const handbook = (t: Pick<JssDocType, 'id' | 'label' | 'stencil' | 'chapters' | 'defaultBookName' | 'coverTitle'> & Partial<JssDocType>): JssDocType => ({
-  domain: 'naval', bodyKind: 'chapter-manual', ready: true, maxDepth: 5, coverInbr: true, forewordDocumentNo: true, publisher: NAVAL_PUBLISHER,
+  domain: 'naval', bodyKind: 'chapter-manual', ready: true, maxDepth: 6, coverInbr: true, forewordDocumentNo: true, publisher: NAVAL_PUBLISHER,
   ...t,
   frontMatter: { foreword: foreword(FOREWORD_TEXT_DEFENCE, 'defence@larsentoubro.com', ADDRESS_DEFENCE), labels: HANDBOOK_LABELS, ...(t.frontMatter ?? {}) },
 });
@@ -256,7 +256,7 @@ export const NAVAL_TYPES: JssDocType[] = [
   handbook({ id: 'naval-uhb', label: 'User Handbook', stencil: '1_User_Handbook.docx', chapters: UHB_CHAPTERS, defaultBookName: 'User Handbook', coverTitle: ['USER HANDBOOK'] }),
   handbook({
     id: 'naval-tm-1', label: 'Technical Manual - Part I Technical Description', stencil: 'TM_Part-I_Technical_Description.docx', chapters: TM1_CHAPTERS,
-    defaultBookName: 'Technical Manual Part I Technical Description', coverTitle: ['TECHNICAL MANUAL', 'PART I TECHNICAL INFORMATION', 'TECHNICAL DESCRIPTION'], maxDepth: 5,
+    defaultBookName: 'Technical Manual Part I Technical Description', coverTitle: ['TECHNICAL MANUAL', 'PART I TECHNICAL INFORMATION', 'TECHNICAL DESCRIPTION'], maxDepth: 6,
   }),
   handbook({ id: 'naval-tm-2', label: 'Technical Manual - Part II Maintenance', stencil: 'TM_Part-II_Maintenance.docx', chapters: TM2_CHAPTERS, defaultBookName: 'Technical Manual Part II Maintenance', coverTitle: ['TECHNICAL MANUAL', 'PART II MAINTENANCE'] }),
   handbook({

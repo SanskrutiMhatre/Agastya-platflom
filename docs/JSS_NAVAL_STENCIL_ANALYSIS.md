@@ -79,3 +79,17 @@ the editor, numbers renumbered.
 | isolation guard failed on the date | the S1000D baseline prints the build date | `capturedOn` in the baseline; today mapped to it |
 | cover said "L&T Defence," | publisher is a house-template value | `publisher` on the registry type, copied into the project |
 | the list types printed a divider page, the Change Notice table, a 2-column abbreviations table and the first-aid line | the frame was the handbook's | `chapter.divider`, `roc.layout`, `abbrev.layout`, `safety.footer.show` (vendor exceptions) |
+
+## 6. After the merge with the ancillary-pages commit (2026-11-24)
+
+The owner's commit eb43711 added the Ancillary pages editor (which pages print, their headings, the XML of each), six heading levels for chapter manuals, notices that hold lists, 21 pt chapter titles and
+full-width tables and notices. How the Naval types meet it:
+
+* **Six heading levels.** The five Naval chapter manuals (UHB, TM I-III, DS) take `maxDepth: 6` like the Land chapter manuals. Part IV Vol 1 / Vol 2 and the list types keep their own limits (2, 3, 2).
+* **One list of pages the stencil does not have.** The build (`composeBook`) and the Ancillary pages editor both read the registry's `omitPages` (the old `frontPages` of the Land types is the same idea and is gone).
+  The owner's editor read `frontPages`, which the Naval types do not set; left like that it would have offered pages that never print (e.g. Vol 2's Abbreviations).
+* **The stencil's own page list survives a choice.** The list stencils bring their own order and choices (Demolition before First aid, the Contents last, no Associated Handbooks, "AMENDMENTS"). Saving an
+  ancillary choice used to rewrite the whole list from the catalogue: it switched the pages the stencil leaves out back on, dropped the headings and reshuffled the book. It now starts from the list in
+  force and keeps its order (`saveAncillaryChoices`, tested in `jss-naval.test.js`).
+* **A list in force that is an array replaces, it does not merge** (`applyJssFrontMatter`): the safety warning's lines and the page list are lists; spreading a list into an object would turn it into `{0:..., 1:...}`.
+* Not done: the Ancillary pages editor was not opened in a browser for a Naval project, and the playwright spec of the owner's commit (`frontend/e2e/jss-editor.spec.ts`) was not run (it needs the app and a browser).

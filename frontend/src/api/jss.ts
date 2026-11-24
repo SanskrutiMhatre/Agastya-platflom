@@ -31,3 +31,15 @@ export const jssApi = {
   save: (id: string, xml: string, baseHash?: string) => put<{ hash: string; report: JssReport }>(P(id), { xml, baseHash }),
   validate: (id: string, xml?: string) => post<JssReport>(`${P(id)}/validate`, xml === undefined ? {} : { xml }),
 };
+
+export interface AncillaryPage { id: string; label: string; title: string | null; customTitle: string; enabled: boolean; required: boolean; file: string | null; edited: boolean }
+const A = (id: string) => `/api/projects/${id}/ancillary`;
+
+/** The pages before the body of a JSS document: which are printed, and what each says. */
+export const ancillaryApi = {
+  list: (id: string) => get<{ pages: AncillaryPage[] }>(A(id)).then((r) => r.pages),
+  choose: (id: string, pages: Array<{ id: string; enabled?: boolean; title?: string }>) => put<{ pages: AncillaryPage[] }>(A(id), { pages }).then((r) => r.pages),
+  read: (id: string, page: string) => get<{ page: AncillaryPage; xml: string }>(`${A(id)}/${page}`),
+  save: (id: string, page: string, xml: string) => put<{ page: AncillaryPage }>(`${A(id)}/${page}`, { xml }).then((r) => r.page),
+  reset: (id: string, page: string) => post<{ page: AncillaryPage; xml: string }>(`${A(id)}/${page}/reset`, {}),
+};

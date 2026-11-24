@@ -287,7 +287,7 @@ test('document types: a User Handbook project starts with its seven chapters and
   assert.equal(st.templateRef, 'uhb');
   assert.equal(st.house.layout.fonts.family, 'Arial');
   assert.equal(st.house.layout.fonts.bodySize, '12pt');
-  assert.equal(st.house.layout.chapterTitleSize, '18pt');
+  assert.equal(st.house.layout.chapterTitleSize, '21pt');      // the owner's decision of 2026-11-24 (commit eb43711): chapter titles are 20-22 pt; the seeded templates say 21
   const def = (await writer.get(`/api/projects/${pid}/settings`)).json;
   assert.equal(def.house.layout.fonts.family, 'Helvetica', 'the default house style is untouched');
 

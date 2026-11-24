@@ -342,3 +342,26 @@ test('the Part IV volumes keep the handbook frame but have no chapter divider', 
     const pages = raw.split('\f'); assert.ok(pages.some((p) => /Chapter 1/.test(p) && /Page \| 1-1/.test(flat(p))), `${id}: the chapter opens on page 1-1`);
   }
 });
+
+// ── the ancillary-pages editor (owner's commit eb43711) on the Naval types ───────────────────────────────────────────────────────────
+
+test('ancillary pages of the Naval types: the editor lists the pages the stencil has, and choosing one page does not switch the other choices of the stencil back on', { timeout: 600000 }, async () => {
+  // a list stencil brings its own page list (no Associated Handbooks, Change Notice or Cautions; "AMENDMENTS"); Vol 2 has no Abbreviations or List of tables
+  const p = await create('naval-mrls', 'MRLS ancillary'); const A = `${p.U}/ancillary`;
+  const before = (await w.get(A)).json.pages; const by = (pages) => Object.fromEntries(pages.map((x) => [x.id, x]));
+  for (const id of ['associatedHandbooks', 'cautionsNotes', 'changeNotice', 'listOfFigures']) assert.equal(by(before)[id].enabled, false, `${id}: the list stencil has no such page`);
+  assert.equal(by(before).recordOfChanges.title, 'AMENDMENTS'); assert.equal(by(before).listOfAbbreviations.title, 'ABBREVIATIONS'); assert.equal(by(before).descriptionOfSymbols.enabled, true);
+
+  const after = await w.put(A, { pages: [{ id: 'demolition', enabled: false }] }); assert.equal(after.status, 200);
+  assert.equal(by(after.json.pages).demolition.enabled, false, 'the page that was chosen');
+  for (const id of ['associatedHandbooks', 'cautionsNotes', 'changeNotice', 'listOfFigures']) assert.equal(by(after.json.pages)[id].enabled, false, `${id}: still off after choosing another page`);
+  assert.equal(by(after.json.pages).recordOfChanges.title, 'AMENDMENTS', "the stencil's heading is kept"); assert.deepEqual(after.json.pages.map((x) => x.id), before.map((x) => x.id), 'the print order is unchanged');
+  const flat = text(await build(p.U)).replace(/s+/g, ' ');
+  assert.ok(!/ASSOCIATED HANDBOOKS/.test(flat) && !/CHANGE NOTICE/.test(flat), 'the pages the stencil does not have are still not printed'); assert.match(flat, /AMENDMENTS/); assert.ok(!/DEMOLITION OF EQUIPMENT/.test(flat), 'the page that was switched off');
+
+  // a page the stencil does not have is not offered at all (the same list the build uses)
+  const v2 = (await w.get(`${(await create('naval-tm-4-2', 'V2 ancillary')).U}/ancillary`)).json.pages.map((x) => x.id);
+  assert.ok(!v2.includes('listOfAbbreviations') && !v2.includes('listOfTables'), 'Vol 2 has no Abbreviations or List of tables');
+  const ds = (await w.get(`${(await create('naval-uhb', 'UHB ancillary')).U}/ancillary`)).json.pages;
+  assert.ok(ds.some((x) => x.id === 'associatedHandbooks' && x.enabled), 'a handbook stencil has the Associated Handbooks page');
+});

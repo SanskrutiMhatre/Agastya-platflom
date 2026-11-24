@@ -328,16 +328,14 @@
                         <xsl:with-param name="align">left</xsl:with-param>
                     </xsl:call-template>
                 </fo:static-content>
-                <!-- xignal-jss: the pad pages that close a prelim part carry the running head and foot, as the reference's do (the stencil's
-                     own blank pages stay bare). A forced blank page is always a verso. -->
-                <xsl:if test="$xjss">
-                    <fo:static-content flow-name="prelim-before-blank">
-                        <xsl:call-template name="running-head"><xsl:with-param name="align">left</xsl:with-param></xsl:call-template>
-                    </fo:static-content>
-                    <fo:static-content flow-name="prelim-after-blank">
-                        <xsl:call-template name="running-foot"><xsl:with-param name="align">left</xsl:with-param></xsl:call-template>
-                    </fo:static-content>
-                </xsl:if>
+                <!-- The pad pages that close a prelim part carry the running head and foot, as every other page does (in every profile, not only xignal-jss).
+                     A forced blank page is always a verso. -->
+                <fo:static-content flow-name="prelim-before-blank">
+                    <xsl:call-template name="running-head"><xsl:with-param name="align">left</xsl:with-param></xsl:call-template>
+                </fo:static-content>
+                <fo:static-content flow-name="prelim-after-blank">
+                    <xsl:call-template name="running-foot"><xsl:with-param name="align">left</xsl:with-param></xsl:call-template>
+                </fo:static-content>
                 <!-- Note: no static-content for prelim-blank-body — the XSL-FO
                      spec forbids static-content targeting region-body, so the
                      "intentionally left blank" text there comes from a
@@ -460,6 +458,23 @@
                 </xsl:call-template>
             </fo:static-content>
             <fo:static-content flow-name="body-after-even">
+                <xsl:call-template name="running-foot">
+                    <xsl:with-param name="align">left</xsl:with-param>
+                    <xsl:with-param name="chapter-number" select="$chapter-number"/>
+                    <xsl:with-param name="page-h" select="$page-h"/>
+                    <xsl:with-param name="page-w" select="$page-w"/>
+                    <xsl:with-param name="classification-color">black</xsl:with-param>
+                </xsl:call-template>
+            </fo:static-content>
+            <!-- The pad page that closes a chapter carries the running head, the foot and the page number like any other page; only the region-body
+                 legend ("This page is intentionally left blank") comes from the background image. A forced blank page is always a verso. -->
+            <fo:static-content flow-name="body-before-blank">
+                <xsl:call-template name="running-head">
+                    <xsl:with-param name="align">left</xsl:with-param>
+                    <xsl:with-param name="classification-color">black</xsl:with-param>
+                </xsl:call-template>
+            </fo:static-content>
+            <fo:static-content flow-name="body-after-blank">
                 <xsl:call-template name="running-foot">
                     <xsl:with-param name="align">left</xsl:with-param>
                     <xsl:with-param name="chapter-number" select="$chapter-number"/>
