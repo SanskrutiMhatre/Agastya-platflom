@@ -14,12 +14,12 @@ import fs from 'fs';
 import type { Express } from 'express';
 import { requireAuth, requireProject, audit } from '../context';
 import { wrap, bad, notFound } from '../services/http';
-import { JSS_TYPES, jssTypeById } from '../services/jss/registry';
+import { JSS_TYPES, jssTypeById, tableTemplatesOf } from '../services/jss/registry';
 import { JSS_XSD, isJssAuthored, jssTypeOfProject, readSource, writeSource, validateJss } from '../services/jss/service';
 
 export function registerJssRoutes(app: Express): void {
   app.get('/api/jss/types', requireAuth(), wrap((_req, res) => {
-    res.json({ types: JSS_TYPES.map((t) => ({ id: t.id, label: t.label, stencil: t.stencil, bodyKind: t.bodyKind, ready: t.ready, notReady: t.notReady, chapters: (t.chapters ?? []).map((c) => c.title), maxDepth: t.maxDepth })) });
+    res.json({ types: JSS_TYPES.map((t) => ({ id: t.id, label: t.label, stencil: t.stencil, domain: t.domain, bodyKind: t.bodyKind, ready: t.ready, notReady: t.notReady, chapters: (t.chapters ?? []).map((c) => c.title), maxDepth: t.maxDepth })) });
   }));
   app.get('/api/jss/schema', requireAuth(), wrap((_req, res) => { res.type('application/xml').send(fs.readFileSync(JSS_XSD, 'utf8')); }));
 
@@ -34,6 +34,8 @@ export function registerJssRoutes(app: Express): void {
     res.json({
       docType: type?.id ?? null, label: type?.label ?? null, bodyKind: type?.bodyKind ?? null, stencil: type?.stencil ?? null,
       chapters: (type?.chapters ?? []).map((c) => c.title), maxDepth: type?.maxDepth ?? 5,
+      domain: type?.domain ?? null, chapterRule: type?.chapterRule ?? 'fixed', sectionsFixed: !!type?.sectionsFixed, bodyPage: type?.bodyPage ?? null, tableTemplates: tableTemplatesOf(type),
+      chapterStarter: type?.chapterRule === 'free' ? (type.chapters?.[0] ?? null) : null,
       xml, hash, report: await validateJss(req.project.id, xml),
     });
   }));
@@ -57,6 +59,6 @@ export function registerJssRoutes(app: Express): void {
   app.get('/api/jss/types/:type', requireAuth(), wrap((req, res) => {
     const t = jssTypeById(req.params.type);
     if (!t) throw notFound('No such JSS document type.');
-    res.json({ id: t.id, label: t.label, ready: t.ready, notReady: t.notReady, chapters: t.chapters ?? [] });
+    res.json({ id: t.id, label: t.label, domain: t.domain, bodyKind: t.bodyKind, ready: t.ready, notReady: t.notReady, coverTitle: t.coverTitle, chapterRule: t.chapterRule ?? 'fixed', bodyPage: t.bodyPage ?? null, chapters: t.chapters ?? [] });
   }));
 }

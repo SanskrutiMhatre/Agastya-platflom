@@ -93,3 +93,32 @@ the 28 files of `vendor/pipeline/s1000dtofo/` are byte-identical to before; and 
 | JSS-authored UHB, MM, ORM | differ, as intended |
 
 **To undo** a parameter: remove its `xsl:param` and the use of it, and its entry in `layoutParamsFor`.
+
+## Exceptions: the Naval types (2026-11-24, made under the standing brief "small, parameterised, old behaviour as default")
+
+Five more stylesheet parameters, for the ten Naval stencils. Same method as above: **each is declared with the old behaviour as its default**, is set only by the JSS authoring
+build (`layoutParamsFor`, from fields of the registry type), and is not sent to an S1000D build, an imported JSS book or the old JSS User Handbook path.
+
+| Parameter | Declared in | Default (= before) | Why | Set by (registry field) |
+|---|---|---|---|---|
+| `chapter.pageBreak` | `jsstofo/jsstofo.xsl`, used in `jsstofo/body.xsl` | `0` | A `<pageBreak/>` written directly in a chapter (not in a section) was never selected by the chapter template and was dropped silently. It is a defect for the Land types too; fixing it for every document would change old output, so it is on for JSS-authored books only | every JSS-authored book |
+| `chapter.divider` | `jsstofo/jsstofo.xsl`, used in `jsstofo/body.xsl` | `1` | A chapter with sections always began with a portrait divider page (heading + topics list). The MRLS, Complete Equipment Schedule and the Part IV volumes have none: the heading opens the first body page, which is folio 1-1. With `0` the heading is passed to `emit-orientation-runs` as `lead` and that first run claims the folio restart the divider had | `chapterDivider: false` |
+| `roc.layout` | `jsstofo/frontmatter.xsl` (shared) | `change-notice` | MRLS, CES and SMT/STE print an **Amendments** table of five columns (Sr. No., Page No., Para Reference, Amendment / Required, Authority with Ref No. & Date), 21 blank rows, instead of the four-column Change Notice table | `listFrame: true` |
+| `abbrev.layout` | `jsstofo/frontmatter.xsl` (shared) | `description` | the same stencils number the abbreviations: Sr. No. / Abbreviations issued / For (16 blank rows) instead of Abbreviations / Description | `listFrame: true` |
+| `safety.footer.show` | `jsstofo/frontmatter.xsl` (shared) | `1` | the same stencils have no "FOR FIRST AID IN CASE OF ELECTRIC SHOCK SEE ..." line under the WARNING | `listFrame: true` |
+
+The labels of the two new tables (`fm.label.amend.*`, `fm.label.abbrev.colSrNo/colIssued/colFor`) are declared in `jsstofo/frontmatter.xsl` next to the switches, **not** in `jsstofo.xsl`:
+`frontmatter.xsl` is included by the S1000D direct engine, which declares none of them, so a label declared anywhere else would be an unresolved variable there. They are empty by
+default and fall back to the English wording in the template (`fm-label`), exactly like the labels that exist.
+
+**Isolation, proved again** (`backend/test/jss-cover-isolation.test.js`, all its tests pass): every parameter of this and the sections above is found only in the files named (the six
+declared in `frontmatter.xsl`, which the S1000D direct engine also includes, only there; the others only in `jsstofo/`); none is in `s1000dtofo/` or `s1000dtojss/`; none is set in `publisher.ts`; each default is
+asserted as written above; the normalised XSL-FO of the S1000D direct engine, of S1000D through JSS and of the old JSS User Handbook is
+identical to the baseline captured before any of these changes. (The baseline carries `capturedOn`: those documents print the build date, so the comparison maps today's date to the
+capture date; without that the guard failed on the date alone, not on a layout change.)
+
+**Other changes made for the Naval types that are not vendor changes:** the registry (`registry-naval.ts`), the schema enum and `Chapter/@orientation`, the stencil tables and publisher
+block (`NAVAL_PUBLISHER`, copied into the project as `Media/publisher-logo.png` + `project.json`), `HeadCell.open` (a head cell whose words are the author's, not the stencil's, so the
+head check ignores it: the MRLS "Recommended Nos. for 52 Systems for Two Years").
+
+**To undo** a parameter: remove its `xsl:param`, the branch that uses it, its entry in `layoutParamsFor` and its row in this table and in the isolation test.

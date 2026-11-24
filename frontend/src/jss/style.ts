@@ -59,6 +59,10 @@ export const JSS_CSS = `
 .jss-ch-no { font-size: 18pt; font-weight: 700; margin-bottom: 1mm; text-align: left; }
 .jss-ch-title { font-size: 18pt; font-weight: 700; border-bottom: 1pt solid #000; padding-bottom: 2mm; margin-bottom: 6mm; text-align: left; }
 .jss-ch-lock { font-size: 9pt; font-weight: 400; color: #6b7280; margin-left: 8px; font-family: system-ui, sans-serif; }
+.jss-chapter { position: relative; }
+.jss-chapter:hover > .jss-ch-tools, .jss-chapter:focus-within > .jss-ch-tools { display: inline-flex; }
+.jss-addch { display: block; margin: 10mm 0 0; padding: 6px 14px; border: 1px dashed var(--border-strong, #9aa0a6); border-radius: 6px; background: none; color: var(--text, inherit); font: 13px system-ui, sans-serif; cursor: pointer; }
+.jss-addch:hover { background: var(--bg-hover, rgba(0,0,0,.05)); }
 
 .jss-sec { margin-top: 0; position: relative; }
 .jss-sec-head { display: flex; align-items: baseline; margin-top: 4.2mm; margin-bottom: 2.1mm; font-weight: 700; text-align: left; break-after: avoid; }

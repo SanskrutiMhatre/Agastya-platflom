@@ -37,7 +37,8 @@ export interface PageBreak { k: 'pageBreak' }
 
 export type Block = Para | List | Table | Figure | Notice | PageBreak;
 export interface Section { k: 'section'; id?: string; title: string; orientation?: Orientation; children: Array<Block | Section> }
-export interface Chapter { k: 'chapter'; number: number; id?: string; title: string; children: Array<Block | Section> }
+/** A chapter's page (the stencil sets it for a landscape body: MRLS on A3, the SMT / STE list and Part IV on A4 landscape); none = portrait. */
+export interface Chapter { k: 'chapter'; number: number; id?: string; title: string; orientation?: Orientation; children: Array<Block | Section> }
 
 /** The identity fields of <bookmeta>, in the order the author sees them. */
 export const META_FIELDS: Array<{ key: string; label: string; hint?: string }> = [
@@ -87,6 +88,41 @@ export const newList = (type: ListType | undefined, items = 1): List => ({ k: 'l
 export const newNotice = (kind: NoticeKind): Notice => ({ k: kind, paras: [para()] });
 export const newFigure = (src: string, id?: string): Figure => ({ k: 'figure', id, title: '', graphics: [{ src }], legend: [] });
 export const newSection = (title: string, id?: string): Section => ({ k: 'section', id, title, children: [] });
+export const newChapter = (number: number, title: string, id?: string, orientation?: Orientation): Chapter => ({ k: 'chapter', number, id, title, orientation, children: [] });
+
+// ── What the stencil fixes, as the server hands it over (backend/src/services/jss/registry.ts) ─────────────────────────────────────
+
+/** One cell of a stencil table's head. */
+export interface HeadCell { text: string; colspan?: number; rowspan?: number; open?: boolean }
+/** A table the stencil fixes: its widths (proportions), its head, the blank rows a new one starts with, its caption, and the section it belongs to (null: any). */
+export interface TableTemplate { widths: string; head: HeadCell[][]; blankRows: number; caption?: string; forSection?: string | null }
+/** A heading of the stencil's outline, with what the stencil puts under it. */
+export interface OutlineNode { title: string; children?: OutlineNode[]; example?: boolean; table?: TableTemplate; intro?: string; figuresHeading?: string }
+
+/** The columns of a stencil table: the cells of its first head row, each as wide as it spans. */
+export const templateColumns = (t: TableTemplate): number => t.head[0].reduce((n, c) => n + (c.colspan ?? 1), 0);
+
+/** A table as the stencil has it: its head as the stencil merges it, its widths and caption, and blank rows to fill. */
+export function tableFromTemplate(t: TableTemplate, id?: string): Table {
+  const head = t.head.map((r): Row => ({ cells: r.map((c): Cell => ({ colspan: c.colspan && c.colspan > 1 ? c.colspan : undefined, rowspan: c.rowspan && c.rowspan > 1 ? c.rowspan : undefined, parts: [inlinePart(c.text)] })) }));
+  return { k: 'table', id, widths: t.widths, title: t.caption ?? '', head, body: Array.from({ length: Math.max(1, t.blankRows) }, () => newRow(templateColumns(t))) };
+}
+
+/**
+ * A chapter started from the stencil's outline (the first chapter of a type whose chapters are the author's: its sections, the tables under them, the sentence before a table,
+ * the figures heading). Examples the stencil only shows ("Assembly-1") are left out, as in the starting document the server writes.
+ */
+export function chapterFromOutline(doc: JssDoc, node: OutlineNode, number: number, orientation?: Orientation): Chapter {
+  const build = (n: OutlineNode): Array<Block | Section> => {
+    const out: Array<Block | Section> = [];
+    if (n.intro) out.push(para(n.intro));
+    if (n.table) out.push({ ...tableFromTemplate(n.table, newId(doc, 't')) });
+    if (n.figuresHeading) out.push({ k: 'pageBreak' }, { k: 'para', align: 'center', inline: [{ t: 'mark', mark: 'b', children: [text(n.figuresHeading)] }] });
+    for (const c of (n.children ?? []).filter((x) => !x.example)) out.push({ ...newSection(c.title, newId(doc, 's')), children: build(c) });
+    return out;
+  };
+  return { ...newChapter(number, node.title, newId(doc, 'c'), orientation), children: build(node) };
+}
 
 // ── Plain text of inline runs (for titles, labels and search) ───────────────────────────────────────────────────────────────────
 

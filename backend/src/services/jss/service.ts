@@ -16,7 +16,7 @@ import { bad, conflict, HttpError } from '../http';
 import { parseTree, walk, norm, type MNode } from '../miniXml';
 import { wellFormedError } from '../wellFormed';
 import { readProjectJson, updateProjectJson, pmRel } from '../projects';
-import { jssTypeById, skeletonOf, type JssDocType, type OutlineNode } from './registry';
+import { jssTypeById, type JssDocType, type OutlineNode, type TableTemplate } from './registry';
 
 const { validateXML } = require('xmllint-wasm');
 const { bookmetaXml } = vendor('engine/frontmatterInject');
@@ -50,14 +50,35 @@ export function sourcePath(projectId: string): string {
 
 export interface NewDocInput { bookName?: string; systemName?: string }
 
-function outlineXml(nodes: OutlineNode[], depth: number, ids: { n: number }, chapterNo?: number): string {
+/** The columns of a stencil table: the cells of the first head row, each as wide as it spans. */
+export const columnsOf = (t: TableTemplate): number => t.head[0].reduce((n, c) => n + (c.colspan ?? 1), 0);
+
+/** A stencil table as XML: its head as the stencil merges it, and `blankRows` empty rows for the author to fill. */
+export function tableXml(t: TableTemplate, id: string, pad: string): string {
+  const cell = (c: { text: string; colspan?: number; rowspan?: number }): string =>
+    `<cell${c.colspan && c.colspan > 1 ? ` colspan="${c.colspan}"` : ''}${c.rowspan && c.rowspan > 1 ? ` rowspan="${c.rowspan}"` : ''}>${esc(c.text)}</cell>`;
+  const head = t.head.map((r) => `${pad}    <row>${r.map(cell).join('')}</row>`).join('\n');
+  const empty = `${pad}    <row>${'<cell/>'.repeat(columnsOf(t))}</row>`;
+  const body = Array.from({ length: Math.max(1, t.blankRows) }, () => empty).join('\n');
+  return `${pad}<table id="${id}" widths="${t.widths}">\n${t.caption ? `${pad}  <title>${esc(t.caption)}</title>\n` : ''}${pad}  <thead>\n${head}\n${pad}  </thead>\n${pad}  <tbody>\n${body}\n${pad}  </tbody>\n${pad}</table>`;
+}
+
+interface Skeleton { ids: { n: number }; page?: string }
+
+/** The starting outline of a type: the stencil's own headings and the tables it puts under them, and nothing the stencil does not have. Examples ("Assembly-1") are left out. */
+function outlineXml(nodes: OutlineNode[], depth: number, sk: Skeleton): string {
   const pad = '  '.repeat(depth + 1);
-  return nodes.map((n, i) => {
-    const id = `${depth === 0 ? 'c' : 's'}${++ids.n}`;
-    const open = depth === 0 ? `<chapter number="${i + 1}" id="${id}">` : `<section id="${id}">`;
+  return nodes.filter((n) => !n.example).map((n, i) => {
+    const id = `${depth === 0 ? 'c' : 's'}${++sk.ids.n}`;
+    const open = depth === 0 ? `<chapter number="${i + 1}" id="${id}"${sk.page ? ` orientation="${sk.page}"` : ''}>` : `<section id="${id}">`;
     const close = depth === 0 ? '</chapter>' : '</section>';
-    const inner = n.children?.length ? '\n' + outlineXml(n.children, depth + 1, ids) + '\n' + pad : '';
-    return `${pad}${open}<title>${esc(n.title)}</title>${inner}${close}`;
+    const own: string[] = [];
+    if (n.intro) own.push(`${pad}  <para>${esc(n.intro)}</para>`);
+    if (n.table) own.push(tableXml(n.table, `t${++sk.ids.n}`, `${pad}  `));
+    if (n.figuresHeading) own.push(`${pad}  <pageBreak/>`, `${pad}  <para align="center"><b>${esc(n.figuresHeading)}</b></para>`);
+    const kids = n.children?.some((c) => !c.example) ? outlineXml(n.children, depth + 1, sk) : '';
+    const inner = [...own, kids].filter(Boolean).join('\n');
+    return `${pad}${open}<title>${esc(n.title)}</title>${inner ? '\n' + inner + '\n' + pad : ''}${close}`;
   }).join('\n');
 }
 
@@ -66,7 +87,7 @@ export function skeletonXml(type: JssDocType, input: NewDocInput = {}): string {
   if (!type.ready || !type.chapters) throw bad(`${type.label}: ${type.notReady ?? 'not available yet'}`, 'JSS_TYPE_NOT_READY');
   const now = new Date();
   const month = now.toLocaleString('en-GB', { month: 'long' });
-  const ids = { n: 0 };
+  const sk: Skeleton = { ids: { n: 0 }, page: type.bodyPage };
   return `<?xml version="1.0" encoding="UTF-8"?>
 <jssbook docType="${type.id}" schemaVersion="${JSS_SCHEMA_VERSION}">
   <bookmeta>
@@ -76,7 +97,7 @@ export function skeletonXml(type: JssDocType, input: NewDocInput = {}): string {
     <year>${now.getFullYear()}</year>
   </bookmeta>
   <body>
-${outlineXml(skeletonOf(type.chapters), 0, ids)}
+${outlineXml(type.chapters, 0, sk)}
   </body>
 </jssbook>
 `;
@@ -178,15 +199,50 @@ export async function validateJss(projectId: string | null, xml: string): Promis
   const chapters = body?.children.filter((c) => c.name === 'chapter') ?? [];
   const expected = type.chapters ?? [];
 
-  // the stencil fixes the chapters and their order
-  if (chapters.length !== expected.length || chapters.some((c, i) => !sameTitle(titleOf(c), expected[i].title))) {
+  // A table the stencil fixes: the columns must be the stencil's (the pipeline lays the table out on them), the head should be (its wording is the author's to adapt:
+  // figures and brackets are not compared, and a cell the stencil marks `open` ("Recommended Nos. for 52 Systems for Two Years") is only required to be there).
+  const headKey = (s: string): string => norm(s).toLowerCase().replace(/\([^)]*\)/g, '').replace(/[^a-z]/g, '');
+  const headOf = (t: MNode): string[] => (t.children.find((c) => c.name === 'thead')?.children ?? []).filter((r) => r.name === 'row').flatMap((r) => r.children.filter((c) => c.name === 'cell').map((c) => headKey(c.text)));
+  const checkTemplate = (t: MNode, tpl: TableTemplate, what: string): void => {
+    let cols = 0;
+    for (const g of t.children.filter((c) => c.name === 'thead' || c.name === 'tbody')) cols = Math.max(cols, gridOf(g.children.filter((r) => r.name === 'row')).columns);
+    const want = columnsOf(tpl);
+    if (cols !== want) { add('error', 'JSS-TABLE-TEMPLATE', `${what} has ${cols} column${cols === 1 ? '' : 's'}; the stencil's has ${want}.`, t); return; }
+    if (!t.children.some((c) => c.name === 'thead')) { add('error', 'JSS-TABLE-TEMPLATE', `${what} has no head row; the stencil's head is: ${tpl.head[0].map((c) => c.text).join(' | ')}.`, t); return; }
+    const have = headOf(t); const exp = tpl.head.flatMap((r) => r.map((c) => (c.open ? '' : headKey(c.text))));
+    if (have.length !== exp.length || exp.some((e, i) => e && e !== have[i])) add('warning', 'JSS-TABLE-HEAD', `${what}: the head differs from the stencil's (${tpl.head[0].map((c) => c.text).join(' | ')}).`, t);
+  };
+
+  if (type.chapterRule === 'free') {
+    // the chapters are the author's (one per system or sub-system); the stencil only requires that there is at least one
+    if (!chapters.length) add('error', 'JSS-CHAPTERS', `A ${type.label} has at least one chapter (one for each system or sub-system it covers).`, body ?? root);
+  } else if (chapters.length !== expected.length || chapters.some((c, i) => !sameTitle(titleOf(c), expected[i].title))) {
+    // the stencil fixes the chapters and their order
     const have = chapters.map(titleOf);
     const missing = expected.filter((e) => !have.some((h) => sameTitle(h, e.title))).map((e) => e.title);
     const extra = have.filter((h) => !expected.some((e) => sameTitle(h, e.title)));
     const why = [missing.length ? `missing: ${missing.join('; ')}` : '', extra.length ? `not in the stencil: ${extra.join('; ')}` : '', !missing.length && !extra.length ? 'the order differs' : ''].filter(Boolean).join(' | ');
-    add('error', 'JSS-CHAPTERS', `A ${type.label} has the ${expected.length} chapters of its stencil, in order (${why}).`, body ?? root);
+    add('error', 'JSS-CHAPTERS', `A ${type.label} has the ${expected.length} chapter${expected.length === 1 ? '' : 's'} of its stencil, in order (${why}).`, body ?? root);
   }
   chapters.forEach((c, i) => { if (Number(c.attrs.number) !== i + 1) add('error', 'JSS-CHAPTER-NUMBER', `Chapter "${titleOf(c)}" is numbered ${c.attrs.number}; its position makes it chapter ${i + 1}.`, c); });
+  // a stencil on landscape pages sets every chapter on them (the pipeline reads it from the chapter)
+  if (type.bodyPage) chapters.forEach((c) => { if (c.attrs.orientation !== type.bodyPage) add('warning', 'JSS-PAGE', `The stencil of a ${type.label} sets its pages ${type.bodyPage}; chapter "${titleOf(c)}" is ${c.attrs.orientation ?? 'portrait'}.`, c); });
+  // the Complete Equipment Schedule's stencil also fixes the sections under its chapter
+  if (type.sectionsFixed && type.chapterRule !== 'free') {
+    chapters.forEach((c, i) => {
+      const want = (expected[i]?.children ?? []).filter((n) => !n.example).map((n) => n.title);
+      const have = c.children.filter((k) => k.name === 'section').map(titleOf);
+      if (want.length !== have.length || want.some((w, k) => !sameTitle(w, have[k]))) add('error', 'JSS-SECTIONS', `Chapter "${titleOf(c)}" has the sections of its stencil, in order: ${want.join('; ')}.`, c);
+      // each of those sections holds the table the stencil gives it
+      (expected[i]?.children ?? []).filter((n) => !n.example && n.table).forEach((n) => {
+        const sec = c.children.find((k) => k.name === 'section' && sameTitle(titleOf(k), n.title));
+        if (!sec) return;
+        const tables = sec.children.filter((k) => k.name === 'table');
+        if (!tables.length) add('error', 'JSS-TABLE-MISSING', `The section "${n.title}" has no table; the stencil puts one there.`, sec);
+        tables.forEach((tb) => checkTemplate(tb, n.table!, `The table of "${n.title}"`));
+      });
+    });
+  }
 
   // headings: depth
   const depthOf = (n: MNode): number => { let d = 1; for (let p = n.parent; p; p = p.parent) if (p.name === 'section' || p.name === 'chapter') d++; return d; };
@@ -202,7 +258,8 @@ export async function validateJss(projectId: string | null, xml: string): Promis
   // tables: the stencil captions every table; rows must agree on the number of columns
   for (const t of walk(root)) {
     if (t.name === 'table') {
-      if (!t.children.some((c) => c.name === 'title')) add('warning', 'JSS-TABLE-CAPTION', 'A table without a caption: the stencil numbers and captions every table ("Table 11: ...").', t);
+      if (type.captionTables !== false && !t.children.some((c) => c.name === 'title')) add('warning', 'JSS-TABLE-CAPTION', 'A table without a caption: the stencil numbers and captions every table ("Table 11: ...").', t);
+      if (type.tableTemplate) checkTemplate(t, type.tableTemplate, 'This table');
       const spec = t.attrs.widths && t.attrs.widths.trim().split(/\s+/).length;
       let cols = 0; const byGroup: Record<string, number> = {};
       for (const g of t.children.filter((c) => c.name === 'thead' || c.name === 'tbody')) {
@@ -279,14 +336,19 @@ export const STENCIL_HEADING_FONT = 'Arial Narrow,Arial,Liberation Sans,DejaVu S
  *   heading.1.bodyIndent       text under a first-level heading starts at 7 mm (the style's indent)
  *   heading.1.gap              while the heading's own text starts at 8 mm from its number (the engine otherwise ties the two together)
  *   cover.title.split          the MM and ORM covers set their title on two lines
- *   foreword.documentNo.show   the stencil foreword has no "L&T Document No." line
+ *   foreword.documentNo.show   the Land stencils' foreword has no "L&T Document No." line; the Naval handbooks' has (the registry says which)
  *   cover.inbr.show            only a cover whose stencil has an INBR No. line (UHB2) keeps it
+ *   roc.layout, abbrev.layout, safety.footer.show   the list stencils' Amendments table, numbered abbreviations and safety warning without the first-aid line (registry: listFrame)
+ *   chapter.divider            the list stencils and Part IV have no chapter divider page: the chapter opens with its heading (registry: chapterDivider)
+ *   chapter.pageBreak          a page break the author places directly in a chapter (the figure sheet of the SMT / STE list) breaks the page, as it does in a section
  */
 export function layoutParamsFor(type: JssDocType, base: Array<[string, string]>): Array<[string, string]> {
   const set: Array<[string, string]> = [
-    ['para.after', '0mm'], ['heading.1.font', STENCIL_HEADING_FONT], ['heading.1.bodyIndent', '7mm'], ['heading.1.gap', '8mm'], ['cover.title.split', '1'], ['foreword.documentNo.show', '0'],
+    ['para.after', '0mm'], ['heading.1.font', STENCIL_HEADING_FONT], ['heading.1.bodyIndent', '7mm'], ['heading.1.gap', '8mm'], ['cover.title.split', '1'], ['foreword.documentNo.show', type.forewordDocumentNo ? '1' : '0'], ['chapter.pageBreak', '1'],
   ];
   if (!type.coverInbr) set.push(['cover.inbr.show', '0']);
+  if (type.listFrame) set.push(['roc.layout', 'amendments'], ['abbrev.layout', 'numbered'], ['safety.footer.show', '0']);
+  if (type.chapterDivider === false) set.push(['chapter.divider', '0']);
   const names = new Set(set.map(([n]) => n));
   return [...base.filter(([n]) => !names.has(n)), ...set];
 }
@@ -321,8 +383,7 @@ export function composeBook(projectId: string, effective: any): { text: string; 
   const rows: string[] = [];
   for (const page of enabledPages(effective?.frontMatter) as any[]) {
     if (page.id === 'titlePageJoint' && !joint) continue;
-    if (page.id === 'cautionsNotes' && type?.frontPages && !type.frontPages.cautionsNotes) continue;        // this stencil has no such page
-    if (page.id === 'systemNamePage' && type?.frontPages && !type.frontPages.systemNamePage) continue;
+    if (type?.omitPages?.includes(page.id)) continue;                                                       // this stencil has no such page
     if (page.element) rows.push(page.file && have.has(page.file) ? `    <xi:include href="${fmRel}/${page.file}"/>` : `    <${page.element}/>`);
     else if (page.file && have.has(page.file)) rows.push(`    <xi:include href="${fmRel}/${page.file}"/>`);
   }
@@ -348,5 +409,18 @@ export function createInitialDocument(projectId: string, type: JssDocType, input
   const abs = sourcePath(projectId);
   fs.mkdirSync(path.dirname(abs), { recursive: true });
   fs.writeFileSync(abs, skeletonXml(type, input), 'utf8');
-  updateProjectJson(projectId, (pj) => { pj.authoring = 'jss-xml'; pj.jssDocType = type.id; pj.jssSchemaVersion = JSS_SCHEMA_VERSION; });
+  // the publisher block of this stencil's cover, with the default publisher logo in the project's Media folder (Settings > Branding can change both)
+  let logo: string | undefined;
+  if (type.publisher) {
+    const source = path.resolve(__dirname, '..', '..', '..', 'assets', 'default-publisher-logo.png');
+    if (fs.existsSync(source)) {
+      fs.mkdirSync(path.join(projectDirFor(projectId), 'Media'), { recursive: true });
+      fs.copyFileSync(source, path.join(projectDirFor(projectId), 'Media', 'publisher-logo.png'));
+      logo = 'Media/publisher-logo.png';
+    }
+  }
+  updateProjectJson(projectId, (pj) => {
+    pj.authoring = 'jss-xml'; pj.jssDocType = type.id; pj.jssSchemaVersion = JSS_SCHEMA_VERSION;
+    if (type.publisher) pj.publishers = [{ ...type.publisher, ...(logo ? { logo } : {}) }];
+  });
 }

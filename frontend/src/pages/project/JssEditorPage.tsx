@@ -71,6 +71,7 @@ export function JssEditorPage() {
     catch (e) { setError(e instanceof JssParseError ? `The editor cannot open this document: ${e.message}` : errText(e)); return; }
     const editor = new JssEditor(hostRef.current, {
       doc, maxDepth: loaded.maxDepth, readOnly: !writable,
+      chapterRule: loaded.chapterRule, sectionsFixed: loaded.sectionsFixed, tableTemplates: loaded.tableTemplates, chapterStarter: loaded.chapterStarter,
       host: {
         graphics: async (): Promise<GraphicInfo[]> => (await graphicsApi.list(id)).map((g) => ({ src: `${g.dir === 'csdb' ? 'csdb' : 'Media'}/${g.name}`, name: g.name, url: graphicsApi.url(id, g.name) })),
         uploadGraphic: async (file: File): Promise<GraphicInfo> => {

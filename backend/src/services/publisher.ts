@@ -117,9 +117,11 @@ function prepareInput(projectId: string, project: any, effective: any, useDirect
     const jt = jssTypeOfProject(projectId);
     if (jt && !project.frontMatter?.titlePage?.documentType) effective.frontMatter = { ...(effective.frontMatter ?? {}), titlePage: { ...(effective.frontMatter?.titlePage ?? {}), documentType: jt.coverTitle.join(String.fromCharCode(10)) } };      // one title line per line: the cover sets MM and ORM on two lines
     // wording that differs between the stencils (the Foreword's address and the symbols legends in MM and ORM), unless Settings word it themselves
+    // (an object is laid over the Settings' own; a list - the safety warning's lines, the page order - replaces it: spreading a list into an object would turn it into {0:..., 1:...})
     for (const [key, value] of Object.entries(jt?.frontMatter ?? {})) {
       if (project.frontMatter?.[key]) continue;
-      effective.frontMatter = { ...(effective.frontMatter ?? {}), [key]: { ...(effective.frontMatter?.[key] ?? {}), ...(value as object) } };
+      const layered = Array.isArray(value) ? value : { ...(effective.frontMatter?.[key] ?? {}), ...(value as object) };
+      effective.frontMatter = { ...(effective.frontMatter ?? {}), [key]: layered };
     }
     const book = composeBook(projectId, effective);
     fs.writeFileSync(path.join(dir, COMPOSED_NAME), book.text, 'utf8');

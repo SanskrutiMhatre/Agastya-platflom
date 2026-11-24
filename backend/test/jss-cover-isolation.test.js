@@ -16,11 +16,16 @@ const { spawnSync } = require('node:child_process');
 const { boot } = require('./helpers');
 
 const PW = 'Correct-Horse-9!';
-const BASELINE = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'cover-baseline.json'), 'utf8')).cases;
+const BASELINE_FILE = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'cover-baseline.json'), 'utf8'));
+const BASELINE = BASELINE_FILE.cases;
 const VENDOR = path.resolve(__dirname, '..', 'vendor', 'pipeline');
 
 // the same normalisation the before/after comparison used: generated ids and print stamps differ between two runs of identical code
-const norm = (s) => s.replace(/idm\d+/g, 'idm#').replace(/\b(?:ID|id)_?[A-Za-z0-9-]*?\d{6,}\b/g, 'id#').replace(/\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?/g, 'TIMESTAMP').replace(/>\s+</g, '><').replace(/\s+/g, ' ');
+// The day of the run: an S1000D build prints the day it was built ("Issue No. 001, 2026-11-24", the chapter.issue.date marker), in the local calendar or in UTC. Those are replaced
+// with the day the baseline was captured on, so the same code gives the same fingerprint on every day (a date-only string was not covered by the timestamp rule below, and the
+// guard failed from the day after the capture on although no stylesheet had changed).
+const todayForms = () => { const d = new Date(); const p = (n) => String(n).padStart(2, '0'); return [...new Set([`${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`, d.toISOString().slice(0, 10)])]; };
+const norm = (s) => s.replace(new RegExp(todayForms().join('|'), 'g'), BASELINE_FILE.capturedOn).replace(/idm\d+/g, 'idm#').replace(/\b(?:ID|id)_?[A-Za-z0-9-]*?\d{6,}\b/g, 'id#').replace(/\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?/g, 'TIMESTAMP').replace(/>\s+</g, '><').replace(/\s+/g, ' ');
 // What a fingerprint must ignore to mean "the same XSL-FO" on any machine: (1) WHERE the repository is checked out - the FO refers to the vendored stylesheet
 // folder (intentionally-blank.svg) by a relative path from the build folder, so the same code gives a different string in every folder, and a fingerprint taken in
 // one checkout could never pass in another (this was the first cause of the failures after the merge); (2) the ORDER of the attributes inside a tag, which is not
@@ -42,9 +47,12 @@ const PARAMS = {
   'heading.2.font': ['jsstofo/body.xsl', 'jsstofo/jsstofo.xsl'], 'heading.3.font': ['jsstofo/body.xsl', 'jsstofo/jsstofo.xsl'], 'heading.4.font': ['jsstofo/body.xsl', 'jsstofo/jsstofo.xsl'],
   'heading.1.gap': ['jsstofo/body.xsl', 'jsstofo/jsstofo.xsl'],
   'heading.2.gap': ['jsstofo/body.xsl', 'jsstofo/jsstofo.xsl'], 'heading.3.gap': ['jsstofo/body.xsl', 'jsstofo/jsstofo.xsl'], 'heading.4.gap': ['jsstofo/body.xsl', 'jsstofo/jsstofo.xsl'],
+  'chapter.pageBreak': ['jsstofo/body.xsl', 'jsstofo/jsstofo.xsl'],
+  'chapter.divider': ['jsstofo/body.xsl', 'jsstofo/jsstofo.xsl'],
+  'roc.layout': ['jsstofo/frontmatter.xsl'], 'abbrev.layout': ['jsstofo/frontmatter.xsl'], 'safety.footer.show': ['jsstofo/frontmatter.xsl'],
 };
-// the S1000D direct engine includes jsstofo/frontmatter.xsl and nothing else of the JSS stylesheets: only the first three can reach it, and all three default to the old behaviour
-const SHARED = new Set(['cover.inbr.show', 'cover.title.split', 'foreword.documentNo.show']);
+// the S1000D direct engine includes jsstofo/frontmatter.xsl and nothing else of the JSS stylesheets: only the parameters declared there can reach it, and every one defaults to the old behaviour
+const SHARED = new Set(['cover.inbr.show', 'cover.title.split', 'foreword.documentNo.show', 'roc.layout', 'abbrev.layout', 'safety.footer.show']);
 
 
 let h; let w;
@@ -64,7 +72,8 @@ const build = async (id) => {
 
 test('the registry says which stencil covers have an INBR No. line: only UHB2\'s does', () => {
   const { JSS_TYPES } = require('../dist/services/jss/registry');
-  assert.deepEqual(JSS_TYPES.filter((t) => t.coverInbr).map((t) => t.id), ['uhb2']);
+  const land = JSS_TYPES.filter((t) => t.domain === 'land');            // the Naval stencils have their own covers (test/jss-naval.test.js)
+  assert.deepEqual(land.filter((t) => t.coverInbr).map((t) => t.id), ['uhb2']);
   for (const id of ['uhb', 'mm', 'orm']) assert.equal(JSS_TYPES.find((t) => t.id === id).coverInbr, false, id);
 });
 
@@ -139,12 +148,16 @@ test('the exceptions stay small and isolated: each parameter lives in the files 
   // the default of each declaration is the value the stylesheets always had
   const jss = fs.readFileSync(path.join(VENDOR, 'jsstofo', 'jsstofo.xsl'), 'utf8'); const fm = fs.readFileSync(path.join(VENDOR, 'jsstofo', 'frontmatter.xsl'), 'utf8');
   assert.match(fm, /<xsl:param name="cover\.inbr\.show">1<\/xsl:param>/); assert.match(fm, /<xsl:param name="foreword\.documentNo\.show">1<\/xsl:param>/); assert.match(fm, /<xsl:param name="cover\.title\.split">0<\/xsl:param>/);
+  assert.match(jss, /<xsl:param name="chapter\.pageBreak">0<\/xsl:param>/, 'chapter.pageBreak defaults to the old behaviour');
   assert.match(jss, /<xsl:param name="para\.after"><xsl:choose><xsl:when test="\$xjss">2mm<\/xsl:when><xsl:otherwise>3mm<\/xsl:otherwise><\/xsl:choose><\/xsl:param>/);
   for (const n of ['heading.1.font', 'heading.2.font', 'heading.3.font', 'heading.4.font', 'heading.1.gap', 'heading.2.gap', 'heading.3.gap', 'heading.4.gap']) assert.match(jss, new RegExp(`<xsl:param name="${n.replace(/\./g, '\.')}"/>`), `${n} defaults to empty`);
   // who sends them: one function, called for a JSS-authored project only
   const svc = fs.readFileSync(path.join(__dirname, '..', 'src', 'services', 'jss', 'service.ts'), 'utf8'); const pub = fs.readFileSync(path.join(__dirname, '..', 'src', 'services', 'publisher.ts'), 'utf8');
   for (const n of Object.keys(PARAMS)) assert.equal((pub.match(new RegExp(n.replace(/\./g, '\.'), 'g')) || []).length, 0, `${n} is not set in publisher.ts`);
-  for (const n of ['para.after', 'heading.1.font', 'heading.1.bodyIndent', 'heading.1.gap', 'cover.title.split', 'foreword.documentNo.show', 'cover.inbr.show']) assert.equal((svc.match(new RegExp(`'${n.replace(/\./g, '\.')}'`, 'g')) || []).length, 1, `${n} is set once, in layoutParamsFor`);
+  for (const n of ['para.after', 'heading.1.font', 'heading.1.bodyIndent', 'heading.1.gap', 'cover.title.split', 'foreword.documentNo.show', 'cover.inbr.show', 'chapter.pageBreak', 'chapter.divider', 'roc.layout', 'abbrev.layout', 'safety.footer.show']) assert.equal((svc.match(new RegExp(`'${n.replace(/\./g, '\.')}'`, 'g')) || []).length, 1, `${n} is set once, in layoutParamsFor`);
   assert.match(pub, /if \(jssType\) common\.layoutParams = layoutParamsFor\(jssType, common\.layoutParams\);/); assert.match(pub, /const jssType = isJssAuthored\(projectId\) \? jssTypeOfProject\(projectId\) : undefined;/);
-  assert.ok(SHARED.size === 3);
+  assert.ok(SHARED.size === 6);
+  for (const n of SHARED) assert.deepEqual(PARAMS[n], ['jsstofo/frontmatter.xsl'], `${n}: declared and used in the one shared file`);
+  assert.match(fm, /<xsl:param name="roc\.layout">change-notice<\/xsl:param>/); assert.match(fm, /<xsl:param name="abbrev\.layout">description<\/xsl:param>/); assert.match(fm, /<xsl:param name="safety\.footer\.show">1<\/xsl:param>/);
+  assert.match(jss, /<xsl:param name="chapter\.divider">1<\/xsl:param>/, 'chapter.divider defaults to the old behaviour');
 });

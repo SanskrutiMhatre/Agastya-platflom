@@ -184,8 +184,8 @@ export function parseJss(xml: string): JssDoc {
     } else if (c.localName === 'body') {
       for (const ch of els(c)) {
         if (ch.localName !== 'chapter') throw new JssParseError(`<${ch.localName}> is not allowed in <body>`);
-        attrs(ch, ['number', 'id']);
-        chapters.push({ k: 'chapter', number: posInt(ch.getAttribute('number'), 'chapter number') ?? chapters.length + 1, id: ch.getAttribute('id') ?? undefined, ...childrenOf(ch) });
+        attrs(ch, ['number', 'id', 'orientation']);
+        chapters.push({ k: 'chapter', number: posInt(ch.getAttribute('number'), 'chapter number') ?? chapters.length + 1, id: ch.getAttribute('id') ?? undefined, orientation: oneOf<Orientation>(ch.getAttribute('orientation'), ORIENTATIONS, 'orientation'), ...childrenOf(ch) });
       }
     } else throw new JssParseError(`<${c.localName}> is not allowed in <jssbook>`);
   }
@@ -255,7 +255,7 @@ export function serializeJss(doc: JssDoc): string {
   const meta = META_FIELDS.filter((f) => f.key === 'bookName' || (doc.meta[f.key] ?? '').trim() !== '').map((f) => `    <${f.key}>${esc((doc.meta[f.key] ?? '').trim())}</${f.key}>`).join('\n');
   const chapters = doc.chapters.map((c) => {
     const body = childrenXml(c.children, '      ');
-    return `    <chapter number="${c.number}"${at('id', c.id)}><title>${esc(c.title)}</title>${body ? `\n${body}\n    ` : ''}</chapter>`;
+    return `    <chapter number="${c.number}"${at('id', c.id)}${at('orientation', c.orientation)}><title>${esc(c.title)}</title>${body ? `\n${body}\n    ` : ''}</chapter>`;
   }).join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>\n<jssbook docType="${escAttr(doc.docType)}" schemaVersion="1.0">\n  <bookmeta>\n${meta}\n  </bookmeta>\n  <body>\n${chapters}\n  </body>\n</jssbook>\n`;
 }

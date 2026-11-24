@@ -8,17 +8,43 @@
 // of them and comes from the project's Settings, so it cannot drift between types. What the type decides about the frame is only
 // the wording of the cover title.
 
+import { NAVAL_TYPES } from './registry-naval';
+
 export type BodyKind = 'chapter-manual' | 'parts-list' | 'illustrations' | 'single-table';
+/** The two domains of the JSS stencils: JSS-0251 (Land) and the Naval set. A type's id is unique across both because a project stores it. */
+export type JssDomain = 'land' | 'naval';
+export type PageOrientation = 'landscape' | 'a3-landscape';
+
+/** One cell of a stencil table's head. A merged head (rowspan / colspan) is written as the stencil merges it. */
+export interface HeadCell {
+  text: string; colspan?: number; rowspan?: number;
+  /** The stencil's wording is a prompt the project adapts ("Recommended Nos. for 52 Systems for Two Years"): the cell must be there, its words are not compared. */
+  open?: boolean;
+}
+
+/**
+ * A table the stencil fixes: its columns (widths as proportions, so it fits whatever page the pipeline lays it on), its head and how many blank rows a new one starts with.
+ * The author fills the rows; the head is the stencil's and the document is checked against it (JSS-TABLE-TEMPLATE).
+ */
+export interface TableTemplate { widths: string; head: HeadCell[][]; blankRows: number; /** Caption the stencil gives this table ("Table 1: ..."), when it has one. */ caption?: string }
 
 export interface OutlineNode {
   title: string;
   children?: OutlineNode[];
   /** A heading the stencil shows as an example to be renamed or repeated ("Assembly-1", "Unit-1"): left out of the starting skeleton. */
   example?: boolean;
+  /** The table the stencil puts under this heading (a parts list, a list of spares ...). Written into the starting skeleton and checked on validation. */
+  table?: TableTemplate;
+  /** A sentence the stencil prints before that table, written into the starting skeleton. */
+  intro?: string;
+  /** A page break and a bold centred line that introduces a sheet of figures after the table (List of SMT / STE: "Figure / Diagram of ..."), written into the starting skeleton. */
+  figuresHeading?: string;
 }
 
 export interface JssDocType {
   id: string;
+  /** Which stencil set this type belongs to (the wizard's Domain). */
+  domain: JssDomain;
   /** The name the stencil's cover gives the publication. */
   label: string;
   /** The stencil file this type was read from. */
@@ -27,8 +53,34 @@ export interface JssDocType {
   ready: boolean;
   /** Why it is not ready (shown to the person, never hidden). */
   notReady?: string;
-  /** The chapters the stencil fixes, in order. A document of this type has exactly these chapters, in this order. */
+  /** The chapters the stencil fixes, in order. A document of this type has exactly these chapters, in this order (unless chapterRule is 'free'). */
   chapters?: OutlineNode[];
+  /**
+   * 'fixed' (the default): the stencil names every chapter and a document has exactly those. 'free': the chapters are the author's, one per system or sub-system (Part IV volumes);
+   * the outline then only supplies the first chapter to start from.
+   */
+  chapterRule?: 'fixed' | 'free';
+  /** True when the stencil also fixes the sections under each chapter (Complete Equipment Schedule): they must be present, in this order. */
+  sectionsFixed?: boolean;
+  /** The page the stencil sets the body on when it is not the portrait A4 of the chapter manuals: written on each chapter as its orientation. */
+  bodyPage?: PageOrientation;
+  /** The table every table of the document follows (parts list, MRLS, SMT / STE): the pipeline checks the number of columns and the head. */
+  tableTemplate?: TableTemplate;
+  /** False when the stencil does not caption its tables (a missing caption is then not reported). Default true. */
+  captionTables?: boolean;
+  /**
+   * The list stencils (MRLS, Complete Equipment Schedule, List of SMT / STE) have an Amendments table of five columns, a numbered list of abbreviations ("Sr. No. | Abbreviations issued | For")
+   * and no "first aid" line under the safety warning: the build sets roc.layout, abbrev.layout and safety.footer.show.
+   */
+  listFrame?: boolean;
+  /** False when the stencil has no chapter divider page: its first chapter opens with the heading and goes straight on to the sections (the list stencils, Part IV Vol 1 and 2). Default true. */
+  chapterDivider?: boolean;
+  /** The publisher block of the stencil's cover ("Prepared & Published by"). A new project starts with it (Settings > Branding can change it); the Land stencils use the house template's. */
+  publisher?: { name: string; addressLines: string[] };
+  /** Whether the Foreword has the "L&T Document No." line. Read from the stencils: the Land ones do not, the Naval handbooks do. Default false. */
+  forewordDocumentNo?: boolean;
+  /** Front-matter pages (ids of the catalogue in vendor/engine/frontMatterPages) this stencil does not have. */
+  omitPages?: string[];
   /** The deepest heading level the stencil defines (Heading 1 = chapter). */
   maxDepth: number;
   /** The title of the book as the stencil's cover words it, used when the author has not given one. */
@@ -38,12 +90,10 @@ export interface JssDocType {
   /** Whether the stencil's cover has an "INBR No." line. Read from the stencils: only UHB2's does; the others have Code No. and Rev No. only. */
   coverInbr: boolean;
   /**
-   * Front-matter pages that differ between stencils, read from them (docs/JSS_STENCIL_ANALYSIS.md): UHB has a System Name page and no Cautions / Notes page; MM and ORM
-   * have a Cautions / Notes page (title only, the author fills it) and no System Name page. Left out for a type that is not built yet: it is read when the type is.
+   * Front-matter wording and pages that differ from the shared defaults in this stencil, laid over the project's Settings (a key the project sets itself wins).
+   * Objects are merged into the Settings' own; a list (the safety warning's lines, the page order) replaces it.
    */
-  frontPages?: { cautionsNotes: boolean; systemNamePage: boolean };
-  /** Front-matter wording that differs from the shared defaults in this stencil (the MM and ORM stencils name a different building in the Foreword's postal address). */
-  frontMatter?: { foreword?: { postalAddress: string[] }; noticeLegends?: { note: string; warning: string; caution: string } };
+  frontMatter?: Record<string, unknown>;
 }
 
 // ── Body kind A: chapter manuals ──────────────────────────────────────────────────────────────────────────────────────────────────
@@ -119,10 +169,10 @@ const ORM_CHAPTERS: OutlineNode[] = [
 const later = (kind: string): string => `The ${kind} body is not built yet; the stencil is analysed (docs/JSS_STENCIL_ANALYSIS.md) but its editor, schema and layout are a later step.`;
 const manualNext = 'Chapter manual not yet taken through the end-to-end check; the first slice is UHB, MM and ORM.';
 
-export const JSS_TYPES: JssDocType[] = [
-  { id: 'uhb', label: 'User Handbook', stencil: 'UHB.docx', bodyKind: 'chapter-manual', ready: true, chapters: UHB_CHAPTERS, maxDepth: 5, defaultBookName: 'User Handbook', coverInbr: false, coverTitle: ['USER HANDBOOK'], frontPages: { cautionsNotes: false, systemNamePage: true } },
-  { id: 'mm', label: 'Technical Manual - Part II Maintenance', stencil: 'MM.docx', bodyKind: 'chapter-manual', ready: true, chapters: MM_CHAPTERS, maxDepth: 5, defaultBookName: 'Technical Manual Part II Maintenance', coverInbr: false, coverTitle: ['TECHNICAL MANUAL', 'PART II MAINTENANCE'], frontPages: { cautionsNotes: true, systemNamePage: false }, frontMatter: { foreword: { postalAddress: ['Head, Documentation & Training,', 'L&T Defence, Larsen & Toubro.', 'Defence Engineering Block, Gate No. 1,', 'Saki Vihar Road, Powai.', 'Mumbai - 400 072.'] }, noticeLegends: { note: 'Denote additional information.', warning: 'Denote possibility of danger to personnel due to improper use of equipment.', caution: 'Denote possibility of damage to equipment.' } } },
-  { id: 'orm', label: 'Technical Manual - Part III Overhaul and Reconditioning', stencil: 'ORM.docx', bodyKind: 'chapter-manual', ready: true, chapters: ORM_CHAPTERS, maxDepth: 5, defaultBookName: 'Technical Manual Part III Overhaul and Reconditioning', coverInbr: false, coverTitle: ['TECHNICAL MANUAL', 'PART III OVERHAUL AND RECONDITIONING'], frontPages: { cautionsNotes: true, systemNamePage: false }, frontMatter: { foreword: { postalAddress: ['Head, Documentation & Training,', 'L&T Defence, Larsen & Toubro.', 'Defence Engineering Block, Gate No. 1,', 'Saki Vihar Road, Powai.', 'Mumbai - 400 072.'] }, noticeLegends: { note: 'Denote additional information.', warning: 'Denote possibility of danger to personnel due to improper use of equipment.', caution: 'Denote possibility of damage to equipment.' } } },
+const LAND_TYPES: Array<Omit<JssDocType, 'domain'>> = [
+  { id: 'uhb', label: 'User Handbook', stencil: 'UHB.docx', bodyKind: 'chapter-manual', ready: true, chapters: UHB_CHAPTERS, maxDepth: 5, defaultBookName: 'User Handbook', coverInbr: false, coverTitle: ['USER HANDBOOK'], omitPages: ['cautionsNotes'] },
+  { id: 'mm', label: 'Technical Manual - Part II Maintenance', stencil: 'MM.docx', bodyKind: 'chapter-manual', ready: true, chapters: MM_CHAPTERS, maxDepth: 5, defaultBookName: 'Technical Manual Part II Maintenance', coverInbr: false, coverTitle: ['TECHNICAL MANUAL', 'PART II MAINTENANCE'], omitPages: ['systemNamePage'], frontMatter: { foreword: { postalAddress: ['Head, Documentation & Training,', 'L&T Defence, Larsen & Toubro.', 'Defence Engineering Block, Gate No. 1,', 'Saki Vihar Road, Powai.', 'Mumbai - 400 072.'] }, noticeLegends: { note: 'Denote additional information.', warning: 'Denote possibility of danger to personnel due to improper use of equipment.', caution: 'Denote possibility of damage to equipment.' } } },
+  { id: 'orm', label: 'Technical Manual - Part III Overhaul and Reconditioning', stencil: 'ORM.docx', bodyKind: 'chapter-manual', ready: true, chapters: ORM_CHAPTERS, maxDepth: 5, defaultBookName: 'Technical Manual Part III Overhaul and Reconditioning', coverInbr: false, coverTitle: ['TECHNICAL MANUAL', 'PART III OVERHAUL AND RECONDITIONING'], omitPages: ['systemNamePage'], frontMatter: { foreword: { postalAddress: ['Head, Documentation & Training,', 'L&T Defence, Larsen & Toubro.', 'Defence Engineering Block, Gate No. 1,', 'Saki Vihar Road, Powai.', 'Mumbai - 400 072.'] }, noticeLegends: { note: 'Denote additional information.', warning: 'Denote possibility of danger to personnel due to improper use of equipment.', caution: 'Denote possibility of damage to equipment.' } } },
   { id: 'uhb2', label: 'User Handbook (variant 2)', stencil: 'UHB2.docx', bodyKind: 'chapter-manual', ready: false, notReady: 'UHB2 is kept separate from UHB (different chapter 1 sections, INBR cover, Times New Roman tables, A3 fold-outs); its outline and tables are the next chapter-manual step.', maxDepth: 5, defaultBookName: 'User Handbook', coverInbr: true, coverTitle: ['USER HANDBOOK'] },
   { id: 'tm-pi', label: 'Technical Manual - Part I Technical Information', stencil: 'TM_PI.docx', bodyKind: 'chapter-manual', ready: false, notReady: manualNext, maxDepth: 5, defaultBookName: 'Technical Manual Part I Technical Information', coverInbr: false, coverTitle: ['TECHNICAL MANUAL', 'PART I TECHNICAL INFORMATION'] },
   { id: 'ds', label: 'Design Specification', stencil: 'DS.docx', bodyKind: 'chapter-manual', ready: false, notReady: manualNext, maxDepth: 5, defaultBookName: 'Design Specification', coverInbr: false, coverTitle: ['DESIGN SPECIFICATION'] },
@@ -136,6 +186,23 @@ export const JSS_TYPES: JssDocType[] = [
   { id: 'ispl', label: 'Illustrative Spares Part List (ISPL)', stencil: 'ISPL.docx', bodyKind: 'parts-list', ready: false, notReady: later('parts-list'), maxDepth: 3, defaultBookName: 'Illustrative Spares Part List (ISPL)', coverInbr: false, coverTitle: ['ILLUSTRATIVE SPARES PART LIST (ISPL)'] },
   { id: 'ispl-wrt-jss', label: 'Illustrative Spares Part List (ISPL), JSS cross-referenced', stencil: 'ISPL_wrt_JSS.docx', bodyKind: 'parts-list', ready: false, notReady: later('parts-list') + ' It differs from ISPL only in that the assembly index of each chapter is made of live cross-references to the assembly headings.', maxDepth: 3, defaultBookName: 'Illustrative Spares Part List (ISPL)', coverInbr: false, coverTitle: ['ILLUSTRATIVE SPARES PART LIST (ISPL)'] },
 ];
+
+/** Every JSS document type: the Land stencils (JSS-0251) then the Naval ones. The wizard's catalogue (services/formats) is built from this list, so it cannot offer what the engine lacks. */
+export const JSS_TYPES: JssDocType[] = [...LAND_TYPES.map((t) => ({ ...t, domain: 'land' as const })), ...NAVAL_TYPES];
+
+export const jssTypesOf = (domain: JssDomain): JssDocType[] => JSS_TYPES.filter((t) => t.domain === domain);
+
+/** A stencil table as the editor offers it: its head and widths, and the section it belongs to (null: any section of the document). */
+export interface TemplateInfo extends TableTemplate { forSection: string | null }
+
+/** Every table the stencil of a type fixes, so the editor can insert the stencil's own table rather than a plain one. */
+export function tableTemplatesOf(type: JssDocType | undefined): TemplateInfo[] {
+  if (!type) return [];
+  const out: TemplateInfo[] = type.tableTemplate ? [{ ...type.tableTemplate, forSection: null }] : [];
+  const walk = (nodes: OutlineNode[] | undefined): void => { for (const n of nodes ?? []) { if (n.table && n.table !== type.tableTemplate && !out.some((o) => o.forSection === n.title)) out.push({ ...n.table, forSection: n.title }); walk(n.children); } };
+  walk(type.chapters);
+  return out;
+}
 
 export const jssTypeById = (id: unknown): JssDocType | undefined => JSS_TYPES.find((t) => t.id === id);
 

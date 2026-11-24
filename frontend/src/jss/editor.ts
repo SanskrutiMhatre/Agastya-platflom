@@ -4,11 +4,12 @@
 //
 // The author edits on the sheet. Typing is read back into the model as it happens (inline.ts); structural changes (a new section, a table, a list item
 // moved) change the model through ops.ts and the sheet is drawn again. Undo and redo are whole-document snapshots of the XML, so they can never disagree
-// with what is saved. The stencil fixes a document's chapters, so chapters are shown but cannot be added, renamed, moved or removed.
+// with what is saved. Most stencils fix a document's chapters, so chapters are shown but cannot be added, renamed, moved or removed; a type whose chapters are the author's
+// (the Part IV volumes of the Naval technical manual: one chapter for each system or sub-system) gets those controls, and a type that also fixes its sections locks them.
 
 import {
-  META_FIELDS, inlineText, isNotice, isSection, newFigure, newId, newList, newNotice, newSection, newTable, para as newPara,
-  type Align, type Block, type Cell, type Chapter, type Figure, type Inline, type JssDoc, type List, type ListItem, type ListType, type NoticeKind, type Orientation, type Para, type Part, type Section, type Table,
+  META_FIELDS, chapterFromOutline, inlineText, isNotice, isSection, newChapter, newFigure, newId, newList, newNotice, newSection, newTable, para as newPara, tableFromTemplate, templateColumns,
+  type Align, type Block, type Cell, type Chapter, type Figure, type Inline, type JssDoc, type List, type ListItem, type ListType, type NoticeKind, type Orientation, type OutlineNode, type Para, type Part, type Section, type Table, type TableTemplate,
 } from './model';
 import { parseJss, serializeJss } from './xml';
 import { effectiveListType, itemLabel, numberDocument, type Numbers } from './numbering';
@@ -31,7 +32,17 @@ export interface EditorHost {
   notify(message: string, kind?: 'info' | 'error'): void;
 }
 
-export interface EditorOptions { doc: JssDoc; maxDepth: number; readOnly: boolean; host: EditorHost }
+export interface EditorOptions {
+  doc: JssDoc; maxDepth: number; readOnly: boolean; host: EditorHost;
+  /** 'free': the chapters are the author's (add, rename, move, delete). Anything else: the stencil fixes them. */
+  chapterRule?: 'fixed' | 'free';
+  /** The stencil fixes the sections under each chapter too: they cannot be added, renamed, moved or deleted. */
+  sectionsFixed?: boolean;
+  /** The tables the stencil fixes, offered when a table is inserted. */
+  tableTemplates?: TableTemplate[];
+  /** What a new chapter starts from (its sections and the stencil tables under them), for a type with free chapters. */
+  chapterStarter?: OutlineNode | null;
+}
 
 type Children = Array<Block | Section>;
 interface Bind { kind: 'inline' | 'plain'; sync(): void }
@@ -262,6 +273,9 @@ export class JssEditor {
     this.nodeEl.clear(); this.labelFns = [];
     this.paper.textContent = '';
     for (const ch of this.doc.chapters) this.paper.append(this.chapterEl(ch));
+    if (this.opts.chapterRule === 'free' && !this.opts.readOnly) {
+      this.paper.append(h('button', { type: 'button', class: 'jss-addch', 'data-testid': 'jss-add-chapter', title: 'Add a chapter for another system or sub-system', on: { mousedown: (e: Event) => e.preventDefault(), click: () => this.addChapter() } }, '+ Add a chapter'));
+    }
     this.renderOutline(); this.applyFindingMarks(); this.markOutline();
     if (this.view === 'source') this.sourceEl.textContent = this.getXml();
   }
@@ -270,12 +284,46 @@ export class JssEditor {
 
   private chapterEl(ch: Chapter): HTMLElement {
     const el = this.reg(ch, h('section', { class: 'jss-chapter', 'data-kind': 'chapter' }));
+    const free = this.opts.chapterRule === 'free';
+    const page = ch.orientation === 'a3-landscape' ? 'A3 landscape pages' : ch.orientation === 'landscape' ? 'landscape pages' : '';
+    const title = h('div', { class: 'jss-ch-title', ...(free ? { 'data-ph': 'Name of the system or sub-system' } : { title: 'The stencil fixes the chapters of this publication, so their titles cannot be changed here' }) });
+    if (free) this.plainEditable(title, () => ch.title, (v) => { ch.title = v; });
+    else title.append(ch.title, h('span', { class: 'jss-ch-lock' }, 'fixed by the stencil'));
     el.append(
-      h('div', { class: 'jss-ch-no' }, `Chapter ${ch.number}`),
-      h('div', { class: 'jss-ch-title', title: 'The stencil fixes the chapters of this publication, so their titles cannot be changed here' }, ch.title, h('span', { class: 'jss-ch-lock' }, 'fixed by the stencil')),
+      this.chapterTools(ch),
+      h('div', { class: 'jss-ch-no' }, `Chapter ${ch.number}`, ...(page ? [h('span', { class: 'jss-ch-lock', title: 'The stencil sets this chapter on a page of its own size' }, `printed on ${page}`)] : [])),
+      title,
     );
     this.appendChildren(el, el, ch.children, ch, 1);
     return el;
+  }
+
+  /** Move, add after and delete, for a type whose chapters are the author's. */
+  private chapterTools(ch: Chapter): HTMLElement {
+    if (this.opts.readOnly || this.opts.chapterRule !== 'free') return h('span');
+    const i = this.doc.chapters.indexOf(ch); const last = this.doc.chapters.length - 1;
+    const mk = (label: string, title: string, run: () => void, ok: boolean) => h('button', { type: 'button', title, 'aria-label': title, disabled: !ok, on: { mousedown: (e: Event) => e.preventDefault(), click: run } }, label);
+    return h('div', { class: 'jss-sec-tools jss-ch-tools' },
+      mk('↑', 'Move this chapter up', () => this.mutate(() => ops.moveChapter(this.doc, ch, -1), () => ch), i > 0),
+      mk('↓', 'Move this chapter down', () => this.mutate(() => ops.moveChapter(this.doc, ch, 1), () => ch), i < last),
+      mk('+', 'Add a chapter after this one', () => this.addChapter(ch), true),
+      mk('✕', 'Delete this chapter', () => void this.deleteChapter(ch), last > 0));
+  }
+
+  /** A new chapter, started from the stencil's first chapter (its sections and tables), on the same page as the others; its title is selected, ready to be typed over. */
+  private addChapter(after?: Chapter): void {
+    if (this.opts.readOnly || this.opts.chapterRule !== 'free') return;
+    const at = after ? this.doc.chapters.indexOf(after) : this.doc.chapters.length - 1; const orientation = this.doc.chapters[0]?.orientation;
+    const ch = this.opts.chapterStarter ? chapterFromOutline(this.doc, this.opts.chapterStarter, at + 2, orientation) : newChapter(at + 2, 'New chapter', newId(this.doc, 'c'), orientation);
+    this.mutate(() => ops.addChapter(this.doc, ch, at), () => ch);
+    const t = this.nodeEl.get(ch)?.querySelector<HTMLElement>('.jss-ch-title');
+    if (t) { placeCaret(t, 0); const sel = selection(); if (sel) { const r = document.createRange(); r.selectNodeContents(t); sel.removeAllRanges(); sel.addRange(r); } }
+  }
+
+  private async deleteChapter(ch: Chapter): Promise<void> {
+    if (this.doc.chapters.length <= 1) return this.opts.host.notify('A publication has at least one chapter.');
+    if ((ch.children.length || ch.title.trim()) && !(await confirmDialog('Delete this chapter?', `"${ch.title || 'Untitled'}"${ch.children.length ? ' and everything in it' : ''} will be removed. You can undo this.`))) return;
+    this.mutate(() => ops.removeChapter(this.doc, ch), () => null);
   }
 
   /** A section's own content first (into `bodyEl`), then its sub-sections (into `subsEl`): the order the pipeline prints them in. */
@@ -293,6 +341,7 @@ export class JssEditor {
     const sec = this.reg(s, h('div', { class: `jss-sec d${Math.min(depth - 1, 5)}`, 'data-kind': 'section' }));
     const no = h('span', { class: 'jss-sec-no' }); const title = h('div', { class: 'jss-sec-title', 'data-ph': 'Section title' });
     this.plainEditable(title, () => s.title, (v) => { s.title = v; });
+    if (this.opts.sectionsFixed) { this.setEditable(title, false); title.title = 'The stencil fixes the sections of this publication, so their titles cannot be changed here'; }
     const bindNo = () => { no.textContent = this.numbers.heading.get(s) ?? ''; }; bindNo(); this.labelFns.push(bindNo);
     const bodyEl = h('div', { class: 'jss-sec-body' });
     sec.append(this.sectionTools(s), h('div', { class: 'jss-sec-head' }, no, title), bodyEl);
@@ -302,7 +351,7 @@ export class JssEditor {
   }
 
   private sectionTools(s: Section): HTMLElement {
-    if (this.opts.readOnly) return h('span');
+    if (this.opts.readOnly || this.opts.sectionsFixed) return h('span');
     const mk = (label: string, title: string, run: () => void, ok: boolean) => { const b = h('button', { type: 'button', title, 'aria-label': title, disabled: !ok, on: { mousedown: (e: Event) => e.preventDefault(), click: run } }, label); return b; };
     const at = ops.locate(this.doc, s); const sibs = at ? at.list.filter(isSection) : []; const si = sibs.indexOf(s);
     const orient = h('select', { title: 'Page orientation of this section', 'aria-label': 'Page orientation' },
@@ -420,10 +469,12 @@ export class JssEditor {
 
   private tableTools(t: Table): HTMLElement {
     if (this.opts.readOnly) return h('div');
-    const spans = ops.hasSpans(t);
+    const spans = ops.hasSpans(t); const bodySpans = ops.groupHasSpans(t, 'body');
     const mk = (label: string, title: string, run: () => void, enabled = true) => h('button', { type: 'button', title, disabled: !enabled, on: { mousedown: (e: Event) => e.preventDefault(), click: run } }, label);
     const cell = () => this.activeCell(t);
-    const row = (where: 'above' | 'below') => { const c = cell(); if (!c) return this.opts.host.notify('Click in a cell first.'); this.mutate(() => ops.addRow(t, c.group, c.row, where), () => t); };
+    // a stencil's merged head ("Recommended Nos." over five columns) does not stop rows being added to or removed from the body under it; only the merged part itself is refused
+    const rowsOk = (c: CellRef): boolean => { if (!ops.groupHasSpans(t, c.group)) return true; this.opts.host.notify(`This ${c.group === 'head' ? 'header' : 'part of the table'} has merged cells: split them to add or remove rows there${c.group === 'head' ? ', or click in the body to add rows to it' : ''}.`); return false; };
+    const row = (where: 'above' | 'below') => { const c = cell(); if (!c) return this.opts.host.notify('Click in a cell first.'); if (!rowsOk(c)) return; this.mutate(() => ops.addRow(t, c.group, c.row, where), () => t); };
     const merge = (dir: 'right' | 'down') => {
       const c = cell(); if (!c) return this.opts.host.notify('Click in a cell first.');
       const why = ops.mergeCheck(t, c.group, c.row, c.col, dir); if (why) return this.opts.host.notify(why);
@@ -431,8 +482,8 @@ export class JssEditor {
     };
     const col = (where: 'before' | 'after') => { const c = cell(); if (!c) return this.opts.host.notify('Click in a cell first.'); this.mutate(() => ops.addColumn(t, c.col, where), () => t); };
     return h('div', { class: 'jss-ttools' },
-      mk('+ Row above', 'Add a row above the current one', () => row('above'), !spans), mk('+ Row below', 'Add a row below the current one', () => row('below'), !spans),
-      mk('− Row', 'Delete the current row', () => { const c = cell(); if (c) this.mutate(() => ops.deleteRow(t, c.group, c.row), () => t); else this.opts.host.notify('Click in a cell first.'); }, !spans),
+      mk('+ Row above', 'Add a row above the current one', () => row('above'), !bodySpans), mk('+ Row below', 'Add a row below the current one', () => row('below'), !bodySpans),
+      mk('− Row', 'Delete the current row', () => { const c = cell(); if (c) { if (rowsOk(c)) this.mutate(() => ops.deleteRow(t, c.group, c.row), () => t); } else this.opts.host.notify('Click in a cell first.'); }, !bodySpans),
       mk('+ Column left', 'Add a column to the left of the current one', () => col('before'), !spans), mk('+ Column right', 'Add a column to the right of the current one', () => col('after'), !spans),
       mk('− Column', 'Delete the current column', () => { const c = cell(); if (c) this.mutate(() => ops.deleteColumn(t, c.col), () => t); else this.opts.host.notify('Click in a cell first.'); }, !spans),
       mk(t.head.length ? 'Header row: on' : 'Header row: off', 'Show the first row as a header', () => this.mutate(() => ops.toggleHeader(t), () => t)),
@@ -440,7 +491,7 @@ export class JssEditor {
       mk('Split cell', 'Split a merged cell back into single cells', () => { const c = cell(); if (!c) return this.opts.host.notify('Click in a cell first.'); if ((c.cell.colspan ?? 1) === 1 && (c.cell.rowspan ?? 1) === 1) return this.opts.host.notify('This cell is not merged.'); this.mutate(() => ops.splitCell(t, c.group, c.row, c.col), () => t); }),
       mk('Widths…', 'Set the column widths', () => void this.widthsDialog(t)),
       mk('Delete table', 'Delete this table', () => this.removeBlock(t)),
-      spans ? h('span', { class: 'hint' }, 'This table has merged cells: split them to add or remove rows and columns.') : null,
+      spans ? h('span', { class: 'hint' }, bodySpans ? 'This table has merged cells: split them to add or remove rows and columns.' : 'The header has merged cells (as the stencil has them): rows can be added to the body; split the header cells to change the columns.') : null,
     );
   }
 
@@ -810,10 +861,15 @@ export class JssEditor {
       const t = this.nodeEl.get(s)?.querySelector<HTMLElement>('.jss-sec-title'); if (t) { placeCaret(t, 0); const sel = selection(); if (sel) { const r = document.createRange(); r.selectNodeContents(t); sel.removeAllRanges(); sel.addRange(r); } }   // the new title is selected, ready to be typed over
     };
     const level = isCh ? 1 : ops.headingLevel(this.doc, cur as Section);
-    return [
+    if (this.opts.sectionsFixed) {
+      return [{ label: 'Add a section', disabled: true, hint: 'the stencil fixes the sections', run: () => undefined }];
+    }
+    const items: MenuItem[] = [
       { label: isCh ? 'Add a section to this chapter' : 'Add a section after this one', disabled: !isCh && false, run: () => make(isCh ? cur : (ops.locate(this.doc, cur as Section)?.owner ?? cur), isCh ? 'end' : 'after') },
       { label: 'Add a sub-section inside this one', disabled: level + 1 > this.opts.maxDepth, hint: level + 1 > this.opts.maxDepth ? 'deepest level' : '', run: () => make(cur, 'end') },
     ];
+    if (this.opts.chapterRule === 'free') items.push({ label: 'Add a chapter (another system or sub-system)', run: () => this.addChapter(ops.chapterOf(this.doc, cur) ?? undefined) });
+    return items;
   }
 
   private async deleteSection(s: Section): Promise<void> {
@@ -837,13 +893,33 @@ export class JssEditor {
   // ── dialogs ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
   private async insertTableDialog(): Promise<void> {
-    const r = await ask<{ rows: number; cols: number; head: boolean; title: string }>('Insert a table', (body, api) => {
+    // the tables the stencil fixes are offered first: the one that belongs under the section the caret is in, else the only one the stencil has
+    const templates = this.opts.tableTemplates ?? [];
+    const here = this.activeSection(); const hereTitle = here.k === 'section' ? here.title.trim().toLowerCase() : '';
+    const preset = templates.findIndex((t) => t.forSection && t.forSection.trim().toLowerCase() === hereTitle);
+    const initial = preset >= 0 ? preset : templates.length === 1 && !templates[0].forSection ? 0 : -1;
+    const label = (t: TableTemplate): string => `${t.forSection ? `${t.forSection}: ` : ''}${t.caption ?? 'the stencil’s table'} (${templateColumns(t)} columns)`;
+    const r = await ask<{ template: TableTemplate | null; rows: number; cols: number; head: boolean; title: string }>('Insert a table', (body, api) => {
       const rows = h('input', { type: 'number', min: 1, max: 100, value: 3 }) as HTMLInputElement; const cols = h('input', { type: 'number', min: 1, max: 12, value: 3 }) as HTMLInputElement;
       const head = h('input', { type: 'checkbox', checked: true }) as HTMLInputElement; const title = h('input', { type: 'text', placeholder: 'e.g. Technical Specifications' }) as HTMLInputElement;
+      const kind = h('select', { 'aria-label': 'Kind of table' }, h('option', { value: '-1' }, 'A table of my own'), ...templates.map((t, i) => h('option', { value: String(i), selected: i === initial }, label(t)))) as HTMLSelectElement;
+      const sync = () => {
+        const tpl = Number(kind.value) >= 0 ? templates[Number(kind.value)] : null;
+        for (const el of [rows, cols, head]) el.disabled = !!tpl;
+        title.placeholder = tpl?.caption ? tpl.caption : 'e.g. Technical Specifications';
+      };
+      kind.addEventListener('change', sync); sync();
+      if (templates.length) body.append(field('Table', kind, 'The stencil’s own tables keep its columns and its header, merged as the stencil merges it; you fill the rows.'));
       body.append(field('Caption', title, 'The stencil numbers and captions every table (Table 1-1: ...).'), h('div', { class: 'grid' }, field('Rows (below the header)', rows), field('Columns', cols)), h('label', { style: 'flex-direction:row;align-items:center;gap:8px' }, head, 'First row is a header row'));
-      return () => { const r = Math.round(Number(rows.value)); const c = Math.round(Number(cols.value)); if (!(r >= 1 && r <= 100)) { api.error('Rows: a number from 1 to 100.'); return null; } if (!(c >= 1 && c <= 12)) { api.error('Columns: a number from 1 to 12.'); return null; } return { rows: r, cols: c, head: head.checked, title: title.value.trim() }; };
+      return () => {
+        const template = Number(kind.value) >= 0 ? templates[Number(kind.value)] : null;
+        if (template) return { template, rows: 0, cols: 0, head: true, title: title.value.trim() };
+        const r = Math.round(Number(rows.value)); const c = Math.round(Number(cols.value)); if (!(r >= 1 && r <= 100)) { api.error('Rows: a number from 1 to 100.'); return null; } if (!(c >= 1 && c <= 12)) { api.error('Columns: a number from 1 to 12.'); return null; }
+        return { template: null, rows: r, cols: c, head: head.checked, title: title.value.trim() };
+      };
     }, 'Insert table', this.root);
     if (!r) return;
+    if (r.template) { const t = tableFromTemplate(r.template, newId(this.doc, 't')); if (r.title) t.title = r.title; this.insertBlock(t); return; }
     const t = newTable(r.rows, r.cols, newId(this.doc, 't')); t.title = r.title; if (!r.head) { t.body.unshift(...t.head); t.head = []; }
     this.insertBlock(t);
   }

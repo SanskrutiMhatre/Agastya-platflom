@@ -1,14 +1,14 @@
 // The publication formats a project can be created in, and (for the document formats) the domain and manual type that decide its stencil.
 //
 //   s1000d  S1000D data modules, published by the S1000D engine. No domain or manual type to choose.
-//   jss     Joint Services Specification manuals: Land and Naval (a third domain is on hold), each with its own manual types / stencils.
+//   jss     Joint Services Specification manuals: Land and Naval (a third domain is on hold), each with its own manual types / stencils, all from the JSS registry.
 //   jsg     Joint Services Guide manuals: Land.
 //
 // `ready: false` means the stencil was received (or is expected) but the engine for it is not built yet: the wizard shows it, disabled, and the
 // server refuses to create it. The catalogue is data, so a new manual type is one line here and nothing else in the platform changes.
 // Names follow the stencil files the owner supplied (JSS-0251 land stencils DTF0025-29, NAval_stencil, JSG-0308).
 
-import { JSS_TYPES } from './jss/registry';
+import { jssTypesOf, type JssDocType } from './jss/registry';
 import { JSG_TYPES } from './jsg/registry';
 
 export type FormatId = 's1000d' | 'jss' | 'jsg';
@@ -16,29 +16,17 @@ export interface ManualType { id: string; label: string; ready: boolean; /** The
 export interface Domain { id: string; label: string; manualTypes: ManualType[] }
 export interface FormatInfo { id: FormatId; label: string; description: string; ready: boolean; domains: Domain[] }
 
-const NAVAL: ManualType[] = [
-  { id: 'uhb', label: 'User Handbook', ready: false },
-  { id: 'tm-part-1', label: 'Technical Manual - Part I Technical Description', ready: false },
-  { id: 'tm-part-2', label: 'Technical Manual - Part II Maintenance', ready: false },
-  { id: 'tm-part-3', label: 'Technical Manual - Part III Overhaul', ready: false },
-  { id: 'tm-part-4-1', label: 'Technical Manual - Part IV Vol 1 Parts List', ready: false },
-  { id: 'tm-part-4-2', label: 'Technical Manual - Part IV Vol 2 Illustrations', ready: false },
-  { id: 'design-specification', label: 'Design Specification', ready: false },
-  { id: 'mrls', label: 'MRLS', ready: false },
-  { id: 'equipment-schedule', label: 'Complete Equipment Schedule', ready: false },
-  { id: 'smt-ste', label: 'List of SMT / STE', ready: false },
-];
+/** A JSS manual type of the wizard, taken from the registry: the registry (services/jss/registry) is the only list, so the wizard cannot offer what the engine does not have. */
+const jssManual = (t: JssDocType): ManualType => ({ id: t.id, label: t.label, ready: t.ready, notReady: t.notReady, jssType: t.id });
 
 export const FORMATS: FormatInfo[] = [
   { id: 's1000d', label: 'S1000D', description: 'Data modules written to the S1000D standard.', ready: true, domains: [] },
   {
     id: 'jss', label: 'JSS', description: 'Joint Services Specification manuals.', ready: true,
     domains: [
-      {
-        // one entry per JSS-0251 land stencil: the registry (services/jss/registry) is the only list, so the wizard cannot offer what the engine does not have
-        id: 'land', label: 'Land', manualTypes: JSS_TYPES.map((t) => ({ id: t.id, label: t.label, ready: t.ready, notReady: t.notReady, jssType: t.id })),
-      },
-      { id: 'naval', label: 'Naval', manualTypes: NAVAL },
+      // one entry per stencil: the JSS-0251 land set and the Naval set (Sampels/NAval_stencil)
+      { id: 'land', label: 'Land', manualTypes: jssTypesOf('land').map(jssManual) },
+      { id: 'naval', label: 'Naval', manualTypes: jssTypesOf('naval').map(jssManual) },
     ],
   },
   {
@@ -66,5 +54,5 @@ export function resolveFormat(input: { format?: unknown; domain?: unknown; manua
   if (!f.ready || !m.ready) throw new Error(`${f.label} ${d.label} - ${m.label} is not available yet: ${m.notReady ?? 'its stencil is received but the engine for it is still to be built.'}`);
   // a JSG document is authored and built by the JSG engine alone (services/jsg); `pipeline` is inert for it, nothing in the S1000D / JSS build reads a JSG project
   if (f.id === 'jsg') return { format: 'jsg', domain: d.id, manualType: m.id, jsgType: m.jsgType, pipeline: 's1000dtojss', type: 'JSG' };
-  return { format: f.id, domain: d.id, manualType: m.id, profile: m.profile, jssType: d.id === 'land' && f.id === 'jss' ? m.jssType : undefined, pipeline: 's1000dtojss', type: 'JSS' };
+  return { format: f.id, domain: d.id, manualType: m.id, profile: m.profile, jssType: f.id === 'jss' ? m.jssType : undefined, pipeline: 's1000dtojss', type: 'JSS' };
 }

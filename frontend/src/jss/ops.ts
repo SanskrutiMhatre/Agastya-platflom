@@ -1,7 +1,7 @@
 // Structural edits to a JSS document. Every function works on the model in place and says whether it did anything; none of them touches the DOM.
 //
-// The stencil fixes a document's chapters (their number, titles and order), so there is no operation that adds, removes, renames or moves one:
-// the editor can only fill chapters and manage the sections inside them.
+// Most stencils fix a document's chapters (their number, titles and order), so the editor can only fill them and manage the sections inside. The exception is a type
+// whose chapters are the author's (Part IV of the Naval technical manual: one chapter for each system or sub-system): for it the chapter operations at the end apply.
 
 import {
   isSection, newCell, newRow, type Block, type Cell, type Chapter, type JssDoc, type List, type ListItem, type ListType, type Part, type Row, type Section, type Table,
@@ -75,17 +75,20 @@ export const canOutdentSection = (doc: JssDoc, s: Section): boolean => { const a
 
 // ── Tables ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
-export const hasSpans = (t: Table): boolean => [...t.head, ...t.body].some((r) => r.cells.some((c) => (c.colspan ?? 1) > 1 || (c.rowspan ?? 1) > 1));
+const rowsHaveSpans = (rows: Row[]): boolean => rows.some((r) => r.cells.some((c) => (c.colspan ?? 1) > 1 || (c.rowspan ?? 1) > 1));
+export const hasSpans = (t: Table): boolean => rowsHaveSpans([...t.head, ...t.body]);
+/** Whether one part of the table (its head or its body) has merged cells. A merged head (a stencil's "Recommended Nos." over five columns) does not stop rows being added to the body below it. */
+export const groupHasSpans = (t: Table, group: 'head' | 'body'): boolean => rowsHaveSpans(group === 'head' ? t.head : t.body);
 export const columnCount = (t: Table): number => Math.max(0, ...[...t.head, ...t.body].map((r) => r.cells.reduce((n, c) => n + (c.colspan ?? 1), 0)));
 
-/** Add a row after body row `index` (or before the first when index is -1). Refused for a table with merged cells. */
+/** Add a row after body row `index` (or before the first when index is -1). Refused in a part of the table that has merged cells (every row of it would have to be re-laid). */
 export function addRow(t: Table, group: 'head' | 'body', index: number, where: 'above' | 'below'): boolean {
-  if (hasSpans(t)) return false;
+  if (groupHasSpans(t, group)) return false;
   const rows = group === 'head' ? t.head : t.body; const cols = columnCount(t) || 1;
   insertAt(rows, where === 'above' ? index : index + 1, newRow(cols)); return true;
 }
 export function deleteRow(t: Table, group: 'head' | 'body', index: number): boolean {
-  if (hasSpans(t)) return false;
+  if (groupHasSpans(t, group)) return false;
   const rows = group === 'head' ? t.head : t.body;
   if (group === 'body' && rows.length <= 1) return false;             // the schema needs a body
   return removeAt(rows, index) !== undefined;
@@ -229,4 +232,23 @@ export function outdentItem(parent: List, itemIndex: number, sub: List, subIndex
   // the items that followed it stay in the sub-list, which must not be left empty
   if (!sub.items.length) { for (const it of parent.items) { const k = it.parts.indexOf(sub); if (k >= 0) it.parts.splice(k, 1); } }
   return true;
+}
+
+// ── Chapters (only for a type whose chapters are the author's) ───────────────────────────────────────────────────────────────────
+
+/** Number the chapters 1, 2, 3 ... in their order: the number a chapter carries is the number the pipeline prints. */
+export function renumberChapters(doc: JssDoc): void { doc.chapters.forEach((c, i) => { c.number = i + 1; }); }
+
+/** Insert a chapter after chapter index `after` (the end by default) and renumber. */
+export function addChapter(doc: JssDoc, chapter: Chapter, after: number = doc.chapters.length - 1): void { insertAt(doc.chapters, after + 1, chapter); renumberChapters(doc); }
+
+/** Remove a chapter; the document is never left with none (the schema needs at least one). */
+export function removeChapter(doc: JssDoc, chapter: Chapter): boolean {
+  const i = doc.chapters.indexOf(chapter); if (i < 0 || doc.chapters.length <= 1) return false;
+  doc.chapters.splice(i, 1); renumberChapters(doc); return true;
+}
+
+export function moveChapter(doc: JssDoc, chapter: Chapter, dir: -1 | 1): boolean {
+  if (!move(doc.chapters, doc.chapters.indexOf(chapter), dir)) return false;
+  renumberChapters(doc); return true;
 }

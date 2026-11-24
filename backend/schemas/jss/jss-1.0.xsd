@@ -14,8 +14,10 @@
   foreword, record of changes, contents, lists, symbols - taken from the project's Settings), the emblem and publishers,
   running heads and feet, and the folios.
 
-  Scope of 1.0: body kind A, the chapter manual (stencils UHB, MM, ORM). The other stencil kinds (parts list, illustrations,
-  single-table list) are added to this file as they are implemented; a document type that is not in JssDocType is refused.
+  Scope of 1.0: every body kind the stencils use is written with the same elements - chapter manuals (headings, paragraphs, lists, tables, figures,
+  notices), parts lists and lists of spares (tables whose head the stencil fixes), illustrations (figures). What differs between types is not the
+  vocabulary but the rules the server checks (services/jss/registry): the chapters, the table head, the page. A document type that is not in
+  JssDocType is refused.
 -->
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="unqualified">
 
@@ -25,6 +27,17 @@
       <xs:enumeration value="uhb"/>
       <xs:enumeration value="mm"/>
       <xs:enumeration value="orm"/>
+      <!-- The Naval stencils (Sampels/NAval_stencil). The list must equal the ids of the READY types of services/jss/registry; test/jss-naval.test.js fails when it does not. -->
+      <xs:enumeration value="naval-uhb"/>
+      <xs:enumeration value="naval-tm-1"/>
+      <xs:enumeration value="naval-tm-2"/>
+      <xs:enumeration value="naval-tm-3"/>
+      <xs:enumeration value="naval-tm-4-1"/>
+      <xs:enumeration value="naval-tm-4-2"/>
+      <xs:enumeration value="naval-ds"/>
+      <xs:enumeration value="naval-mrls"/>
+      <xs:enumeration value="naval-ces"/>
+      <xs:enumeration value="naval-smt-ste"/>
     </xs:restriction>
   </xs:simpleType>
 
@@ -242,6 +255,8 @@
     </xs:sequence>
     <xs:attribute name="number" type="xs:positiveInteger" use="required"/>
     <xs:attribute name="id" type="xs:ID"/>
+    <!-- The page the whole chapter is set on when its stencil is not portrait A4 (the pipeline lets a section override it). -->
+    <xs:attribute name="orientation" type="Orientation"/>
   </xs:complexType>
 
   <!-- ===== Identity of the publication (what the stencil's cover and running heads carry) ===== -->

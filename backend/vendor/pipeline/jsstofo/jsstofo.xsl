@@ -217,6 +217,12 @@
     <xsl:param name="heading.3.gap"/>
     <xsl:param name="heading.4.gap"/>
     <xsl:param name="heading.4.pageBreakBefore">0</xsl:param>
+    <!-- 1 = a <pageBreak/> placed directly in a chapter (between its own paragraphs, tables and figures, ahead of its sections) breaks the page, as it already does inside a section.
+         0 (the default, as before) drops it there: body.xsl selected the chapter's own content without it. A JSS document sets 1 (the stencils break the page before a figure sheet). -->
+    <xsl:param name="chapter.pageBreak">0</xsl:param>
+    <!-- 0 = a chapter that has sections opens with its own heading ("Chapter 1" and the title) at the top of its first page and goes straight on to the sections, with no divider page
+         in front (the list stencils: MRLS, Complete Equipment Schedule, List of SMT / STE, Part IV Vol 1 and 2). 1 (the default, as before) = the divider page with its topics list. -->
+    <xsl:param name="chapter.divider">1</xsl:param>
 
     <!-- ==================================================================== -->
     <!--                         CONTENT PARAMETERS                            -->

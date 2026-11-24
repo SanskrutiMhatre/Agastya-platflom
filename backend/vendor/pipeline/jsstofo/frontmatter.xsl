@@ -23,6 +23,24 @@
          one block exactly as before; only the JSS authoring build sets 1. -->
     <xsl:param name="cover.title.split">0</xsl:param>
 
+    <!-- Three pages whose table differs in the list stencils (Manufacturer's Recommended List of Spares, Complete Equipment Schedule, List of SMT / STE). Each default is what the page
+         always was; only the JSS authoring build sets the others.
+           roc.layout          "amendments": the Amendments table (Sr. No. | Page No. | Para Reference | Amendment / Required | Authority with Ref No. & Date) instead of the Change Notice table
+           abbrev.layout       "numbered": Sr. No. | Abbreviations issued | For, instead of Abbreviations | Description
+           safety.footer.show  0: no "FOR FIRST AID IN CASE OF ELECTRIC SHOCK SEE THE FOLLOWING PAGE" line under the safety warning
+         The labels of the new tables are declared here (not in the engine's main stylesheet) because the S1000D direct engine includes this file too and does not declare them. -->
+    <xsl:param name="roc.layout">change-notice</xsl:param>
+    <xsl:param name="abbrev.layout">description</xsl:param>
+    <xsl:param name="safety.footer.show">1</xsl:param>
+    <xsl:param name="fm.label.amend.colSrNo"/>
+    <xsl:param name="fm.label.amend.colPage"/>
+    <xsl:param name="fm.label.amend.colPara"/>
+    <xsl:param name="fm.label.amend.colAmendment"/>
+    <xsl:param name="fm.label.amend.colAuthority"/>
+    <xsl:param name="fm.label.abbrev.colSrNo"/>
+    <xsl:param name="fm.label.abbrev.colIssued"/>
+    <xsl:param name="fm.label.abbrev.colFor"/>
+
     <!--
       Everything from the proprietary page onward is grouped into "parts",
       each its own page-sequence that opens on an odd (right-hand) page and
@@ -551,6 +569,37 @@
                  parent, so the table came out wider than the box that draws
                  the rule around it. Omitting it lets the table take the
                  parent's actual content width. -->
+            <xsl:choose>
+            <xsl:when test="$roc.layout = 'amendments'">
+                <fo:table table-layout="fixed" font-size="{$table-font-size}">
+                    <fo:table-column column-width="proportional-column-width(14.7)"/>
+                    <fo:table-column column-width="proportional-column-width(20.3)"/>
+                    <fo:table-column column-width="proportional-column-width(30.6)"/>
+                    <fo:table-column column-width="proportional-column-width(62.5)"/>
+                    <fo:table-column column-width="proportional-column-width(41.8)"/>
+                    <fo:table-header>
+                        <fo:table-row font-weight="bold">
+                            <xsl:call-template name="roc-head"><xsl:with-param name="t"><xsl:call-template name="fm-label"><xsl:with-param name="override" select="$fm.label.amend.colSrNo"/><xsl:with-param name="default">Sr. No.</xsl:with-param></xsl:call-template></xsl:with-param></xsl:call-template>
+                            <xsl:call-template name="roc-head"><xsl:with-param name="t"><xsl:call-template name="fm-label"><xsl:with-param name="override" select="$fm.label.amend.colPage"/><xsl:with-param name="default">Page No.</xsl:with-param></xsl:call-template></xsl:with-param></xsl:call-template>
+                            <xsl:call-template name="roc-head"><xsl:with-param name="t"><xsl:call-template name="fm-label"><xsl:with-param name="override" select="$fm.label.amend.colPara"/><xsl:with-param name="default">Para Reference</xsl:with-param></xsl:call-template></xsl:with-param></xsl:call-template>
+                            <xsl:call-template name="roc-head"><xsl:with-param name="t"><xsl:call-template name="fm-label"><xsl:with-param name="override" select="$fm.label.amend.colAmendment"/><xsl:with-param name="default">Amendment / Required</xsl:with-param></xsl:call-template></xsl:with-param></xsl:call-template>
+                            <xsl:call-template name="roc-head"><xsl:with-param name="t"><xsl:call-template name="fm-label"><xsl:with-param name="override" select="$fm.label.amend.colAuthority"/><xsl:with-param name="default">Authority with Ref No. &amp; Date</xsl:with-param></xsl:call-template></xsl:with-param></xsl:call-template>
+                        </fo:table-row>
+                    </fo:table-header>
+                    <fo:table-body>
+                        <xsl:call-template name="empty-rows">
+                            <xsl:with-param name="count">
+                                <xsl:choose>
+                                    <xsl:when test="@rows"><xsl:value-of select="@rows"/></xsl:when>
+                                    <xsl:otherwise>21</xsl:otherwise>
+                                </xsl:choose>
+                            </xsl:with-param>
+                            <xsl:with-param name="cols">5</xsl:with-param>
+                        </xsl:call-template>
+                    </fo:table-body>
+                </fo:table>
+            </xsl:when>
+            <xsl:otherwise>
             <fo:table table-layout="fixed" font-size="{$table-font-size}">
                 <fo:table-column column-width="proportional-column-width(1.2)"/>
                 <fo:table-column column-width="proportional-column-width(1)"/>
@@ -582,6 +631,8 @@
                     </xsl:call-template>
                 </fo:table-body>
             </fo:table>
+            </xsl:otherwise>
+            </xsl:choose>
         </fo:block>
     </xsl:template>
 
@@ -703,9 +754,11 @@
                     </xsl:for-each>
                 </xsl:with-param>
             </xsl:call-template>
+            <xsl:if test="$safety.footer.show != '0'">
             <fo:block text-align="center" font-weight="bold" text-decoration="underline">
                 <xsl:call-template name="fm-label"><xsl:with-param name="override" select="$fm.label.safety.footer"/><xsl:with-param name="default">FOR FIRST AID IN CASE OF ELECTRIC SHOCK SEE THE FOLLOWING PAGE</xsl:with-param></xsl:call-template>
             </fo:block>
+            </xsl:if>
         </fo:block>
     </xsl:template>
 
@@ -975,6 +1028,48 @@
                     </xsl:call-template>
                 </xsl:with-param>
             </xsl:call-template>
+            <xsl:choose>
+            <xsl:when test="$abbrev.layout = 'numbered'">
+                <fo:table table-layout="fixed" width="100%" font-size="{$table-font-size}">
+                    <fo:table-column column-width="proportional-column-width(22.5)"/>
+                    <fo:table-column column-width="proportional-column-width(40)"/>
+                    <fo:table-column column-width="proportional-column-width(107.5)"/>
+                    <fo:table-header>
+                        <fo:table-row font-weight="bold">
+                            <xsl:call-template name="roc-head"><xsl:with-param name="t"><xsl:call-template name="fm-label"><xsl:with-param name="override" select="$fm.label.abbrev.colSrNo"/><xsl:with-param name="default">Sr. No.</xsl:with-param></xsl:call-template></xsl:with-param></xsl:call-template>
+                            <xsl:call-template name="roc-head"><xsl:with-param name="t"><xsl:call-template name="fm-label"><xsl:with-param name="override" select="$fm.label.abbrev.colIssued"/><xsl:with-param name="default">Abbreviations issued</xsl:with-param></xsl:call-template></xsl:with-param></xsl:call-template>
+                            <xsl:call-template name="roc-head"><xsl:with-param name="t"><xsl:call-template name="fm-label"><xsl:with-param name="override" select="$fm.label.abbrev.colFor"/><xsl:with-param name="default">For</xsl:with-param></xsl:call-template></xsl:with-param></xsl:call-template>
+                        </fo:table-row>
+                    </fo:table-header>
+                    <fo:table-body>
+                        <xsl:choose>
+                            <xsl:when test="abbreviation">
+                                <xsl:for-each select="abbreviation">
+                                    <xsl:sort select="translate(@term, $lower, $upper)"/>
+                                    <fo:table-row>
+                                        <fo:table-cell border="0.6pt solid black" padding="1.5mm">
+                                            <fo:block text-align="center"><xsl:value-of select="position()"/></fo:block>
+                                        </fo:table-cell>
+                                        <fo:table-cell border="0.6pt solid black" padding="1.5mm">
+                                            <fo:block font-weight="bold"><xsl:value-of select="@term"/></fo:block>
+                                        </fo:table-cell>
+                                        <fo:table-cell border="0.6pt solid black" padding="1.5mm">
+                                            <fo:block><xsl:value-of select="."/></fo:block>
+                                        </fo:table-cell>
+                                    </fo:table-row>
+                                </xsl:for-each>
+                            </xsl:when>
+                            <xsl:otherwise>
+                                <xsl:call-template name="empty-rows">
+                                    <xsl:with-param name="count">16</xsl:with-param>
+                                    <xsl:with-param name="cols">3</xsl:with-param>
+                                </xsl:call-template>
+                            </xsl:otherwise>
+                        </xsl:choose>
+                    </fo:table-body>
+                </fo:table>
+            </xsl:when>
+            <xsl:otherwise>
             <fo:table table-layout="fixed" width="100%" font-size="{$table-font-size}">
                 <fo:table-column column-width="50mm"/>
                 <fo:table-column column-width="proportional-column-width(1)"/>
@@ -1019,6 +1114,8 @@
                     </xsl:choose>
                 </fo:table-body>
             </fo:table>
+            </xsl:otherwise>
+            </xsl:choose>
         </fo:block>
     </xsl:template>
 

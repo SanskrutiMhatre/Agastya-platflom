@@ -32,11 +32,15 @@ test('creating by format: S1000D uses the direct S1000D engine; JSS Land UHB the
   assert.equal(a.json.project.templateRef, 'xignal-s1000d', 'an S1000D publication is printed in the reference (Xignal) layout');
   const b = await w.post('/api/projects', { name: 'Fmt JSS Land UHB', format: 'jss', domain: 'land', manualType: 'uhb' });
   assert.equal(b.status, 201, JSON.stringify(b.json)); assert.equal(b.json.project.format, 'jss'); assert.equal(b.json.project.domain, 'land'); assert.equal(b.json.project.manualType, 'uhb'); assert.equal(b.json.project.pipeline, 's1000dtojss'); assert.equal(b.json.project.templateRef, 'jss-stencil', 'a JSS document starts on the stencil house style');
-  for (const body of [{ format: 'jss', domain: 'naval', manualType: 'uhb' }, { format: 'jsg', domain: 'land', manualType: 'no-such-type' }, { format: 'jss', domain: 'land' }, { format: 'jss' }]) {
+  // the Naval domain is open (test/jss-naval.test.js builds all ten); what is still refused plainly: a type of another domain, a type the registry does not have, a Land type without its stencil, no type at all
+  const c = await w.post('/api/projects', { name: 'Fmt JSS Naval UHB', format: 'jss', domain: 'naval', manualType: 'naval-uhb' });
+  assert.equal(c.status, 201, JSON.stringify(c.json)); assert.equal(c.json.project.domain, 'naval'); assert.equal(c.json.project.manualType, 'naval-uhb'); assert.equal(c.json.project.pipeline, 's1000dtojss'); assert.equal(c.json.project.templateRef, 'jss-stencil');
+  for (const body of [{ format: 'jss', domain: 'naval', manualType: 'uhb' }, { format: 'jss', domain: 'land', manualType: 'naval-uhb' }, { format: 'jss', domain: 'naval' }, { format: 'jss', domain: 'land', manualType: 'ds' }, { format: 'jsg', domain: 'land', manualType: 'no-such-type' }, { format: 'jss', domain: 'land' }, { format: 'jss' }]) {
     const r = await w.post('/api/projects', { name: `Fmt bad ${JSON.stringify(body)}`.slice(0, 60), ...body });
     assert.equal(r.status, 400, JSON.stringify([body, r.json])); assert.equal(r.json.code, 'FORMAT_NOT_READY');
   }
-  assert.match((await w.post('/api/projects', { name: 'Fmt naval', format: 'jss', domain: 'naval', manualType: 'uhb' })).json.error, /not available yet/);
+  assert.match((await w.post('/api/projects', { name: 'Fmt land ds', format: 'jss', domain: 'land', manualType: 'ds' })).json.error, /not available yet/);
+  assert.match((await w.post('/api/projects', { name: 'Fmt naval wrong', format: 'jss', domain: 'naval', manualType: 'uhb' })).json.error, /Choose the type of JSS Naval manual/);
 });
 
 test('import first: the package is detected, the owner confirms, the project takes its identity from the package', { skip: !fs.existsSync(SAMPLE) && 'the 20 Nov sample is not in this checkout' }, async () => {

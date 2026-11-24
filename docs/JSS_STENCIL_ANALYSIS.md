@@ -177,3 +177,5 @@ Method (`backend/test/jss-stencil-corrections.test.js`, reading the Word files):
 * A document that lists content after a sub-section is an error on the server (`JSS-ORDER`, and the schema); the editor opens it, shows the content where the PDF prints it, and marks the document unsaved so the next save writes it in order.
 
 **Not built:** UHB2, TM_PI, DS, TOTE_and_CS, PRS (chapter manuals); parts-list, illustrations and single-table bodies (Vol_1_PL, Vol_2_Illustrations, MPL, ISPL, ISPL_wrt_JSS, MRLS, ROTABLE).
+
+**Naval (2026-11-24):** the ten Naval types (User Handbook, TM Parts I-IV, Design Specification, MRLS, Complete Equipment Schedule, List of SMT / STE) are built; see `JSS_NAVAL_STENCIL_ANALYSIS.md`. The Land-folder stencils listed above as "not built" are still not built.

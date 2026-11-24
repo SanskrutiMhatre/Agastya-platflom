@@ -87,7 +87,7 @@ const norm = (t) => { let s = t.toLowerCase().replace(/\s*\/\s*/g, '/').replace(
 // ── the catalogue ───────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 test('the catalogue lists all 15 stencil document types; only the three of this slice are ready, and the others say why not', async () => {
-  const t = (await w.get('/api/jss/types')).json.types;
+  const t = (await w.get('/api/jss/types')).json.types.filter((x) => x.domain === 'land');       // the Naval stencils are in test/jss-naval.test.js
   assert.deepEqual(t.map((x) => x.id), ['uhb', 'mm', 'orm', 'uhb2', 'tm-pi', 'ds', 'tote-cs', 'prs', 'mrls', 'rotable', 'vol-1-pl', 'vol-2-illustrations', 'mpl', 'ispl', 'ispl-wrt-jss']);
   assert.deepEqual(t.filter((x) => x.ready).map((x) => x.id), ['uhb', 'mm', 'orm']);
   for (const x of t.filter((y) => !y.ready)) assert.ok(x.notReady && x.notReady.length > 20, `${x.id} gives a reason`);

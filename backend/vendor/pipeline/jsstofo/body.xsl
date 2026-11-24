@@ -29,6 +29,16 @@
                 <xsl:when test="$xhead"><xsl:value-of select="$xhead/title"/></xsl:when>
             </xsl:choose>
         </xsl:variable>
+        <!-- The chapter's own heading, as the divider page begins with it -->
+        <xsl:variable name="chapter-heading">
+            <fo:block font-size="{$heading1-size}" font-weight="bold" space-after="1mm">
+                <xsl:text>Chapter </xsl:text><xsl:value-of select="@number"/>
+            </fo:block>
+            <fo:block font-size="{$heading1-size}" font-weight="bold"
+                      border-bottom="1pt solid black" padding-bottom="2mm" space-after="6mm">
+                <xsl:value-of select="$ctitle"/>
+            </fo:block>
+        </xsl:variable>
         <!-- Divider page; belongs to the chapter's first page-sequence -->
         <xsl:variable name="divider">
           <xsl:choose>
@@ -40,13 +50,7 @@
             </xsl:when>
             <xsl:otherwise>
             <fo:block id="{concat('chapter-', @number)}">
-                <fo:block font-size="{$heading1-size}" font-weight="bold" space-after="1mm">
-                    <xsl:text>Chapter </xsl:text><xsl:value-of select="@number"/>
-                </fo:block>
-                <fo:block font-size="{$heading1-size}" font-weight="bold"
-                          border-bottom="1pt solid black" padding-bottom="2mm" space-after="6mm">
-                    <xsl:value-of select="$ctitle"/>
-                </fo:block>
+                <xsl:copy-of select="$chapter-heading"/>
                 <xsl:if test="section">
                     <fo:block space-after="3mm">This chapter covers the following topics:</fo:block>
                     <!-- break-after forces the chapter's actual content (first
@@ -100,7 +104,7 @@
             </xsl:otherwise>
           </xsl:choose>
             <!-- Content sitting directly on the chapter, ahead of any section -->
-            <xsl:apply-templates select="para | list | table | figure | note | warning | caution"/>
+            <xsl:apply-templates select="para | list | table | figure | note | warning | caution | pageBreak[$chapter.pageBreak = '1']"/>
         </xsl:variable>
 
         <!-- The Xignal reference has no end-of-chapter marker. -->
@@ -113,6 +117,16 @@
         </xsl:variable>
 
         <xsl:choose>
+            <!-- chapter.divider = 0: no divider page; the chapter's heading opens the first page of its first section run, which claims the folio restart the divider would have -->
+            <xsl:when test="$csections and $chapter.divider = '0'">
+                <xsl:call-template name="emit-orientation-runs">
+                    <xsl:with-param name="sections" select="$csections/descendant-or-self::section"/>
+                    <xsl:with-param name="chapter-number" select="@number"/>
+                    <xsl:with-param name="end-marker" select="$end-marker"/>
+                    <xsl:with-param name="lead"><fo:block id="{concat('chapter-', @number)}"><xsl:copy-of select="$chapter-heading"/></fo:block></xsl:with-param>
+                    <xsl:with-param name="first">1</xsl:with-param>
+                </xsl:call-template>
+            </xsl:when>
             <xsl:when test="$csections">
                 <!--
                   The divider is its own page-sequence, always portrait,
@@ -177,6 +191,9 @@
         <xsl:param name="sections"/>
         <xsl:param name="chapter-number"/>
         <xsl:param name="end-marker"/>
+        <!-- What opens the first run, and whether that run claims the chapter's first folio: set only for a chapter without a divider page (chapter.divider = 0) -->
+        <xsl:param name="lead"/>
+        <xsl:param name="first">0</xsl:param>
 
         <xsl:if test="count($sections) &gt; 0">
             <xsl:variable name="orientation">
@@ -226,6 +243,7 @@
 
             <xsl:call-template name="body-page-sequence">
                 <xsl:with-param name="content">
+                    <xsl:copy-of select="$lead"/>
                     <xsl:choose>
                         <xsl:when test="$xjss"><xsl:apply-templates select="$sections[position() &lt;= $n]" mode="xjss-flat"/></xsl:when>
                         <xsl:otherwise><xsl:apply-templates select="$sections[position() &lt;= $n]" mode="flat"/></xsl:otherwise>
@@ -234,7 +252,7 @@
                 </xsl:with-param>
                 <xsl:with-param name="chapter-number" select="$chapter-number"/>
                 <xsl:with-param name="orientation" select="$orientation"/>
-                <xsl:with-param name="first">0</xsl:with-param>
+                <xsl:with-param name="first" select="$first"/>
                 <xsl:with-param name="last">
                     <xsl:choose>
                         <xsl:when test="count($sections) = $n">1</xsl:when>
