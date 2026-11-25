@@ -134,6 +134,34 @@ export function applyJssFrontMatter(projectId: string, project: any, effective: 
   }
 }
 
+/**
+ * The emblem, the publisher logos and the first-aid figures a JSS document prints when its project has not supplied them (or names a file that is not in its Media
+ * folder): the pictures of the JSS-0251 stencils, shipped in vendor/pipeline/jss/artwork. They are referenced where they are, never copied into the project, and a
+ * file the project does have always wins. A publisher gets the Larsen & Toubro logo only when it is Larsen & Toubro; another publisher with no logo prints none.
+ */
+export function applyDefaultArtwork(projectId: string, effective: any, dir: string, log: (m: string) => void): void {
+  const art = (f: string): string => relFromProject(projectId, path.join(config.pipelineDir, 'jss', 'artwork', f), dir);
+  const has = (rel: unknown): boolean => typeof rel === 'string' && rel !== '' && fs.existsSync(path.resolve(dir, rel));
+  const used: string[] = [];
+  const branding = { ...(effective.branding ?? {}) };
+  if (!has(branding.emblem)) { branding.emblem = art('emblem.png'); used.push('the emblem'); }
+  if (Array.isArray(branding.publishers)) {
+    branding.publishers = branding.publishers.map((pub: any) => {
+      if (has(pub?.logo) || !/l\s*&\s*t\b|larsen/i.test(`${pub?.name ?? ''} ${(pub?.addressLines ?? []).join(' ')}`)) return pub;
+      used.push(`the logo of ${String(pub.name ?? 'a publisher').replace(/,\s*$/, '')}`);
+      return { ...pub, logo: art('lt-logo.png') };
+    });
+  }
+  effective.branding = branding;
+  const fm = { ...(effective.frontMatter ?? {}) };
+  if (!has(fm.firstAidImage)) {
+    fm.firstAidImage = art('first-aid.png'); used.push('the first-aid figures');
+    fm.firstAidImageHeight = '145mm';                      // the box the strip scales into: tall enough for the four figures to sit beside the five steps
+  }
+  effective.frontMatter = fm;
+  if (used.length) log(`Default artwork from the stencil: ${used.join(', ')} (the project has no such file in its Media folder)`);
+}
+
 function prepareInput(projectId: string, project: any, effective: any, useDirect: boolean, log: (m: string) => void, dir: string = projectDirFor(projectId)) {
   if (isJssAuthored(projectId)) {
     // A JSS document is rendered as authored: only the shared frame is added (from Settings), then it goes straight to the JSS stylesheets.
@@ -206,6 +234,8 @@ export function syncFrontMatter(projectId: string): void {
     } else {
       const fmDir = path.join(dir, 'jss', 'frontmatter');
       fs.mkdirSync(fmDir, { recursive: true });
+      if (isJssAuthored(projectId)) applyJssFrontMatter(projectId, project, effective);
+      applyDefaultArtwork(projectId, effective, dir, () => undefined);        // the same inputs as the build, so the files the approval covers are the files it writes
       generateFrontMatter(effective.frontMatter, fmDir, 's1000dtojss');
     }
   } catch (e) { console.error('[publisher] front matter not synced before review:', (e as Error).message); }
@@ -323,6 +353,7 @@ async function renderFull(projectId: string, gate: GatePass, log: (m: string) =>
     const isS1000D = fs.existsSync(pmAbs) && !/<\s*jssbook[\s>]/.test(fs.readFileSync(pmAbs, 'utf8'));
     const useDirect = project.pipeline === 's1000dtofo' && isS1000D;
     log(useDirect ? 'Engine: direct S1000D -> FO' : 'Engine: S1000D -> JSS book -> FO');
+    if (!useDirect) applyDefaultArtwork(projectId, effective, dir, log);        // every JSS book: written in the editor, built from S1000D modules, or imported
 
     const renderedState = releaseStateOf(projectId);          // what this PDF will claim: released or NOT RELEASED, for which content
     const { wm, releaseLabel } = resolveMarks(projectId, effective, project.pipeline, log, { derived: !!opts.workDir, dir });

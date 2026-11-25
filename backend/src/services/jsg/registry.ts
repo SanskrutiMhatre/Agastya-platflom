@@ -86,4 +86,18 @@ export const ISPL_PREFACE: Array<{ kind: 'para' | 'note' | 'list'; text?: string
   { kind: 'para', text: 'Queries relating to this ISPL must be referred to Controller / HOE of the concerned office by whom this ISPL has been published. The name and address of the publisher is shown on cover page / cover leaf of this ISPL.' },
 ];
 
+/**
+ * The standard wording of the User Handbook's PREFACE, exactly as the stencil (JSG_UHB_Stencil.docx) prints it: four numbered paragraphs. A new User Handbook starts with it;
+ * the author may edit it (the stencil's text is about a bridging system, so the equipment's own wording usually replaces the third paragraph).
+ */
+export const UHB_PREFACE: string[] = [
+  'This handbook provides information required by the user units for operations, upkeep, fault diagnosing at site. It also has a special section for use as a comprehensive asset book for maintaining record of vital data for future analysis with a view to optimize the requirement of spares and for improving its performance. It is prepared as a compendium containing the required information to accept, operate and maintain the equipment. It is aimed to assist the users of the equipment in getting acquainted with, learning about and as a day to day operating log of a given set.',
+  'Though this handbook covers main aspects of the equipment to understand capabilities, limitations, and ways to operate it, is not a supplement for on-the-job training and for assessing functional serviceability of the equipment. It is recommended to have formal training and practice before the equipment is entrusted to a completely new operating crew. Systems have been described to understand the way systems function and not merely to perform drills; so that through experience gained, users can suggest improvement besides commenting on shortcomings.',
+  'The handbook incorporates individual chapters about the basic bridging system, the technical and operating data of the bridging system, the basic operating modes, details about Bridge Superstructure, Launching Mechanism, Hydraulic System, Electrical System, the operations associated with the launching, de-launching, retrieval when damaged, inspection, care and maintenance of the equipment, as well as the historical record of operations performed by the system and the modifications carried out to it.',
+  'In designing the layout of the handbook, effort has been made to simplify the textural contents for the first time reader by adopting suitable colours, fonts and formats.',
+];
+
+/** How many numbered, empty lines the stencil prints on each list page of the User Handbook front matter, and rows in its tables. */
+export const UHB_FRONT_COUNTS = { warning: 6, dos: 5, donts: 5, important: 5, abbreviationRows: 37, amendmentRows: 20 } as const;
+
 export const jsgTypeById = (id: unknown): JsgDocType | undefined => JSG_TYPES.find((t) => t.id === id);

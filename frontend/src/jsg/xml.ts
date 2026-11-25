@@ -10,7 +10,7 @@ export class JsgParseError extends Error {}
 
 const MARKS: Mark[] = ['b', 'i', 'u', 'sup', 'sub'];
 const ALIGNS: Align[] = ['left', 'center', 'right', 'justify'];
-const LISTS: ListType[] = ['alpha', 'number', 'step', 'bullet', 'dash'];
+const LISTS: ListType[] = ['alpha', 'roman', 'number', 'step', 'bullet', 'dash'];
 const ORIENT: Orientation[] = ['portrait', 'landscape', 'a3-landscape'];
 const META_TEXT = ['docNo', 'title', 'subtitle', 'projectName', 'atNo', 'dated', 'nsn', 'issueDate', 'equipmentLife', 'qtyUnit', 'classification', 'emblem', 'logo'];
 
@@ -65,10 +65,11 @@ function plate(e: Element): Plate {
   const p: Plate = { ...(attr(e, 'id') ? { id: attr(e, 'id') } : {}), ref: attr(e, 'ref') ?? '', title: attr(e, 'title') ?? '', caption: attr(e, 'caption') ?? '', divider: attr(e, 'divider') === 'true', setColumn: attr(e, 'setColumn') === 'true', views: [] };
   for (const v of kids(e)) {
     if (v.tagName !== 'view') fail(v, 'a plate holds <view> only');
-    const view = { caption: attr(v, 'caption') ?? '', graphics: [] as Graphic[], parts: [] as PartRow[] };
+    const view = { caption: attr(v, 'caption') ?? '', graphics: [] as Graphic[], parts: [] as PartRow[], notes: [] as Inline[][] };
     for (const c of kids(v)) {
       if (c.tagName === 'graphic') view.graphics.push(graphic(c));
       else if (c.tagName === 'part') { const row = newPart(); for (const k of PART_KEYS) row[k] = attr(c, k) ?? ''; view.parts.push(row); }
+      else if (c.tagName === 'note') view.notes.push(inline(c));
       else fail(c, 'is not allowed in a view');
     }
     p.views.push(view);
@@ -107,7 +108,7 @@ function block(e: Element): Block | null {
 }
 
 function clause(e: Element): Clause {
-  return { k: 'clause', ...(attr(e, 'id') ? { id: attr(e, 'id') } : {}), title: attr(e, 'title') ?? '', children: kids(e).map((c) => (c.tagName === 'clause' ? clause(c) : block(c) ?? fail(c, 'is not allowed in a clause'))) };
+  return { k: 'clause', ...(attr(e, 'id') ? { id: attr(e, 'id') } : {}), title: attr(e, 'title') ?? '', ...(attr(e, 'orientation') && orientation(e) !== 'portrait' ? { orientation: orientation(e) } : {}), children: kids(e).map((c) => (c.tagName === 'clause' ? clause(c) : block(c) ?? fail(c, 'is not allowed in a clause'))) };
 }
 
 function orientation(e: Element): Orientation {
@@ -122,16 +123,19 @@ const lines = (e: Element): string[] => kids(e).map((l) => l.textContent ?? '');
 function front(e: Element | undefined): Front {
   const f = emptyFront();
   if (!e) return f;
+  f.omit = (attr(e, 'omit') ?? '').split(/\s+/).filter(Boolean);
   for (const c of kids(e)) {
     switch (c.tagName) {
       case 'amendments': f.has.amendments = true; f.amendmentsMinRows = Number(attr(c, 'minRows') ?? 20); f.amendments = kids(c).map((r) => ({ no: attr(r, 'no') ?? '', page: attr(r, 'page') ?? '', para: attr(r, 'para') ?? '', required: attr(r, 'required') ?? '', authority: attr(r, 'authority') ?? '', date: attr(r, 'date') ?? '', by: attr(r, 'by') ?? '' })); break;
       case 'warning': f.has.warning = true; f.warning = items(c); break;
-      case 'associated': f.has.associated = true; f.associated = kids(c).map((r) => ({ title: attr(r, 'title') ?? '', docNo: attr(r, 'docNo') ?? '', remark: attr(r, 'remark') ?? '' })); break;
-      case 'abbreviations': f.has.abbreviations = true; f.abbreviations = kids(c).map((r) => ({ short: attr(r, 'short') ?? '', long: attr(r, 'long') ?? '' })); break;
+      case 'associated': f.has.associated = true; f.associatedIntro = attr(c, 'intro') ?? ''; f.associated = kids(c).map((r) => ({ title: attr(r, 'title') ?? '', docNo: attr(r, 'docNo') ?? '', remark: attr(r, 'remark') ?? '' })); break;
+      case 'abbreviations': f.has.abbreviations = true; f.abbreviationsMinRows = Number(attr(c, 'minRows') ?? 0); f.abbreviations = kids(c).map((r) => ({ short: attr(r, 'short') ?? '', long: attr(r, 'long') ?? '' })); break;
       case 'preface': f.has.preface = true; f.preface = kids(c).map((p) => (p.tagName === 'list' ? list(p) : p.tagName === 'para' ? para(p) : fail(p, 'is not allowed in the preface'))); break;
       case 'dos': f.has.dos = true; f.dos = items(c); break;
       case 'donts': f.has.donts = true; f.donts = items(c); break;
       case 'important': f.has.important = true; f.important = items(c); break;
+      case 'demolition': f.has.demolition = true; f.demolition = kids(c).map((p) => (p.tagName === 'para' ? para(p) : fail(p, 'is not allowed in the demolition notice'))); break;
+      case 'firstAid': f.has.firstAid = true; f.firstAid = items(c); break;
       case 'photos': f.has.photos = true; f.photos = kids(c).map(graphic); break;
       case 'certificate': f.has.certificate = true; f.certificate = inline(c); break;
       case 'supplied': f.has.supplied = true; f.supplied = { equipment: attr(c, 'equipment') ?? '', rows: kids(c).map((r) => ({ no: attr(r, 'no') ?? '', dcan: attr(r, 'dcan') ?? '', name: attr(r, 'name') ?? '', order: attr(r, 'order') ?? '' })) }; break;
@@ -196,7 +200,7 @@ const GRAPHIC = (g: Graphic, pad: string): string => `${pad}<graphic${at('src', 
 
 function plateXml(p: Plate, pad: string): string {
   const views = p.views.map((v) => {
-    const inner = [...v.graphics.map((g) => GRAPHIC(g, pad + '    ')), ...v.parts.map((r) => `${pad}    <part${PART_KEYS.map((k) => (k === 'item' || k === 'designation' ? ` ${k}="${escA(r[k])}"` : at(k, r[k]))).join('')}/>`)].join('\n');
+    const inner = [...v.graphics.map((g) => GRAPHIC(g, pad + '    ')), ...v.parts.map((r) => `${pad}    <part${PART_KEYS.map((k) => (k === 'item' || k === 'designation' ? ` ${k}="${escA(r[k])}"` : at(k, r[k]))).join('')}/>`), ...(v.notes ?? []).map((n) => `${pad}    <note>${inlineXml(n)}</note>`)].join('\n');
     return `${pad}  <view${at('caption', v.caption)}>${inner ? `\n${inner}\n${pad}  ` : ''}</view>`;
   }).join('\n');
   return `${pad}<plate${at('id', p.id)} ref="${escA(p.ref)}" title="${escA(p.title)}"${at('caption', p.caption)}${p.divider ? ' divider="true"' : ''}${p.setColumn ? ' setColumn="true"' : ''}>${views ? `\n${views}\n${pad}` : ''}</plate>`;
@@ -234,7 +238,7 @@ export function blockXml(b: Block, pad: string): string {
 
 function clauseXml(c: Clause, pad: string): string {
   const inner = c.children.map((x) => (isClause(x) ? clauseXml(x, pad + '  ') : blockXml(x, pad + '  '))).join('\n');
-  return `${pad}<clause${at('id', c.id)} title="${escA(c.title)}">${inner ? `\n${inner}\n${pad}` : ''}</clause>`;
+  return `${pad}<clause${at('id', c.id)} title="${escA(c.title)}"${c.orientation && c.orientation !== 'portrait' ? at('orientation', c.orientation) : ''}>${inner ? `\n${inner}\n${pad}` : ''}</clause>`;
 }
 
 const itemsXml = (name: string, it: Inline[][], pad: string): string => `${pad}<${name}>${it.length ? '\n' + it.map((i) => `${pad}  <item>${inlineXml(i)}</item>`).join('\n') + '\n' + pad : ''}</${name}>`;
@@ -242,15 +246,17 @@ const itemsXml = (name: string, it: Inline[][], pad: string): string => `${pad}<
 function frontXml(f: Front, pad: string): string {
   const out: string[] = [];
   if (f.has.amendments) out.push(`${pad}<amendments minRows="${f.amendmentsMinRows}">${f.amendments.length ? '\n' + f.amendments.map((r) => `${pad}  <row${at('no', r.no)}${at('page', r.page)}${at('para', r.para)}${at('required', r.required)}${at('authority', r.authority)}${at('date', r.date)}${at('by', r.by)}/>`).join('\n') + '\n' + pad : ''}</amendments>`);
+  if (f.has.demolition) out.push(`${pad}<demolition>${f.demolition.length ? '\n' + f.demolition.map((p) => `${pad}  ${paraXml(p)}`).join('\n') + '\n' + pad : ''}</demolition>`);
+  if (f.has.firstAid) out.push(itemsXml('firstAid', f.firstAid, pad));
   if (f.has.certificate && f.certificate) out.push(`${pad}<certificate>${inlineXml(f.certificate)}</certificate>`);
   if (f.has.warning) out.push(itemsXml('warning', f.warning, pad));
-  if (f.has.associated) out.push(`${pad}<associated>${f.associated.length ? '\n' + f.associated.map((r) => `${pad}  <doc title="${escA(r.title)}"${at('docNo', r.docNo)}${at('remark', r.remark)}/>`).join('\n') + '\n' + pad : ''}</associated>`);
-  if (f.has.abbreviations) out.push(`${pad}<abbreviations>${f.abbreviations.length ? '\n' + f.abbreviations.map((r) => `${pad}  <abbr short="${escA(r.short)}" long="${escA(r.long)}"/>`).join('\n') + '\n' + pad : ''}</abbreviations>`);
+  if (f.has.associated) out.push(`${pad}<associated${at('intro', f.associatedIntro)}>${f.associated.length ? '\n' + f.associated.map((r) => `${pad}  <doc title="${escA(r.title)}"${at('docNo', r.docNo)}${at('remark', r.remark)}/>`).join('\n') + '\n' + pad : ''}</associated>`);
+  if (f.has.abbreviations) out.push(`${pad}<abbreviations${f.abbreviationsMinRows ? ` minRows="${f.abbreviationsMinRows}"` : ''}>${f.abbreviations.length ? '\n' + f.abbreviations.map((r) => `${pad}  <abbr short="${escA(r.short)}" long="${escA(r.long)}"/>`).join('\n') + '\n' + pad : ''}</abbreviations>`);
   if (f.has.preface) out.push(`${pad}<preface>${f.preface.length ? '\n' + f.preface.map((p) => (p.k === 'list' ? listXml(p, pad + '  ') : `${pad}  ${paraXml(p)}`)).join('\n') + '\n' + pad : ''}</preface>`);
   if (f.has.dos) out.push(itemsXml('dos', f.dos, pad));
   if (f.has.donts) out.push(itemsXml('donts', f.donts, pad));
   if (f.has.important) out.push(itemsXml('important', f.important, pad));
-  if (f.has.photos) out.push(`${pad}<photos>${f.photos.length ? '\n' + f.photos.map((g) => `${pad}  <graphic src="${escA(g.src)}"/>`).join('\n') + '\n' + pad : ''}</photos>`);
+  if (f.has.photos) out.push(`${pad}<photos>${f.photos.length ? '\n' + f.photos.map((g) => GRAPHIC(g, pad + '  ')).join('\n') + '\n' + pad : ''}</photos>`);
   if (f.has.supplied && f.supplied) out.push(`${pad}<supplied${at('equipment', f.supplied.equipment)}>${f.supplied.rows.length ? '\n' + f.supplied.rows.map((r) => `${pad}  <row${at('no', r.no)}${at('dcan', r.dcan)}${at('name', r.name)}${at('order', r.order)}/>`).join('\n') + '\n' + pad : ''}</supplied>`);
   return out.join('\n');
 }
@@ -269,6 +275,6 @@ export function serializeJsg(d: JsgDoc): string {
   <meta>
 ${[...meta.slice(0, META_TEXT.indexOf('equipmentLife') >= 0 ? meta.length : meta.length), l('supplier', d.supplier), l('issuedBy', d.issuedBy)].join('\n')}
   </meta>
-${fx ? `  <front>\n${fx}\n  </front>\n` : ''}${chapters ? chapters + '\n' : ''}${d.appendices.length ? `  <appendices>\n${apps}\n  </appendices>\n` : ''}${d.type === 'ispl' ? `  <plates>${d.plates.length ? '\n' + d.plates.map((p) => plateXml(p, '    ')).join('\n') + '\n  ' : ''}</plates>\n` : ''}</jsgdoc>
+${fx || d.front.omit.length ? `  <front${d.front.omit.length ? ` omit="${escA(d.front.omit.join(' '))}"` : ''}>${fx ? `\n${fx}\n  ` : ''}</front>\n` : ''}${chapters ? chapters + '\n' : ''}${d.type === 'ispl' ? `  <plates>${d.plates.length ? '\n' + d.plates.map((p) => plateXml(p, '    ')).join('\n') + '\n  ' : ''}</plates>\n` : ''}${d.appendices.length ? `  <appendices>\n${apps}\n  </appendices>\n` : ''}</jsgdoc>
 `;
 }

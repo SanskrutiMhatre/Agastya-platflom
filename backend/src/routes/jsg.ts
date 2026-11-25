@@ -7,6 +7,7 @@
 //   POST /api/projects/:id/jsg/validate    check { xml? } (default: the saved document)   (viewer)
 //   POST /api/projects/:id/jsg/build       build the PDF with the JSG engine   (reviewer)
 //   GET  /api/projects/:id/jsg/pdf         the last PDF built   (viewer)
+//   POST /api/projects/:id/jsg/import-docx  a Word file (multipart `file`) in the JSG User Handbook or ISPL format -> replaces the document, copies its pictures   (editor)
 //
 // These routes are the whole JSG surface: the JSS and S1000D routes and the shared publish route are not involved.
 
@@ -19,6 +20,9 @@ import { readProjectJson } from '../services/projects';
 import { JSG_TYPES, jsgTypeById } from '../services/jsg/registry';
 import { JSG_XSD, isJsgProject, jsgTypeOfProject, readSource, writeSource, validateJsg } from '../services/jsg/service';
 import { buildJsgPdf, PDF_NAME } from '../services/jsg/engine';
+import { importDocx } from '../services/jsg/docx';
+import { importIsplDocx } from '../services/jsg/docx-ispl';
+import { diskUpload, discard, tooLarge } from '../services/uploads';
 
 export function registerJsgRoutes(app: Express): void {
   app.get('/api/jsg/types', requireAuth(), wrap((_req, res) => {
@@ -67,6 +71,30 @@ export function registerJsgRoutes(app: Express): void {
     res.type('application/pdf');
     if (req.query.download === '1') res.attachment(name);
     res.sendFile(abs);
+  }));
+
+  // Import from Word: the filled handbook's styles are read (docx.ts), its pictures go to the project's Media folder, and the document is replaced (the old one is kept as a .bak beside it).
+  const wordUpload = diskUpload({ files: 1 });
+  app.post(`${base}/import-docx`, requireProject('editor', { from: 'param', cap: 'dm.write' }), (req, res, next) => wordUpload.single('file')(req, res, (err: unknown) => {
+    if (!err) return next();
+    return (err as { code?: string }).code === 'LIMIT_FILE_SIZE' ? res.status(413).json(tooLarge()) : next(err);
+  }), wrap(async (req, res) => {
+    needJsg(req);
+    const file = (req as any).file as { path: string; originalname: string } | undefined;
+    try {
+      if (!file) throw bad('Send the Word file as the form field "file".', 'NO_FILE');
+      const kind = jsgTypeOfProject(req.project.id)?.id;
+      if (kind !== 'uhb' && kind !== 'ispl') throw bad('Only a User Handbook or an Illustrated Spare Parts List can be imported from Word.', 'IMPORT_TYPE');
+      if (!/\.docx$/i.test(file.originalname)) throw bad('This is not a Word document (.docx). Save the file as .docx in Word first.', 'NOT_DOCX');
+      let out;
+      try { out = await (kind === 'ispl' ? importIsplDocx : importDocx)(file.path, { projectDir: projectDirFor(req.project.id) }); }
+      catch (e) { throw bad(`This Word file could not be read: ${(e as Error).message}`, 'DOCX_UNREADABLE'); }
+      const dir = projectDirFor(req.project.id); const src = path.join(dir, 'jsg-document.xml');
+      if (fs.existsSync(src)) fs.copyFileSync(src, path.join(dir, 'jsg-document.before-import.bak'));
+      const saved = await writeSource(req.project.id, out.xml);
+      log(req, 'jsg.imported', { file: file.originalname, pictures: out.media.length, chapters: out.report.chapters, errors: saved.report.errors });
+      res.json({ ok: true, hash: saved.hash, report: saved.report, import: out.report, pictures: out.media.length });
+    } finally { discard(file ? [file] : []); }
   }));
 
   void jsgTypeById;

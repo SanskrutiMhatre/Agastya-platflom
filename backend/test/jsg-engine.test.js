@@ -64,7 +64,7 @@ test('saving: malformed XML is refused, a schema-invalid draft is kept and repor
 
 test('a table that does not hold together, an absolute picture path and a dangling cross-reference are errors', async () => {
   const doc = (await w.get(`/api/projects/${id}/jsg`)).json.xml;
-  const withTable = doc.replace('<clause id="k1" title="General"><para/></clause>', '<clause id="k1" title="General"><table title="T"><body><row><cell><text>a</text></cell><cell><text>b</text></cell></row><row><cell><text>c</text></cell></row></body></table><figure title="F"><graphic src="C:/x.png"/></figure><para><xref to="nowhere">x</xref></para></clause>');
+  const withTable = doc.replace('<clause id="k1" title="General"><figure title="FIGURE NAME"/></clause>', '<clause id="k1" title="General"><table title="T"><body><row><cell><text>a</text></cell><cell><text>b</text></cell></row><row><cell><text>c</text></cell></row></body></table><figure title="F"><graphic src="C:/x.png"/></figure><para><xref to="nowhere">x</xref></para></clause>');
   assert.notEqual(withTable, doc);
   const r = (await w.post(`/api/projects/${id}/jsg/validate`, { xml: withTable })).json;
   const rules = r.findings.map((f) => f.rule);
@@ -106,4 +106,36 @@ test('ISOLATION: no JSG logic in the JSS or S1000D engines, stylesheets, schemas
     for (const m of read(f).matchAll(/<xsl:(?:include|import)\s+href="([^"]+)"/g)) assert.match(m[1], /^jsg-[a-z]+\.xsl$/, `${f} includes ${m[1]}`);
     assert.doesNotMatch(read(f).replace(/<!--[\s\S]*?-->/g, ''), /jsstofo|s1000dtofo|s1000dtojss/, `${f} uses another engine`);
   }
+});
+
+test('a new User Handbook prints the stencil: same pages, the red underlined RESTRICTED, the stencil\'s front matter and a landscape System Tree Chart', { timeout: 300000 }, async () => {
+  const { spawnSync } = require('node:child_process');
+  const r = await w.post('/api/projects', { name: 'Jsg UHB stencil', format: 'jsg', domain: 'land', manualType: 'uhb' });
+  const pid = r.json.project.id; const d = path.join(h.ws, 'projects', pid);
+  const b = await w.post(`/api/projects/${pid}/jsg/build`); assert.equal(b.status, 200, JSON.stringify(b.json).slice(0, 300));
+  const fo = fs.readFileSync(path.join(d, 'jsg-output.fo'), 'utf8');
+  const pdf = path.join(d, 'jsg-output.pdf');
+  const page = (n) => spawnSync('pdftotext', ['-layout', '-f', String(n), '-l', String(n), pdf, '-'], { encoding: 'utf8' }).stdout.replace(/\s+/g, ' ').trim();
+
+  // head and foot: RESTRICTED in red, 12 pt, underlined (JSG_UHB_Stencil headers and footers); the page number in brackets, 12 pt
+  assert.match(fo, /<fo:inline font-size="12pt" color="#FF0000" text-decoration="underline"[^>]*>RESTRICTED<\/fo:inline>/);
+  assert.ok(!/font-size="9pt"[^>]*>RESTRICTED/.test(fo), 'the old 9 pt black head is gone');
+  // the stencil is 110 pages and this is the same book: front matter in the stencil's order, then the body
+  assert.equal(Number(/Pages:\s+(\d+)/.exec(spawnSync('pdfinfo', [pdf], { encoding: 'utf8' }).stdout)[1]), 110);
+  assert.match(page(1), /DOCUMENT NO\..*USER HANDBOOK FOR PROJECT NAME|DOCUMENT NO\..*USER HANDBOOK FOR/);
+  assert.match(page(3), /AMENDMENTS/); assert.match(page(5), /WARNING 1\. 2\. 3\. 4\. 5\. 6\./);
+  assert.match(page(7), /DEMOLITION OF EQUIPMENT TO PREVENT ENEMY USE/); assert.match(page(10), /Figure\. 1.*SWITCH OFF/);
+  assert.match(page(11), /ABBREVIATIONS Sr\. No\. Abbreviation Issued For 1 2 3/); assert.match(page(12), /25 26 27.*37/, 'the 37 numbered rows run onto a second page, as the stencil\'s do');
+  assert.match(page(13), /PREFACE 1\. This handbook provides information required by the user units/);
+  assert.match(page(15), /DO’S 1\. 2\. 3\. 4\. 5\. DONT’S 1\. 2\. 3\. 4\. 5\./); assert.match(page(17), /IMPORTANT POINTS 1 2 3 4 5/);
+  assert.match(page(21), /CONTENTS CHAPTERS DESCRIPTION PAGE No\. CHAPTER 1 GENERAL DESCRIPTION/); assert.match(page(22) + page(21), /Section 6 Appendices/);
+  assert.match(page(23), /LIST OF FIGURES Figure 1: FIGURE NAME\.+ \d+ Figure 2: System Tree Chart/); assert.match(page(25), /LIST OF TABLES Table 1: Technical Specifications/);
+  // body: CHAPTER and SECTION dividers, then 1.1 General with its captioned placeholder figure, 1.2 with a lettered list and Table 1, and 1.3 on a landscape page
+  assert.match(page(27), /CHAPTER 1 GENERAL DESCRIPTION/); assert.match(page(29), /SECTION 1 INTRODUCTION/);
+  assert.match(page(31), /1\.1 GENERAL Figure 1: FIGURE NAME 1\.2 SPECIAL FEATURES AND SPECIFICATIONS \(a\) Table 1: Technical Specifications Sr\. No\. Parameter Value/);
+  assert.match(page(32), /1\.3 SYSTEM TREE CHART Figure 2: System Tree Chart/);
+  const line = spawnSync('pdfinfo', ['-f', '32', '-l', '32', pdf], { encoding: 'utf8' }).stdout.split('\n').find((l) => /^Page\s+32 size/.test(l)) ?? '';
+  const size = /size:\s+([\d.]+) x ([\d.]+)/.exec(line);
+  assert.ok(size && Number(size[1]) > Number(size[2]), `page 32 is landscape (${line})`);
+  assert.match(page(93), /APPENDIX ‘H’ SYSTEM SPECIFICATION/, 'the appendices start after their SECTION divider');
 });

@@ -1,6 +1,6 @@
 // Calls for JSS authoring (backend/src/routes/jss.ts). The document is one XML file per project; the server validates it against jss-1.0.xsd and the stencil's rules.
 
-import { get, post, put } from './client';
+import { get, post, put, request } from './client';
 
 export interface JssFinding { severity: 'error' | 'warning'; rule: string; message: string; line: number; location: string }
 export interface JssReport { docType: string | null; valid: boolean; errors: number; warnings: number; findings: JssFinding[]; validatedAt: string }
@@ -30,6 +30,19 @@ export const jssApi = {
   read: (id: string) => get<JssDocument>(P(id)),
   save: (id: string, xml: string, baseHash?: string) => put<{ hash: string; report: JssReport }>(P(id), { xml, baseHash }),
   validate: (id: string, xml?: string) => post<JssReport>(`${P(id)}/validate`, xml === undefined ? {} : { xml }),
+};
+
+/** What an import or an export found, in plain language (the server writes the messages). */
+export interface PackageFinding { severity: 'error' | 'warning' | 'info'; code: string; message: string; where?: string; detail?: string }
+export interface ImportSummary { ok: true; packageName: string; importedAt: string; findings: PackageFinding[]; counts: { chapters: number; sections: number; paragraphs: number; lists: number; tables: number; figures: number; pictures: number; picturesMissing: number; picturesUnused: number; documents: number; documentsPlacedByNumber: number } }
+export interface ExportSummary { ok: true; fileName: string; findings: PackageFinding[]; counts: { documents: number; chapters: number; pictures: number; picturesMissing: number; documentsKept: number; documentsRebuilt: number } }
+
+/** Importing a finished project package into a JSS document, and exporting the document back as one. */
+export const packageApi = {
+  import: (id: string, file: File) => { const fd = new FormData(); fd.append('file', file); return request<{ ok: true; hash: string; report: JssReport; import: ImportSummary }>('POST', `${P(id)}/import-project`, fd).then((r) => r.import); },
+  importReport: (id: string) => get<ImportSummary>(`${P(id)}/import-report`),
+  exportCheck: (id: string) => get<{ ok: boolean; report: ExportSummary }>(`${P(id)}/export-check`),
+  exportUrl: (id: string) => `${P(id)}/export`,
 };
 
 export interface AncillaryPage { id: string; label: string; title: string | null; customTitle: string; enabled: boolean; required: boolean; file: string | null; edited: boolean }

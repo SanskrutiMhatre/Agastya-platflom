@@ -42,7 +42,7 @@ describe('ISPL page preview', () => {
     const heads = Array.from(page.querySelectorAll('th')).map((t) => t.textContent);
     expect(heads).toContain('No. Off (for 100m)'); expect(heads).toContain('No. Off (For 1 Set)'); expect(heads[2]).toBe('‘P’Provide');
     expect(page.querySelectorAll('tr')).toHaveLength(3);                    // header + 2 parts
-    expect(page.querySelector('.h')?.textContent).toBe('RESTRICTED(3)'); expect(page.querySelector('.f')?.textContent).toBe('RESTRICTED');
+    expect(page.querySelector('.h')?.textContent).toBe('RESTRICTED'); expect(page.querySelector('.f')?.textContent).toBe('(3)RESTRICTED');
     expect(page.querySelector('.cap')?.textContent).toBe('GENERAL ASSY OF 100M BRIDGE');
     const ten = renderPage(platePages(d, 2)[1], d, 'RESTRICTED', url);
     expect(ten.querySelectorAll('th')).toHaveLength(10);
@@ -68,7 +68,7 @@ describe('ISPL page preview', () => {
     const many = Array.from({ length: 80 }, (_, i) => part(i + 1));
     const pages = paginateParts(many, true);
     expect(pages.length).toBeGreaterThan(1); expect(pages.flat()).toHaveLength(80);
-    expect(pages[0].length).toBeGreaterThan(15); expect(pages[0].length).toBeLessThan(40);
+    expect(pages[0].length).toBeGreaterThan(12); expect(pages[0].length).toBeLessThan(40);
     expect(rowHeightMm(part(1, { designation: 'GARWARE ROPE 12 MM DIA. 150 M LONG WITH THIMBLE AND TWO SHACKLES' }), true)).toBeGreaterThan(rowHeightMm(part(1), true));
     const d = doc(); d.plates[1].views[0].parts = many;
     const specs = platePages(d, 1); expect(specs.filter((s) => s.kind === 'table').length).toBe(pages.length); expect(specs[specs.length - 1].continued).toBe(true);

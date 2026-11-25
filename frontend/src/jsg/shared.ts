@@ -84,7 +84,124 @@ export const BASE_CSS = `
 .jsg-tag{font:10px system-ui,sans-serif;color:#5a6572;margin:10px 0 0;text-transform:uppercase}
 .jsg-sel{box-shadow:-4px 0 0 #7aa7ff}.jsg-ro .jsg-bar button.edit{display:none}
 .jsg-app{text-align:center;font-weight:bold;font-size:14pt;margin:34px 0 10px}
+
+
+/* ---- the toolbar in tabs (both JSG editors): Write, Insert, Table, Arrange, Document; every button stays in the page, a tab only hides its panel ---- */
+.jsg-ed{color:var(--text,#111)}
+.jsg-nav{background:var(--bg-elev,#fff);border-right-color:var(--border,#cfd4da);color:var(--text,#1b1f24)}
+.jsg-nav a{color:var(--text,#1b1f24)}.jsg-nav a:hover{background:var(--accent-soft,#e8f0fe)}
+.jsg-bar.jsg-tabbed{display:block;padding:0;background:var(--bg-elev,#fff);border-bottom-color:var(--border,#cfd4da)}
+.jsg-tabs{display:flex;align-items:flex-end;gap:2px;padding:4px 10px 0;border-bottom:1px solid var(--border,#cfd4da)}
+.jsg-quick{display:inline-flex;gap:1px;margin:0 10px 3px 0;padding-right:10px;border-right:1px solid var(--border,#cfd4da)}
+.jsg-tab{height:30px;padding:0 14px;border:1px solid transparent;border-bottom:0;border-radius:6px 6px 0 0;background:none;color:var(--text-muted,#5a6572);font:inherit;font-size:12.5px;cursor:pointer;margin-bottom:-1px}
+.jsg-tab:hover{color:var(--text,#1b1f24);background:var(--bg-hover,#eef2f7)}
+.jsg-tab.on{background:var(--bg,#f4f5f7);color:var(--accent,#2563eb);font-weight:600;border-color:var(--border,#cfd4da);border-bottom:1px solid var(--bg,#f4f5f7)}
+.jsg-tab:focus-visible{outline:2px solid var(--accent,#2563eb);outline-offset:1px}
+.jsg-panels{background:var(--bg,#f4f5f7)}
+.jsg-panel{display:flex;flex-wrap:wrap;align-items:stretch;gap:2px 0;padding:6px 10px 4px;min-height:60px}
+.jsg-panel[hidden]{display:none}
+.jsg-tgroup{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:0 10px;border-right:1px solid var(--border,#cfd4da)}
+.jsg-tgroup:first-child{padding-left:0}.jsg-tgroup:last-of-type{border-right:0}
+.jsg-tbtns{display:flex;align-items:center;flex-wrap:wrap;gap:1px}
+.jsg-tlabel{font-size:10.5px;color:var(--text-faint,#8a94a0);letter-spacing:.03em}
+.jsg-bar .jsg-tb{min-width:28px;height:28px;padding:0 8px;border:1px solid transparent;border-radius:6px;background:none;color:var(--text,#1b1f24);cursor:pointer;font:inherit;font-size:12.5px;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap}
+.jsg-bar .jsg-tb:hover:not(:disabled){background:var(--bg-hover,#eef2f7)}
+.jsg-bar .jsg-tb:disabled{color:var(--text-faint,#8a94a0);cursor:default;opacity:.55}
+.jsg-bar .jsg-tb.on{background:var(--accent-soft,#e8f0fe);color:var(--accent,#2563eb);border-color:var(--accent,#2563eb)}
+.jsg-bar .jsg-tb:focus-visible{outline:2px solid var(--accent,#2563eb);outline-offset:1px}
+.jsg-thint{align-self:center;max-width:52ch;font-size:11.5px;color:var(--text-faint,#8a94a0);padding:0 12px}
+.jsg-menu{position:fixed;z-index:60;min-width:210px;background:var(--bg-elev,#fff);border:1px solid var(--border-strong,#b8c0c8);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:4px;font:13px system-ui,sans-serif}
+.jsg-menu button{display:flex;width:100%;align-items:center;gap:8px;padding:7px 10px;border:0;background:none;border-radius:5px;color:var(--text,#1b1f24);font:inherit;cursor:pointer;text-align:left}
+.jsg-menu button:hover:not(:disabled){background:var(--bg-hover,#eef2f7)}.jsg-menu button:disabled{color:var(--text-faint,#8a94a0);cursor:default}
+.jsg-menu .k{margin-left:auto;color:var(--text-faint,#8a94a0);font-size:11.5px}
+.jsg-menu hr{border:0;border-top:1px solid var(--border,#cfd4da);margin:4px 2px}
+@media (max-width:900px){.jsg-nav{display:none}.jsg-tabs{overflow-x:auto}.jsg-panel{flex-wrap:nowrap;overflow-x:auto}.jsg-scroll{padding:10px 6px}.jsg-sheet{padding:28px 20px 40px 28px}}
+.jsg-sel{box-shadow:-4px 0 0 var(--accent,#7aa7ff)}
+.jsg-status{display:flex;align-items:center;gap:14px;padding:3px 12px;border-top:1px solid var(--border,#cfd4da);background:var(--bg-elev,#fff);color:var(--text-muted,#5a6572);font:11.5px system-ui,sans-serif;flex:none;white-space:nowrap;overflow:hidden}
+.jsg-status .grow{flex:1;overflow:hidden;text-overflow:ellipsis}.jsg-status select{font:inherit;border:1px solid var(--border,#cfd4da);border-radius:4px;background:var(--bg,#fff);color:inherit;padding:0 2px}
+.jsg-find{display:none;align-items:center;flex-wrap:wrap;gap:6px;padding:6px 10px;border-bottom:1px solid var(--border,#cfd4da);background:var(--bg-elev,#fff);font:12.5px system-ui,sans-serif}
+.jsg-find.open{display:flex}.jsg-find input[type=text]{height:26px;padding:0 8px;border:1px solid var(--border-strong,#b8c0c8);border-radius:5px;background:var(--bg,#fff);color:inherit;min-width:150px}
+.jsg-find button{height:26px;border:1px solid var(--border-strong,#b8c0c8);border-radius:5px;background:var(--bg-elev,#fff);color:inherit;padding:0 9px;cursor:pointer;font:inherit}.jsg-find button:hover:not(:disabled){background:var(--bg-hover,#eef2f7)}.jsg-find button:disabled{opacity:.5;cursor:default}
+.jsg-find .cnt{color:var(--text-faint,#8a94a0);min-width:70px}
+::highlight(jsg-hit){background:#ffe58f;color:#000}::highlight(jsg-cur){background:#ff9f43;color:#000}
+.jsg-orient{font:10px system-ui,sans-serif;color:#6b7280;text-align:center;margin:6px 0;border-top:1px dashed #9aa4ae;padding-top:2px}
 `;
+
+// ── The toolbar in tabs ─────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+export interface MenuItem { label: string; hint?: string; run: () => void; disabled?: boolean; separator?: boolean }
+
+/** A small menu under a button: closes on a click away, on Escape, or when an item runs. */
+export function openMenu(anchor: HTMLElement, items: MenuItem[]): void {
+  document.querySelectorAll('.jsg-menu').forEach((m) => m.remove());
+  const r = anchor.getBoundingClientRect();
+  const menu = mk('div', 'jsg-menu'); menu.setAttribute('role', 'menu');
+  menu.style.left = `${Math.max(4, Math.min(r.left, window.innerWidth - 240))}px`; menu.style.top = `${r.bottom + 4}px`;
+  const close = (): void => { menu.remove(); document.removeEventListener('mousedown', away, true); document.removeEventListener('keydown', esc, true); };
+  const away = (e: Event): void => { if (!menu.contains(e.target as Node)) close(); };
+  const esc = (e: KeyboardEvent): void => { if (e.key === 'Escape') { e.stopPropagation(); close(); anchor.focus(); } };
+  for (const it of items) {
+    if (it.separator) { menu.appendChild(document.createElement('hr')); continue; }
+    const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'menuitem'); b.disabled = !!it.disabled; b.textContent = it.label;
+    if (it.hint) { const k = mk('span', 'k', it.hint); b.appendChild(k); }
+    b.addEventListener('mousedown', (e) => e.preventDefault());                    // keep the caret where it is
+    b.addEventListener('click', () => { close(); it.run(); });
+    menu.appendChild(b);
+  }
+  document.body.appendChild(menu);
+  setTimeout(() => { document.addEventListener('mousedown', away, true); document.addEventListener('keydown', esc, true); (menu.querySelector('button:not(:disabled)') as HTMLElement | null)?.focus(); }, 0);
+}
+
+export interface BarButton { id: string; label: string; title: string; run: (btn: HTMLButtonElement) => void; /** false for a button that does not change the document (Check, Outline) */ edit?: boolean }
+export interface BarGroup { label: string; buttons: BarButton[] }
+export interface BarTab { id: string; label: string; groups: BarGroup[]; /** a line of advice at the end of the panel */ hint?: string }
+
+/**
+ * Fill `bar` with tabs, each holding labelled groups of buttons. Every button is in the page whichever tab is open (a tab only hides its panel), so the commands are reachable
+ * by tests and by script; in a read-only view only the buttons that do not edit are offered. The last tab used is remembered. Returns the buttons by id.
+ */
+export function tabbedBar(bar: HTMLElement, tabs: BarTab[], opts: { readOnly: boolean; storageKey: string; /** buttons always in reach, left of the tabs (Undo, Redo) */ quick?: BarButton[] }): Map<string, HTMLButtonElement> {
+  const buttons = new Map<string, HTMLButtonElement>();
+  bar.classList.add('jsg-tabbed');
+  const strip = mk('div', 'jsg-tabs'); strip.setAttribute('role', 'tablist'); strip.setAttribute('aria-label', 'Toolbar sections');
+  const panels = mk('div', 'jsg-panels'); bar.append(strip, panels);
+  const made: Array<{ id: string; panel: HTMLElement; tab: HTMLButtonElement }> = [];
+  const quick = (opts.quick ?? []).filter((b) => !opts.readOnly || b.edit === false);
+  if (quick.length) {
+    const box = mk('div', 'jsg-quick');
+    for (const b of quick) {
+      const el = document.createElement('button'); el.type = 'button'; el.className = `jsg-tb${b.edit === false ? '' : ' edit'}`; el.textContent = b.label; el.title = b.title; el.setAttribute('aria-label', b.title); el.dataset.cmd = b.id;
+      el.addEventListener('mousedown', (e) => e.preventDefault()); el.addEventListener('click', () => b.run(el)); buttons.set(b.id, el); box.appendChild(el);
+    }
+    strip.appendChild(box);
+  }
+  const pick = (id: string): void => {
+    for (const t of made) { const on = t.id === id; t.panel.hidden = !on; t.tab.classList.toggle('on', on); t.tab.setAttribute('aria-selected', String(on)); }
+    try { localStorage.setItem(opts.storageKey, id); } catch { /* private mode */ }
+  };
+  for (const t of tabs) {
+    const groups = t.groups.map((g) => ({ ...g, buttons: g.buttons.filter((b) => !opts.readOnly || b.edit === false) })).filter((g) => g.buttons.length);
+    if (!groups.length) continue;
+    const panel = mk('div', 'jsg-panel'); panel.setAttribute('role', 'tabpanel'); panel.setAttribute('aria-label', t.label);
+    const tab = document.createElement('button'); tab.type = 'button'; tab.className = 'jsg-tab'; tab.setAttribute('role', 'tab'); tab.dataset.tab = t.id; tab.textContent = t.label;
+    tab.addEventListener('click', () => pick(t.id));
+    for (const g of groups) {
+      const row = mk('div', 'jsg-tbtns');
+      for (const b of g.buttons) {
+        const el = document.createElement('button'); el.type = 'button'; el.className = `jsg-tb${b.edit === false ? '' : ' edit'}`; el.textContent = b.label; el.title = b.title; el.setAttribute('aria-label', b.title); el.dataset.cmd = b.id;
+        el.addEventListener('mousedown', (e) => e.preventDefault());              // keep the text selection
+        el.addEventListener('click', () => b.run(el));
+        buttons.set(b.id, el); row.appendChild(el);
+      }
+      const grp = mk('div', 'jsg-tgroup'); grp.setAttribute('role', 'group'); grp.setAttribute('aria-label', g.label); grp.append(row, mk('span', 'jsg-tlabel', g.label)); panel.appendChild(grp);
+    }
+    if (t.hint && !opts.readOnly) panel.appendChild(mk('span', 'jsg-thint', t.hint));
+    strip.appendChild(tab); panels.appendChild(panel); made.push({ id: t.id, panel, tab });
+  }
+  let saved: string | null = null; try { saved = localStorage.getItem(opts.storageKey); } catch { /* private mode */ }
+  if (made.length) pick(made.some((m) => m.id === saved) ? (saved as string) : made[0].id);
+  return buttons;
+}
 
 /** The chooser of a project picture, with an upload; resolves to the picture or null. */
 export async function pickGraphic(host: JsgHost): Promise<GraphicInfo | null> {

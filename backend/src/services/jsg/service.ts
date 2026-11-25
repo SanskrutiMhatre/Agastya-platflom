@@ -15,7 +15,7 @@ import { bad, conflict, HttpError } from '../http';
 import { parseTree, walk, type MNode } from '../miniXml';
 import { wellFormedError } from '../wellFormed';
 import { readProjectJson, updateProjectJson } from '../projects';
-import { jsgTypeById, ISPL_PREFACE, type JsgDocType } from './registry';
+import { jsgTypeById, ISPL_PREFACE, UHB_FRONT_COUNTS, UHB_PREFACE, type JsgDocType } from './registry';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { validateXML } = require('xmllint-wasm');
@@ -41,22 +41,45 @@ export const sourcePath = (projectId: string): string => path.join(projectDirFor
 
 export interface NewDocInput { projectName?: string }
 
+// ── The stencil's own example blocks ────────────────────────────────────────────────────────────────────────────────────────────
+
+const tcell = (t = '', align?: string, bold = false): string => `<cell${align ? ` align="${align}"` : ''}${bold ? ' bold="true"' : ''}><text>${esc(t)}</text></cell>`;
+const trow = (...cells: string[]): string => `<row>${cells.join('')}</row>`;
+/** A three-column table the stencil way: Sr. No. / Parameter / Value, numbered rows, empty cells to fill. */
+function specTable(title: string | null, rows: number, widths: string): string {
+  const body = Array.from({ length: rows }, (_, i) => trow(tcell(String(i + 1), 'center'), tcell(), tcell())).join('');
+  return `<table${title ? ` title="${escAttr(title)}"` : ''} widths="${widths}"><head>${trow(tcell('Sr. No.', 'center', true), tcell('Parameter', 'left', true), tcell('Value', 'left', true))}</head><body>${body}</body></table>`;
+}
+/** 1.1 General holds a captioned figure, 1.2 Special Features a lettered list and "Table 1: Technical Specifications", 1.3 System Tree Chart a captioned figure. */
+const STENCIL_EXAMPLES: Record<string, string> = {
+  'General': '<figure title="FIGURE NAME"/>',
+  'Special Features and Specifications': `<list type="alpha"><item><text/></item></list>${specTable('Technical Specifications', 5, '988 3402 5240')}`,
+  'System Tree Chart': '<figure title="System Tree Chart"/>',
+};
+/** Appendix H (System Specification): the stencil's 17-row table. */
+const APPENDIX_H_TABLE = specTable(null, 16, '704 3687 5241');
+
 function uhbSkeleton(type: JsgDocType, input: NewDocInput): string {
   const now = new Date();
   const issue = `${now.toLocaleString('en-GB', { month: 'long' }).toUpperCase()}, ${now.getFullYear()}`;
   let n = 0;
+  const items = (k: number): string => Array.from({ length: k }, () => '      <item></item>').join('\n');       // the stencil's numbered, empty lines
   const chapters = (type.chapters ?? []).map((c) => {
     const sections = c.sections.map((s) => {
-      const clauses = (s.clauses ?? []).map((t) => `        <clause id="k${++n}" title="${escAttr(t)}"><para/></clause>`).join('\n');
+      const clauses = (s.clauses ?? []).map((t) => {
+        const example = c.title === 'General Description' && s.title === 'Introduction' ? STENCIL_EXAMPLES[t] : undefined;     // the stencil's own placeholders in 1.1 - 1.3
+        const orient = t === 'System Tree Chart' && example ? ' orientation="landscape"' : '';          // the stencil sets 1.3 on a landscape page
+        return `        <clause id="k${++n}" title="${escAttr(t)}"${orient}>${example ?? '<para/>'}</clause>`;
+      }).join('\n');
       return `      <section id="s${++n}" title="${escAttr(s.title)}">${clauses ? '\n' + clauses + '\n      ' : ''}</section>`;
     }).join('\n');
     return `  <chapter id="c${++n}" title="${escAttr(c.title)}">\n${sections}\n  </chapter>`;
   }).join('\n');
-  const appendices = (type.appendices ?? []).map((a) => `    <appendix id="a${++n}" label="${escAttr(a.label)}" title="${escAttr(a.title)}"><para/></appendix>`).join('\n');
+  const appendices = (type.appendices ?? []).map((a) => `    <appendix id="a${++n}" label="${escAttr(a.label)}" title="${escAttr(a.title)}">${a.label === 'H' ? APPENDIX_H_TABLE : '<para/>'}</appendix>`).join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>
 <jsgdoc version="${JSG_SCHEMA_VERSION}" type="${type.id}">
   <meta>
-    <docNo></docNo>
+    <docNo>DOCUMENT NO.</docNo>
     <title>${esc(type.coverTitle)}</title>
     <projectName>${esc(input.projectName ?? 'PROJECT NAME')}</projectName>
     <atNo></atNo>
@@ -68,9 +91,24 @@ function uhbSkeleton(type: JsgDocType, input: NewDocInput): string {
     <classification>RESTRICTED</classification>
   </meta>
   <front>
-    <amendments minRows="20"/>
-    <warning><item></item></warning>
-    <abbreviations/>
+    <amendments minRows="${UHB_FRONT_COUNTS.amendmentRows}"/>
+    <warning>
+${items(UHB_FRONT_COUNTS.warning)}
+    </warning>
+    <abbreviations minRows="${UHB_FRONT_COUNTS.abbreviationRows}"/>
+    <preface>
+${UHB_PREFACE.map((t) => `      <para>${esc(t)}</para>`).join('\n')}
+    </preface>
+    <dos>
+${items(UHB_FRONT_COUNTS.dos)}
+    </dos>
+    <donts>
+${items(UHB_FRONT_COUNTS.donts)}
+    </donts>
+    <important>
+${items(UHB_FRONT_COUNTS.important)}
+    </important>
+    <photos/>
   </front>
 ${chapters}
   <appendices>
@@ -104,7 +142,7 @@ function isplSkeleton(type: JsgDocType, input: NewDocInput): string {
     <classification>RESTRICTED</classification>
   </meta>
   <front>
-    <certificate>Certified that this document no. <b>DOCUMENT NO.</b> contains ___ pages which have been serially numbered from (i) to (___) as ancillary pages and from 1 to ___ as main content.</certificate>
+    <certificate>Certified that this document no. <b>{docNo}</b> contains {total} pages which have been serially numbered from (i) to (___) as ancillary pages and from 1 to {mainLast} as main content.</certificate>
     <preface>
 ${preface}
     </preface>
@@ -200,7 +238,7 @@ export async function validateJsg(xml: string): Promise<JsgReport> {
   // the body must be the type's own: a User Handbook has chapters, not plates
   const has = (name: string): boolean => root.children.some((c) => c.name === name);
   if (type.id === 'uhb' && has('plates')) add('error', 'JSG-BODY', 'A User Handbook has chapters and appendices, not plates.', root);
-  if (type.id === 'ispl' && (has('chapter') || has('appendices'))) add('error', 'JSG-BODY', 'An Illustrated Spare Parts List has plates, not chapters or appendices.', root);
+  if (type.id === 'ispl' && has('chapter')) add('error', 'JSG-BODY', 'An Illustrated Spare Parts List has plates and appendices, not chapters.', root);
   if (type.id === 'ispl') validatePlates(root, add);
 
   // a figure or table entering the lists needs a title; cross-references need a target (libxml2 does not resolve IDREFs in this setup)
@@ -210,6 +248,9 @@ export async function validateJsg(xml: string): Promise<JsgReport> {
     if (n.name === 'xref' && n.attrs.to && !ids.has(n.attrs.to)) add('error', 'JSG-XREF', `A cross-reference points at "${n.attrs.to}", which is not in this document.`, n);
     if (n.name === 'graphic' && n.attrs.src && /^(https?:|file:|[a-z]:[\\/]|\/)/i.test(n.attrs.src)) add('error', 'JSG-GRAPHIC-PATH', `The picture "${n.attrs.src}" must be a file of this project (a relative path such as Media/name.png).`, n);
   }
+
+  // a captioned figure with no picture is the stencil's placeholder: printed as its caption alone, so say so (a warning, never a block)
+  for (const n of walk(root)) if (n.name === 'figure' && !n.children.some((c) => c.name === 'graphic')) add('warning', 'JSG-FIGURE-EMPTY', `The figure "${n.attrs.title ?? ''}" has no picture yet.`, n);
 
   // table grid: every row of a table has the same number of columns (rowspan / colspan aware)
   for (const n of walk(root)) {

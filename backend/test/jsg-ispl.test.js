@@ -104,7 +104,7 @@ test('the User Handbook takes its cover artwork and first-aid figures from the s
   const r = await w.post('/api/projects', { name: 'Jsg UHB art', format: 'jsg', domain: 'land', manualType: 'uhb' });
   uhbId = r.json.project.id; const d = path.join(h.ws, 'projects', uhbId);
   const doc = (await w.get(`/api/projects/${uhbId}/jsg`)).json;
-  const xml = doc.xml.replace('<warning><item></item></warning>', '<warning><item>Do not touch.</item></warning>');
+  const xml = doc.xml.replace(/<warning>\s*<item><\/item>/, '<warning><item>Do not touch.</item>');          // the first of the stencil's six numbered lines
   assert.equal((await w.put(`/api/projects/${uhbId}/jsg`, { xml })).json.report.errors, 0);
   const b = await w.post(`/api/projects/${uhbId}/jsg/build`); assert.equal(b.status, 200, JSON.stringify(b.json).slice(0, 400));
   const fo = fs.readFileSync(path.join(d, 'jsg-output.fo'), 'utf8');

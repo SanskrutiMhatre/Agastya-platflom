@@ -7,15 +7,18 @@
 // Independent of the JSS editor (src/jss) and the S1000D Studio (src/studio): it imports only its own model and XML code.
 
 import { isClause, newClause, newFigure, newList, newNotice, newPara, newTable, META_FIELDS, plain, text,
-  type Appendix, type Block, type Cell, type Chapter, type Clause, type Figure, type Graphic, type Inline, type JsgDoc, type List, type ListType, type Mark, type Notice, type Para, type Part, type Section, type Table } from './model';
-import { serializeJsg } from './xml';
-import { BASE_CSS, coverCard, escH, injectCss, mk, pickGraphic, type GraphicInfo, type JsgEditorLike, type JsgEditorOptions, type JsgFinding, type JsgHost } from './shared';
+  type Align, type Appendix, type Block, type Cell, type Chapter, type Clause, type Figure, type Graphic, type Inline, type JsgDoc, type List, type ListType, type Mark, type Notice, type Orientation, type Para, type Part, type Section, type Table } from './model';
+import { parseJsg, serializeJsg } from './xml';
+import { BASE_CSS, escH, injectCss, mk, openMenu, pickGraphic, tabbedBar, type BarTab, type GraphicInfo, type JsgEditorLike, type JsgEditorOptions, type JsgFinding, type JsgHost, type MenuItem } from './shared';
 
 export type { GraphicInfo, JsgFinding, JsgHost, JsgEditorOptions } from './shared';
 
 type Container = Array<Block | Clause>;
 interface Slot { list: Array<any>; index: number }
 
+/** 1 -> i, 4 -> iv ... (the stencil's roman lists) */
+const toRoman = (n: number): string => { const m: Array<[number, string]> = [[1000, 'm'], [900, 'cm'], [500, 'd'], [400, 'cd'], [100, 'c'], [90, 'xc'], [50, 'l'], [40, 'xl'], [10, 'x'], [9, 'ix'], [5, 'v'], [4, 'iv'], [1, 'i']]; let r = ''; for (const [v, t] of m) while (n >= v) { r += t; n -= v; } return r; };
+const ALIGNS: Array<[Align | undefined, string]> = [[undefined, 'Justified (default)'], ['left', 'Left'], ['center', 'Centre'], ['right', 'Right']];
 const MARK_TAGS: Record<string, Mark> = { B: 'b', STRONG: 'b', I: 'i', EM: 'i', U: 'u', SUP: 'sup', SUB: 'sub' };
 
 export function inlineHtml(inl: Inline[]): string {
@@ -56,8 +59,21 @@ export class JsgEditor implements JsgEditorLike {
   private slots = new WeakMap<HTMLElement, Slot>();
   private sheet!: HTMLElement; private nav!: HTMLElement; private bar!: HTMLElement;
   private figures = 0; private tables = 0;
+  // history: the document as XML before each burst of editing (typing is grouped by a short pause), so Undo and Redo work on the model whatever was edited
+  private undoStack: string[] = []; private redoStack: string[] = []; private lastXml = ''; private histTimer: ReturnType<typeof setTimeout> | undefined; private restoring = false;
+  private findBar!: HTMLElement; private findInput!: HTMLInputElement; private replaceInput!: HTMLInputElement; private matchCase!: HTMLInputElement; private findCount!: HTMLElement;
+  private hits: Range[] = []; private hitAt = -1; private status!: HTMLElement;
   private onKey = (e: KeyboardEvent): void => {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); this.host.onSaveRequested(); }
+    const mod = e.ctrlKey || e.metaKey; const k = e.key.toLowerCase();
+    if (mod && k === 's') { e.preventDefault(); this.host.onSaveRequested(); return; }
+    const inside = this.root.contains(e.target as Node);
+    if (!inside) return;
+    const field = (e.target as HTMLElement | null)?.closest('input,textarea,select');
+    if (mod && (k === 'f' || k === 'h')) { e.preventDefault(); this.openFind(k === 'h' && !this.readOnly); return; }
+    if (k === 'escape' && this.findBar.classList.contains('open') && this.findBar.contains(e.target as Node)) { this.closeFind(); return; }
+    if (field && !this.findBar.contains(field)) return;                                           // the cover card's own inputs keep the browser's undo
+    if (mod && k === 'z' && !e.shiftKey && !this.findBar.contains(e.target as Node)) { e.preventDefault(); this.undo(); }
+    else if (mod && (k === 'y' || (k === 'z' && e.shiftKey)) && !this.findBar.contains(e.target as Node)) { e.preventDefault(); this.redo(); }
   };
 
   constructor(host: HTMLElement, opts: JsgEditorOptions) {
@@ -70,49 +86,332 @@ export class JsgEditor implements JsgEditorLike {
     this.bar = document.createElement('div'); this.bar.className = 'jsg-bar';
     const scroll = document.createElement('div'); scroll.className = 'jsg-scroll';
     this.sheet = document.createElement('div'); this.sheet.className = 'jsg-sheet'; this.sheet.setAttribute('data-testid', 'jsg-sheet');
-    scroll.appendChild(this.sheet); main.append(this.bar, scroll); this.root.append(this.nav, main);
+    this.findBar = document.createElement('div'); this.findBar.className = 'jsg-find'; this.findBar.setAttribute('role', 'search'); this.findBar.setAttribute('data-testid', 'jsg-find');
+    this.status = document.createElement('div'); this.status.className = 'jsg-status'; this.status.setAttribute('data-testid', 'jsg-status');
+    scroll.appendChild(this.sheet); main.append(this.bar, this.findBar, scroll, this.status); this.root.append(this.nav, main);
+    this.buildFind(); this.buildStatus();
     document.addEventListener('keydown', this.onKey);          // the page, not just the editor: Ctrl+S must save after a dialog closed with focus on the body
     this.buildBar();
     this.render();
+    this.lastXml = serializeJsg(this.doc); this.refreshHistory();
   }
 
-  destroy(): void { document.removeEventListener('keydown', this.onKey); this.root.innerHTML = ''; this.root.classList.remove('jsg-ed', 'jsg-ro'); }
+  destroy(): void { document.removeEventListener('keydown', this.onKey); if (this.histTimer) clearTimeout(this.histTimer); this.clearHits(); this.root.innerHTML = ''; this.root.classList.remove('jsg-ed', 'jsg-ro'); }
   isDirty(): boolean { return this.dirty; }
   markSaved(): void { this.dirty = false; this.host.onDirty(false); }
   getXml(): string { return serializeJsg(this.doc); }
   getDoc(): JsgDoc { return this.doc; }
   setFindings(f: JsgFinding[]): void { this.findings = f; this.renderNav(); }
 
-  private touch(): void { if (!this.dirty) { this.dirty = true; this.host.onDirty(true); } }
+  private touch(): void {
+    if (!this.dirty) { this.dirty = true; this.host.onDirty(true); }
+    if (this.restoring) return;
+    if (this.histTimer) clearTimeout(this.histTimer);
+    this.histTimer = setTimeout(() => this.checkpoint(), 600);
+  }
+
+  // ── history ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  /** Remember the document as it was before the edit that has just been made (nothing is remembered if nothing changed). */
+  private checkpoint(): void {
+    if (this.histTimer) { clearTimeout(this.histTimer); this.histTimer = undefined; }
+    if (this.restoring) return;
+    const now = serializeJsg(this.doc);
+    if (now === this.lastXml) return;
+    this.undoStack.push(this.lastXml); if (this.undoStack.length > 100) this.undoStack.shift();
+    this.redoStack = []; this.lastXml = now; this.refreshHistory(); this.refreshStatus();
+  }
+  canUndo(): boolean { this.checkpoint(); return this.undoStack.length > 0; }
+  canRedo(): boolean { return this.redoStack.length > 0; }
+  undo(): void {
+    if (this.readOnly) return; this.checkpoint();
+    const prev = this.undoStack.pop(); if (prev === undefined) return this.host.notify('Nothing to undo.', 'info');
+    this.redoStack.push(this.lastXml); this.restore(prev);
+  }
+  redo(): void {
+    if (this.readOnly) return; this.checkpoint();
+    const next = this.redoStack.pop(); if (next === undefined) return this.host.notify('Nothing to redo.', 'info');
+    this.undoStack.push(this.lastXml); this.restore(next);
+  }
+  private restore(xml: string): void {
+    this.restoring = true;
+    try {
+      const d = parseJsg(xml); Object.assign(this.doc, d); this.lastXml = xml; this.selected = null; this.selectedEl = null;
+      const keep = this.sheet.parentElement?.scrollTop ?? 0; this.render(); if (this.sheet.parentElement) this.sheet.parentElement.scrollTop = keep;
+      if (!this.dirty) { this.dirty = true; this.host.onDirty(true); }
+    } finally { this.restoring = false; }
+    this.refreshHistory(); this.refreshStatus(); if (this.findBar.classList.contains('open')) this.runFind(false);
+  }
+  private refreshHistory(): void {
+    const u = this.buttons.get('undo'); const r = this.buttons.get('redo');
+    if (u) u.disabled = this.readOnly || !this.undoStack.length; if (r) r.disabled = this.readOnly || !this.redoStack.length;
+  }
+
+  // ── find and replace ─────────────────────────────────────────────────────────────────────────────────────────────────────────
+  // Works on the sheet as the author sees it: every match in editable text (paragraphs, list items, table cells, headings, captions) is found, highlighted and counted; a replacement is typed
+  // into the text and the model follows through the editor's own input handling, so it is one more edit that Undo takes back.
+  private buildFind(): void {
+    const btn = (label: string, title: string, fn: () => void, edit = false): HTMLButtonElement => {
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.title = title; b.setAttribute('aria-label', title); b.addEventListener('mousedown', (e) => e.preventDefault()); b.addEventListener('click', fn);
+      if (edit && this.readOnly) b.style.display = 'none'; return b;
+    };
+    this.findInput = document.createElement('input'); this.findInput.type = 'text'; this.findInput.placeholder = 'Find…'; this.findInput.setAttribute('aria-label', 'Find');
+    this.replaceInput = document.createElement('input'); this.replaceInput.type = 'text'; this.replaceInput.placeholder = 'Replace with…'; this.replaceInput.setAttribute('aria-label', 'Replace with'); if (this.readOnly) this.replaceInput.style.display = 'none';
+    this.matchCase = document.createElement('input'); this.matchCase.type = 'checkbox';
+    const mc = document.createElement('label'); mc.style.cssText = 'display:inline-flex;align-items:center;gap:4px'; mc.append(this.matchCase, document.createTextNode('Match case'));
+    this.findCount = document.createElement('span'); this.findCount.className = 'cnt'; this.findCount.setAttribute('aria-live', 'polite');
+    this.findInput.addEventListener('input', () => this.runFind(true)); this.matchCase.addEventListener('change', () => this.runFind(true));
+    this.findInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); this.stepFind(e.shiftKey ? -1 : 1); } });
+    this.replaceInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); this.replaceOne(); } });
+    this.findBar.append(this.findInput, btn('↑', 'Previous match (Shift+Enter)', () => this.stepFind(-1)), btn('↓', 'Next match (Enter)', () => this.stepFind(1)), mc, this.findCount,
+      this.replaceInput, btn('Replace', 'Replace this match', () => this.replaceOne(), true), btn('Replace all', 'Replace every match', () => this.replaceAll(), true), btn('✕', 'Close (Esc)', () => this.closeFind()));
+  }
+  openFind(replace: boolean): void {
+    this.findBar.classList.add('open');
+    const picked = window.getSelection()?.toString().trim(); if (picked && picked.length < 80 && !picked.includes('\n')) this.findInput.value = picked;
+    (replace ? this.replaceInput : this.findInput).focus(); if (!replace) this.findInput.select();
+    this.runFind(true);
+  }
+  closeFind(): void { this.findBar.classList.remove('open'); this.clearHits(); }
+  private collectHits(): Range[] {
+    const q = this.findInput.value; if (!q) return [];
+    const cs = this.matchCase.checked; const needle = cs ? q : q.toLowerCase(); const out: Range[] = [];
+    const walker = document.createTreeWalker(this.sheet, NodeFilter.SHOW_TEXT, { acceptNode: (n) => {
+      const el = n.parentElement; if (!el) return NodeFilter.FILTER_REJECT;
+      if (el.closest('.jsg-card,.jsg-orient,.jsg-tag,button,.jsg-num,.jsg-ttools,.jsg-clause .n,.jsg-li .m')) return NodeFilter.FILTER_REJECT;
+      return el.closest('[contenteditable]') ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+    } });
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const hay = cs ? (n.nodeValue ?? '') : (n.nodeValue ?? '').toLowerCase();
+      for (let i = hay.indexOf(needle); i >= 0; i = hay.indexOf(needle, i + needle.length)) { const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + needle.length); out.push(r); }
+    }
+    return out;
+  }
+  private runFind(jump: boolean): void {
+    this.hits = this.collectHits();
+    this.hitAt = this.hits.length ? (jump ? 0 : Math.min(Math.max(this.hitAt, 0), this.hits.length - 1)) : -1;
+    this.paintHits(jump);
+  }
+  private paintHits(scroll: boolean): void {
+    const css = (globalThis as { CSS?: { highlights?: Map<string, unknown> } }).CSS; const H = (globalThis as { Highlight?: new (...r: Range[]) => unknown }).Highlight;
+    if (css?.highlights && H) { css.highlights.set('jsg-hit', new H(...this.hits)); if (this.hitAt >= 0) css.highlights.set('jsg-cur', new H(this.hits[this.hitAt])); else css.highlights.delete('jsg-cur'); }
+    this.findCount.textContent = !this.findInput.value ? '' : this.hits.length ? `${this.hitAt + 1} of ${this.hits.length}` : 'No matches';
+    if (scroll && this.hitAt >= 0) this.hits[this.hitAt].startContainer.parentElement?.scrollIntoView?.({ block: 'center' });
+  }
+  private clearHits(): void {
+    const css = (globalThis as { CSS?: { highlights?: Map<string, unknown> } }).CSS; css?.highlights?.delete('jsg-hit'); css?.highlights?.delete('jsg-cur'); this.hits = []; this.hitAt = -1;
+  }
+  private stepFind(d: 1 | -1): void { if (!this.hits.length) return this.runFind(true); this.hitAt = (this.hitAt + d + this.hits.length) % this.hits.length; this.paintHits(true); }
+  private sync(node: Node): void { (node.parentElement?.closest('[contenteditable]') as HTMLElement | null)?.dispatchEvent(new Event('input', { bubbles: true })); }
+  private replaceOne(): void {
+    if (this.readOnly || this.hitAt < 0) return;
+    const r = this.hits[this.hitAt]; const node = r.startContainer as Text; if (node.nodeType !== 3) return;
+    node.data = node.data.slice(0, r.startOffset) + this.replaceInput.value + node.data.slice(r.endOffset); this.sync(node); this.checkpoint();
+    this.runFind(false);
+  }
+  private replaceAll(): void {
+    if (this.readOnly || !this.hits.length) return;
+    const n = this.hits.length; const touched = new Set<Node>(); const rep = this.replaceInput.value;
+    for (const r of [...this.hits].reverse()) { const node = r.startContainer as Text; if (node.nodeType !== 3) continue; node.data = node.data.slice(0, r.startOffset) + rep + node.data.slice(r.endOffset); touched.add(node); }
+    for (const node of touched) this.sync(node);
+    this.checkpoint(); this.host.notify(`Replaced ${n} match${n === 1 ? '' : 'es'}.`, 'info'); this.runFind(true);
+  }
+
+  // ── status bar and zoom ──────────────────────────────────────────────────────────────────────────────────────────────────────
+  private buildStatus(): void {
+    const mkSpan = (key: string, cls = ''): HTMLElement => { const e = document.createElement('span'); if (cls) e.className = cls; e.dataset.st = key; return e; };
+    const zl = document.createElement('label'); zl.append(document.createTextNode('Zoom '));
+    const sel = document.createElement('select'); sel.setAttribute('aria-label', 'Zoom');
+    let saved = 100; try { saved = Number(localStorage.getItem('agastya.jsg.zoom')) || 100; } catch { /* private mode */ }
+    for (const z of [75, 90, 100, 110, 125, 150]) { const o = document.createElement('option'); o.value = String(z); o.textContent = `${z}%`; if (z === saved) o.selected = true; sel.appendChild(o); }
+    sel.addEventListener('change', () => this.setZoom(Number(sel.value))); zl.appendChild(sel);
+    this.status.append(mkSpan('path', 'grow'), mkSpan('words'), mkSpan('counts'), zl);
+    this.sheet.addEventListener('focusin', () => this.refreshStatus());
+    this.setZoom(saved);
+  }
+  private setZoom(pct: number): void {
+    (this.sheet.style as CSSStyleDeclaration & { zoom: string }).zoom = pct === 100 ? '' : String(pct / 100);
+    try { localStorage.setItem('agastya.jsg.zoom', String(pct)); } catch { /* private mode */ }
+  }
+  private refreshStatus(): void {
+    const set = (k: string, v: string): void => { const e = this.status.querySelector<HTMLElement>(`[data-st="${k}"]`); if (e) e.textContent = v; };
+    const words = Array.from(this.sheet.querySelectorAll('.jsg-p,.jsg-li .b,.jsg-cap,td,th,.jsg-clause .t,.jsg-notice')).map((e) => e.textContent ?? '').join(' ').split(/\s+/).filter(Boolean).length;
+    set('words', `${words.toLocaleString()} words`); set('counts', `${this.figures} figure${this.figures === 1 ? '' : 's'} · ${this.tables} table${this.tables === 1 ? '' : 's'}`);
+    // where the caret is: the heading above the selected block
+    let where = ''; let n: Element | null = this.selectedEl;
+    while (n && !/\bjsg-(clause|sectionh|chapter|app)\b/.test(n.className)) n = n.previousElementSibling;
+    if (n) where = (n.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 90);
+    const slot = this.selectedEl ? this.slots.get(this.selectedEl) : undefined; const kind = slot ? (slot.list[slot.index] as { k?: string })?.k : undefined;
+    set('path', where ? `${where}${kind && kind !== 'clause' ? ` › ${kind === 'para' ? 'paragraph' : kind === 'pageBreak' ? 'page break' : kind}` : ''}` : '');
+  }
+
+  // ── paste ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  /** Text from Word or the web comes in clean: several lines become several paragraphs, and a pasted table becomes a table; formatting from outside is never kept. */
+  private paste(ev: ClipboardEvent, el: HTMLElement): void {
+    ev.preventDefault();
+    const html = ev.clipboardData?.getData('text/html') ?? ''; const plain = ev.clipboardData?.getData('text/plain') ?? '';
+    if (html && /<table[\s>]/i.test(html) && this.selected) { const t = this.tableFromHtml(html); if (t) { this.insert(t); this.host.notify('Pasted a table. Check the header row and the caption.', 'info'); return; } }
+    const slot = this.slots.get(el); const blk = slot ? slot.list[slot.index] : null;
+    const lines = plain.split(/\r?\n/).map((x) => x.replace(/\s+/g, ' ').trim()).filter(Boolean);
+    if (slot && blk && (blk as Para).k === 'para' && lines.length > 1) {
+      const p = blk as Para; document.execCommand('insertText', false, lines[0]);
+      let at = slot.list.indexOf(p); let last: unknown = p;
+      for (const line of lines.slice(1)) { const np = newPara(line, p.indent); slot.list.splice(++at, 0, np); last = np; }
+      this.afterEdit(last); this.host.notify(`Pasted ${lines.length} paragraphs.`, 'info'); return;
+    }
+    document.execCommand('insertText', false, lines.length ? lines.join(' ') : plain);
+  }
+  private tableFromHtml(html: string): Table | null {
+    const t = new DOMParser().parseFromString(html, 'text/html').querySelector('table'); if (!t) return null;
+    const rows = Array.from(t.rows).map((r) => ({ head: !!r.querySelector('th'), cells: Array.from(r.cells).map((c) => ({ text: (c.textContent ?? '').replace(/\s+/g, ' ').trim(), span: c.colSpan > 1 ? c.colSpan : undefined })) })).filter((r) => r.cells.length);
+    if (!rows.length) return null;
+    const cell = (c: { text: string; span?: number }, align?: Align): Cell => ({ ...(c.span ? { colspan: c.span } : {}), ...(align ? { align } : {}), parts: [{ k: 'text', inline: text(c.text) }] });
+    const headRows = rows.filter((r, i) => r.head && i === 0 ? true : false);
+    const head = headRows.map((r) => ({ cells: r.cells.map((c) => cell(c, 'center')) })); const body = rows.slice(head.length).map((r) => ({ cells: r.cells.map((c) => cell(c)) }));
+    return { k: 'table', title: 'TABLE NAME', head, body: body.length ? body : head.splice(0) };
+  }
 
   // ── toolbar ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  // The tools are sorted into tabs by what the author is doing: write, insert, work on a table, arrange the page, look after the document.
+  private buttons = new Map<string, HTMLButtonElement>();
+
   private buildBar(): void {
-    const b = (label: string, title: string, fn: () => void, edit = true): void => {
-      const el = document.createElement('button'); el.type = 'button'; el.textContent = label; el.title = title; if (edit) el.className = 'edit';
-      el.addEventListener('mousedown', (e) => e.preventDefault());          // keep the text selection
-      el.addEventListener('click', () => { if (this.readOnly && edit) return; fn(); });
-      this.bar.appendChild(el);
+    const tabs: BarTab[] = [
+      { id: 'write', label: 'Write', hint: 'These work on the text you clicked in.', groups: [
+        { label: 'Text style', buttons: [
+          { id: 'bold', label: 'B', title: 'Bold (Ctrl+B)', run: () => this.mark('bold') }, { id: 'italic', label: 'I', title: 'Italic (Ctrl+I)', run: () => this.mark('italic') },
+          { id: 'underline', label: 'U', title: 'Underline (Ctrl+U)', run: () => this.mark('underline') },
+          { id: 'sup', label: 'x²', title: 'Superscript', run: () => this.mark('superscript') }, { id: 'sub', label: 'x₂', title: 'Subscript', run: () => this.mark('subscript') },
+        ] },
+        { label: 'Paragraph', buttons: [
+          { id: 'align', label: 'Align ▾', title: 'Align the selected paragraph', run: (b) => openMenu(b, ALIGNS.map(([a, label]) => ({ label, run: () => this.setAlign(a) }))) },
+          { id: 'indent', label: 'Indent ▸', title: 'Move the selected paragraph or list one step in (the stencil\'s L2 to L5 paragraph levels)', run: () => this.indentBlock(1) },
+          { id: 'outdent', label: '◂ Outdent', title: 'Move the selected paragraph or list one step out', run: () => this.indentBlock(-1) },
+        ] },
+      ] },
+      { id: 'insert', label: 'Insert', groups: [
+        { label: 'Text', buttons: [
+          { id: 'para', label: 'Paragraph', title: 'Add a paragraph after the selected block', run: () => this.insert(newPara('')) },
+          { id: 'heading', label: 'Heading', title: 'Add a numbered heading (1.1, 1.1.1 ...) under the selected one', run: () => this.addClause() },
+          { id: 'list', label: 'List ▾', title: 'Add a list', run: (b) => openMenu(b, ([['alpha', '(a) (b) (c) lettered'], ['number', '1. 2. 3. numbered'], ['roman', '(i) (ii) (iii) roman'], ['step', 'Step 1) Step 2) procedure'], ['bullet', '• bullets'], ['dash', '- dashes']] as Array<[ListType, string]>).map(([t, label]) => ({ label, run: () => this.insert(newList(t)) }))) },
+        ] },
+        { label: 'Objects', buttons: [
+          { id: 'table', label: 'Table', title: 'Add a table (3 x 3)', run: () => this.insert(newTable(3, 3, 'TABLE NAME')) },
+          { id: 'figure', label: 'Figure', title: 'Add a figure with its caption', run: () => this.insert(newFigure()) },
+          { id: 'notice', label: 'Notice ▾', title: 'Add a note, warning or caution', run: (b) => openMenu(b, (['note', 'warning', 'caution'] as const).map((k) => ({ label: k[0].toUpperCase() + k.slice(1), run: () => this.insert(newNotice(k)) }))) },
+        ] },
+        { label: 'Page', buttons: [{ id: 'pagebreak', label: 'Page break', title: 'Start a new page here', run: () => this.insert({ k: 'pageBreak' }) }] },
+      ] },
+      { id: 'table', label: 'Table', hint: 'Click in a cell of the table first.', groups: [
+        { label: 'Rows and columns', buttons: [
+          { id: 'row+', label: 'Row +', title: 'Add a table row below the cursor', run: () => this.tableOp('row+') }, { id: 'row-', label: 'Row −', title: 'Delete the table row', run: () => this.tableOp('row-') },
+          { id: 'col+', label: 'Col +', title: 'Add a table column right of the cursor', run: () => this.tableOp('col+') }, { id: 'col-', label: 'Col −', title: 'Delete the table column', run: () => this.tableOp('col-') },
+        ] },
+        { label: 'Alignment and size', buttons: [
+          { id: 'talign', label: 'Align ▾', title: 'Align the text of a cell, a column or the whole table', run: (b) => openMenu(b, this.tableAlignMenu()) },
+          { id: 'thead', label: 'Header row', title: 'Switch the first row between a header (bold, repeated on every page) and an ordinary row', run: () => this.toggleHeader() },
+          { id: 'equal', label: 'Equal columns', title: 'Give every column the same width (the table always fills the full text width)', run: () => this.equalColumns() },
+        ] },
+      ] },
+      { id: 'arrange', label: 'Arrange', groups: [
+        { label: 'Move the selected block', buttons: [
+          { id: 'up', label: 'Move up', title: 'Move the selected block up', run: () => this.move(-1) }, { id: 'down', label: 'Move down', title: 'Move the selected block down', run: () => this.move(1) },
+        ] },
+        { label: 'Page orientation', buttons: [{ id: 'orient', label: 'Orientation ▾', title: 'Print this section, or the selected heading, on landscape pages', run: (b) => openMenu(b, this.orientationMenu()) }] },
+        { label: 'Remove', buttons: [{ id: 'delete', label: 'Delete', title: 'Delete the selected block', run: () => this.remove() }] },
+      ] },
+      { id: 'document', label: 'Document', groups: [
+        { label: 'Check', buttons: [{ id: 'check', label: 'Check', title: 'Check the document without saving', run: () => this.host.onCheckRequested(), edit: false }] },
+        { label: 'View', buttons: [
+          { id: 'outline', label: 'Outline', title: 'Show or hide the outline on the left', edit: false, run: () => { this.nav.hidden = !this.nav.hidden; this.buttons.get('outline')?.classList.toggle('on', !this.nav.hidden); } },
+        ] },
+      ] },
+    ];
+    this.buttons = tabbedBar(this.bar, tabs, { readOnly: this.readOnly, storageKey: 'agastya.jsg.tab', quick: [
+      { id: 'undo', label: '↶ Undo', title: 'Undo (Ctrl+Z)', run: () => this.undo() }, { id: 'redo', label: '↷ Redo', title: 'Redo (Ctrl+Y)', run: () => this.redo() },
+      { id: 'find', label: 'Find', title: 'Find and replace (Ctrl+F, Ctrl+H)', run: () => this.openFind(false), edit: false },
+    ] });
+    this.refreshHistory();
+    this.buttons.get('outline')?.classList.add('on');
+  }
+
+  /** The selected block (a paragraph, list, table ...), or null. */
+  private selectedBlock(): any { return this.selected ? this.selected.list[this.selected.index] : null; }
+
+  private setAlign(a: Align | undefined): void {
+    const p = this.selectedBlock();
+    if (!p || p.k !== 'para') return this.host.notify('Click in a paragraph first.', 'info');
+    p.align = a; this.afterEdit(p);
+  }
+
+  /** One step in or out for a paragraph or list: the stencil has paragraph levels L2 (22.7 pt in) to L5. */
+  private indentBlock(d: 1 | -1): void {
+    const b = this.selectedBlock();
+    if (!b || (b.k !== 'para' && b.k !== 'list')) return this.host.notify('Click in a paragraph or a list first.', 'info');
+    const now = b.indent ?? 2; const next = Math.max(2, Math.min(5, now + d));
+    if (next === now) return this.host.notify(d > 0 ? 'This is already the deepest level (L5).' : 'This is already at the first level.', 'info');
+    b.indent = next; this.afterEdit(b);
+  }
+
+  private activeCell(): { t: Table; r: number; c: number } | null {
+    const td = (document.activeElement as HTMLElement | null)?.closest('td,th') as HTMLElement | null; const t = (td?.closest('table') as any)?._jsg as Table | undefined;
+    return td && t ? { t, r: Number(td.dataset.r), c: Number(td.dataset.c) } : null;
+  }
+
+  private tableAlignMenu(): MenuItem[] {
+    const A: Array<[Align | undefined, string]> = [['left', 'Left'], ['center', 'Centre'], ['right', 'Right'], ['justify', 'Justified'], [undefined, 'Default']];
+    const set = (scope: 'cell' | 'column' | 'table', a: Align | undefined): void => {
+      const at = this.activeCell(); if (!at) return this.host.notify('Click in a table cell first.', 'info');
+      const all = [...at.t.head, ...at.t.body];
+      const cells = scope === 'table' ? all.flatMap((r) => r.cells) : scope === 'cell' ? [all[at.r]?.cells[at.c]] : all.map((r) => r.cells[at.c]);
+      for (const c of cells) if (c) { if (a) c.align = a; else delete c.align; }
+      this.afterEdit(at.t);
     };
-    const sep = (): void => { const s = document.createElement('span'); s.className = 'sep'; this.bar.appendChild(s); };
-    b('B', 'Bold (Ctrl+B)', () => this.mark('bold')); b('I', 'Italic (Ctrl+I)', () => this.mark('italic')); b('U', 'Underline (Ctrl+U)', () => this.mark('underline'));
-    b('x²', 'Superscript', () => this.mark('superscript')); b('x₂', 'Subscript', () => this.mark('subscript'));
-    sep();
-    b('+ Paragraph', 'Add a paragraph after the selected block', () => this.insert(newPara('')));
-    b('+ Heading', 'Add a numbered heading (1.1, 1.1.1 ...) under the selected one', () => this.addClause());
-    b('+ (a) list', 'Add a lettered list', () => this.insert(newList('alpha')));
-    b('+ 1. list', 'Add a numbered list', () => this.insert(newList('number')));
-    b('+ Step list', 'Add a procedure with "Step 1)"', () => this.insert(newList('step')));
-    b('+ Table', 'Add a table (3 x 3)', () => this.insert(newTable(3, 3, 'TABLE NAME')));
-    b('+ Figure', 'Add a figure with its caption', () => this.insert(newFigure()));
-    b('+ Note', 'Add a note', () => this.insert(newNotice('note'))); b('+ Warning', 'Add a warning', () => this.insert(newNotice('warning'))); b('+ Caution', 'Add a caution', () => this.insert(newNotice('caution')));
-    b('Page break', 'Start a new page here', () => this.insert({ k: 'pageBreak' }));
-    sep();
-    b('↑', 'Move the selected block up', () => this.move(-1)); b('↓', 'Move the selected block down', () => this.move(1)); b('Delete', 'Delete the selected block', () => this.remove());
-    sep();
-    b('Row +', 'Add a table row below the cursor', () => this.tableOp('row+')); b('Col +', 'Add a table column right of the cursor', () => this.tableOp('col+'));
-    b('Row −', 'Delete the table row', () => this.tableOp('row-')); b('Col −', 'Delete the table column', () => this.tableOp('col-'));
-    sep();
-    b('Check', 'Check the document without saving', () => this.host.onCheckRequested(), false);
+    const spans = (() => { const at = this.activeCell(); return !!at && [...at.t.head, ...at.t.body].some((r) => r.cells.some((c) => (c.colspan ?? 1) > 1 || (c.rowspan ?? 1) > 1)); })();
+    return [
+      ...A.map(([a, label]): MenuItem => ({ label: `This cell: ${label}`, run: () => set('cell', a) })), { label: '', separator: true, run: () => undefined },
+      ...A.map(([a, label]): MenuItem => ({ label: `This column: ${label}`, run: () => set('column', a), disabled: spans })), { label: '', separator: true, run: () => undefined },
+      ...A.map(([a, label]): MenuItem => ({ label: `Whole table: ${label}`, run: () => set('table', a) })),
+    ];
+  }
+
+  private toggleHeader(): void {
+    const at = this.activeCell(); if (!at) return this.host.notify('Click in a table cell first.', 'info');
+    const t = at.t;
+    if (t.head.length) { t.body.unshift(...t.head); t.head = []; }
+    else if (t.body.length > 1) { t.head = [t.body.shift() as Table['body'][number]]; }
+    else return this.host.notify('A table needs at least one other row to have a header.', 'info');
+    this.afterEdit(t);
+  }
+
+  private equalColumns(): void {
+    const at = this.activeCell(); if (!at) return this.host.notify('Click in a table cell first.', 'info');
+    const cols = Math.max(1, ...[...at.t.head, ...at.t.body].map((r) => r.cells.reduce((n, c) => n + (c.colspan ?? 1), 0)));
+    at.t.widths = Array.from({ length: cols }, () => '1').join(' '); this.afterEdit(at.t);
+  }
+
+  /** The section or appendix holding the selection, and the heading (clause) the selection is, or is inside, when that heading is a direct child of the section. */
+  private pageOwner(): { holder: Section | Appendix | null; clause: Clause | null } {
+    const sel = this.selected; if (!sel) return { holder: null, clause: null };
+    const item = sel.list[sel.index];
+    let found: { holder: Section | Appendix | null; clause: Clause | null } = { holder: null, clause: null };
+    const within = (list: Array<Block | Clause>, holder: Section | Appendix, top: Clause | null): void => {
+      if (list === sel.list) found = { holder, clause: top }; 
+      for (const x of list) if (isClause(x)) within(x.children, holder, holder.k === 'section' && (holder.children as Array<Block | Clause>).includes(x) ? x : top);
+    };
+    for (const ch of this.doc.chapters) for (const sec of ch.sections) { within(sec.children, sec, null); }
+    for (const ap of this.doc.appendices) within(ap.children, ap, null);
+    if (item && isClause(item) && found.holder && found.holder.k === 'section' && (found.holder.children as Array<Block | Clause>).includes(item)) found.clause = item;
+    return found;
+  }
+
+  private orientationMenu(): MenuItem[] {
+    const { holder, clause } = this.pageOwner();
+    const O: Array<[Orientation, string]> = [['portrait', 'Portrait'], ['landscape', 'Landscape'], ['a3-landscape', 'A3 landscape']];
+    const items: MenuItem[] = [];
+    items.push(...O.map(([o, label]): MenuItem => ({ label: `All of this ${holder?.k === 'appendix' ? 'appendix' : 'section'}: ${label}`, disabled: !holder, hint: holder?.orientation === o ? '✓' : '', run: () => { if (holder) { holder.orientation = o; this.afterEdit(null); } } })));
+    items.push({ label: '', separator: true, run: () => undefined });
+    items.push(...O.map(([o, label]): MenuItem => ({ label: `This heading on its own page: ${label}`, disabled: !clause, hint: (clause?.orientation ?? 'portrait') === o ? '✓' : '', run: () => { if (clause) { if (o === 'portrait') delete clause.orientation; else clause.orientation = o; this.afterEdit(clause); } } })));
+    return items;
   }
 
   private mark(cmd: string): void { if (this.readOnly) return; document.execCommand(cmd); const el = this.activeEditable(); if (el) el.dispatchEvent(new Event('input', { bubbles: true })); }
@@ -159,25 +458,27 @@ export class JsgEditor implements JsgEditorLike {
     else { if ((all[0]?.cells.length ?? 0) <= 1) return this.host.notify('A table keeps at least one column.', 'info'); for (const row of all) row.cells.splice(c, 1); }
     t.widths = undefined; this.afterEdit(t);
   }
-  private afterEdit(focus: unknown): void { this.touch(); const keep = this.sheet.parentElement?.scrollTop ?? 0; this.render(focus); if (this.sheet.parentElement) this.sheet.parentElement.scrollTop = keep; }
+  private afterEdit(focus: unknown): void { this.touch(); this.checkpoint(); const keep = this.sheet.parentElement?.scrollTop ?? 0; this.render(focus); if (this.sheet.parentElement) this.sheet.parentElement.scrollTop = keep; }
 
   // ── rendering ────────────────────────────────────────────────────────────────────────────────────────────────────────────────
   private render(focus?: unknown): void {
     this.sheet.innerHTML = ''; this.slots = new WeakMap(); this.figures = 0; this.tables = 0;
     const s = this.sheet; let focusEl: HTMLElement | null = null;
-    this.cover(s); this.frontMatter(s);
+    this.ancillaryNote();
     this.doc.chapters.forEach((ch, ci) => {
       const h = this.el('div', 'jsg-chapter'); h.id = `jsg-ch-${ci}`;
       h.append(this.el('span', 'jsg-num', `CHAPTER ${ci + 1}`)); h.append(this.titleEl(ch, 'title', 'Chapter title')); s.appendChild(h);
       ch.sections.forEach((sec, si) => {
         const sh = this.el('div', 'jsg-sectionh'); sh.id = `jsg-sec-${ci}-${si}`;
         sh.append(this.el('span', 'jsg-num', `SECTION ${si + 1}`)); sh.append(this.titleEl(sec, 'title', 'Section title')); s.appendChild(sh);
+        if (sec.orientation !== 'portrait') s.appendChild(this.el('div', 'jsg-orient', `This section prints on ${sec.orientation === 'a3-landscape' ? 'A3 landscape' : 'landscape'} pages`));
         const slot = (list: Array<any>, i: number): Slot => ({ list, index: i });
         const walk = (list: Container, prefix: string): void => list.forEach((x, i) => {
           if (isClause(x)) {
             const n = list.slice(0, i + 1).filter(isClause).length; const num = `${prefix}${n}`;
             const c = this.el('div', 'jsg-clause'); c.append(this.el('span', 'n', num)); c.append(this.titleEl(x, 'title', 'Heading'));
             this.slots.set(c, slot(list, i)); c.addEventListener('focusin', () => this.select(c)); s.appendChild(c); if (focus === x) focusEl = c;
+            if (x.orientation && x.orientation !== 'portrait') s.appendChild(this.el('div', 'jsg-orient', `This heading is on its own ${x.orientation === 'a3-landscape' ? 'A3 landscape' : 'landscape'} page`));
             walk(x.children, `${num}.`);
           } else { const e = this.blockEl(x, slot(list, i)); s.appendChild(e); if (focus === x) focusEl = e; }
         });
@@ -185,7 +486,7 @@ export class JsgEditor implements JsgEditorLike {
       });
     });
     this.doc.appendices.forEach((a, ai) => this.appendix(s, a, ai, focus, (e) => { focusEl = e; }));
-    this.renderNav();
+    this.renderNav(); this.refreshStatus();
     if (focusEl) { const f = focusEl as HTMLElement; const first = f.querySelector<HTMLElement>('[contenteditable]'); (first ?? f).focus?.(); this.select(f); }
   }
 
@@ -212,7 +513,7 @@ export class JsgEditor implements JsgEditorLike {
       e.setAttribute('contenteditable', 'true');
       e.addEventListener('input', () => { set(readInline(e)); this.touch(); });
       e.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && !ev.shiftKey && onEnter) { ev.preventDefault(); onEnter(); } else if (ev.key === 'Enter' && ev.shiftKey) { ev.preventDefault(); document.execCommand('insertLineBreak'); e.dispatchEvent(new Event('input', { bubbles: true })); } });
-      e.addEventListener('paste', (ev) => { ev.preventDefault(); const t = ev.clipboardData?.getData('text/plain') ?? ''; document.execCommand('insertText', false, t); });
+      e.addEventListener('paste', (ev) => this.paste(ev, e));
     }
     return e;
   }
@@ -274,6 +575,7 @@ export class JsgEditor implements JsgEditorLike {
   }
   private marker(t: ListType, i: number): string {
     if (t === 'alpha') return `(${String.fromCharCode(97 + (i % 26))})`;
+    if (t === 'roman') return `(${toRoman(i + 1)})`;
     if (t === 'step') return `Step ${i + 1})`;
     if (t === 'bullet') return '•'; if (t === 'dash') return '-';
     return `${i + 1}.`;
@@ -323,44 +625,12 @@ export class JsgEditor implements JsgEditorLike {
     return td;
   }
 
-  // ── the cover and the front matter ──────────────────────────────────────────────────────────────────────────────────────────
   private card(title: string): HTMLElement { const c = this.el('div', 'jsg-card'); c.append(this.el('h3', '', title)); this.sheet.appendChild(c); return c; }
 
-  private cover(_s: HTMLElement): void { coverCard(this.sheet, this.doc, this.readOnly, () => this.touch(), ['qtyUnit']); }
-
-  private frontMatter(_s: HTMLElement): void {
-    const f = this.doc.front;
-    const itemsCard = (title: string, key: 'warning' | 'dos' | 'donts' | 'important'): void => {
-      const c = this.card(title); const arr = f[key];
-      const draw = (): void => {
-        c.querySelectorAll('.jsg-row').forEach((r) => r.remove()); const addBtn = c.querySelector('button.add');
-        arr.forEach((it, i) => { const r = this.el('div', 'jsg-row'); r.append(this.el('span', '', `${i + 1}.`)); r.appendChild(this.richEl('div', '', () => it, (v) => { arr[i] = v; f.has[key] = true; }));
-          if (!this.readOnly) { const d = this.el('button', '', '×'); (d as HTMLButtonElement).type = 'button'; d.onclick = () => { arr.splice(i, 1); this.touch(); draw(); }; r.appendChild(d); } if (addBtn) c.insertBefore(r, addBtn); else c.appendChild(r); });
-      };
-      if (!this.readOnly) { const a = this.el('button', 'add', '+ item'); (a as HTMLButtonElement).type = 'button'; a.onclick = () => { arr.push([]); f.has[key] = true; this.touch(); draw(); }; c.appendChild(a); }
-      draw();
-    };
-    itemsCard('Warning page (numbered items)', 'warning');
-    const pf = this.card('Preface (numbered paragraphs)');
-    { const draw = (): void => { pf.querySelectorAll('.jsg-row').forEach((r) => r.remove()); const addBtn = pf.querySelector('button.add');
-        f.preface.forEach((p, i) => { if (p.k !== 'para') return; const r = this.el('div', 'jsg-row'); r.append(this.el('span', '', `${i + 1}.`)); r.appendChild(this.richEl('div', '', () => p.inline, (v) => { p.inline = v; f.has.preface = true; }));
-          if (!this.readOnly) { const d = this.el('button', '', '×'); (d as HTMLButtonElement).type = 'button'; d.onclick = () => { f.preface.splice(i, 1); this.touch(); draw(); }; r.appendChild(d); } if (addBtn) pf.insertBefore(r, addBtn); else pf.appendChild(r); }); };
-      if (!this.readOnly) { const a = this.el('button', 'add', '+ paragraph'); (a as HTMLButtonElement).type = 'button'; a.onclick = () => { f.preface.push(newPara('')); f.has.preface = true; this.touch(); draw(); }; pf.appendChild(a); }
-      draw(); }
-    itemsCard("Do's", 'dos'); itemsCard("Dont's", 'donts'); itemsCard('Important points', 'important');
-    const ab = this.card('Abbreviations');
-    { const draw = (): void => { ab.querySelectorAll('.jsg-row').forEach((r) => r.remove()); const addBtn = ab.querySelector('button.add');
-        f.abbreviations.forEach((a, i) => { const r = this.el('div', 'jsg-row'); r.append(this.el('span', '', `${i + 1}`));
-          const s = document.createElement('input'); s.value = a.short; s.placeholder = 'Abbreviation'; s.disabled = this.readOnly; s.addEventListener('input', () => { a.short = s.value; f.has.abbreviations = true; this.touch(); });
-          const l = document.createElement('input'); l.value = a.long; l.placeholder = 'For'; l.disabled = this.readOnly; l.addEventListener('input', () => { a.long = l.value; f.has.abbreviations = true; this.touch(); });
-          r.append(s, l); if (!this.readOnly) { const d = this.el('button', '', '×'); (d as HTMLButtonElement).type = 'button'; d.onclick = () => { f.abbreviations.splice(i, 1); this.touch(); draw(); }; r.appendChild(d); }
-          if (addBtn) ab.insertBefore(r, addBtn); else ab.appendChild(r); }); };
-      if (!this.readOnly) { const a = this.el('button', 'add', '+ abbreviation'); (a as HTMLButtonElement).type = 'button'; a.onclick = () => { f.abbreviations.push({ short: '', long: '' }); f.has.abbreviations = true; this.touch(); draw(); }; ab.appendChild(a); }
-      draw(); }
-    const am = this.card('Amendments'); const row = this.el('div', 'jsg-row');
-    row.append(document.createTextNode('Blank rows printed in the table: ')); const n = document.createElement('input'); n.type = 'number'; n.min = '0'; n.max = '60'; n.value = String(f.amendmentsMinRows); n.style.maxWidth = '70px'; n.disabled = this.readOnly;
-    n.addEventListener('input', () => { f.amendmentsMinRows = Math.max(0, Math.min(60, Number(n.value) || 0)); f.has.amendments = true; this.touch(); }); row.appendChild(n); am.appendChild(row);
-    am.append(this.el('div', 'jsg-tag', 'Contents, List of figures and List of tables are produced from the headings, figures and tables below.'));
+  // The cover and the other ancillary pages are edited in the project's "Ancillary pages" dashboard, not here.
+  private ancillaryNote(): void {
+    const c = this.card('Cover and ancillary pages');
+    c.append(this.el('div', 'jsg-tag', 'The cover, certificate, warning, preface, abbreviations and the other pages before the body are edited under "Ancillary pages" in the project menu on the left. This editor holds the chapters, sections and appendices.'));
   }
 
   // ── the outline (left) and the findings ─────────────────────────────────────────────────────────────────────────────────────

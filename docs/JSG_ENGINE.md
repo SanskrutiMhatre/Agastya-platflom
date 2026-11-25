@@ -40,7 +40,7 @@ was "not ready".
 
 | Part of the stencil | Status |
 |---|---|
-| Page A4 210 x 296.9, mirrored margins (25 / 15 mm, top 20, bottom 20), RESTRICTED head and foot, page `(n)`, roman front matter, decimal body | declared |
+| Page A4 210 x 296.9, mirrored margins (25 / 15 mm, top 20, bottom 20), RESTRICTED head and foot (red `#FF0000`, 12 pt, underlined; bold on the cover), page `(n)` in 12 pt, roman front matter, decimal body | declared |
 | Cover: document no., red boxed notice, emblem 30.2 x 40.2 mm, bold blue 18 pt title, FOR, project name, NSN / A/T / DATED, SUPPLIED BY + logo 20.1 x 16.9 mm, ISSUED BY, month-year, EQUIPMENT LIFE box (37.7 / 122.4 mm) | declared (sizes from the Word drawings); vertical spacing assumed |
 | Verso after the cover with "This page is intentionally left blank." | declared |
 | AMENDMENTS (5 columns, the stencil's widths, 21 rows) | declared |
@@ -50,7 +50,7 @@ was "not ready".
 | CONTENTS table (CHAPTERS / DESCRIPTION / PAGE No., 31.9 / 112.5 / 25.3 mm) with page numbers; LIST OF FIGURES / TABLES with dot leaders from the captions | declared widths; line spacing assumed |
 | CHAPTER n / SECTION n divider pages, Heading 2-5 as `n.n`, `n.n.n` ... (bold blue caps 12 pt, hanging 454 / 720 / 851 / 992 twips) | declared styles; divider position assumed; SECTION restarts per chapter (read from the stencil's CONTENTS table) |
 | Paragraph levels L2-L5 (left 454 / 1174 / 1304 / 1474 twips), lettered lists `(a)`, `Step n)`, numbered lists, notes, figures with "Figure n:" below, tables with "Table n:" above | declared styles |
-| Tables: Times New Roman 10 pt, 0.5 pt grid, header row repeated | declared (table style) |
+| Tables: Times New Roman 12 pt (Word's Normal style wins over the Table Grid style's 10 pt), 0.5 pt grid, cell margins 1.4 pt top and bottom and 5.4 pt at the sides (a 17.1 pt row), header row repeated | measured on the stencil render and read from the filled handbook |
 | Landscape A4 and A3 sections (per section / appendix) | declared page sizes |
 | Appendices: heading right-aligned, bold, blue, underlined; title centred bold blue underlined | declared |
 
@@ -108,3 +108,28 @@ Limits, stated plainly:
 * **Numbered callouts are not modelled.** In the Word stencil the item numbers of an exploded view are part of the picture file, so the engine and the preview print the picture as it is; neither
   draws or links callouts, and clicking a part row does not highlight a number on the picture. (That would need a new data model - positions per item - which the stencil does not have.)
 * It shows one plate at a time (all of its pages), not the whole list.
+
+## Measured against the stencil (2026-11-24)
+
+The three Word files were rendered with LibreOffice (`soffice --convert-to pdf`; the 123 MB filled handbook takes about a minute) and compared with a new User Handbook built by this engine:
+
+* **Pages and text.** A new User Handbook is **110 pages, the stencil's 110**, and 95 of the 110 pages have the same text. The rest are the stencil's own typos that the skeleton corrects ("Ponits", "Peridical"), the cover's project name and date, and the page after the landscape System Tree Chart (the stencil puts an explicit blank page there). `test/jsg-engine.test.js` ("a new User Handbook prints the stencil") holds the page contents.
+* **Furniture.** The classification word is red, 12 pt, underlined in the head and the foot (`header*.xml` / `footer*.xml`: `FF0000`, `sz 24`, underline; the cover's pair is bold); the page number is `(n)`, 12 pt. Head, foot, the cover lines, the CHAPTER / SECTION dividers (22 pt, two lines 38 pt apart), the Warning, Do's and Don'ts lines and the table rows are within about 2 pt of the stencil's positions.
+* **Front matter** is the stencil's: Amendments (20 numbered rows of 28.35 pt), Warning (six numbered red lines), Demolition, First aid (two tables, "Figure. n" above each picture), Abbreviations (**37 numbered rows**, `minRows`), Preface (the stencil's four paragraphs), Do's / Don'ts (five numbered lines each), Important Points (numbers without a dot), System photos, Contents (blue bold header and CHAPTER rows, 30.9 pt rows, "Appendix 'H'" in mixed case and a "Section 6 Appendices" row), List of figures and List of tables.
+* **Body.** CHAPTER and SECTION dividers, then `n.n` clauses with the stencil's blue 12 pt bold capitals; the starting document carries the stencil's example blocks (1.1 General: a captioned placeholder figure; 1.2: a lettered list and Table 1 "Technical Specifications"; 1.3 System Tree Chart on **its own landscape page**; Appendix H: its 17-row table). The SECTION that holds the appendices has its own divider page. A section with nothing in it prints its divider and the blank verso only.
+* **Landscape clause.** `<clause orientation="landscape">` (new) puts a heading on a landscape page inside a portrait section: the section is cut into page runs, and only the last run is padded to an even page.
+* **A figure with no picture** is the stencil's captioned placeholder: the schema accepts it, the checker warns (`JSG-FIGURE-EMPTY`), and the PDF prints the caption under an empty line.
+
+LibreOffice is not Word: where the two disagree about spacing (it adds a 1.5-line's extra space below a line, FOP above it) the engine follows the declared Word values and the filled handbook, not the render.
+
+
+## Illustrated Spare Parts List (ISPL): what the engine follows
+
+Measured against `JSG_ISPL_Format.docx` (rendered with LibreOffice; the filled list imports to 89 pages, as the Word file has):
+
+- Portrait pages are **not** mirrored (25 mm left, 15 mm right); the cover has 20 mm each side. The head is RESTRICTED alone; the foot is the page number in brackets **over** RESTRICTED (portrait: 10 mm from the bottom; landscape: 15 mm).
+- Tables are Times New Roman **12 pt**, line 15.8 pt, 3.7 pt cell padding (contents 1.65 pt, abbreviations 5.7 pt); the amendments rows are 10 mm.
+- The Plate Ref. column widens to its longest reference ("I-B/2/11/5/13"), as Word fits it; the Designation column gives the width up.
+- `front/@omit` accepts `certificate preface amendments abbreviations supplied contents`; every page that stays still starts on an odd page.
+- The plate list is followed by `<appendices>` (APPX 'A' ... at the right, blue title, a sentence, a table; each on an odd page with a blank verso, after an APPENDICES page). A view may hold `<note>` lines printed under its parts table.
+- The Word importer for this format is `src/services/jsg/docx-ispl.ts`; `node scripts/make-jsg-sample.js ispl` rebuilds `samples/jsg-ispl`.

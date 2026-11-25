@@ -22,8 +22,8 @@
   </xs:simpleType>
   <xs:simpleType name="ListType">
     <xs:restriction base="xs:string">
-      <!-- alpha: (a) (b) ...   number: 1. 2. ...   step: "Step 1)" ...   bullet / dash: unnumbered -->
-      <xs:enumeration value="alpha"/><xs:enumeration value="number"/><xs:enumeration value="step"/><xs:enumeration value="bullet"/><xs:enumeration value="dash"/>
+      <!-- alpha: (a) (b) ...   roman: (i) (ii) ...   number: 1. 2. ...   step: "Step 1)" ...   bullet / dash: unnumbered -->
+      <xs:enumeration value="alpha"/><xs:enumeration value="roman"/><xs:enumeration value="number"/><xs:enumeration value="step"/><xs:enumeration value="bullet"/><xs:enumeration value="dash"/>
     </xs:restriction>
   </xs:simpleType>
   <xs:simpleType name="Indent">
@@ -103,7 +103,8 @@
     <xs:attribute name="label" type="xs:string"/>
   </xs:complexType>
   <xs:complexType name="Figure">
-    <xs:sequence><xs:element name="graphic" type="Graphic" maxOccurs="unbounded"/></xs:sequence>
+    <!-- no picture yet = the stencil's captioned placeholder ("Figure 1: FIGURE NAME"); the checker warns until one is added -->
+    <xs:sequence><xs:element name="graphic" type="Graphic" minOccurs="0" maxOccurs="unbounded"/></xs:sequence>
     <xs:attribute name="id" type="Id"/>
     <xs:attribute name="title" type="xs:string" use="required"/>
   </xs:complexType>
@@ -136,6 +137,8 @@
     </xs:sequence>
     <xs:attribute name="id" type="Id"/>
     <xs:attribute name="title" type="xs:string" use="required"/>
+    <!-- a clause on its own landscape page inside a portrait section (the stencil's 1.3 System Tree Chart) -->
+    <xs:attribute name="orientation" type="Orientation" default="portrait"/>
   </xs:complexType>
 
   <!-- ===== the User Handbook ===== -->
@@ -164,6 +167,8 @@
     <xs:attribute name="orientation" type="Orientation" default="portrait"/>
   </xs:complexType>
 
+  <xs:complexType name="Appendices"><xs:sequence><xs:element name="appendix" type="Appendix" minOccurs="0" maxOccurs="unbounded"/></xs:sequence></xs:complexType>
+
   <!-- ===== the Illustrated Spare Parts List ===== -->
   <xs:complexType name="Part">
     <xs:attribute name="item" type="xs:string" use="required"/>
@@ -182,6 +187,8 @@
     <xs:sequence>
       <xs:element name="graphic" type="Graphic" minOccurs="0" maxOccurs="unbounded"/>
       <xs:element name="part" type="Part" minOccurs="0" maxOccurs="unbounded"/>
+      <!-- the lines printed under the parts table ("Note: Above mentioned quantity is for one Pontoon Assy.") -->
+      <xs:element name="note" type="Para" minOccurs="0" maxOccurs="unbounded"/>
     </xs:sequence>
     <!-- the red caption under the picture: "100M INFANTRY FOOT BRIDGE FLOATING (ISOMETRIC VIEW 1)" -->
     <xs:attribute name="caption" type="xs:string"/>
@@ -241,15 +248,25 @@
         </xs:complexType>
       </xs:element>
       <xs:element name="warning" type="Items" minOccurs="0"/>
+      <!-- the demolition notice (red text); absent = the stencil's sentence -->
+      <xs:element name="demolition" minOccurs="0">
+        <xs:complexType><xs:sequence><xs:element name="para" type="Para" minOccurs="0" maxOccurs="unbounded"/></xs:sequence></xs:complexType>
+      </xs:element>
+      <!-- the steps of the first page of FIRST AID IN CASE OF ELECTRICAL SHOCK (a step may hold line breaks); absent = the stencil's two steps -->
+      <xs:element name="firstAid" type="Items" minOccurs="0"/>
       <xs:element name="associated" minOccurs="0">
+        <!-- the sentence above the table ("Modular Bridge System has following associated handbooks:") -->
         <xs:complexType><xs:sequence><xs:element name="doc" minOccurs="0" maxOccurs="unbounded">
           <xs:complexType><xs:attribute name="title" type="xs:string" use="required"/><xs:attribute name="docNo" type="xs:string"/><xs:attribute name="remark" type="xs:string"/></xs:complexType>
-        </xs:element></xs:sequence></xs:complexType>
+        </xs:element></xs:sequence><xs:attribute name="intro" type="xs:string"/></xs:complexType>
       </xs:element>
       <xs:element name="abbreviations" minOccurs="0">
         <xs:complexType><xs:sequence><xs:element name="abbr" minOccurs="0" maxOccurs="unbounded">
           <xs:complexType><xs:attribute name="short" type="xs:string" use="required"/><xs:attribute name="long" type="xs:string" use="required"/></xs:complexType>
-        </xs:element></xs:sequence></xs:complexType>
+        </xs:element></xs:sequence>
+          <!-- numbered empty rows printed after the filled ones, up to this many: the stencil's table has 37 -->
+          <xs:attribute name="minRows" type="xs:nonNegativeInteger" default="0"/>
+        </xs:complexType>
       </xs:element>
       <xs:element name="preface" minOccurs="0">
         <xs:complexType><xs:choice minOccurs="0" maxOccurs="unbounded"><xs:element name="para" type="Para"/><xs:element name="list" type="List"/></xs:choice></xs:complexType>
@@ -271,6 +288,8 @@
         </xs:complexType>
       </xs:element>
     </xs:all>
+    <!-- the ancillary pages that are NOT printed (space separated): certificate associated amendments warning demolition firstAid abbreviations preface dos donts important photos contents listOfFigures listOfTables (an ISPL: certificate preface amendments abbreviations supplied contents) -->
+    <xs:attribute name="omit" type="xs:string"/>
   </xs:complexType>
 
   <!-- ===== the document ===== -->
@@ -283,12 +302,13 @@
           <!-- uhb -->
           <xs:sequence>
             <xs:element name="chapter" type="Chapter" minOccurs="0" maxOccurs="unbounded"/>
-            <xs:element name="appendices" minOccurs="0">
-              <xs:complexType><xs:sequence><xs:element name="appendix" type="Appendix" minOccurs="0" maxOccurs="unbounded"/></xs:sequence></xs:complexType>
-            </xs:element>
+            <xs:element name="appendices" type="Appendices" minOccurs="0"/>
           </xs:sequence>
-          <!-- ispl -->
-          <xs:element name="plates"><xs:complexType><xs:sequence><xs:element name="plate" type="Plate" minOccurs="0" maxOccurs="unbounded"/></xs:sequence></xs:complexType></xs:element>
+          <!-- ispl: the plates, then the appendices (APPX 'A' ... lists of spares, tools, suppliers ...) -->
+          <xs:sequence>
+            <xs:element name="plates"><xs:complexType><xs:sequence><xs:element name="plate" type="Plate" minOccurs="0" maxOccurs="unbounded"/></xs:sequence></xs:complexType></xs:element>
+            <xs:element name="appendices" type="Appendices" minOccurs="0"/>
+          </xs:sequence>
         </xs:choice>
       </xs:sequence>
       <xs:attribute name="version" type="xs:string" fixed="1.0" use="required"/>

@@ -60,17 +60,18 @@ test('UHB: opens the JSG editor (not the Studio, not the JSS editor) with the st
   await page.screenshot({ path: path.join(SHOTS, 'uhb-1-open.png') });
 });
 
-test('UHB: edit the cover, a paragraph, a heading, a table and a list; Ctrl+S saves valid JSG XML', async () => {
-  await page.locator('.jsg-card input').nth(3).fill('MODULAR BRIDGE');                      // Project name
+test('UHB: edit a paragraph, a heading, a table and a list; Ctrl+S saves valid JSG XML', async () => {
+  await expect(page.locator('.jsg-card h3')).toHaveText(['Cover and ancillary pages']);   // the cover and front pages live in the Ancillary pages dashboard
   const p = page.locator('.jsg-p').first(); await p.click(); await page.keyboard.type('This handbook describes the Modular Bridge.');
-  await page.getByRole('button', { name: '+ Heading' }).click();
-  await page.getByRole('button', { name: '+ Table' }).click();
-  await page.getByRole('button', { name: '+ (a) list' }).click();
+  await page.getByRole('tab', { name: 'Insert', exact: true }).click();                      // the toolbar is in tabs: Write, Insert, Table, Arrange, Document
+  await page.locator('[data-cmd="heading"]').click();
+  await page.locator('[data-cmd="table"]').click();
+  await page.locator('[data-cmd="list"]').click(); await page.getByRole('menuitem', { name: /\(a\) \(b\) \(c\) lettered/ }).click();
   await expect(state()).toContainText('Unsaved');
   await page.keyboard.press('Control+s');
   await expect(state()).toContainText('Saved', { timeout: 15_000 });
   const d = await doc(uhb);
-  expect(d.xml).toContain('<projectName>MODULAR BRIDGE</projectName>'); expect(d.xml).toContain('This handbook describes the Modular Bridge.');
+  expect(d.xml).toContain('This handbook describes the Modular Bridge.');
   expect(d.xml).toMatch(/<table [^>]*title=/); expect(d.xml).toContain('type="alpha"');
   expect(d.report.errors).toBe(0);
 });
@@ -79,7 +80,6 @@ test('UHB: reload - the saved work is there; the PDF is built by the JSG engine'
   await page.reload();
   await expect(page.getByTestId('jsg-sheet')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId('jsg-sheet')).toContainText('This handbook describes the Modular Bridge.');
-  await expect(page.locator('.jsg-card input').nth(3)).toHaveValue('MODULAR BRIDGE');
   await page.getByTestId('jsg-generate').click();
   await expect(page.getByTestId('jsg-note')).toContainText('Built in', { timeout: 120_000 });
   const pdf = await api.get(`/api/projects/${uhb}/jsg/pdf`);
@@ -101,19 +101,14 @@ test('ISPL: opens the ISPL editor with the stencil preface, the tables and the f
   await page.goto(`/projects/${ispl}/editor`);
   await expect(page.getByTestId('jsg-sheet')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId('jsg-sheet').getByRole('heading', { name: 'Plates' })).toBeVisible();
-  await expect(page.locator('.jsg-card h3')).toContainText(['Cover', 'Certificate', 'Preface', 'Amendments', 'Abbreviations', 'List of equipment already supplied against AT/SO']);
-  await expect(page.getByTestId('jsg-sheet')).toContainText('Queries relating to this ISPL');
+  await expect(page.locator('.jsg-card h3')).toHaveText(['Cover and ancillary pages']);     // the cover and the front pages live in the Ancillary pages dashboard
   await expect(page.locator('.jsg-plate')).toHaveCount(1);
   await expect(page.locator('.jsg-plate header input.ref')).toHaveValue('I');
   await expect(page.getByTestId('studio-host')).toHaveCount(0);
   await page.screenshot({ path: path.join(SHOTS, 'ispl-1-open.png') });
 });
 
-test('ISPL: edit the cover, add a plate with a picture and parts, paste rows; Ctrl+S saves valid JSG XML', async () => {
-  const inputs = page.locator('.jsg-card').first().locator('input');
-  await inputs.nth(1).fill('ILLUSTRATED SPARE PARTS LIST (ISPL)');
-  await page.locator('.jsg-card').first().getByPlaceholder('for 100m').fill('for 100m');
-  await page.locator('.jsg-card').first().locator('input').nth(0).fill('CQAE/IL/14/27/A');
+test('ISPL: add a plate with a picture and parts, paste rows; Ctrl+S saves valid JSG XML', async () => {
   // a sub-plate of the selected plate, with a picture uploaded through the chooser
   await page.locator('.jsg-plate').first().locator('header input.ref').click();
   await page.getByRole('button', { name: '+ Sub-plate' }).click();
@@ -133,7 +128,6 @@ test('ISPL: edit the cover, add a plate with a picture and parts, paste rows; Ct
   await expect(state()).toContainText('Saved', { timeout: 15_000 });
   const d = await doc(ispl);
   expect(d.report.errors).toBe(0);
-  expect(d.xml).toContain('<qtyUnit>for 100m</qtyUnit>');
   expect(d.xml).toMatch(/<plate [^>]*ref="I-A"[^>]*title="Bridging System"[^>]*setColumn="true"/);
   expect(d.xml).toContain('designation="PONTOON ASSY"'); expect(d.xml).toContain('designation="DECK ASSY"');
   expect((d.xml.match(/<graphic /g) || []).length).toBe(1);
@@ -173,4 +167,85 @@ test('ISPL: reload - the plate, the picture and the parts are still there; the P
   const pdf = await api.get(`/api/projects/${ispl}/jsg/pdf`);
   expect(pdf.ok()).toBeTruthy(); expect((await pdf.body()).subarray(0, 5).toString()).toBe('%PDF-');
   await page.screenshot({ path: path.join(SHOTS, 'ispl-2-built.png') });
+});
+
+test('JSG sample and ancillary pages: create the sample from the button, tick pages off, edit a page, save; the document follows and the editor finds and undoes', async () => {
+  test.setTimeout(120_000);                                                           // the sample is a 47,000-word handbook with 244 figures: opening it takes a while
+  const t0 = Date.now(); const lap = (what: string) => console.log(`[sample] ${what}: ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+  await page.goto('/projects');
+  await page.getByTestId('create-jsg-sample').first().click();
+  await expect(page).toHaveURL(/\/projects\/[^/]+(\/editor)?$/, { timeout: 60_000 });
+  const pid = page.url().split('/projects/')[1].split('/')[0]; const U = `/api/projects/${pid}`;
+  // the rail has the page, and not the S1000D tabs that mean nothing here
+  await expect(page.getByRole('link', { name: 'Explore' })).toHaveCount(0); await expect(page.getByRole('link', { name: 'Publication' })).toHaveCount(0);
+  lap('sample created');
+  await page.getByRole('link', { name: 'Ancillary pages' }).click();
+  await expect(page).toHaveURL(new RegExp(`/projects/${pid}/ancillary`));
+  const rows = page.getByTestId('jsg-anc-row'); await expect(rows).toHaveCount(16);
+  await expect(page.locator('[data-page="cover"] [data-testid="jsg-anc-print"]')).toBeDisabled();
+  await expect(page.locator('[data-page="certificate"] [data-testid="jsg-anc-print"]')).toBeChecked();      // the sample is a filled handbook
+  // switch two pages off and edit the warning page
+  await page.locator('[data-page="demolition"] [data-testid="jsg-anc-print"]').uncheck();
+  await page.locator('[data-page="listOfTables"] [data-testid="jsg-anc-print"]').uncheck();
+  await expect(page.getByTestId('jsg-anc-save')).toBeEnabled();
+  await page.locator('[data-page="warning"] .v2-anc-name').click();
+  const first = page.getByTestId('jsg-anc-lines').getByRole('textbox').first();
+  await expect(first).toHaveValue(/SWITCH OFF/i); await first.fill('E2E warning: keep clear of the launcher.');
+  await page.getByTestId('jsg-anc-save').click();
+  await expect(page.getByTestId('jsg-anc-save')).toBeDisabled({ timeout: 15_000 });                    // saved: nothing left to save
+  const xml = (await (await api.get(`${U}/jsg`)).json()).xml as string;
+  expect(xml).toMatch(/<front omit="[^"]*demolition[^"]*">/); expect(xml).toContain('listOfTables'); expect(xml).toContain('E2E warning: keep clear of the launcher.'); expect(xml).toContain('<demolition>');   // switched off, not deleted
+  await page.screenshot({ path: path.join(SHOTS, 'jsg-ancillary.png') });
+  // a page that is not in the handbook is added by ticking it
+  await page.locator('[data-page="associated"] .v2-anc-name').click();
+  await expect(page.getByTestId('jsg-anc-rows').getByRole('textbox').first()).toBeVisible();
+  await page.locator('[data-page="associated"] [data-testid="jsg-anc-print"]').uncheck(); await page.locator('[data-page="associated"] [data-testid="jsg-anc-print"]').check();
+  await expect(page.locator('[data-page="associated"] [data-testid="jsg-anc-print"]')).toBeChecked();
+
+  // the editor: the real handbook opens, Find counts, Undo takes an edit back
+  lap('ancillary done');
+  await page.goto(`/projects/${pid}/editor`);
+  await expect(page.getByTestId('jsg-sheet')).toBeVisible({ timeout: 60_000 });
+  lap('editor open');
+  await expect(page.getByTestId('jsg-status')).toContainText('words');
+  await page.getByRole('button', { name: /^Find and replace/ }).click();
+  await page.getByLabel('Find', { exact: true }).fill('Modular Bridge');
+  await expect(page.locator('.jsg-find .cnt')).toHaveText(/^1 of \d+$/);
+  lap('found');
+  await page.keyboard.press('Escape');
+  const para = page.locator('.jsg-p').first(); const before = (await para.textContent()) ?? '';
+  await para.click(); await page.keyboard.press('End'); await page.keyboard.type(' EXTRA');
+  await expect(para).toContainText('EXTRA'); await page.waitForTimeout(900);
+  await page.getByRole('button', { name: /Undo/ }).click();
+  await expect(para).not.toContainText('EXTRA'); expect(((await para.textContent()) ?? '').trim()).toBe(before.trim());
+});
+
+test('ISPL sample and ancillary pages: create the sample, tick pages off, edit the preface and the amendments, save; the editor shows plates and appendices without the front pages', async () => {
+  test.setTimeout(120_000);
+  await page.goto('/projects');
+  await page.getByTestId('create-jsg-ispl-sample').click();
+  await expect(page).toHaveURL(/\/projects\/sample-jsg-illustrated/, { timeout: 60_000 });
+  const pid = new URL(page.url()).pathname.split('/')[2];
+  await page.getByRole('link', { name: 'Ancillary pages' }).click();
+  const rows = page.getByTestId('jsg-anc-row');
+  await expect(rows).toHaveCount(7);
+  await expect(page.locator('[data-page="cover"] [data-testid="jsg-anc-print"]')).toBeDisabled();
+  await expect(page.locator('[data-page="certificate"] [data-testid="jsg-anc-print"]')).toBeChecked();
+  await page.locator('[data-page="supplied"] [data-testid="jsg-anc-print"]').uncheck();
+  await page.locator('[data-page="preface"] .v2-anc-name').click();
+  const first = page.getByLabel('Preface paragraph 1');
+  await first.fill('1. EDITED PREFACE LINE.');
+  await page.locator('[data-page="amendments"] .v2-anc-name').click();
+  await page.getByRole('button', { name: 'Add amendment' }).click();
+  await page.getByLabel('Authority, row 1').fill('HQ 123');
+  await page.getByTestId('jsg-anc-save').click();
+  await expect(page.getByTestId('jsg-anc-save')).toBeDisabled({ timeout: 20_000 });
+  const d = await (await api.get(`/api/projects/${pid}/jsg`)).json();
+  expect(d.xml).toMatch(/<front omit="[^"]*supplied/); expect(d.xml).toContain('EDITED PREFACE LINE'); expect(d.xml).toContain('authority="HQ 123"'); expect(d.report.errors).toBe(0);
+  await page.goto(`/projects/${pid}/editor`);
+  await expect(page.getByTestId('jsg-sheet')).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('.jsg-card h3')).toHaveText(['Cover and ancillary pages']);
+  await expect(page.locator('.jsg-plate').first()).toBeVisible();
+  await expect(page.getByTestId('jsg-status')).toContainText('appendices');
+  await expect(page.locator('[id^="jsg-ap-"]')).toHaveCount(7);
 });

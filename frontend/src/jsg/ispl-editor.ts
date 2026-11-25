@@ -6,9 +6,10 @@
 //
 // Independent of the User Handbook editor's text editing, of the JSS editor (src/jss) and of the S1000D Studio (src/studio): it shares only ./shared.ts (host, look, picture chooser, cover card).
 
-import { PART_COLUMNS, newList, newPara, newPart, newPlate, newView, parentRef, text, type Inline, type JsgDoc, type List, type Para, type Plate, type PlateView } from './model';
+import { PART_COLUMNS, newPara, newPart, newPlate, newView, newTable, parentRef, text, type Appendix, type Cell, type Inline, type JsgDoc, type Para, type Plate, type PlateView, type Table } from './model';
 import { inlineHtml, readInline } from './editor';
-import { BASE_CSS, button, coverCard, injectCss, mk, pickGraphic, type JsgEditorLike, type JsgEditorOptions, type JsgFinding, type JsgHost } from './shared';
+import { plain as plainOf } from './model';
+import { BASE_CSS, button, injectCss, mk, pickGraphic, type JsgEditorLike, type JsgEditorOptions, type JsgFinding, type JsgHost } from './shared';
 import { mountIsplPreview, type PreviewHandle } from './ispl-preview';
 import { serializeJsg } from './xml';
 
@@ -50,7 +51,7 @@ export class IsplEditor implements JsgEditorLike {
   private dirty = false;
   private findings: JsgFinding[] = [];
   private sel = -1;
-  private nav!: HTMLElement; private bar!: HTMLElement; private sheet!: HTMLElement;
+  private nav!: HTMLElement; private bar!: HTMLElement; private sheet!: HTMLElement; private status!: HTMLElement;
   private pvPane!: HTMLElement; private preview!: PreviewHandle; private pvTimer = 0; private pvOn = true; private pvBtn!: HTMLButtonElement;
   private onKey = (e: KeyboardEvent): void => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); this.host.onSaveRequested(); } };
 
@@ -63,7 +64,7 @@ export class IsplEditor implements JsgEditorLike {
     scroll.appendChild(this.sheet);
     // the grid on the left, the stencil-style page preview of the selected plate on the right; editing the grid redraws the preview
     const body = mk('div', 'jsg-isplbody'); this.pvPane = mk('div', 'jsg-pvpane'); this.pvPane.setAttribute('data-testid', 'jsg-preview');
-    body.append(scroll, this.pvPane); main.append(this.bar, body); this.root.append(this.nav, main);
+    body.append(scroll, this.pvPane); this.status = mk('div', 'jsg-status'); this.status.setAttribute('data-testid', 'jsg-status'); main.append(this.bar, body, this.status); this.root.append(this.nav, main);
     try { this.pvOn = localStorage.getItem('agastya.jsg.ispl.preview') !== 'off'; } catch { /* the choice is only remembered when storage works */ }
     this.preview = mountIsplPreview(this.pvPane, (s) => this.host.imageUrl(s), (i) => { this.sel = i; this.schedulePreview(); document.getElementById(`jsg-pl-${i}`)?.scrollIntoView({ block: 'start' }); });
     this.pvPane.classList.toggle('off', !this.pvOn);
@@ -77,7 +78,7 @@ export class IsplEditor implements JsgEditorLike {
   getXml(): string { return serializeJsg(this.doc); }
   getDoc(): JsgDoc { return this.doc; }
   setFindings(f: JsgFinding[]): void { this.findings = f; this.renderNav(); }
-  private touch(): void { if (!this.dirty) { this.dirty = true; this.host.onDirty(true); } this.schedulePreview(); }
+  private touch(): void { if (!this.dirty) { this.dirty = true; this.host.onDirty(true); } this.refreshStatus(); this.schedulePreview(); }
   /** Redraw the preview shortly after the last edit (typing in the grid must not redraw on every key). */
   private schedulePreview(): void {
     if (!this.pvOn) return; window.clearTimeout(this.pvTimer);
@@ -95,7 +96,10 @@ export class IsplEditor implements JsgEditorLike {
     add('+ View', 'Add a view (a picture page and its parts table) to the selected plate', () => { const p = this.plate(); if (p) { p.views.push(newView()); this.redraw(); } });
     sep();
     add('↑', 'Move the selected plate up', () => this.movePlate(-1)); add('↓', 'Move the selected plate down', () => this.movePlate(1));
+    add('Duplicate', 'Copy the selected plate with its views and parts', () => this.duplicatePlate());
     add('Delete plate', 'Delete the selected plate', () => this.deletePlate());
+    sep();
+    add('+ Appendix', 'Add an appendix (APPX \u2018A\u2019 ...: a list of spares, tools, suppliers ...) with a table', () => { const n = this.doc.appendices.length; const a: Appendix = { k: 'appendix', label: String.fromCharCode(65 + n), title: 'NEW APPENDIX', orientation: 'landscape', children: [newPara('', 2), newTable(2, 4)] }; a.children[1] && ((a.children[1] as Table).head = [{ cells: ['Sr. No.', 'Description', 'Quantity', 'Remark'].map((t) => ({ parts: [{ k: 'text' as const, inline: text(t) }] })) }]); this.doc.appendices.push(a); this.redraw(); });
     sep();
     add('Check', 'Check the document without saving', () => this.host.onCheckRequested(), false);
     this.pvBtn = button('Page preview', () => { this.pvOn = !this.pvOn; try { localStorage.setItem('agastya.jsg.ispl.preview', this.pvOn ? 'on' : 'off'); } catch { /* not remembered */ } this.pvPane.classList.toggle('off', !this.pvOn); this.pvBtn.setAttribute('aria-pressed', String(this.pvOn)); if (this.pvOn) this.schedulePreview(); });
@@ -138,96 +142,86 @@ export class IsplEditor implements JsgEditorLike {
 
   private render(): void {
     this.sheet.innerHTML = '';
-    const f = this.doc.front;
-    coverCard(this.sheet, this.doc, this.readOnly, () => this.touch(), ['subtitle']);
-
-    const cert = this.card('Certificate'); cert.append(mk('div', 'jsg-note', 'Printed under C E R T I F I C A T E, followed by the Date / Name / Designation / Group block.'));
-    cert.appendChild(this.rich(() => f.certificate ?? [], (i) => { f.certificate = i; f.has.certificate = true; }, 'Certified that this document no. ... contains ... pages ...'));
-
-    this.prefaceCard();
-    this.amendmentsCard();
-    this.gridCard('Abbreviations', ['Abbreviation', 'For'], () => f.abbreviations.map((a) => [a.short, a.long]), (rows) => { f.abbreviations = rows.map((r) => ({ short: r[0], long: r[1] })); f.has.abbreviations = true; });
-    this.suppliedCard();
+    const note = this.card('Cover and ancillary pages');
+    note.append(mk('div', 'jsg-note', 'The cover, certificate, preface, amendments, abbreviations, the list of equipment already supplied and the contents are edited under "Ancillary pages" in the project menu on the left. This editor holds the plates and the appendices.'));
 
     const head = mk('h2', '', 'Plates'); head.style.cssText = 'font:600 14px system-ui;margin:22px 0 4px'; this.sheet.appendChild(head);
     this.sheet.appendChild(mk('div', 'jsg-note', 'Each view prints a picture page and a parts-table page. The Contents page (with page ranges) is produced from the plates; the first plate marked "divider" also prints the big PLATE page and an index of its sub-plates.'));
     this.doc.plates.forEach((p, i) => this.plateCard(p, i));
     if (!this.doc.plates.length) this.sheet.appendChild(mk('div', 'jsg-note', 'No plates yet: press + Plate.'));
-    this.renderNav(); this.schedulePreview();
+    this.appendicesSection();
+    this.renderNav(); this.refreshStatus(); this.schedulePreview();
   }
 
-  private prefaceCard(): void {
-    const f = this.doc.front; const c = this.card('Preface');
-    c.append(mk('div', 'jsg-note', 'Numbered paragraphs (1., 2., ...), lettered lists, and continuation paragraphs (the NOTE). The stencil’s standard wording is the starting text.'));
-    const draw = (): void => {
-      c.querySelectorAll('.jsg-row, .jsg-add').forEach((r) => r.remove());
-      let n = 0;
-      f.preface.forEach((p, i) => {
-        const r = mk('div', 'jsg-row');
-        if (p.k === 'list') {
-          r.append(mk('span', '', '(a)'));
-          const box = mk('div'); box.style.flex = '1';
-          p.items.forEach((it, k) => {
-            const line = mk('div', 'jsg-row'); line.append(mk('span', '', `(${String.fromCharCode(97 + k)})`));
-            const part = it.parts[0] ?? { k: 'text' as const, inline: [] }; if (!it.parts.length) it.parts.push(part);
-            line.appendChild(this.rich(() => (part.k === 'text' || part.k === 'para' ? part.inline : []), (v) => { if (part.k === 'text' || part.k === 'para') part.inline = v; }));
-            if (!this.readOnly) line.appendChild(button('×', () => { p.items.splice(k, 1); this.touch(); draw(); }));
-            box.appendChild(line);
-          });
-          if (!this.readOnly) box.appendChild(button('+ item', () => { p.items.push({ parts: [{ k: 'text', inline: [] }] }); this.touch(); draw(); }));
-          r.appendChild(box);
-        } else {
-          const numbered = p.indent === 2; if (numbered) n++;
-          r.append(mk('span', '', numbered ? `${n}.` : '•'));
-          r.appendChild(this.rich(() => p.inline, (v) => { p.inline = v; }));
-          if (!this.readOnly) { const t = button(numbered ? '→' : '←', () => { p.indent = numbered ? 3 : 2; this.touch(); draw(); }); t.title = numbered ? 'Make this a continuation paragraph (no number)' : 'Make this a numbered paragraph'; r.appendChild(t); }
-        }
-        if (!this.readOnly) r.appendChild(button('×', () => { f.preface.splice(i, 1); this.touch(); draw(); }));
-        c.appendChild(r);
-      });
+  private duplicatePlate(): void {
+    const p = this.doc.plates[this.sel]; if (!p) { this.host.notify('Click a plate first.', 'info'); return; }
+    const copy: Plate = { ...p, id: undefined, ref: `${p.ref}`, title: `${p.title}`, views: p.views.map((v) => ({ ...v, graphics: v.graphics.map((g) => ({ ...g })), parts: v.parts.map((r) => ({ ...r })), notes: (v.notes ?? []).map((n) => JSON.parse(JSON.stringify(n)) as Inline[]) })) };
+    delete copy.id; this.doc.plates.splice(this.sel + 1, 0, copy); this.sel += 1; this.redraw();
+    this.host.notify('Copied: change its reference and title.', 'info');
+  }
+
+  /** Plates, views, parts and pictures counted under the sheet. */
+  private refreshStatus(): void {
+    const views = this.doc.plates.reduce((n, p) => n + p.views.length, 0); const parts = this.doc.plates.reduce((n, p) => n + p.views.reduce((m, v) => m + v.parts.length, 0), 0);
+    const pics = this.doc.plates.reduce((n, p) => n + p.views.reduce((m, v) => m + v.graphics.length, 0), 0);
+    this.status.textContent = `${this.doc.plates.length} plates \u00b7 ${views} views \u00b7 ${parts} parts \u00b7 ${pics} pictures \u00b7 ${this.doc.appendices.length} appendices`;
+  }
+
+  // ── appendices ───────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  private appendicesSection(): void {
+    const apps = this.doc.appendices; if (!apps.length && this.readOnly) return;
+    const head = mk('h2', '', 'Appendices'); head.style.cssText = 'font:600 14px system-ui;margin:26px 0 4px'; this.sheet.appendChild(head);
+    this.sheet.appendChild(mk('div', 'jsg-note', 'Each appendix prints on its own landscape page: APPX \u2018A\u2019 at the right, its title, a sentence, and a table. Press + Appendix to add one.'));
+    apps.forEach((a, ai) => {
+      const card = mk('div', 'jsg-plate'); card.id = `jsg-ap-${ai}`; const h = mk('header'); card.appendChild(h);
+      const inp = (cls: string, ph: string, get: () => string, set: (v: string) => void): HTMLInputElement => { const i = document.createElement('input'); i.type = 'text'; i.className = cls; i.placeholder = ph; i.value = get(); i.disabled = this.readOnly; i.addEventListener('input', () => { set(i.value); this.touch(); }); return i; };
+      h.append(mk('b', '', 'APPX \u2018'), inp('ref', 'A', () => a.label, (v) => { a.label = v; }), mk('b', '', '\u2019'), inp('ttl', 'LIST OF CARRIED SPARES', () => a.title, (v) => { a.title = v; }));
       if (!this.readOnly) {
-        const a = mk('div', 'jsg-add'); a.append(button('+ paragraph', () => { f.preface.push(newPara('')); f.has.preface = true; this.touch(); draw(); }), button('+ (a) list', () => { const l: List = newList('alpha', 2); l.indent = 3; f.preface.push(l); f.has.preface = true; this.touch(); draw(); })); c.appendChild(a);
+        h.append(button('\u2191', () => { if (ai) { [apps[ai - 1], apps[ai]] = [apps[ai], apps[ai - 1]]; this.redraw(); } }), button('\u2193', () => { if (ai < apps.length - 1) { [apps[ai + 1], apps[ai]] = [apps[ai], apps[ai + 1]]; this.redraw(); } }),
+          button('Delete', () => { if (window.confirm(`Delete appendix ${a.label} ${a.title}?`)) { apps.splice(ai, 1); this.redraw(); } }));
+      }
+      a.children.forEach((b, bi) => {
+        if (b.k === 'para') {
+          const box = mk('div', 'jsg-view'); box.append(mk('b', '', 'Sentence under the title'));
+          box.appendChild(this.rich(() => b.inline, (v) => { b.inline = v; })); card.appendChild(box);
+        } else if (b.k === 'table') card.appendChild(this.appendixTable(b, () => a.children.splice(bi, 1)));
+      });
+      if (!this.readOnly) { const bar = mk('div', 'jsg-view'); bar.append(button('+ sentence', () => { a.children.unshift(newPara('', 2)); this.redraw(); }), button('+ table', () => { a.children.push(newTable(2, 4)); this.redraw(); })); card.appendChild(bar); }
+      this.sheet.appendChild(card);
+    });
+  }
+
+  private cellText(c: Cell): string { return c.parts.map((x) => (x.k === 'text' || x.k === 'para' ? plainOf(x.inline) : '')).join(' ').trim(); }
+
+  /** A table of text cells: heading rows (bold), body rows, group rows (one cell across the table). Typing keeps the cell's other settings. */
+  private appendixTable(t: Table, remove: () => void): HTMLElement {
+    const box = mk('div', 'jsg-view'); const wrap = mk('div', 'jsg-grid'); box.appendChild(wrap);
+    const cols = (): number => Math.max(1, ...[...t.head, ...t.body].map((r) => r.cells.reduce((n, c) => n + (c.colspan ?? 1), 0)));
+    const draw = (): void => {
+      wrap.innerHTML = ''; const tb = document.createElement('table');
+      const rowsOf = (rows: typeof t.body, isHead: boolean): void => rows.forEach((r, ri) => {
+        const tr = document.createElement('tr');
+        r.cells.forEach((c) => {
+          const td = document.createElement(isHead ? 'th' : 'td'); if (c.colspan && c.colspan > 1) td.colSpan = c.colspan; if (c.rowspan && c.rowspan > 1) td.rowSpan = c.rowspan;
+          const i = document.createElement('input'); i.value = this.cellText(c); i.disabled = this.readOnly; if (isHead) i.style.fontWeight = 'bold';
+          i.addEventListener('input', () => { c.parts = [{ k: 'text', inline: text(i.value) }]; this.touch(); }); td.appendChild(i); tr.appendChild(td);
+        });
+        const act = mk('td', 'act'); if (!this.readOnly) { act.appendChild(button('\u00d7', () => { rows.splice(ri, 1); if (!isHead && !t.body.length) t.body.push({ cells: Array.from({ length: cols() }, () => ({ parts: [{ k: 'text' as const, inline: [] }] })) }); this.touch(); draw(); })); } tr.appendChild(act); tb.appendChild(tr);
+      });
+      rowsOf(t.head, true); rowsOf(t.body, false); wrap.appendChild(tb);
+      if (!this.readOnly) {
+        const bar = mk('div');
+        bar.append(button('+ row', () => { t.body.push({ cells: Array.from({ length: cols() }, () => ({ parts: [{ k: 'text' as const, inline: [] }] })) }); this.touch(); draw(); }),
+          button('+ group row', () => { t.body.push({ cells: [{ colspan: cols(), parts: [{ k: 'text' as const, inline: [] }] }] }); this.touch(); draw(); }),
+          button('Paste rows', () => {
+            const txt = window.prompt('Paste rows copied from a spreadsheet (tab-separated, one row per line).', ''); if (!txt) return; const n = cols();
+            for (const line of txt.split(/\r?\n/)) { if (!line.trim()) continue; const cells = line.split('\t'); t.body.push({ cells: Array.from({ length: n }, (_, k) => ({ parts: [{ k: 'text' as const, inline: text((cells[k] ?? '').trim()) }] })) }); }
+            this.touch(); draw();
+          }), button('Remove table', () => { remove(); this.redraw(); }));
+        wrap.appendChild(bar);
       }
     };
-    draw();
-  }
-
-  private amendmentsCard(): void {
-    const f = this.doc.front; const c = this.card('Amendments');
-    const row = mk('div', 'jsg-row'); row.append(document.createTextNode('Blank rows to print in the table: '));
-    const n = document.createElement('input'); n.type = 'number'; n.min = '0'; n.max = '60'; n.value = String(f.amendmentsMinRows); n.style.maxWidth = '70px'; n.disabled = this.readOnly;
-    n.addEventListener('input', () => { f.amendmentsMinRows = Math.max(0, Math.min(60, Number(n.value) || 0)); f.has.amendments = true; this.touch(); }); row.appendChild(n); c.appendChild(row);
-    this.gridInto(c, ['Amendment No.', 'Authority', 'Date of Amendment', 'By Whom Amended'], () => f.amendments.map((a) => [a.no, a.authority, a.date, a.by]),
-      (rows) => { f.amendments = rows.map((r) => ({ no: r[0], page: '', para: '', required: '', authority: r[1], date: r[2], by: r[3] })); f.has.amendments = true; });
-  }
-
-  private suppliedCard(): void {
-    const f = this.doc.front; const c = this.card('List of equipment already supplied against AT/SO');
-    const l = document.createElement('label'); l.append(document.createTextNode('Name of the equipment')); const i = document.createElement('input'); i.value = f.supplied?.equipment ?? ''; i.disabled = this.readOnly;
-    i.addEventListener('input', () => { if (!f.supplied) f.supplied = { equipment: '', rows: [] }; f.supplied.equipment = i.value; f.has.supplied = true; this.touch(); }); l.appendChild(i); c.appendChild(l);
-    c.append(mk('div', 'jsg-note', 'With no rows the table prints one row reading "Nil", as the stencil does.'));
-    this.gridInto(c, ['S. No.', 'DCAN No. / NSN', 'Name of Item', 'Supply Order Details'], () => (f.supplied?.rows ?? []).map((r) => [r.no, r.dcan, r.name, r.order]),
-      (rows) => { if (!f.supplied) f.supplied = { equipment: '', rows: [] }; f.supplied.rows = rows.map((r) => ({ no: r[0], dcan: r[1], name: r[2], order: r[3] })); f.has.supplied = true; });
-  }
-
-  private gridCard(title: string, heads: string[], get: () => string[][], set: (rows: string[][]) => void): void { this.gridInto(this.card(title), heads, get, set); }
-
-  /** A small table of text cells with add / delete row. `set` receives the whole table after every change. */
-  private gridInto(parent: HTMLElement, heads: string[], get: () => string[][], set: (rows: string[][]) => void): void {
-    const wrap = mk('div', 'jsg-grid'); parent.appendChild(wrap);
-    let rows = get(); if (!rows.length) rows = [];
-    const draw = (): void => {
-      wrap.innerHTML = ''; const t = document.createElement('table'); const hr = document.createElement('tr');
-      for (const h of heads) { const th = document.createElement('th'); th.textContent = h; hr.appendChild(th); } hr.appendChild(mk('th')); t.appendChild(hr);
-      rows.forEach((r, ri) => {
-        const tr = document.createElement('tr');
-        heads.forEach((_, ci) => { const td = document.createElement('td'); const inp = document.createElement('input'); inp.value = r[ci] ?? ''; inp.disabled = this.readOnly; inp.addEventListener('input', () => { r[ci] = inp.value; set(rows); this.touch(); }); td.appendChild(inp); tr.appendChild(td); });
-        const act = mk('td', 'act'); if (!this.readOnly) act.appendChild(button('×', () => { rows.splice(ri, 1); set(rows); this.touch(); draw(); })); tr.appendChild(act); t.appendChild(tr);
-      });
-      wrap.appendChild(t);
-      if (!this.readOnly) wrap.appendChild(button('+ row', () => { rows.push(heads.map(() => '')); set(rows); this.touch(); draw(); }));
-    };
-    draw();
+    draw(); return box;
   }
 
   private plateCard(p: Plate, index: number): void {
@@ -267,7 +261,10 @@ export class IsplEditor implements JsgEditorLike {
       v.parts.forEach((row, ri) => {
         const tr = document.createElement('tr');
         for (const c of cols) { const td = document.createElement('td'); const i = document.createElement('input'); i.value = row[c.key]; i.disabled = this.readOnly; if (c.align) i.style.textAlign = c.align; i.addEventListener('input', () => { row[c.key] = i.value; this.touch(); }); td.appendChild(i); tr.appendChild(td); }
-        const act = mk('td', 'act'); if (!this.readOnly) act.appendChild(button('×', () => { v.parts.splice(ri, 1); this.touch(); draw(); })); tr.appendChild(act); t.appendChild(tr);
+        const act = mk('td', 'act'); act.style.width = '92px';
+        if (!this.readOnly) act.append(button('\u2191', () => { if (ri) { [v.parts[ri - 1], v.parts[ri]] = [v.parts[ri], v.parts[ri - 1]]; this.touch(); draw(); } }), button('\u2193', () => { if (ri < v.parts.length - 1) { [v.parts[ri + 1], v.parts[ri]] = [v.parts[ri], v.parts[ri + 1]]; this.touch(); draw(); } }),
+          button('\u2398', () => { v.parts.splice(ri + 1, 0, { ...row }); this.touch(); draw(); }), button('×', () => { v.parts.splice(ri, 1); this.touch(); draw(); }));
+        tr.appendChild(act); t.appendChild(tr);
       });
       wrap.appendChild(t);
       if (!this.readOnly) {
@@ -283,6 +280,17 @@ export class IsplEditor implements JsgEditorLike {
       }
     };
     draw();
+    // the lines printed under the parts table ("Note: Above mentioned quantity is for one Pontoon Assy.")
+    const notes = mk('div', 'jsg-view'); notes.style.margin = '8px 0 0'; box.appendChild(notes);
+    const drawNotes = (): void => {
+      notes.innerHTML = ''; notes.append(mk('b', '', 'Notes under the table'));
+      (v.notes ??= []).forEach((n, ni) => {
+        const r = mk('div', 'jsg-row'); r.appendChild(this.rich(() => n, (x) => { v.notes[ni] = x; }, 'Note: Above mentioned quantity is for one ...'));
+        if (!this.readOnly) r.appendChild(button('×', () => { v.notes.splice(ni, 1); this.touch(); drawNotes(); })); notes.appendChild(r);
+      });
+      if (!this.readOnly) notes.appendChild(button('+ note', () => { v.notes.push(text('Note: ')); this.touch(); drawNotes(); }));
+    };
+    drawNotes();
     return box;
   }
 
@@ -293,6 +301,10 @@ export class IsplEditor implements JsgEditorLike {
     this.doc.plates.forEach((p, i) => {
       const a = mk('a', parentRef(p.ref) ? 'l2' : '', `${p.ref}  ${p.title}`); a.title = `${p.ref} ${p.title}`; a.onclick = () => { this.sel = i; document.getElementById(`jsg-pl-${i}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }); }; this.nav.appendChild(a);
     });
+    if (this.doc.appendices.length) {
+      this.nav.append(mk('h4', '', 'Appendices'));
+      this.doc.appendices.forEach((a, i) => { const l = mk('a', 'l2', `APPX \u2018${a.label}\u2019  ${a.title}`); l.onclick = () => document.getElementById(`jsg-ap-${i}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }); this.nav.appendChild(l); });
+    }
     if (this.findings.length) {
       this.nav.append(mk('h4', '', `Problems (${this.findings.length})`));
       for (const f of this.findings) { const d = mk('div', `jsg-find ${f.severity}`, f.message); d.title = `${f.rule}, line ${f.line}`; this.nav.appendChild(d); }

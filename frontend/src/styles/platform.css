@@ -426,3 +426,7 @@ html.v2-compact .v2-card-pad { padding: 12px; }
 .v2-anc-field .v2-input { width: 100%; }
 @media (max-width: 900px) { .v2-anc { grid-template-columns: 1fr; } }
 .v2-anc-field textarea.v2-input { height: auto; padding: 7px 10px; line-height: 1.45; resize: vertical; }
+
+/* the PDF viewer is dark in both themes: its empty-state text must read on it */
+[data-testid="pdf-pane"] .v2-empty, [data-testid="pdf-pane"] .v2-empty h3, [data-testid="pdf-pane"] .v2-empty > svg { color: #d5dae0; }
+[data-testid="pdf-pane"] .v2-empty strong { color: #fff; }

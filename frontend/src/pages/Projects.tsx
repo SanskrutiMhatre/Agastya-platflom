@@ -45,7 +45,7 @@ export function Projects() {
             <option value="recent">Recently opened</option><option value="name">Name</option><option value="dms">Most data modules</option>
           </select>
           <BackupButton />
-          {role === 'admin' ? null : <><SampleButton onCreated={() => list.reload()} /><button className="btn btn-primary" onClick={() => setCreating(true)}><Icon name="plus" />New project</button></>}
+          {role === 'admin' ? null : <><SampleButton onCreated={() => list.reload()} /><SampleButton kind="jsg" onCreated={() => list.reload()} /><SampleButton kind="jsg-ispl" onCreated={() => list.reload()} /><button className="btn btn-primary" onClick={() => setCreating(true)}><Icon name="plus" />New project</button></>}
         </div>
       </div>
 

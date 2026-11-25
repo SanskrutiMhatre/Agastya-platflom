@@ -14,6 +14,7 @@ import { Alert, Loading, Spinner, ago, errText } from '../../components/ui';
 import { canBuild, canWrite, useProject } from '../../layouts/ProjectShell';
 import { JssEditor, type GraphicInfo } from '../../jss/editor';
 import { JssParseError, parseJss } from '../../jss/xml';
+import { PackagePanel } from '../../jss/PackagePanel';
 import { useProgress } from '../../lib/progress';
 import { useUi } from '../../store/ui';
 
@@ -68,7 +69,14 @@ export function JssEditorPage() {
     if (!loaded || !hostRef.current) return;
     let doc;
     try { doc = parseJss(loaded.xml); }
-    catch (e) { setError(e instanceof JssParseError ? `The editor cannot open this document: ${e.message}` : errText(e)); return; }
+    catch (e) {
+      setError(e instanceof JssParseError
+        ? (/root element is <pm>/.test(e.message)
+          ? 'This project holds an imported package, not an editable document. Press "Import project" above and choose the project .zip again to turn it into an editable document.'
+          : `The editor cannot open this document: ${e.message}`)
+        : errText(e));
+      return;
+    }
     const editor = new JssEditor(hostRef.current, {
       doc, maxDepth: loaded.maxDepth, readOnly: !writable,
       chapterRule: loaded.chapterRule, sectionsFixed: loaded.sectionsFixed, tableTemplates: loaded.tableTemplates, chapterStarter: loaded.chapterStarter,
@@ -164,6 +172,7 @@ export function JssEditorPage() {
         <span className="spacer" />
         <button className="btn btn-sm" onClick={() => void check()} disabled={!loaded || checking} data-testid="jss-check" title="Check the document for problems without saving or building">{checking ? <Spinner /> : <Icon name="search" size={12} />}Check</button>
         <button className="btn btn-sm" onClick={() => void save()} disabled={!writable || !dirty || saving} data-testid="jss-save" title={!writable ? 'You have read-only access' : !dirty ? 'Nothing to save' : 'Save the document (Ctrl+S)'}>{saving ? <Spinner /> : <Icon name="check" size={12} />}Save</button>
+        <PackagePanel id={id} writable={writable} dirty={dirty} saveFirst={save} onImported={() => { setDirty(false); void load(); ctx.reload(); }} />
         <button className="btn btn-sm btn-primary" onClick={() => void generate()} disabled={!canBuild(role) || building || !loaded} data-testid="jss-generate" title={!canBuild(role) ? 'Reviewers, editors and owners can build the PDF' : 'Save, then build the whole publication as a PDF'}>{building ? <Spinner /> : <Icon name="play" size={12} />}{building ? 'Building…' : 'Generate PDF'}</button>
         <div className="v2-seg" role="group" aria-label="Editor layout">
           <button className={view === 'edit' ? 'on' : ''} onClick={() => setView('edit')} aria-pressed={view === 'edit'} title="Write only">Editor</button>
