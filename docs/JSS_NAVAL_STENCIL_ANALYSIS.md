@@ -66,7 +66,7 @@ the editor, numbers renumbered.
   "User Handbook / System Name", the `<<Project Name>> (xx) RESTRICTED` footer of the list stencils) were **not** compared one by one. Not completed.
 * **Look, not measured:** borders, positions on the page and fonts were compared by eye on the Land types' renders; for the Naval PDFs the text, order, page sizes, table heads and columns are
   asserted, but no raster comparison could be made here (no page rasteriser in this environment). The editor's on-screen look of the new types was not checked in a browser.
-* **Unresolved image warnings** (`Media/...`) appear in builds of a new project until the emblem, publisher logo or illustrations are uploaded under Settings > Branding, as for the Land types.
+* **Unresolved image warnings** (`Media/...`): since the owner's commit c4bc7bf (section 7) the emblem and the first-aid figures of a project that has none are the shipped stencil artwork, so only the author's own illustrations can still be unresolved until they are uploaded under Settings > Branding. (Read from the code, see section 7; not re-checked per Naval type.)
 * **Land Vol 1 / Vol 2** (separate Land types) are untouched.
 
 ## 5. Root causes found and fixed on the way
@@ -93,3 +93,21 @@ full-width tables and notices. How the Naval types meet it:
   force and keeps its order (`saveAncillaryChoices`, tested in `jss-naval.test.js`).
 * **A list in force that is an array replaces, it does not merge** (`applyJssFrontMatter`): the safety warning's lines and the page list are lists; spreading a list into an object would turn it into `{0:..., 1:...}`.
 * Not done: the Ancillary pages editor was not opened in a browser for a Naval project, and the playwright spec of the owner's commit (`frontend/e2e/jss-editor.spec.ts`) was not run (it needs the app and a browser).
+
+## 7. After the merge with the JSG / default-artwork / import-export commits (2026-11-25)
+
+The owner's commits c4bc7bf (JSG Word import and editors, default stencil artwork for every JSS book) and d727032 (import of a finished project package into a JSS document, export back as a package)
+met the Naval work. The text merge was clean; what was checked on the combined code:
+
+* **Default artwork** (`applyDefaultArtwork` in `publisher.ts`): a JSS project with no emblem, no Larsen & Toubro publisher logo or no first-aid figure of its own prints the pictures of the JSS-0251
+  stencils shipped in `vendor/pipeline/jss/artwork`. A file the project has always wins, so the Naval types keep the publisher logo they copy into the project (`Media/publisher-logo.png`, `NAVAL_PUBLISHER`).
+  The Naval list stencils have no first-aid page, so they print no first-aid figures; the Naval handbooks and Part IV print the JSS-0251 figures. **Assumed:** the pictures of the Naval stencils
+  were not compared with those of the Land stencil. If they differ, the project's own `Media` files override the defaults.
+* **Import / export of a project package** (`services/jss/rwi`): the importer reads the project's registry type (`maxDepth`, `id`, default book name), so it works for the Naval types as it does for
+  the Land ones. A package is a chapter-by-chapter body: into a type with **fixed chapters** (UHB, TM I-III, DS, MRLS, CES, SMT/STE) the imported chapters will not match the stencil's headings and the
+  document check reports it (`JSS-CHAPTERS`), as it should; it is meant for the types with the author's own chapters. Not exercised for a Naval type here; the package sample the owner's tests use
+  is not in this checkout, so four of its tests are skipped.
+* **Isolation baselines** (`jss-cover-isolation`): `legacy-jss-uhb` and `s1000d-via-jss` re-captured again, because default artwork is applied to both. With `applyDefaultArtwork` switched off all three builds gave
+  the previous values byte for byte; with it on the only differences are the `src` of the emblem, publisher-logo and first-aid pictures and the first-aid box height (115 mm to 145 mm). The direct S1000D engine did not move.
+* **Not run:** `pdfimages` (used by the owner's first artwork test to count the pictures in the PDF) is not installed here, so that one assertion could not run; the same test's `artwork/...` checks on the XSL-FO are
+  what the isolation probe above confirms.

@@ -139,3 +139,11 @@ They are listed so that nobody mistakes the changed S1000D-through-JSS and old-U
 The other two baselines (`legacy-jss-uhb`, `s1000d-via-jss`) were **re-captured on 2026-11-24**, because both run `jsstofo`. Shown to be the whole cause, not assumed: with exactly the four files above
 (the three stylesheets and `uhb.house.json`) put back to their content before the merge, all three builds gave the 2026-11-23 values again, byte for byte. The Naval parameters of the section above
 were in the tree for that measurement, so they too are shown to change none of the three builds.
+
+## Change made by the owner: default artwork (commit c4bc7bf, 2026-11-24; merged with the Naval work 2026-11-25)
+
+Not a stylesheet exception: `applyDefaultArtwork()` in `publisher.ts` supplies the emblem, the Larsen & Toubro logo and the first-aid figures (`vendor/pipeline/jss/artwork`, from the JSS-0251 stencil) to **every
+JSS book** (written in the editor, built from S1000D modules or imported) whose project has no such file in its `Media` folder, and never to the direct S1000D engine. It changes the XSL-FO of the two JSS
+paths in the isolation guard, so `legacy-jss-uhb` and `s1000d-via-jss` were **re-captured on 2026-11-25**. Shown to be the whole cause: with `applyDefaultArtwork` switched off, all three builds gave the previous
+values again, byte for byte; with it on, the only differences in the XSL-FO are the `src` of the emblem, publisher-logo and first-aid pictures (12 lines in the old JSS path, 8 in S1000D through JSS) and the
+first-aid box height (115 mm to 145 mm) in the old JSS path. `s1000d-direct` did not move.
