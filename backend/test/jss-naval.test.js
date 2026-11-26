@@ -115,7 +115,7 @@ test('the wizard offers the ten Naval stencils, all ready, from the same registr
   assert.deepEqual(types.filter((t) => t.domain === 'naval').map((t) => t.id), IDS, 'the registry is the only list');
   const land = f.domains.find((d) => d.id === 'land').manualTypes;
   assert.deepEqual(land.map((m) => m.id), types.filter((t) => t.domain === 'land').map((t) => t.id), 'Land is unchanged and comes from the same list');
-  assert.deepEqual(land.filter((m) => m.ready).map((m) => m.id), ['uhb', 'mm', 'orm']);
+  assert.deepEqual(land.filter((m) => m.ready).map((m) => m.id), land.map((m) => m.id), 'every Land type is ready too (test/jss-authoring.test.js builds them)');
 });
 
 test('the schema names exactly the registry types (so a new type cannot be added to one and forgotten in the other)', async () => {

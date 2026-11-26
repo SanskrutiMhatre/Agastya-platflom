@@ -36,7 +36,7 @@ import { listProjectSns } from './sns';
 
 const dbh = () => store.db;
 
-export const DEFAULT_ISSUE: IssueKey = '5-0';          // the wizard's existing default (settings.defaultIssue)
+export const DEFAULT_ISSUE: IssueKey = '4-2';          // the wizard's default (settings.defaultIssue)
 export const DEFAULT_LANGUAGE = 'en';
 export const DEFAULT_COUNTRY = 'IN';                    // EN-IN is the platform default (memory.md, phase 13)
 

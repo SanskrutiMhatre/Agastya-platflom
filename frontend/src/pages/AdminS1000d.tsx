@@ -27,7 +27,7 @@ function ImpactBody({ impact, verb }: { impact: Impact; verb: string }) {
 export function CatalogueSection() {
   const toast = useUi((s) => s.toast);
   const overview = useAsync(() => s1000dApi.overview(), []);
-  const [issue, setIssue] = useState<IssueKey>('5-0');
+  const [issue, setIssue] = useState<IssueKey>('4-2');
   const [kind, setKind] = useState<CodeKind>('infoCode');
   const cat = useAsync(() => s1000dApi.catalogue(issue, kind), [issue, kind]);
   const [q, setQ] = useState('');

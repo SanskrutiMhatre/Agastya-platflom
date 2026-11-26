@@ -12,12 +12,12 @@ import { jssTypesOf, type JssDocType } from './jss/registry';
 import { JSG_TYPES } from './jsg/registry';
 
 export type FormatId = 's1000d' | 'jss' | 'jsg';
-export interface ManualType { id: string; label: string; ready: boolean; /** The starting-outline profile (services/profiles) this type uses, when it has one. */ profile?: string; /** The JSS document type (services/jss/registry) a project of this type is authored as. */ jssType?: string; /** The JSG document type (services/jsg/registry) a project of this type is authored as. */ jsgType?: string; /** Why it cannot be created yet. */ notReady?: string }
+export interface ManualType { id: string; label: string; ready: boolean; /** A remark shown with the type (a JSS type the stencil set has no file for). */ note?: string; /** The starting-outline profile (services/profiles) this type uses, when it has one. */ profile?: string; /** The JSS document type (services/jss/registry) a project of this type is authored as. */ jssType?: string; /** The JSG document type (services/jsg/registry) a project of this type is authored as. */ jsgType?: string; /** Why it cannot be created yet. */ notReady?: string }
 export interface Domain { id: string; label: string; manualTypes: ManualType[] }
 export interface FormatInfo { id: FormatId; label: string; description: string; ready: boolean; domains: Domain[] }
 
 /** A JSS manual type of the wizard, taken from the registry: the registry (services/jss/registry) is the only list, so the wizard cannot offer what the engine does not have. */
-const jssManual = (t: JssDocType): ManualType => ({ id: t.id, label: t.label, ready: t.ready, notReady: t.notReady, jssType: t.id });
+const jssManual = (t: JssDocType): ManualType => ({ id: t.id, label: t.label, ready: t.ready, notReady: t.notReady, jssType: t.id, ...(t.derivedFrom ? { note: t.derivedFrom } : {}) });   // a type the stencil set has no file for says so
 
 export const FORMATS: FormatInfo[] = [
   { id: 's1000d', label: 'S1000D', description: 'Data modules written to the S1000D standard.', ready: true, domains: [] },

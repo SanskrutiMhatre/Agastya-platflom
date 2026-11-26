@@ -40,10 +40,10 @@ const state = () => page.getByTestId('jss-state');
 const tab = (name: string) => page.getByRole('tab', { name, exact: true }).click();
 const saved = async () => (await (await api.get(`${U}/jss`)).json());
 
-test('the catalogue offers the 14 stencil types: three ready, and the rest explained', async () => {
+test('the catalogue offers the 18 types of the JSS catalogue, all ready', async () => {
   const types = (await (await api.get('/api/formats')).json()).formats.find((f: any) => f.id === 'jss').domains.find((d: any) => d.id === 'land').manualTypes;
-  expect(types).toHaveLength(14); expect(types.filter((t: any) => t.ready).map((t: any) => t.id)).toEqual(['uhb', 'mm', 'orm']);
-  for (const t of types.filter((x: any) => !x.ready)) expect(t.notReady.length).toBeGreaterThan(20);
+  expect(types).toHaveLength(18); expect(types.filter((t: any) => !t.ready)).toEqual([]);
+  expect(types.map((t: any) => t.id)).toEqual(expect.arrayContaining(['tm-pi', 'tm-pi-vol-2', 'vol-1-pl', 'vol-2-illustrations', 'ces', 'fis', 'bis']));
 });
 
 test('opening a JSS project opens the JSS editor, with the stencil chapters locked and the outline beside the sheet', async () => {

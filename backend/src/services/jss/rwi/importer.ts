@@ -7,6 +7,7 @@
 import fs from 'fs';
 import path from 'path';
 import { projectDirFor } from '../../../context';
+import { assertNativeJssXml, nativeProblemOfProject } from '../native';
 import { bad } from '../../http';
 import { placeholderPng } from '../../importer/png';
 import { authoredMeta, isJssAuthored, jssTypeOfProject, readSource, writeSource, type JssReport } from '../service';
@@ -67,7 +68,14 @@ export async function importRwiProject(projectId: string, zipFile: string): Prom
     }
     const before = path.join(dir, 'publication.xml');
     if (fs.existsSync(before)) fs.copyFileSync(before, path.join(dir, 'publication.before-import.bak'));
+    assertNativeJssXml(xml);                                       // what is about to be written is the JSS document ...
     const saved = await writeSource(projectId, xml);
+    const damaged = nativeProblemOfProject(projectId);             // ... and what is on disk afterwards is too; if not, the previous document comes back
+    if (damaged) {
+      const bak = path.join(dir, 'publication.before-import.bak');
+      if (fs.existsSync(bak)) fs.copyFileSync(bak, before);
+      throw bad(`The import was undone: ${damaged}`, 'NOT_NATIVE_JSS');
+    }
 
     // the source record
     const counts = emptyCounts();

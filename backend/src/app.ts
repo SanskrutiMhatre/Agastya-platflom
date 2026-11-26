@@ -20,6 +20,7 @@ import { registerPackageRoutes } from './routes/packages';
 import { registerLifecycleRoutes } from './routes/lifecycle';
 import { registerExtensionRoutes } from './routes/extensions';
 import { registerImporterRoutes } from './routes/importer';
+import { registerJssGuard } from './routes/jss-guard';
 import { registerSnsRoutes } from './routes/sns';
 import { registerJssdmRoutes } from './routes/jssdm';
 import { registerJssRoutes } from './routes/jss';
@@ -69,6 +70,7 @@ export function createApp(): express.Express {
     onProjectDecided: () => undefined,
     onAccess: notifyAccess,
   });
+  registerJssGuard(app);                 // before every S1000D-side writer: a JSS document project's publication.xml is never replaced by them
   registerWorkspaceRoutes(app);
   registerProjectContentRoutes(app);
   registerTeamRoutes(app);

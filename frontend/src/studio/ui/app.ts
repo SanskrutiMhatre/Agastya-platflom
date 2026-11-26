@@ -41,7 +41,7 @@ export interface Settings {
 
 const DEFAULT_SETTINGS: Settings = {
   defaultView: 'design', theme: 'system', liveValidation: true, liveXsd: true, liveBrex: true, spellcheck: true, syncSelection: true,
-  splitTags: false, drafts: true, declareEntitiesOnSave: true, defaultNotation: 'png', defaultIssue: '5-0', xmlCommitDelay: 500, zoom: 1,
+  splitTags: false, drafts: true, declareEntitiesOnSave: true, defaultNotation: 'png', defaultIssue: '4-2', xmlCommitDelay: 500, zoom: 1,
   modelIdentCode: '', enterpriseCode: '', enterpriseName: '', language: 'en', country: 'US',
 };
 

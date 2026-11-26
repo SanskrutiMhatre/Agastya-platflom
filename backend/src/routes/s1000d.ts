@@ -41,7 +41,7 @@ export function registerS1000dRoutes(app: Express): void {
 
   // ── Read: catalogues and presets ────────────────────────────────────────
   app.get('/api/s1000d/catalogue', requireAuth(), wrap((req, res) => {
-    const issue = issueParam(req.query.issue ?? '5-0');
+    const issue = issueParam(req.query.issue ?? '4-2');
     const kind = kindParam(req.query.kind ?? 'infoCode');
     res.json({
       issue, issueLabel: REF.ISSUE_LABEL[issue], kind, rule: REF.KIND_RULE[kind].rule, label: REF.KIND_RULE[kind].label,

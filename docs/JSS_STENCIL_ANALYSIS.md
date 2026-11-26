@@ -178,4 +178,30 @@ Method (`backend/test/jss-stencil-corrections.test.js`, reading the Word files):
 
 **Not built:** UHB2, TM_PI, DS, TOTE_and_CS, PRS (chapter manuals); parts-list, illustrations and single-table bodies (Vol_1_PL, Vol_2_Illustrations, MPL, ISPL, ISPL_wrt_JSS, MRLS, ROTABLE).
 
-**Naval (2026-11-24):** the ten Naval types (User Handbook, TM Parts I-IV, Design Specification, MRLS, Complete Equipment Schedule, List of SMT / STE) are built; see `JSS_NAVAL_STENCIL_ANALYSIS.md`. The Land-folder stencils listed above as "not built" are still not built.
+**Naval (2026-11-24):** the ten Naval types (User Handbook, TM Parts I-IV, Design Specification, MRLS, Complete Equipment Schedule, List of SMT / STE) are built; see `JSS_NAVAL_STENCIL_ANALYSIS.md`. The Land types listed above as "not built" were built afterwards (2026-11-25): see section 7.
+
+## 7. Every type is ready (2026-11-25)
+
+All 14 stencil types and three more are now offered in the wizard (Land), validate, and build to PDF. The outlines are read from each stencil's Word file (headings by style, tables by
+their head row and caption) and live in `backend/src/services/jss/registry.ts`; a new document starts with the stencil's own headings **and tables** (heads and a few empty rows, widths
+from the stencil's grid), and sections the stencil sets landscape (Vol 1, Vol 2, ISPL, the rotable list) carry `orientation="landscape"`.
+
+| Type | Stencil | Chapters (top level) |
+|---|---|---|
+| UHB, MM, ORM | UHB.docx, MM.docx, ORM.docx | as before |
+| UHB (variant 2) | UHB2.docx | the 7 UHB chapters; chapter 1 has Dimensions and Weight, Electrical / Environmental Specifications, Ship Services; INBR cover |
+| TM Part I Volume 1 Technical Information | TM_PI.docx | Brief Technical Specifications; Brief Principles of Operation; Detailed Circuit Theory; Drawings / Documents |
+| Design Specification | DS.docx | General Information; Detailed Technical Specifications; Conditions of Use; Description of Tests |
+| Table of Tools and Equipment and Carried Spares | TOTE_and_CS.docx | one chapter: List of Tools; Spares and Spare Box |
+| Permissive Repair Schedule | PRS.docx | one chapter: Importance of Permissive Repair; the 6-column schedule |
+| MRLS | MRLS.docx | one chapter holding the 6-column list |
+| Rotable List | ROTABLE.docx | one chapter, one landscape 7-column table |
+| TM Part IV Vol 1 Parts List | Vol_1_PL.docx | one chapter per subsystem family; an assembly (landscape) with the 10-column parts table |
+| TM Part IV Vol 2 Illustrations | Vol_2_Illustrations.docx | the same chapters; an assembly (landscape) for its figure |
+| ISPL, ISPL (JSS cross-referenced) | ISPL.docx, ISPL_wrt_JSS.docx | Mechanical; Electronics and Electrical; Miscellaneous - an assembly each, landscape, with the parts table |
+| **TM Part I Volume 2 Drawings** | *no file* (chapter 4 of TM_PI + landscape pages of Vol_2_Illustrations) | one chapter per subsystem family: List of Drawings, then a landscape section per drawing |
+| **Complete Equipment Schedule**, **Field Inspection Standard**, **Base Inspection Standard** | *no file in the stencil set* | built on the shared frame and the body of the nearest stencils (PRS, TOTE_and_CS); marked `source: derived` and shown with a note in the wizard. Their outlines are placeholders until the owner supplies the stencils |
+
+Front-matter wording follows each stencil: the Foreword's postal address (G Building / Defence Engineering Block / Defence Engineering Building, "&" or "and"), the notice legends
+("Denotes" / "Denote"), and whether the System Name or the Cautions / Notes page is present. Known limits: ISPL_wrt_JSS differs from ISPL only by live cross-references in the
+chapter index (still plain text here); a landscape body starts its chapter on a portrait page; the three derived types need their real stencils.

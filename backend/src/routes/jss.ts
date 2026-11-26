@@ -26,7 +26,7 @@ import { JSS_XSD, isJssAuthored, jssTypeOfProject, readSource, writeSource, vali
 
 export function registerJssRoutes(app: Express): void {
   app.get('/api/jss/types', requireAuth(), wrap((_req, res) => {
-    res.json({ types: JSS_TYPES.map((t) => ({ id: t.id, label: t.label, stencil: t.stencil, domain: t.domain, bodyKind: t.bodyKind, ready: t.ready, notReady: t.notReady, chapters: (t.chapters ?? []).map((c) => c.title), maxDepth: t.maxDepth })) });
+    res.json({ types: JSS_TYPES.map((t) => ({ id: t.id, label: t.label, stencil: t.stencil, domain: t.domain, bodyKind: t.bodyKind, ready: t.ready, notReady: t.notReady, source: t.source ?? 'stencil', derivedFrom: t.derivedFrom, chapters: (t.chapters ?? []).map((c) => c.title), maxDepth: t.maxDepth })) });
   }));
   app.get('/api/jss/schema', requireAuth(), wrap((_req, res) => { res.type('application/xml').send(fs.readFileSync(JSS_XSD, 'utf8')); }));
 
