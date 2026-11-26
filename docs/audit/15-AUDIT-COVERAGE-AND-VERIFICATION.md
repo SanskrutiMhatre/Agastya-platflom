@@ -195,6 +195,8 @@ Written after the owner's scoped fix and the Phase 2 brief (`16-ADDENDUM-POST-AU
 
 **Update to open unknown 5 (Chrome tab crash):** reproduced on 2026-11-27 in five places with Chrome stable on the audit host; **Edge ran the same 133 tests green except one stale assertion**, which confirms the audit's note that Edge is unaffected and makes Edge the practical reference browser for any regression baseline (decision D18). The cause on Chrome is still unknown.
 
+**Addendum 17 (production architecture positions, 2026-11-27)** is a design proposal built from the evidence already in reports 03, 04, 09, 10, 12 and 13; nothing new was run or measured. Its seven findings (PRD-001 to PRD-007) are all RECOMMENDATION, and its production targets are assumed defaults, not customer facts (`17` section 2 and section 6).
+
 Side effects of this addendum on the repository: the application files changed by the scoped fix (listed in `16` section 2.1), the new `docs/audit/16-*.md` and `docs/audit/baseline/`, regenerated `14`, small status notes under UX-001, UX-011, UX-013, FE-002 and FE-009, and the updated `README.md`, `15` and `docs/CROSS_ENGINE_ARCHITECTURE.md`. Test runs wrote only into git-ignored result folders. No port 4040/4041 and no `workspace\` access; two overlapping test runners were started by mistake early on, their output was discarded and the numbers above come from single runners.
 
 **Conclusion on completeness.** Every top-level area and every second-level module is accounted for in the tables above. The audit is **broad and deep on code structure, security, data, deployment design and UX, and measured where it states numbers, but it is partial** in the areas listed in section D. It must not be read as a certification of the product.

@@ -2,7 +2,7 @@
 
 **Status.** Audit deliverable. **Nothing in this roadmap is approved or started.** It is a proposal for the owner to review; no application code, schema, dependency or installer has been changed by the audit. Implementation starts only after the owner has reviewed the complete audit and approves a phase.
 
-**How it was built.** The 322 findings of the twelve audit areas and of the addendum of report 16 (register in section 10) were grouped by root cause into 36 work packages (WP). Several agents found the same defect independently; those findings are merged into one package instead of being scheduled separately (section 7). Every finding is assigned to exactly one package (checked by script; section 10 lists the assignment). Priorities and effort bands come from the finding owners; a package inherits the highest priority among its findings. Evidence labels are the audit labels (VERIFIED / OBSERVED / SUSPECTED / RECOMMENDATION / NOT VERIFIED); the label of each finding is in the section-10 register.
+**How it was built.** The 329 findings of the twelve audit areas and of the addenda of reports 16 and 17 (register in section 10) were grouped by root cause into 37 work packages (WP). Several agents found the same defect independently; those findings are merged into one package instead of being scheduled separately (section 7). Every finding is assigned to exactly one package (checked by script; section 10 lists the assignment). Priorities and effort bands come from the finding owners; a package inherits the highest priority among its findings. Evidence labels are the audit labels (VERIFIED / OBSERVED / SUSPECTED / RECOMMENDATION / NOT VERIFIED); the label of each finding is in the section-10 register.
 
 ## 1. Reading guide
 
@@ -16,9 +16,9 @@
 | Class | **Mandatory**: required for a production-grade release of the product as requested (offline, one-click, two deployment modes). **Mandatory for Mode B / for enterprise**: required only when that deployment or buyer profile is in scope. **Recommended**: clear benefit, evidenced, not a release blocker. **Enterprise, customer-driven**: build when a customer requires it. **Optional**: only on demand |
 | Gate IDs (G-SEC-n, G-REL-n, ...) | The measurable production-readiness gates of `12-ENTERPRISE-READINESS.md` section 8; the acceptance criteria below refer to them |
 
-**Status since the audit (2026-11-27, report 16 section 2).** At the owner's explicit request, after the audit, a scoped fix was made that is not an audit phase: UX-001 and FE-009 (the JSS Publication page ending in "Internal error") are **resolved** and stay in WP-07 only as closed items; FE-002 (unsaved work lost on navigation) is **partly mitigated** on four surfaces and the rest is GAP-001 in WP-05. Findings and packages added by report 16 (GAP, UID and CLN findings; WP-34 to WP-36; decisions D16 to D20) are marked in the register by their report. Nothing else has changed state: no audit phase is approved or started.
+**Status since the audit (2026-11-27, report 16 section 2).** At the owner's explicit request, after the audit, a scoped fix was made that is not an audit phase: UX-001 and FE-009 (the JSS Publication page ending in "Internal error") are **resolved** and stay in WP-07 only as closed items; FE-002 (unsaved work lost on navigation) is **partly mitigated** on four surfaces and the rest is GAP-001 in WP-05. Findings and packages added by report 16 (GAP, UID and CLN findings; WP-34 to WP-36; decisions D16 to D20) are marked in the register by their report. Report 17 (production architecture positions, 2026-11-27) adds findings PRD-001 to PRD-007, WP-37 and decisions D21 to D23, and changes eight existing packages; its figures are assumed defaults that the owner can overrule. Nothing else has changed state: no audit phase is approved or started.
 
-Package IDs are stable labels, not an order: WP-32 and WP-33 were added after the performance measurements arrived and sit in phases 1A and 3; WP-34 to WP-36 were added by the addendum of report 16 (the Phase 2 brief of the owner) and sit in phases 5 and 6. The order of work is the phase, then the dependencies in each package.
+Package IDs are stable labels, not an order: WP-32 and WP-33 were added after the performance measurements arrived and sit in phases 1A and 3; WP-37 was added by the addendum of report 17 (phase 8, conditional); WP-34 to WP-36 were added by the addendum of report 16 (the Phase 2 brief of the owner) and sit in phases 5 and 6. The order of work is the phase, then the dependencies in each package.
 
 The per-package fields cover what the master prompt asks of every roadmap item: unique ID, category, problem and current implementation, evidence (finding IDs with their reports), recommended solution, expected outcome, priority, complexity, dependencies, risks, acceptance criteria and test cases. The "Problem and current implementation" paragraph states what the code does today and why that is a problem; the underlying evidence (file and line, probe output) is in the cited finding, searchable by ID in the report named in the register.
 
@@ -49,7 +49,7 @@ The effort-ordered list in `12-ENTERPRISE-READINESS.md` section 9 ranks items by
 | 5 | Design system and dark/light themes | WP-19, WP-20, WP-34 | P1 | One generated token set, two first-class themes, zero hard-coded colours outside tokens, contrast and per-theme visual regression in the gate. The baseline diff gate (WP-34) is in place and the browser suite runs to the end (GAP-007). |
 | 6 | UI/UX redesign and workflow improvements | WP-21, WP-22, WP-23, WP-35, WP-36 | P1 | One editor host contract; project home; one problems model; WCAG 2.2 AA gate green on the ten named routes; keyboard-only completion of the five core tasks. Every screen on the tokens in both themes; the checklist of report 16 section 5.4 signed; the cleanup verified and approved separately. |
 | 7 | Mode A: the standalone one-click product | WP-24, WP-25 | P1 | Signed Product-Standalone-Setup.exe and Product-Offline-Update verified on clean no-NIC VMs: install, upgrade, rollback, uninstall, repair, air-gapped workflow. |
-| 8 | Mode B: client-server | WP-26, WP-27, WP-28 | P1 | Signed Client-Setup and Server-Offline-Setup; N concurrent authors without silent overwrite; TLS only on non-loopback; central backup and restore drill passed. |
+| 8 | Mode B: client-server | WP-26, WP-27, WP-28, WP-37 | P1 | Signed Client-Setup and Server-Offline-Setup; N concurrent authors without silent overwrite; TLS only on non-loopback; central backup and restore drill passed; if WP-37 is built, the contract suite and the multi-user acceptance pass on PostgreSQL as well. |
 | 9 | Enterprise administration, audit and operations | WP-29 | P1 | Audit chain verifiable offline; support bundle; readiness endpoint; retention jobs; documented operations runbooks. |
 | 10 | Final QA, security verification, benchmarking, release | WP-30, WP-31 | P1 | Every gate PASS or an owner-signed waiver; independent penetration test; release notes with SBOM and signatures. |
 
@@ -78,6 +78,7 @@ Dependencies are listed per package. The chains that decide the schedule are:
 5. **UI chain:** WP-05 (data-loss fixes and the host contract basics) -> WP-19 (tokens, themes) -> WP-21 (unified editor chrome) -> WP-22 (navigation, project home, review).
 
 7. **Phase 2 chain (the owner's UI redesign and cleanup brief):** WP-08 (a suite that runs to the end, GAP-007) -> WP-34 (feature-preservation baseline) -> WP-19 (tokens and components) -> WP-21 and WP-22 (editor chrome, navigation) -> WP-35 (remaining screens, in batches) -> WP-36 (cleanup after regression sign-off). Decisions D16 to D20 gate it.
+8. **Mode B data tier chain (addendum 17):** WP-10 (a dialect-clean storage seam, contract suite) -> WP-37 (PostgreSQL adapter, conditional on D21) -> WP-28 (multi-user acceptance on the engine the customer chose).
 6. **Document-engine chain:** WP-32 (validation truthfulness and stop-gap, phase 1A) -> WP-14 (job service) -> WP-17 (backend performance); WP-08 (golden-output and PDF regression gate) -> WP-33 (FO-stage stylesheet).
 
 Packages with no dependency can start in parallel: in phase 1A all 8; WP-19 (token migration behind a report-only lint) can begin while phase 2 runs because it does not touch the server.
@@ -88,7 +89,7 @@ Packages with no dependency can start in parallel: in phase 1A all 8; WP-19 (tok
 |---|---|---|---|---|
 | D1 | Runtime baseline: move the bundled runtime to the current LTS line, or keep Node 22 until its end of security support (2027-04-30) | WP-13 (phase 2) | ENT-008, DEP-018 | Move to a supported LTS and re-baseline; keep `node:sqlite` behind the storage seam so a change of driver stays local |
 | D2 | Compatibility window for mandatory `baseHash` on writes (clients that omit it today) | WP-11 | DEP-016, PLT-020, FE-008 | One release with a logged warning, then reject; first confirm that no other client (scripts, the cross-engine tools) writes without it |
-| D3 | Supported scale: concurrent authors, projects, modules per project, workspace size | WP-28, G-PERF-4 | ENT-016, DEP-016 | State a figure and test at 2x; the single SQLite writer and single Node process bound the design (RES-002 lists the switch criteria) |
+| D3 | Supported scale: concurrent authors, projects, modules per project, workspace size | WP-28, G-PERF-4 | ENT-016, DEP-016 | **Assumed (addendum 17, section 2): Mode A one author; Mode B team tier 25 concurrent authors (100 named users), 100 projects, up to 5,000 modules validated and 2,000 published per project; acceptance test at 2x = 50 scripted authors.** Test at 2x; the single SQLite writer and single Node process bound the design (D21 and RES-002 list the switch criteria) |
 | D4 | Signing certificate: organisation CA, purchased code-signing certificate, or both | WP-24 | DEP-003, ENT-014 | Follow the workflow in `docs/SIGNING.md` after it is corrected for current public-CA rules; timestamp every signature |
 | D5 | Is directory sign-on (LDAPS first) required by a customer? | WP-27 | ENT-005, DEP-015 | Only when a customer needs it; build the `AuthProvider` seam in WP-10 regardless |
 | D6 | Is an MSI / GPO / SCCM package required? | WP-31, WP-24 | DEP-014, RES-012 | Optional: the Inno Setup silent switches cover Intune/SCCM script deployment; MSI only on demand |
@@ -106,6 +107,9 @@ Packages with no dependency can start in parallel: in phase 1A all 8; WP-19 (tok
 | D18 | Reference browser for the interface and for its tests: the suite uses Chrome stable by default, whose tab crashes in the Studio on the audit host (Edge does not); Mode A is meant to run in WebView2 | WP-08, WP-34 | UX-011, GAP-007 | Take Edge/WebView2 as the reference (the whole suite was green on Edge on 2026-11-27: 132 of 133, one stale test), track the Chrome crash as UX-011, and accept no screen batch until the suite runs to the end on the reference browser |
 | D19 | Scope of the cleanup: the front-end register of 16 section 6 and the dead-route list of D8, approved together, after the regression sign-off | WP-36, WP-13 | CLN-001 to CLN-004, ARC-013, FE-018 | Approve item by item; nothing is deleted before the baseline diff passes |
 | D20 | Visual direction for the redesign (the brief names Linear, Figma, JetBrains, VS Code) and approval of the mockups before screen work | WP-35, WP-19 | DS-001, 07 | The owner reviews the mockups in both themes and says what to change; the screens without a design (16 section 8.2) are designed after that, not before |
+| D21 | Mode B Enterprise database: SQLite only, a PostgreSQL adapter built now, or a PostgreSQL adapter built when a trigger fires | WP-10, WP-37 | PRD-002, ENT-016, RES-002 | **Assumed: build the dialect-clean seam in WP-10 now; build the adapter (WP-37) only when a trigger fires** (p95 write latency above 200 ms or event-loop lag above 100 ms under the stated load, more than one server host, point-in-time recovery required, or a mandated corporate database). If the owner already knows a customer needs high availability or more than 50 concurrent authors, move WP-37 to the start of phase 8 |
+| D22 | Lock granularity for JSS and JSG, which are one document per project: whole document, or per chapter (JSS) and per section (JSG) | WP-11 | PUB-010, ENT-016, PRD-003 | **Assumed: per chapter / per section**, merged under a short document write lock with a per-part hash check; whole-document lease only as the fallback |
+| D23 | Optional connected services (update check, signed update download, support-bundle upload): never, on demand, or built | WP-31 | PRD-006 | **Assumed: on demand only**, off by default, opt-in per customer, allow-listed host, signed responses; the offline routes stay the primary ones |
 
 ## 6. Work packages
 
@@ -383,13 +387,13 @@ Each package lists its findings as `ID (priority, evidence label)`. The full tex
 
 **Problem and current implementation.** Import-time singletons (74 importers) with no `Config`, `Storage` or `Auth` seam; process-local state; an 8-module runtime cycle closed by lazy `require()`; SQL outside the store.
 
-**Recommended solution.** Typed `Config` built once; `AppContext` injected; `ContentStore`, `SessionStore`/limiter store and `AuthProvider` interfaces with today's implementations as defaults; migrate service by service behind a compatibility export; do not interface the 109-method `AuthStore` until a second engine is real.
+**Recommended solution.** Typed `Config` built once; `AppContext` injected; `ContentStore`, `SessionStore`/limiter store and `AuthProvider` interfaces with today's implementations as defaults; migrate service by service behind a compatibility export; do not interface the 109-method `AuthStore` until a second engine is real; make the storage seam **dialect-clean** (addendum 17, PRD-002): every query lives in a repository behind an interface, migrations are engine-neutral files, no direct SQL outside repositories (about 51 `dbh()` call sites and five services bypass the store today), and one contract test suite runs against any engine, so a PostgreSQL adapter (WP-37) is a contained job.
 
 **Expected outcome.** Services testable in isolation; the same code serves Mode A and Mode B; restart-safe state.
 
 **Risks.** Large mechanical diff; do it behind the gate of WP-08, one service per change.
 
-**Acceptance criteria.** No module reads `process.env` outside config; cycle count 0; tests can construct an isolated context.
+**Acceptance criteria.** No module reads `process.env` outside config; cycle count 0; tests can construct an isolated context; a grep test fails on SQL outside the repositories and a contract test suite runs against the SQLite implementation (PRD-002).
 
 **Test cases.** Existing suites unchanged + isolated-context unit tests.
 
@@ -408,11 +412,11 @@ Each package lists its findings as `ID (priority, evidence label)`. The full tex
 
 **Problem and current implementation.** DM and project files are written in place (no tmp+rename+fsync) and the revision is cut after the write; JSS/JSG books are one overwritten file with no history; `baseHash` is optional, the DM "lock" only freezes non-owners, CIR/PMC/ancillary/settings have no guard (last write wins, VERIFIED); uploads are buffered in memory; builds write intermediates into the project folder.
 
-**Recommended solution.** One `ProjectFiles` write path: temp file + fsync + rename, revision cut in the same step; revision history for JSS/JSG; mandatory `baseHash` on every write route (409 with the server version); per-user check-out lease with expiry for DM, JSS book/chapter and JSG document (RES-001: hash guard + lease, not CRDT/OT); streaming uploads with caps; derived files out of the project folder (job directories, WP-15).
+**Recommended solution.** One `ProjectFiles` write path: temp file + fsync + rename, revision cut in the same step; revision history for JSS/JSG; mandatory `baseHash` on every write route (409 with the server version); per-user check-out lease with expiry for DM, and **per chapter (JSS) and per section (JSG) rather than per whole document** (decision D22: the server merges a chapter or section into the document under a short document write lock and refuses if the hash of that part changed) (RES-001: hash guard + lease, not CRDT/OT); streaming uploads with caps; derived files out of the project folder (job directories, WP-15).
 
 **Expected outcome.** No silent overwrite, no torn file, history for all three formats; the multi-author model Mode B needs.
 
-**Risks.** Behaviour change for API clients that omit `baseHash` (ship a compatibility window with a logged warning); whole-file JSS/JSG locking is coarse (PUB-010) — evaluate chapter-level files later.
+**Risks.** Behaviour change for API clients that omit `baseHash` (ship a compatibility window with a logged warning); whole-file JSS/JSG locking is coarse (PUB-010), which D22 addresses with part-level leases; a JSS or JSG document also carries cross-chapter data (identity record, numbering, front matter), so the part merge must be tested on exactly those.
 
 **Acceptance criteria.** G-REL-2 (n=100 kill points, 0 torn files) and G-REL-4 (0 silent overwrites over 1,000 saves per case) PASS.
 
@@ -481,17 +485,17 @@ Each package lists its findings as `ID (priority, evidence label)`. The full tex
 | Complexity | XL |
 | Class | Mandatory |
 | Dependencies | WP-11, WP-10, WP-32 |
-| Findings covered | 14: `PERF-001 (P0, VERIFIED)`, `PUB-027 (P1, RECOMMENDATION)`, `PUB-003 (P1, VERIFIED)`, `PUB-004 (P1, VERIFIED)`, `PUB-005 (P1, VERIFIED)`, `PUB-006 (P1, VERIFIED)`, `DEP-028 (P1, VERIFIED)`, `PERF-008 (P1, VERIFIED)`, `PERF-012 (P2, VERIFIED)`, `PERF-015 (P3, OBSERVED)`, `PUB-031 (P2, SUSPECTED)`, `PUB-019 (P2, VERIFIED)`, `FE-010 (P2, OBSERVED)`, `FE-028 (P2, VERIFIED)` |
+| Findings covered | 15: `PERF-001 (P0, VERIFIED)`, `PUB-027 (P1, RECOMMENDATION)`, `PUB-003 (P1, VERIFIED)`, `PUB-004 (P1, VERIFIED)`, `PUB-005 (P1, VERIFIED)`, `PUB-006 (P1, VERIFIED)`, `DEP-028 (P1, VERIFIED)`, `PERF-008 (P1, VERIFIED)`, `PERF-012 (P2, VERIFIED)`, `PERF-015 (P3, OBSERVED)`, `PUB-031 (P2, SUSPECTED)`, `PUB-019 (P2, VERIFIED)`, `FE-010 (P2, OBSERVED)`, `FE-028 (P2, VERIFIED)`, `PRD-001 (P1, RECOMMENDATION)` |
 
 **Problem and current implementation.** Node serves every request on one thread, and the whole validation pipeline, the BREX checker and the publication gate (which every publish runs first) are synchronous CPU or file loops inside the HTTP handler: measured stalls of 2.0 s at 200 modules, 6.9 s at 500, 81 s for the 1000-module gate and 168 s for one 1 MB module under BREX, during which no other user is served (PERF-001, VERIFIED). A build is one synchronous request: no deadline, no cancel, no queue, no stored report, no archive; one FOP JVM serves the whole server, grows from 95 to 756 MB, never shrinks, leaks an exit listener and serialises three simultaneous publishes (PERF-008); a suspended FOP JVM blocked every publish for two users while health stayed green (DEP-028, VERIFIED); `GET /publish/download` can start a full build inside a GET (PERF-015); unchanged content is re-validated and re-rendered every time (PERF-012); a release stores only a hash that ignores Media, template and brand; warnings and missing images never reach the user; unresolved native crashes.
 
-**Recommended solution.** Job table (state, log rows, report, input hash) + a small pool of worker processes or `worker_threads` (cores - 1, minimum 1; 2 FOP slots) with a reduced environment + per-job directories + `runTool` with deadline and kill-tree + validation, BREX, applicability, id/ICN scans and the gate as one-module units of work cached by (content hash, BREX chain hash, schema issue) + admission control (one or two validation jobs server-wide, the rest queued) + a FOP pool with restart, heap limits and listener fix + build report returned and stored + release archive (PDF + fingerprint inputs) + cache by input hash with an "up to date" answer for unchanged content + WebSocket progress with replay; `GET /publish/download` serves an existing artefact and never builds; keep the blocking route as a compatibility wrapper. The design and the incremental migration steps are in the engines part of 03-ARCHITECTURE-AUDIT.md (sections 5 and 7).
+**Recommended solution.** Job table (state, log rows, report, input hash) + a small pool of worker processes or `worker_threads` (cores - 1, minimum 1; 2 FOP slots) with a reduced environment + per-job directories + `runTool` with deadline and kill-tree + validation, BREX, applicability, id/ICN scans and the gate as one-module units of work cached by (content hash, BREX chain hash, schema issue) + admission control (one or two validation jobs server-wide, the rest queued) + a FOP pool with restart, heap limits and listener fix + build report returned and stored + release archive (PDF + fingerprint inputs) + cache by input hash with an "up to date" answer for unchanged content + WebSocket progress with replay; `GET /publish/download` serves an existing artefact and never builds; keep the blocking route as a compatibility wrapper; **start every worker and the FOP JVM inside a Windows job object** (per-process and per-job memory limit, CPU rate cap, active-process limit, kill-on-close) with a supervisor that restarts a crashed worker and fails only its job, and call every document engine through one interface so it can be moved out of the process later (addendum 17, PRD-001). The design and the incremental migration steps are in the engines part of 03-ARCHITECTURE-AUDIT.md (sections 5 and 7).
 
 **Expected outcome.** One hung build is a failed job, not an outage; releases are reproducible and auditable.
 
 **Risks.** Memory budget per slot (one FOP build peaked near 480 MB per 03, and the JVM reached 756 MB over repeated builds per 04; re-measure on the chosen runtime); Windows kill-tree behaviour; workers must resolve `vendor/` in the packaged layout; the JSON report (findings and their order) must stay identical to today on the existing fixtures; tests that call services in-process need a synchronous fallback; keep the vendor-exception discipline and the golden tests as the guard.
 
-**Acceptance criteria.** A suspended JVM fails only its job within the deadline and the next build succeeds (DEP-028 re-run); cancel works; `GET /jobs/:id` replays progress after reconnect; while a 200-module BREX validation runs, `/api/health` and `/api/auth/me` have p99 below 100 ms and the 1000-module validation shows event-loop max below 100 ms (B8, T1, T2); a second validation of an unchanged project takes at most 20% of the first; killing a worker mid-job returns a clear error and the next job works; the JVM working set stays under the configured cap over 100 builds (T15).
+**Acceptance criteria.** A suspended JVM fails only its job within the deadline and the next build succeeds (DEP-028 re-run); cancel works; `GET /jobs/:id` replays progress after reconnect; while a 200-module BREX validation runs, `/api/health` and `/api/auth/me` have p99 below 100 ms and the 1000-module validation shows event-loop max below 100 ms (B8, T1, T2); a second validation of an unchanged project takes at most 20% of the first; killing a worker mid-job returns a clear error and the next job works; the JVM working set stays under the configured cap over 100 builds (T15); a worker that exceeds its limit is terminated by the operating system and only its job fails; killing the server leaves no orphan `java.exe` (PRD-001).
 
 **Test cases.** Hang simulation, cancel, parallel-build, restart-during-build, report content, cache hit/miss; event-loop delay during validation at 200 and 1000 modules with a second client polling health every 20 ms and a third saving a module every second; worker killed; job timeout; 100 consecutive builds with listener-warning and JVM-growth checks (B5, B8).
 
@@ -712,11 +716,11 @@ Each package lists its findings as `ID (priority, evidence label)`. The full tex
 | Complexity | XL |
 | Class | Recommended (core to the requested UI outcome) |
 | Dependencies | WP-05, WP-19 |
-| Findings covered | 8: `UX-003 (P1, VERIFIED)`, `UX-002 (P1, VERIFIED)`, `UX-017 (P2, VERIFIED)`, `UX-012 (P2, VERIFIED)`, `UX-020 (P2, VERIFIED)`, `FE-021 (P2, OBSERVED)`, `FE-025 (P2, OBSERVED)`, `GAP-004 (P2, VERIFIED)` |
+| Findings covered | 9: `UX-003 (P1, VERIFIED)`, `UX-002 (P1, VERIFIED)`, `UX-017 (P2, VERIFIED)`, `UX-012 (P2, VERIFIED)`, `UX-020 (P2, VERIFIED)`, `FE-021 (P2, OBSERVED)`, `FE-025 (P2, OBSERVED)`, `PRD-004 (P2, RECOMMENDATION)`, `GAP-004 (P2, VERIFIED)` |
 
 **Problem and current implementation.** Three editors behave as three products (headers, save vocabularies, shortcuts; JSS has no find or palette); the editing surface is 29% of a 1366x768 screen; the shell re-implements dirty/save/session per editor.
 
-**Recommended solution.** One `useEditorHost` contract (dirty, save, session, shortcuts, drafts) and one workspace shell with three document adapters; collapsible panels, command palette, find/replace for JSS; the editor layout of 06 section 7 and mockups/editor.html; keep the framework-free editors, unify their chrome.
+**Recommended solution.** One `useEditorHost` contract (dirty, save, session, shortcuts, drafts) and one workspace shell with three document adapters; collapsible panels, command palette, find/replace for JSS; the editor layout of 06 section 7 and mockups/editor.html; keep the framework-free editors, unify their chrome; the host contract carries one **conflict comparison** dialog (server version against the author version, per-change selection for non-overlapping changes, validation before save; addendum 17, PRD-004).
 
 **Expected outcome.** The editing area is the primary focus; behaviour is the same everywhere.
 
@@ -737,11 +741,11 @@ Each package lists its findings as `ID (priority, evidence label)`. The full tex
 | Complexity | L |
 | Class | Recommended |
 | Dependencies | WP-19, WP-21 |
-| Findings covered | 14: `UX-007 (P1, VERIFIED)`, `UX-008 (P1, VERIFIED)`, `UX-009 (P1, VERIFIED)`, `UX-013 (P2, OBSERVED)`, `UX-014 (P2, VERIFIED)`, `UX-021 (P2, RECOMMENDATION)`, `UX-024 (P3, OBSERVED)`, `UX-025 (P3, VERIFIED)`, `UX-029 (P3, NOT VERIFIED)`, `FE-015 (P2, OBSERVED)`, `FE-016 (P2, VERIFIED)`, `GAP-003 (P2, VERIFIED)`, `GAP-006 (P3, NOT VERIFIED)`, `GAP-008 (P3, RECOMMENDATION)` |
+| Findings covered | 15: `UX-007 (P1, VERIFIED)`, `UX-008 (P1, VERIFIED)`, `UX-009 (P1, VERIFIED)`, `UX-013 (P2, OBSERVED)`, `UX-014 (P2, VERIFIED)`, `UX-021 (P2, RECOMMENDATION)`, `UX-024 (P3, OBSERVED)`, `UX-025 (P3, VERIFIED)`, `UX-029 (P3, NOT VERIFIED)`, `FE-015 (P2, OBSERVED)`, `FE-016 (P2, VERIFIED)`, `PRD-003 (P2, RECOMMENDATION)`, `GAP-003 (P2, VERIFIED)`, `GAP-006 (P3, NOT VERIFIED)`, `GAP-008 (P3, RECOMMENDATION)` |
 
 **Problem and current implementation.** No project home; icon-only rail; five problem surfaces; review comments only on the Release page; "reviewed" marks in localStorage; three tree views; no quick switcher or global search; no error boundary or offline handling.
 
-**Recommended solution.** Navigation of 06 section 6 (Home, Project Home, Write, Structure, Graphics, Check, Review and release); one problems model server-side; review comments surfaced in the editors; Ctrl+K switcher; error boundaries and connection-lost banner.
+**Recommended solution.** Navigation of 06 section 6 (Home, Project Home, Write, Structure, Graphics, Check, Review and release); one problems model server-side; review comments surfaced in the editors; Ctrl+K switcher; error boundaries and connection-lost banner; **lease holders and presence** on Explore, Publication and the editors (a read-only open of a leased module, a notice when it is released; addendum 17, PRD-003).
 
 **Expected outcome.** Authors, reviewers, publishers and admins each land on what needs them.
 
@@ -865,11 +869,11 @@ Each package lists its findings as `ID (priority, evidence label)`. The full tex
 | Complexity | XL |
 | Class | Mandatory (Mode A) |
 | Dependencies | WP-12, WP-13, WP-24 |
-| Findings covered | 2: `DEP-023 (P2, OBSERVED)`, `QA-009 (P1, VERIFIED)` |
+| Findings covered | 3: `DEP-023 (P2, OBSERVED)`, `QA-009 (P1, VERIFIED)`, `PRD-005 (P2, RECOMMENDATION)` |
 
 **Problem and current implementation.** Program files are replaced in place so rollback means reinstalling; the upgrade test is same-version only; no downgrade guard in the installer path; no signed update package.
 
-**Recommended solution.** Per 09: Inno Setup family; versioned program folders with an atomic pointer and automatic rollback on failed health check; `Product-Standalone-Setup.exe` with loopback server + WebView2 launcher (fallback to the default browser); `Product-Offline-Update` (signed, version-checked, pre-update backup via WP-12, data preserved); silent switches and exit codes documented.
+**Recommended solution.** Per 09: Inno Setup family; versioned program folders with an atomic pointer and automatic rollback on failed health check; `Product-Standalone-Setup.exe` with loopback server + WebView2 launcher (fallback to the default browser); `Product-Offline-Update` (signed, version-checked, pre-update backup via WP-12, data preserved); silent switches and exit codes documented; **WebView2 runtime provisioning**: detect at install and at start, bundle the offline (standalone) runtime installer with every release so each offline update refreshes it, report its version in `/api/version`, keep the default-browser fallback with a visible notice (addendum 17, PRD-005).
 
 **Expected outcome.** One-click install, safe upgrade, one-click rollback, clean uninstall.
 
@@ -942,11 +946,11 @@ Each package lists its findings as `ID (priority, evidence label)`. The full tex
 | Complexity | XL |
 | Class | Mandatory for Mode B |
 | Dependencies | WP-25, WP-26, WP-11, WP-12 |
-| Findings covered | 0 (a capability required by the requested deployment, specified in 09-DEPLOYMENT-ARCHITECTURE.md; no defect finding) |
+| Findings covered | 1: `PRD-007 (P2, RECOMMENDATION)` |
 
 **Problem and current implementation.** Only one deployment shape exists (09 DEP design): there is no client-only installer, no server-only offline package and no first-run server wizard.
 
-**Recommended solution.** `Product-Client-Setup.exe` (WebView2 shell + first-run server address wizard + handshake + optional local cache) and `Product-Server-Offline-Setup` (service, TLS, firewall rule, central backup schedule, admin guide), both from the same codebase and family of the standalone installer; multi-user acceptance with N scripted authors.
+**Recommended solution.** `Product-Client-Setup.exe` (WebView2 shell + first-run server address wizard + handshake + optional local cache) and `Product-Server-Offline-Setup` (service, TLS, firewall rule, central backup schedule, admin guide), both from the same codebase and family of the standalone installer; multi-user acceptance with N scripted authors, where N is the figure of decision D3 (assumed: 25 concurrent, tested at 2x = 50); a written **availability position** (no automatic failover in the first release, daily backup by default and hourly selectable, RPO = time since the last backup, RTO measured at the first drill and published, a warm-standby procedure on a second machine; addendum 17, PRD-007).
 
 **Expected outcome.** Mode B deliverable.
 
@@ -955,6 +959,31 @@ Each package lists its findings as `ID (priority, evidence label)`. The full tex
 **Acceptance criteria.** G-REL-4 at the stated user count; restore drill from the central backup; client/server version matrix.
 
 **Test cases.** Multi-client harness; upgrade order tests (server first, then clients).
+
+#### WP-37 - PostgreSQL storage adapter for Mode B Enterprise (conditional)
+
+| Field | Value |
+|---|---|
+| ID | WP-37 |
+| Phase | 8 |
+| Category | Architecture / scalability |
+| Priority | **P2** |
+| Complexity | XL |
+| Class | Enterprise, conditional on decision D21 (build only when a trigger fires or the owner decides) |
+| Dependencies | WP-10, WP-12, WP-13, WP-26 |
+| Findings covered | 1: `PRD-002 (P2, RECOMMENDATION)` |
+
+**Problem and current implementation.** SQLite is the right engine for one host and short writes, but it cannot serve a second server node, cannot give point-in-time recovery and cannot be shared over a network file system. If the supported scale (D3) or a customer exceeds that, the only answer today would be a rewrite, because about 51 `dbh()` call sites and direct SQL in five services bypass the store.
+
+**Recommended solution.** In phase 2, WP-10 makes the storage seam dialect-clean (repositories, engine-neutral migrations, one contract suite). In phase 8, add a PostgreSQL adapter that passes the same contract suite, a Server-Setup option chosen at install time and stored in the configuration (Mode A never uses it), a PostgreSQL-aware backup and restore (base backup plus archived logs) behind the WP-12 interface, and the install, service-account and upgrade path for an air-gapped site. Build it only if a trigger fires (p95 write latency above 200 ms or event-loop lag above 100 ms under the stated load; more than one server host; point-in-time recovery required; a mandated corporate database) or the owner decides in D21.
+
+**Expected outcome.** The product can scale beyond one host without a rewrite, and the cheaper SQLite deployment stays the default and the only one in Mode A.
+
+**Risks.** A second engine doubles the test matrix and the support surface; SQL differences (types, locking, upsert, dates) stay inside repositories only if WP-10 is strict; PostgreSQL on an air-gapped machine needs its own installer and upgrade path; high availability needs more than the adapter (a second node and a failover procedure).
+
+**Acceptance criteria.** The contract suite passes on both engines in the gate; a restore drill from the PostgreSQL backup passes (G-REL-1, G-REL-3); 50 scripted authors on PostgreSQL meet the thresholds of WP-28; the standalone installer is unchanged.
+
+**Test cases.** Contract suite on both engines; migration up and down; kill-the-database test; restore drill; the WP-28 multi-user acceptance on PostgreSQL.
 
 ### Phase 9 - Enterprise administration, audit and operations
 
@@ -1021,11 +1050,11 @@ Each package lists its findings as `ID (priority, evidence label)`. The full tex
 | Complexity | M |
 | Class | Optional |
 | Dependencies | none |
-| Findings covered | 5: `ENT-019 (P3, VERIFIED)`, `RES-008 (P3, RECOMMENDATION)`, `ENT-021 (P3, OBSERVED)`, `RES-010 (P3, RECOMMENDATION)`, `RES-012 (P3, RECOMMENDATION)` |
+| Findings covered | 6: `ENT-019 (P3, VERIFIED)`, `RES-008 (P3, RECOMMENDATION)`, `ENT-021 (P3, OBSERVED)`, `RES-010 (P3, RECOMMENDATION)`, `RES-012 (P3, RECOMMENDATION)`, `PRD-006 (P3, RECOMMENDATION)` |
 
 **Problem and current implementation.** The licence module is dormant (key custody unknown); notifications are in-app only; no MSI/GPO package exists.
 
-**Recommended solution.** Licensing: an offline signed licence file with soft failure and no hardware lock (RES-008) only if the business needs it; internal SMTP relay notifications (RES-010) only for sites that have one; MSI wrapper (RES-012) only when a customer mandates GPO/SCCM.
+**Recommended solution.** Licensing: an offline signed licence file with soft failure and no hardware lock (RES-008) only if the business needs it; internal SMTP relay notifications (RES-010) only for sites that have one; MSI wrapper (RES-012) only when a customer mandates GPO/SCCM; optional **connected services** (update check, signed update download, support-bundle upload) off by default, opt-in per customer, allow-listed host, signed responses, no telemetry (PRD-006, decision D23).
 
 **Expected outcome.** Capabilities exist when someone needs them, without carrying the cost before.
 
@@ -1067,16 +1096,18 @@ Different agents reported the same defect under different IDs. They are schedule
 | Modal and keyboard accessibility | UX-004, UX-005, DS-005, FE-014 | WP-23, WP-19 |
 | JSS "Publication" Internal error | UX-001, FE-009 | WP-07 |
 
-## 8. What this roadmap deliberately does not propose
+## 8. Positions on the architectural options (revised by addendum 17)
 
-These follow the architecture reports (03, 09, 10) and the research (13); each is reversible later if the stated trigger is reached.
+The first version of this roadmap listed six things it deliberately did not propose. For a production release each now has a position, a production design and a trigger; the reasoning and the evidence are in `17-ADDENDUM-PRODUCTION-ARCHITECTURE-POSITIONS.md` section 3. Where an option is not built, it is because the audit found it would cost more than it removes for an offline, one-click Windows product; each is reversible when its trigger is reached.
 
-* No microservices, message broker, containers or orchestration: a single-process modular monolith with a SQLite job table and worker processes covers the measured need.
-* No move to PostgreSQL now. Triggers (measured): p95 write latency above 200 ms or event-loop lag above 100 ms under the stated load, two server nodes, RPO below one minute, or a mandated corporate database (RES-002).
-* No CRDT or operational transform for co-editing: mandatory hash guard plus a per-user check-out lease (RES-001).
-* No rewrite of the three framework-free editors in React; unify the chrome and the host contract instead (WP-21).
-* No Electron or Tauri shell, and no MSIX: loopback server plus a WebView2 launcher for Mode A; Inno Setup for the installer family (09).
-* No cloud dependency of any kind: offline is a requirement, so signing timestamps, advisory data and updates must all work from media the customer carries in.
+| Option | Position | What is built instead or in addition | Change it when |
+|---|---|---|---|
+| Microservices, broker, containers | Not now: modular monolith with a job service and worker processes (WP-14) | OS resource limits and supervision (PRD-001); every engine behind an interface | The product becomes hosted multi-tenant, or a second server node is needed |
+| PostgreSQL | Conditional adapter for Mode B Enterprise (WP-37, D21); SQLite stays for Mode A and the team tier | A dialect-clean storage seam in phase 2 (WP-10) so the adapter is a contained job | p95 write latency above 200 ms or event-loop lag above 100 ms under the stated load; more than one server host; point-in-time recovery required; a mandated corporate database |
+| CRDT / operational transform | Not for structure: collaborative check-out | Mandatory hash guard and per-part leases (WP-11, D22); presence (PRD-003); conflict comparison (PRD-004) | A customer needs several people in one data module at once and accepts a validity guard; then free-text leaf elements only |
+| React rewrite of the three editors | Replace the surroundings piece by piece; keep the canvases (WP-21, WP-35, D16) | Baseline harness (WP-34), host contract, React toolbars, panels, dialogs and inspectors on the design system | The owner chooses a full rebuild in D16: one editor at a time on the same harness |
+| Electron / Tauri / MSIX | No: a thin WebView2 host in the existing C# host, Inno Setup for the installer family (09) | Offline WebView2 runtime provisioning (PRD-005) | A need for OS integration the C# host cannot provide |
+| Cloud dependency | None required at run time; optional connected services on demand (WP-31, D23) | Signed update, licence and support exchange by media; connected mode off by default (PRD-006) | A customer asks for connected updates or remote support |
 
 ## 9. Risks of the roadmap itself
 
@@ -1149,6 +1180,7 @@ Sorted by priority, then by ID. "Report" is the document that contains the full 
 | PLT-015 | P1 | VERIFIED | S | WP-03 | No separation of duties on release: the person who requests a release can approve it | 02-FUNCTIONAL-AUDIT.md |
 | PLT-016 | P1 | OBSERVED | L | WP-27 | RBAC is five ordered roles; `cap` strings are labels; no fine-grained, group or per-document permissions | 02-FUNCTIONAL-AUDIT.md |
 | PLT-028 | P1 | VERIFIED | XL | WP-10 | No explicit application context: import-time singletons prevent server-mode variants, in-process restore and isolated tests, and can write to the wrong workspace | 03-ARCHITECTURE-AUDIT.md |
+| PRD-001 | P1 | RECOMMENDATION | M | WP-14 | Worker processes need operating-system resource limits and a supervisor | 17-ADDENDUM-PRODUCTION-ARCHITECTURE-POSITIONS.md |
 | PUB-002 | P1 | VERIFIED | S | WP-02 | XInclude in an ancillary page pulls any local file (also other projects' files) into the PDF | 02-FUNCTIONAL-AUDIT.md |
 | PUB-003 | P1 | VERIFIED | M | WP-14 | No timeout, no cancellation, one global warm-FOP queue: a hung or slow render blocks every build | 02-FUNCTIONAL-AUDIT.md |
 | PUB-004 | P1 | VERIFIED | M | WP-14 | A build is one synchronous HTTP request; no job identity, no queue, no replay of progress | 02-FUNCTIONAL-AUDIT.md |
@@ -1294,6 +1326,11 @@ Sorted by priority, then by ID. "Report" is the document that contains the full 
 | PLT-029 | P2 | VERIFIED | S | WP-12 | Duplicated implementations, notably the weak ZIP writer guarding the backup | 03-ARCHITECTURE-AUDIT.md |
 | PLT-030 | P2 | VERIFIED | M | WP-10 | Untyped core boundary and SQL outside the store | 03-ARCHITECTURE-AUDIT.md |
 | PLT-031 | P2 | VERIFIED | M | WP-10 | Process-local state, shallow health check and no graceful database shutdown | 03-ARCHITECTURE-AUDIT.md |
+| PRD-002 | P2 | RECOMMENDATION | XL | WP-37 | A PostgreSQL storage adapter for Mode B Enterprise, built only when a trigger fires | 17-ADDENDUM-PRODUCTION-ARCHITECTURE-POSITIONS.md |
+| PRD-003 | P2 | RECOMMENDATION | M | WP-22 | Authors cannot see who else is working where | 17-ADDENDUM-PRODUCTION-ARCHITECTURE-POSITIONS.md |
+| PRD-004 | P2 | RECOMMENDATION | M | WP-21 | A refused save offers no way to compare or merge | 17-ADDENDUM-PRODUCTION-ARCHITECTURE-POSITIONS.md |
+| PRD-005 | P2 | RECOMMENDATION | M | WP-25 | The WebView2 runtime must be provisioned and patched on air-gapped machines | 17-ADDENDUM-PRODUCTION-ARCHITECTURE-POSITIONS.md |
+| PRD-007 | P2 | RECOMMENDATION | M | WP-28 | No stated availability position for Mode B | 17-ADDENDUM-PRODUCTION-ARCHITECTURE-POSITIONS.md |
 | PUB-010 | P2 | OBSERVED | L | WP-11 | One XML file per book means whole-document locking: parallel authors on different chapters collide | 02-FUNCTIONAL-AUDIT.md |
 | PUB-011 | P2 | VERIFIED | M | WP-15 | JSG is a third, separate orchestrator with no release, watermark, review or warm FOP | 02-FUNCTIONAL-AUDIT.md |
 | PUB-012 | P2 | VERIFIED | S | WP-07 | Shipped defaults reference artwork that does not exist: a developer screenshot name and six symbol icons | 02-FUNCTIONAL-AUDIT.md |
@@ -1399,6 +1436,7 @@ Sorted by priority, then by ID. "Report" is the document that contains the full 
 | PLT-024 | P3 | OBSERVED | S | WP-07 | Small defects: extension 403 may become 500; package downloads named `project-project.zip` | 02-FUNCTIONAL-AUDIT.md |
 | PLT-025 | P3 | VERIFIED | S | WP-13 | Documentation contradicts the code in places | 02-FUNCTIONAL-AUDIT.md |
 | PLT-032 | P3 | OBSERVED | S | WP-10 | Configuration is scattered and partly hard-coded | 03-ARCHITECTURE-AUDIT.md |
+| PRD-006 | P3 | RECOMMENDATION | M | WP-31 | Optional connected services, off by default | 17-ADDENDUM-PRODUCTION-ARCHITECTURE-POSITIONS.md |
 | PUB-024 | P3 | VERIFIED | S | WP-02 | `composeBook` mangles book metadata containing `$` patterns | 02-FUNCTIONAL-AUDIT.md |
 | PUB-025 | P3 | VERIFIED | S | WP-02 | A project text with both quote kinds stops the build (tool behaviour verified; the exact entry fields by code reading) | 02-FUNCTIONAL-AUDIT.md |
 | RES-003 | P3 | RECOMMENDATION | L | WP-27 | Identity roadmap beyond LDAPS (optional, customer-driven) | 12-ENTERPRISE-READINESS.md |
@@ -1422,7 +1460,7 @@ Sorted by priority, then by ID. "Report" is the document that contains the full 
 
 ## 11. Appendix B - counts
 
-Findings in the register: **322** (P0 9, P1 88, P2 169, P3 56).
+Findings in the register: **329** (P0 9, P1 89, P2 174, P3 57).
 
 | Package | Phase | Pri | Size | Class | Findings | P0 | P1 | P2 | P3 |
 |---|---|---|---|---|---|---|---|---|---|
@@ -1440,7 +1478,7 @@ Findings in the register: **322** (P0 9, P1 88, P2 169, P3 56).
 | WP-11 | 2 | P1 | XL | Mandatory | 17 | 0 | 5 | 12 | 0 |
 | WP-12 | 2 | P1 | L | Mandatory | 19 | 0 | 9 | 9 | 1 |
 | WP-13 | 2 | P1 | L | Mandatory | 19 | 0 | 3 | 8 | 8 |
-| WP-14 | 3 | P0 | XL | Mandatory | 14 | 1 | 7 | 5 | 1 |
+| WP-14 | 3 | P0 | XL | Mandatory | 15 | 1 | 8 | 5 | 1 |
 | WP-33 | 3 | P0 | L | Mandatory for S1000D manuals above about 50 figure-bearing modules (confirm typical size, decision D15) | 1 | 1 | 0 | 0 | 0 |
 | WP-15 | 3 | P1 | L | Recommended | 9 | 0 | 2 | 6 | 1 |
 | WP-16 | 3 | P2 | M | Recommended | 9 | 0 | 0 | 6 | 3 |
@@ -1449,19 +1487,20 @@ Findings in the register: **322** (P0 9, P1 88, P2 169, P3 56).
 | WP-19 | 5 | P1 | L | Recommended (core to the requested UI outcome) | 19 | 0 | 5 | 12 | 2 |
 | WP-20 | 5 | P2 | L | Recommended | 5 | 0 | 0 | 4 | 1 |
 | WP-34 | 5 | P2 | M | Recommended (required by the owner for any redesign: no feature lost) | 1 | 0 | 0 | 1 | 0 |
-| WP-21 | 6 | P1 | XL | Recommended (core to the requested UI outcome) | 8 | 0 | 2 | 6 | 0 |
-| WP-22 | 6 | P1 | L | Recommended | 14 | 0 | 3 | 6 | 5 |
+| WP-21 | 6 | P1 | XL | Recommended (core to the requested UI outcome) | 9 | 0 | 2 | 7 | 0 |
+| WP-22 | 6 | P1 | L | Recommended | 15 | 0 | 3 | 7 | 5 |
 | WP-23 | 6 | P1 | M | Mandatory for enterprise procurement | 7 | 0 | 3 | 2 | 2 |
 | WP-35 | 6 | P2 | XL | Recommended (requested by the owner: Phase 2 brief) | 3 | 0 | 0 | 2 | 1 |
 | WP-36 | 6 | P3 | M | Recommended (requested by the owner, after regression sign-off) | 4 | 0 | 0 | 0 | 4 |
 | WP-24 | 7 | P1 | L | Mandatory | 11 | 0 | 3 | 7 | 1 |
-| WP-25 | 7 | P1 | XL | Mandatory (Mode A) | 2 | 0 | 1 | 1 | 0 |
+| WP-25 | 7 | P1 | XL | Mandatory (Mode A) | 3 | 0 | 1 | 2 | 0 |
 | WP-26 | 8 | P1 | L | Mandatory for Mode B | 3 | 0 | 3 | 0 | 0 |
 | WP-27 | 8 | P1 | L | Enterprise, customer-driven | 6 | 0 | 2 | 1 | 3 |
-| WP-28 | 8 | P1 | XL | Mandatory for Mode B | 0 | 0 | 0 | 0 | 0 |
+| WP-28 | 8 | P1 | XL | Mandatory for Mode B | 1 | 0 | 0 | 1 | 0 |
+| WP-37 | 8 | P2 | XL | Enterprise, conditional on decision D21 (build only when a trigger fires or the owner decides) | 1 | 0 | 0 | 1 | 0 |
 | WP-29 | 9 | P1 | L | Mandatory for enterprise | 5 | 0 | 1 | 4 | 0 |
 | WP-30 | 10 | P1 | L | Mandatory | 2 | 0 | 2 | 0 | 0 |
-| WP-31 | 10 | P3 | M | Optional | 5 | 0 | 0 | 0 | 5 |
+| WP-31 | 10 | P3 | M | Optional | 6 | 0 | 0 | 0 | 6 |
 
-Package sizes: S 0, M 11, L 17, XL 8 (36 packages).
+Package sizes: S 0, M 11, L 17, XL 9 (37 packages).
 
