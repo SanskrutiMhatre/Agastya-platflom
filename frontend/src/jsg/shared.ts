@@ -28,6 +28,8 @@ export interface JsgEditorLike {
   setFindings(f: JsgFinding[]): void;
   /** Show (or stop showing) a document code beside each section heading; the document itself is not touched. */
   setSectionBadge?(fn: SectionBadge | undefined): void;
+  /** Scroll to a section or appendix by the key the server gives its data module ("id:..." or "t:<number>:<title>"); false when nothing matches. */
+  goToModule?(key: string): boolean;
 }
 
 export const escH = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -75,6 +77,7 @@ export const BASE_CSS = `
 .jsg-sectionh{color:#0000ff;font-weight:bold;text-transform:uppercase;font-size:22pt;text-align:center;margin:36px 0 12px}
 .jsg-num{display:block;font-size:22pt}
 .jsg-code{display:block;width:fit-content;margin:4px auto 0;padding:0 6px;border:1px solid #d0d7e2;border-radius:3px;background:#eef2f7;color:#475569;font:400 9pt/1.5 ui-monospace,Consolas,monospace;text-transform:none;user-select:none}
+.jsg-flash{animation:jsg-flash 1.6s ease-out}@keyframes jsg-flash{0%{background:#fde68a}100%{background:transparent}}
 .jsg-clause{color:#0000ff;font-weight:bold;text-transform:uppercase;margin:12pt 0 6pt;display:flex;gap:10px}
 .jsg-clause .n{flex:0 0 auto;min-width:34px}.jsg-clause .t{flex:1}
 .jsg-p{text-align:justify;margin:3pt 0}

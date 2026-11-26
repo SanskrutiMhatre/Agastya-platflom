@@ -176,8 +176,8 @@ test('JSG sample and ancillary pages: create the sample from the button, tick pa
   await page.getByTestId('create-jsg-sample').first().click();
   await expect(page).toHaveURL(/\/projects\/[^/]+(\/editor)?$/, { timeout: 60_000 });
   const pid = page.url().split('/projects/')[1].split('/')[0]; const U = `/api/projects/${pid}`;
-  // the rail has the page, and not the S1000D tabs that mean nothing here
-  await expect(page.getByRole('link', { name: 'Explore' })).toHaveCount(0); await expect(page.getByRole('link', { name: 'Publication' })).toHaveCount(0);
+  // the rail has the page, and the Explore and Publication pages that show the document's codes
+  await expect(page.getByRole('link', { name: 'Explore' })).toBeVisible(); await expect(page.getByRole('link', { name: 'Publication' })).toBeVisible();
   lap('sample created');
   await page.getByRole('link', { name: 'Ancillary pages' }).click();
   await expect(page).toHaveURL(new RegExp(`/projects/${pid}/ancillary`));

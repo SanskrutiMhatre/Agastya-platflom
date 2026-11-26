@@ -1,6 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
+import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 import './studio/styles/app.css';
 import './studio/styles/document.css';
 import './styles/platform.css';
@@ -12,6 +12,9 @@ applyTheme(useUi.getState().theme);
 // Follow the OS when the user has not chosen a theme explicitly.
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (useUi.getState().theme === 'system') applyTheme('system'); });
 
+// A data router (not <BrowserRouter>): only it can hold a page back while it has unsaved work (lib/leaveGuard.tsx). The app's own <Routes> live inside the one splat route.
+const router = createBrowserRouter([{ path: '*', element: <App /> }]);
+
 createRoot(document.getElementById('root')!).render(
-  <StrictMode><BrowserRouter><App /></BrowserRouter></StrictMode>,
+  <StrictMode><RouterProvider router={router} /></StrictMode>,
 );

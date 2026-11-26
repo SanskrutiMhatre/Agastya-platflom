@@ -4,6 +4,7 @@
 // build the PDF from the saved file through the JSS pipeline (XML -> XSL-FO -> PDF), so what is shown is what the server renders, never a browser approximation.
 
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { contentApi, graphicsApi } from '../../api';
 import { ApiError } from '../../api/client';
 import { jssApi, type JssDocument, type JssFinding } from '../../api/jss';
@@ -15,7 +16,8 @@ import { canBuild, canWrite, useProject } from '../../layouts/ProjectShell';
 import { JssEditor, type GraphicInfo } from '../../jss/editor';
 import { JssParseError, parseJss } from '../../jss/xml';
 import { PackagePanel } from '../../jss/PackagePanel';
-import { ConvertButton, DocCodesButton, DocCodesStrip, ExportProjectButton, useSectionCode } from '../../components/DocCodes';
+import { ConvertButton, ExportProjectButton, useSectionCode } from '../../components/DocCodes';
+import { useLeaveGuard } from '../../lib/leaveGuard';
 import { useProgress } from '../../lib/progress';
 import { useUi } from '../../store/ui';
 
@@ -101,7 +103,11 @@ export function JssEditorPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded, id, writable]);
 
-  // the sections' document codes beside their headings, when the author has switched them on
+  // opened from the Publication or Explore page at a row: scroll to that section (the key is the one the server gives its data module)
+  const [params] = useSearchParams(); const goto = params.get('goto');
+  useEffect(() => { if (!loaded || !goto) return; const t = setTimeout(() => editorRef.current?.goToModule(goto), 150); return () => clearTimeout(t); }, [loaded, goto]);
+
+  // the sections' document codes beside their headings, when the author has switched them on (on the Publication page); the codes themselves are not listed here
   const sectionCode = useSectionCode(id, savedAt);
   useEffect(() => { editorRef.current?.setSectionBadge(sectionCode); }, [sectionCode, loaded]);
 
@@ -122,6 +128,9 @@ export function JssEditorPage() {
     } finally { setSaving(false); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, writable]);
+
+  // going to another tab of the project with unsaved work asks first (the browser's own question for closing the tab is asked below)
+  const guard = useLeaveGuard(dirty, { what: 'changes to the document', save, unload: false });
 
   const check = useCallback(async () => {
     const ed = editorRef.current; if (!ed) return;
@@ -170,6 +179,7 @@ export function JssEditorPage() {
 
   return (
     <>
+      {guard}
       <header className="v2-top" style={{ height: 42 }}>
         <h1 style={{ fontSize: 14 }} className="v2-trunc">{summary.project.name}</h1>
         {loaded ? <span className="v2-badge accent" title={`Document type ${loaded.docType}, from the stencil ${loaded.stencil}`}>{loaded.label}</span> : null}
@@ -178,7 +188,6 @@ export function JssEditorPage() {
         <button className="btn btn-sm" onClick={() => void check()} disabled={!loaded || checking} data-testid="jss-check" title="Check the document for problems without saving or building">{checking ? <Spinner /> : <Icon name="search" size={12} />}Check</button>
         <button className="btn btn-sm" onClick={() => void save()} disabled={!writable || !dirty || saving} data-testid="jss-save" title={!writable ? 'You have read-only access' : !dirty ? 'Nothing to save' : 'Save the document (Ctrl+S)'}>{saving ? <Spinner /> : <Icon name="check" size={12} />}Save</button>
         <PackagePanel id={id} writable={writable} dirty={dirty} saveFirst={save} onImported={() => { setDirty(false); void load(); ctx.reload(); }} />
-        <DocCodesButton id={id} writable={writable} refreshKey={savedAt} />
         <ConvertButton id={id} from="jss" name={summary.project.name} dirty={dirty} saveFirst={save} />
         <ExportProjectButton id={id} dirty={dirty} saveFirst={save} />
         <button className="btn btn-sm btn-primary" onClick={() => void generate()} disabled={!canBuild(role) || building || !loaded} data-testid="jss-generate" title={!canBuild(role) ? 'Reviewers, editors and owners can build the PDF' : 'Save, then build the whole publication as a PDF'}>{building ? <Spinner /> : <Icon name="play" size={12} />}{building ? 'Building…' : 'Generate PDF'}</button>
@@ -189,7 +198,6 @@ export function JssEditorPage() {
         </div>
         <ThemeToggle />
       </header>
-      <DocCodesStrip id={id} refreshKey={savedAt} />
       {!writable ? <Alert tone="warn">You have {role} access to this project: you can read the document, but changes cannot be saved.</Alert> : null}
       {stale ? <Alert tone="warn">Someone else saved this document after you opened it, so your save was refused. <button className="btn btn-sm" onClick={() => { if (!dirty || window.confirm('Reload the saved document? Your unsaved changes will be lost.')) void load(); }}>Reload the saved document</button></Alert> : null}
       {error ? <Alert tone="bad">{error}</Alert> : null}

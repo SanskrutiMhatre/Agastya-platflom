@@ -2,9 +2,9 @@
 //
 //   GET /api/projects/:id/identity               the codes, made or brought up to date from the document                                    (viewer)
 //   PUT /api/projects/:id/identity               change the model / publication identity (model code, issuer, number, volume, language)  (editor)
-//   PUT /api/projects/:id/identity/visibility    which of codes, publication, pictures and contents the editor shows (all off at first)  (editor)
+//   PUT /api/projects/:id/identity/visibility    whether the editor writes each section's code beside its heading (off at first)            (editor)
 //
-// The data is always kept and always returned; `show` only says what the editor should display. An S1000D project has its own, always visible, codes and is not served here.
+// The data is always kept and always returned; `show` only says whether the editor should write the section codes beside the headings. An S1000D project has its own, always visible, codes and is not served here.
 
 import type { Express } from 'express';
 import { requireProject, audit } from '../context';
@@ -30,7 +30,7 @@ export function registerIdentityRoutes(app: Express): void {
   }));
 
   app.put(`${base}/visibility`, requireProject('editor', { from: 'param', cap: 'dm.write' }), wrap((req, res) => {
-    if (!isObject(req.body)) throw bad('Send { "dmc": true, "pmc": false, "icn": false, "toc": false }.', 'BAD_BODY');
+    if (!isObject(req.body)) throw bad('Send { "dmc": true }.', 'BAD_BODY');
     const out = changeVisibility(req.project.id, req.body as any);
     res.json({ ok: true, identity: out.view });
   }));

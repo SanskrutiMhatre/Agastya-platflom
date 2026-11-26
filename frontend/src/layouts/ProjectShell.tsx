@@ -41,8 +41,8 @@ export function ProjectShell() {
   const v = summary.validation;
   const rel = summary.release;
   const isCir = summary.project.type === 'CIR';
-  const jssDoc = summary.project.authoring === 'jss-xml';                      // a JSS document has no S1000D publication tree to explore
-  const jsg = summary.project.format === 'jsg';                                // a JSG document is one XML file too: no publication tree, no S1000D tools
+  const jssDoc = summary.project.authoring === 'jss-xml';                      // a JSS document: its Explore and Publication pages show the document's chapters with their codes (DocExplorePage, DocPublicationPage)
+  const jsg = summary.project.format === 'jsg';                                // a JSG document is one XML file too: the same two pages, no S1000D tools
   const jsgUhb = jsg && summary.project.manualType === 'uhb';
   const s1000d = (summary.project.format ?? 's1000d') === 's1000d';           // validation (schemas, BREX) belongs to S1000D only
   const items: Item[] = isCir ? [
@@ -50,8 +50,8 @@ export function ProjectShell() {
     { to: `/projects/${id}/graphics`, label: 'Graphics', icon: 'image' },
   ] : [
     { to: `/projects/${id}/editor`, label: 'Editor', icon: 'editor' },
-    ...(jssDoc || jsg ? [] : [{ to: `/projects/${id}/explore`, label: 'Explore', icon: 'explore' as const }]),
-    ...(jsg ? [] : [{ to: `/projects/${id}/publication`, label: 'Publication', icon: 'book' as const }]),
+    { to: `/projects/${id}/explore`, label: 'Explore', icon: 'explore' },
+    { to: `/projects/${id}/publication`, label: 'Publication', icon: 'book' },
     { to: `/projects/${id}/graphics`, label: 'Graphics', icon: 'image' },
     ...(jssDoc || jsg ? [{ to: `/projects/${id}/ancillary`, label: 'Ancillary pages', icon: 'file' as const }] : []),
     ...(s1000d ? [

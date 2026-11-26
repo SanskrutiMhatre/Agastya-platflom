@@ -54,7 +54,8 @@ test('opening a JSS project opens the JSS editor, with the stencil chapters lock
   await expect(sheet().locator('.jss-ch-title [contenteditable="true"]')).toHaveCount(0);
   await expect(page.locator('.jss-ol').first()).toContainText('Leading Particulars');
   await expect(page.locator('[data-testid="studio-host"]')).toHaveCount(0);           // not the S1000D Studio
-  await expect(page.getByRole('link', { name: 'Explore' })).toHaveCount(0);            // an S1000D publication tree has no place here
+  await expect(page.getByRole('link', { name: 'Explore' })).toBeVisible(); await expect(page.getByRole('link', { name: 'Publication' })).toBeVisible();   // the document's codes have their own pages (doc-pages.spec.ts)
+  await expect(page.getByTestId('doc-codes-strip')).toHaveCount(0);                    // and are never a strip on the editor page
   await expect(state()).toHaveText(/All changes saved/);
   await page.screenshot({ path: path.join(SHOTS, '1-opened.png') });
 });

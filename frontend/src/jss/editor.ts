@@ -120,6 +120,22 @@ export class JssEditor {
     this.setView('edit'); this.scrollToNode(n);
   }
 
+  /**
+   * Scroll to and flash a data module by the key the server gives it ("id:<element id>", or "t:<chapter>:<title>" for a section without an id), the way the Publication and
+   * Explore pages open the editor at a row. A chapter's own introduction ("(introduction)" in its key) opens its chapter. Returns false when nothing matches.
+   */
+  goToModule(key: string): boolean {
+    const norm = (t: string): string => t.replace(/[‘’´`]/g, "'").replace(/\s+/g, ' ').trim().toLowerCase();
+    let node: object | null = null;
+    if (key.startsWith('id:')) node = this.nodeById(key.slice(3));
+    else { const m = /^t:(\d+):(.*?)(?:#\d+)?$/.exec(key); if (m) {
+      const ch = this.doc.chapters[Number(m[1]) - 1]; const title = m[2].replace(/ \(introduction\)$/, '');
+      node = ch ? (ch.children.filter(isSection).find((s) => norm(s.title) === title) ?? (norm(ch.title) === title ? ch : null)) : null;
+    } }
+    if (!node) return false;
+    this.setView('edit'); this.scrollToNode(node); return true;
+  }
+
   undo(): void {
     if (!this.undoStack.length) return;
     this.redoStack.push(serializeJss(this.doc)); this.restore(this.undoStack.pop() as string);

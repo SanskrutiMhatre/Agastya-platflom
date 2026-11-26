@@ -6,7 +6,8 @@ import type { ProjectCard } from './index';
 export type Format = 's1000d' | 'jss' | 'jsg';
 export type Origin = 'generated' | 'imported';
 
-export interface DocCodesShow { dmc: boolean; pmc: boolean; icn: boolean; toc: boolean }
+/** What the author can switch on: the section code beside a heading in the editor. (The publication code, picture names and contents list are always on the Publication and Explore pages.) */
+export interface DocCodesShow { dmc: boolean }
 export interface DocCodes {
   format: 'jss' | 'jsg'; modelIdentCode: string; systemDiffCode: string; show: DocCodesShow;
   pmc: { code: string; file: string; title: string; issue: string; language: string; pmIssuer: string; pmNumber: string; pmVolume: string; origin: Origin };

@@ -18,8 +18,8 @@ import { BackupPage } from './pages/BackupPage';
 import { AdministratorPage } from './pages/Administrator';
 import { ProjectGraphicsPage } from './pages/project/GraphicsPage';
 import { ProjectShell } from './layouts/ProjectShell';
-import { ExplorePage } from './pages/project/ExplorePage';
-import { PublicationPage } from './pages/project/PublicationPage';
+import { ExploreRoute } from './pages/project/ExploreRoute';
+import { PublicationRoute } from './pages/project/PublicationRoute';
 import { ValidationPage } from './pages/project/ValidationPage';
 import { ReleasePage } from './pages/project/ReleasePage';
 import { AncillaryRoute } from './pages/project/AncillaryRoute';
@@ -70,8 +70,8 @@ export function App() {
       <Route path="projects/:id" element={<ProjectShell />}>
         <Route index element={<Navigate to="editor" replace />} />
         <Route path="editor" element={<EditorRoute />} />
-        <Route path="explore" element={<ExplorePage />} />
-        <Route path="publication" element={<PublicationPage />} />
+        <Route path="explore" element={<ExploreRoute />} />
+        <Route path="publication" element={<PublicationRoute />} />
         <Route path="validation" element={<ValidationPage />} />
         <Route path="graphics" element={<ProjectGraphicsPage />} />
         <Route path="ancillary" element={<AncillaryRoute />} />

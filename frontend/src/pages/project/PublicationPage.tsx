@@ -14,6 +14,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { PublishRefusal } from '../../components/PublishRefusal';
 import { Alert, Badge, Empty, Loading, PromptModal, Spinner, ago, errText, useAsync } from '../../components/ui';
 import { canWrite, useProject } from '../../layouts/ProjectShell';
+import { useLeaveGuard } from '../../lib/leaveGuard';
 import { useProgress } from '../../lib/progress';
 import { countOf, dropTarget, getAt, insertAt, moveTo, removeAt, shiftBy, updateAt, type DropWhere, type Path, type PmEntry } from '../../lib/pmcTree';
 import { pmcApi, poolToEntry } from '../../api/pmc';
@@ -68,11 +69,6 @@ export function PublicationPage() {
   const importRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { if (data.data) { setEntries(data.data.pm.entries as PmEntry[]); setDirty(false); setUndo(null); } }, [data.data]);
-  useEffect(() => {
-    const warn = (e: BeforeUnloadEvent) => { if (dirty) { e.preventDefault(); e.returnValue = ''; } };
-    window.addEventListener('beforeunload', warn);
-    return () => window.removeEventListener('beforeunload', warn);
-  }, [dirty]);
 
   const dms = data.data?.dms ?? [];
   const byFile = useMemo(() => new Map(dms.map((d) => [d.file.toLowerCase(), d])), [dms]);
@@ -146,6 +142,8 @@ export function PublicationPage() {
     catch (e) { setError(errText(e)); }
     if (importRef.current) importRef.current.value = '';
   };
+
+  const guard = useLeaveGuard(dirty, { what: 'changes to the publication', save });
 
   if (data.loading && !data.data) return <Loading />;
   if (data.error || !data.data) return <div className="v2-page"><Alert tone="bad">{data.error || 'Could not read the publication.'}</Alert></div>;
@@ -279,6 +277,7 @@ export function PublicationPage() {
       </div>
 
       <PublishWaivers projectId={id} role={role} refreshKey={waiverTick} />
+      {guard}
 
       {naming ? <PromptModal title="New chapter" label="Chapter title" confirmLabel="Add chapter" onClose={() => setNaming(false)} onSubmit={async (t) => { addChapter(t); }} /> : null}
       {rename ? <PromptModal title="Rename" label="Title" initial={rename.title} onClose={() => setRename(null)} onSubmit={async (t) => { apply(updateAt(entries, pathOf(rename.key), (x) => ({ ...x, title: t }) as PmEntry)); }} /> : null}

@@ -102,6 +102,24 @@ export class JsgEditor implements JsgEditorLike {
   /** Show (or stop showing) a code beside each section heading. The document is not touched; the sheet is drawn again where it stood. */
   setSectionBadge(fn: SectionBadge | undefined): void { this.badge = fn; const keep = this.sheet.parentElement?.scrollTop ?? 0; this.render(); if (this.sheet.parentElement) this.sheet.parentElement.scrollTop = keep; }
   private codeEl(s: { id?: string; title: string }, chapter: number): HTMLElement | null { const t = this.badge?.(s, chapter); if (!t) return null; const e = this.el('span', 'jsg-code', t); e.setAttribute('contenteditable', 'false'); e.title = 'Data module code of this section (kept in the backend, not in the document)'; return e; }
+  /**
+   * Scroll to a section or appendix by the key the server gives it ("id:<element id>", or "t:<number>:<title>" without an id; an appendix is numbered after the chapters),
+   * the way the Publication and Explore pages open the editor at a row. Returns false when nothing matches.
+   */
+  goToModule(key: string): boolean {
+    const norm = (t: string): string => t.replace(/[‘’´`]/g, "'").replace(/\s+/g, ' ').trim().toLowerCase();
+    const m = /^t:(\d+):(.*?)(?:#\d+)?$/.exec(key); const id = key.startsWith('id:') ? key.slice(3) : '';
+    let target = '';
+    this.doc.chapters.forEach((ch, ci) => {
+      if (!target && id && ch.id === id) target = `jsg-ch-${ci}`;
+      ch.sections.forEach((s, si) => { if (!target && ((id && s.id === id) || (m && Number(m[1]) === ci + 1 && norm(s.title) === m[2]))) target = `jsg-sec-${ci}-${si}`; });
+    });
+    this.doc.appendices.forEach((a, ai) => { if (!target && ((id && a.id === id) || (m && Number(m[1]) === this.doc.chapters.length + ai + 1 && norm(`${a.label ? `${a.label} ` : ''}${a.title}`) === m[2]))) target = `jsg-app-${ai}`; });
+    const el = target ? document.getElementById(target) : null; if (!el) return false;
+    el.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+    el.classList.remove('jsg-flash'); void el.offsetWidth; el.classList.add('jsg-flash'); setTimeout(() => el.classList.remove('jsg-flash'), 1700);
+    return true;
+  }
   markSaved(): void { this.dirty = false; this.host.onDirty(false); }
   getXml(): string { return serializeJsg(this.doc); }
   getDoc(): JsgDoc { return this.doc; }

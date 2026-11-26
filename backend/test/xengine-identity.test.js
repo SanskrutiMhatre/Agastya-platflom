@@ -103,8 +103,8 @@ test('the identity can be changed in one place: the model code is rewritten in e
 });
 
 test('nothing is shown by default; the toggles are a record setting', () => {
-  const x = fresh(jss([ch(1, 'G', sec('S'))])); assert.deepEqual(x.rec.show, { dmc: false, pmc: false, icn: false, toc: false });
-  I.applyVisibility(x.rec, { dmc: true, toc: true }); assert.deepEqual(x.rec.show, { dmc: true, pmc: false, icn: false, toc: true });
+  const x = fresh(jss([ch(1, 'G', sec('S'))])); assert.deepEqual(x.rec.show, { dmc: false });
+  I.applyVisibility(x.rec, { dmc: true, toc: true, pmc: true, icn: true }); assert.deepEqual(x.rec.show, { dmc: true }, 'the old pmc / icn / toc switches are accepted and ignored');
   assert.throws(() => I.applyVisibility(x.rec, { dmc: 'yes' }), /true or false/);
 });
 
@@ -125,7 +125,7 @@ test('a JSS project has codes from the start, kept in the backend, hidden by def
   const r = await w.post('/api/projects', { name: 'Identity JSS', format: 'jss', domain: 'land', manualType: 'uhb' }); assert.equal(r.status, 201); const U = `/api/projects/${r.json.project.id}`;
   const a = await w.get(`${U}/identity`); assert.equal(a.status, 200, JSON.stringify(a.json).slice(0, 300));
   const id = a.json.identity;
-  assert.deepEqual(id.show, { dmc: false, pmc: false, icn: false, toc: false });
+  assert.deepEqual(id.show, { dmc: false });
   assert.ok(id.modules.length >= 7, 'every section of the stencil has a code'); assert.equal(new Set(id.modules.map((m) => m.dmc)).size, id.modules.length);
   assert.ok(id.modules.every((m) => /^DMC-[A-Z0-9]+-A-\d\d-[0-9A-Z]{2}-\d\d-00A-040A-D$/.test(m.dmc)), id.modules[0].dmc);
   assert.match(id.pmc.code, /^PMC-[A-Z0-9]+-[A-Z0-9]{5}-\d{5}-00$/); assert.ok(id.toc.length >= 7);
@@ -140,7 +140,7 @@ test('a JSS project has codes from the start, kept in the backend, hidden by def
   for (const [k, dmc] of before) assert.equal(b.modules.find((m) => m.key === k)?.dmc, dmc, `unchanged: ${k}`);
   const added = b.modules.find((m) => m.key === 'id:sx'); assert.ok(added, 'the new section has a code'); assert.equal(b.pictures.find((x) => x.file === 'new-photo.png').module, 'id:sx');
   // the toggles
-  const t = await w.put(`${U}/identity/visibility`, { dmc: true, icn: true }); assert.equal(t.status, 200); assert.deepEqual(t.json.identity.show, { dmc: true, pmc: false, icn: true, toc: false });
+  const t = await w.put(`${U}/identity/visibility`, { dmc: true, icn: true }); assert.equal(t.status, 200); assert.deepEqual(t.json.identity.show, { dmc: true });
   assert.equal((await w.put(`${U}/identity/visibility`, { dmc: 'x' })).status, 400);
   // the identity
   const c = await w.put(`${U}/identity`, { modelIdentCode: 'XYZ77', pmNumber: '00123' }); assert.equal(c.status, 200); assert.ok(c.json.identity.modules.every((m) => m.dmc.startsWith('DMC-XYZ77-')));
@@ -151,7 +151,7 @@ test('a JSS project has codes from the start, kept in the backend, hidden by def
 test('a JSG project has them too; an S1000D project does not (it has its own, always visible)', async () => {
   const g = await w.post('/api/projects', { name: 'Identity JSG', format: 'jsg', domain: 'land', manualType: 'uhb' }); assert.equal(g.status, 201, JSON.stringify(g.json).slice(0, 300));
   const a = await w.get(`/api/projects/${g.json.project.id}/identity`); assert.equal(a.status, 200, JSON.stringify(a.json).slice(0, 300));
-  assert.equal(a.json.identity.format, 'jsg'); assert.ok(a.json.identity.modules.length >= 10); assert.deepEqual(a.json.identity.show, { dmc: false, pmc: false, icn: false, toc: false });
+  assert.equal(a.json.identity.format, 'jsg'); assert.ok(a.json.identity.modules.length >= 10); assert.deepEqual(a.json.identity.show, { dmc: false });
   const s = await w.post('/api/projects/sample', {}); assert.equal(s.status, 201);
   assert.equal((await w.get(`/api/projects/${s.json.project.id}/identity`)).status, 404);
 });

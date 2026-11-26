@@ -4,19 +4,21 @@
 // build the PDF from the saved file (XML -> XSL-FO -> PDF), so what is shown is what the server renders, never a browser approximation.
 
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { graphicsApi } from '../../api';
 import { ApiError } from '../../api/client';
 import { jsgApi, type JsgDocument, type JsgFinding } from '../../api/jsg';
 import { Icon } from '../../components/Icon';
 import { LazyPdfViewer } from '../../components/pdf/LazyPdfViewer';
 import { ThemeToggle } from '../../components/ThemeToggle';
-import { ConvertButton, DocCodesButton, DocCodesStrip, ExportProjectButton, useSectionCode } from '../../components/DocCodes';
+import { ConvertButton, ExportProjectButton, useSectionCode } from '../../components/DocCodes';
 import { Alert, Loading, Spinner, ago, errText } from '../../components/ui';
 import { canBuild, canWrite, useProject } from '../../layouts/ProjectShell';
 import { JsgEditor } from '../../jsg/editor';
 import { IsplEditor } from '../../jsg/ispl-editor';
 import type { GraphicInfo, JsgEditorLike } from '../../jsg/shared';
 import { JsgParseError, parseJsg } from '../../jsg/xml';
+import { useLeaveGuard } from '../../lib/leaveGuard';
 import { useProgress } from '../../lib/progress';
 import { useUi } from '../../store/ui';
 
@@ -121,7 +123,14 @@ export function JsgEditorPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded, id, writable]);
 
-  // the sections' document codes beside their headings, when the author has switched them on (a User Handbook; a parts list has no sections of this kind)
+  // going to another tab of the project with unsaved work asks first (the browser's own question for closing the tab is asked below)
+  const guard = useLeaveGuard(dirty, { what: 'changes to the document', save, unload: false });
+
+  // opened from the Publication or Explore page at a row: scroll to that section (the key is the one the server gives its data module)
+  const [params] = useSearchParams(); const goto = params.get('goto');
+  useEffect(() => { if (!loaded || !goto) return; const t = setTimeout(() => editorRef.current?.goToModule?.(goto), 150); return () => clearTimeout(t); }, [loaded, goto]);
+
+  // the sections' document codes beside their headings, when the author has switched them on (on the Publication page; a User Handbook; a parts list has no sections of this kind)
   const sectionCode = useSectionCode(id, savedAt);
   useEffect(() => { editorRef.current?.setSectionBadge?.(loaded?.docType === 'uhb' ? sectionCode : undefined); }, [sectionCode, loaded]);
 
@@ -188,6 +197,7 @@ export function JsgEditorPage() {
 
   return (
     <>
+      {guard}
       <header className="v2-top" style={{ height: 42 }}>
         <h1 style={{ fontSize: 14 }} className="v2-trunc">{summary.project.name}</h1>
         {loaded ? <span className="v2-badge accent" title={`JSG document type ${loaded.docType}, from the stencil ${loaded.stencil}`}>JSG · {loaded.label}</span> : null}
@@ -200,10 +210,7 @@ export function JsgEditorPage() {
         {writable ? <label className="v2-row" style={{ gap: 4, fontSize: 12 }} title="Save by itself a minute after the last change"><input type="checkbox" checked={autosave} onChange={(e) => setAutosave(e.target.checked)} data-testid="jsg-autosave" />Auto-save</label> : null}
         <button className="btn btn-sm" onClick={() => void check()} disabled={!loaded || checking} data-testid="jsg-check" title="Check the document for problems without saving or building">{checking ? <Spinner /> : <Icon name="search" size={12} />}Check</button>
         <button className="btn btn-sm" onClick={() => void save()} disabled={!writable || !dirty || saving} data-testid="jsg-save" title={!writable ? 'You have read-only access' : !dirty ? 'Nothing to save' : 'Save the document (Ctrl+S)'}>{saving ? <Spinner /> : <Icon name="check" size={12} />}Save</button>
-        {loaded?.docType === 'uhb' ? <>
-          <DocCodesButton id={id} writable={writable} refreshKey={savedAt} />
-          <ConvertButton id={id} from="jsg" name={summary.project.name} dirty={dirty} saveFirst={save} />
-        </> : null}
+        {loaded?.docType === 'uhb' ? <ConvertButton id={id} from="jsg" name={summary.project.name} dirty={dirty} saveFirst={save} /> : null}
         <ExportProjectButton id={id} dirty={dirty} saveFirst={save} />
         <button className="btn btn-sm btn-primary" onClick={() => void generate()} disabled={!canBuild(role) || building || !loaded} data-testid="jsg-generate" title={!canBuild(role) ? 'Reviewers, editors and owners can build the PDF' : 'Save, then build the document as a PDF'}>{building ? <Spinner /> : <Icon name="play" size={12} />}{building ? 'Building…' : 'Generate PDF'}</button>
         <div className="v2-seg" role="group" aria-label="Editor layout">
@@ -213,7 +220,6 @@ export function JsgEditorPage() {
         </div>
         <ThemeToggle />
       </header>
-      {loaded?.docType === 'uhb' ? <DocCodesStrip id={id} refreshKey={savedAt} /> : null}
       {!writable ? <Alert tone="warn">You have {role} access to this project: you can read the document, but changes cannot be saved.</Alert> : null}
       {stale ? <Alert tone="warn">Someone else saved this document after you opened it, so your save was refused. <button className="btn btn-sm" onClick={() => { if (!dirty || window.confirm('Reload the saved document? Your unsaved changes will be lost.')) void load(); }}>Reload the saved document</button></Alert> : null}
       {error ? <Alert tone="bad">{error}</Alert> : null}

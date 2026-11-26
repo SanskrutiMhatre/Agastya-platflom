@@ -3,7 +3,7 @@
 // A JSS or JSG document does not need data module codes (DMC), a publication module code (PMC) or picture names (ICN), and its editor does not show them. They are still kept,
 // because the document can be exported as S1000D, converted to another engine, or came from a package that already had them. This file is the one place that makes and keeps them:
 //
-//   <project>/doc-identity.json   the record: the codes of every module, the PMC, every picture's ICN, and which of them the editor shows (all off by default)
+//   <project>/doc-identity.json   the record: the codes of every module, the PMC, every picture's ICN, and whether the editor writes each section's code beside its heading (off by default)
 //
 // Rules - these are the ones the brief asks for ("generated automatically, unique, driven from systems / sub-systems, no random creations"):
 //   * a code is made from the document's own structure: a chapter is a SYSTEM, a section of the chapter is a SUB-SYSTEM (or, when the project's SNS names it, the SNS row's codes);
@@ -36,7 +36,8 @@ export interface IdModule {
 }
 export interface IdPicture { key: string; icn: string; file: string; module: string; origin: Origin; retired?: boolean }
 export interface PmIdentity { pmIssuer: string; pmNumber: string; pmVolume: string; issueNumber: string; inWork: string; languageIsoCode: string; countryIsoCode: string; title: string; origin: Origin }
-export interface Visibility { dmc: boolean; pmc: boolean; icn: boolean; toc: boolean }
+/** What the author can switch on. Only the section code is shown in the editor (beside a heading); the publication code, picture names and contents list are on the Publication and Explore pages, always. */
+export interface Visibility { dmc: boolean }
 export interface IdentityRecord {
   version: 1; format: 'jss' | 'jsg'; modelIdentCode: string; systemDiffCode: string; pm: PmIdentity;
   modules: IdModule[]; pictures: IdPicture[]; show: Visibility; counters: { picture: number }; updatedAt: string;
@@ -47,7 +48,7 @@ export interface IdentityRecord {
 const pad = (n: number, w: number): string => String(n).padStart(w, '0');
 /** The 35 characters a sub-system code is taken from (0 is kept for "the system itself"). */
 const SUB = '123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-export const DEFAULT_SHOW: Visibility = { dmc: false, pmc: false, icn: false, toc: false };
+export const DEFAULT_SHOW: Visibility = { dmc: false };
 
 export const dmcString = (c: DmcCode): string => `DMC-${[c.modelIdentCode, c.systemDiffCode, c.systemCode, `${c.subSystemCode}${c.subSubSystemCode}`, c.assyCode, `${c.disassyCode}${c.disassyCodeVariant}`, `${c.infoCode}${c.infoCodeVariant}`, c.itemLocationCode].join('-')}`;
 export const pmcString = (m: string, p: PmIdentity): string => `PMC-${m}-${p.pmIssuer}-${p.pmNumber}-${p.pmVolume}`;
@@ -134,7 +135,7 @@ export function emptyRecord(outline: Outline, facts: ProjectFacts): IdentityReco
 export function readRecord(projectId: string): IdentityRecord | null {
   try {
     const r = JSON.parse(fs.readFileSync(identityPath(projectId), 'utf8')) as IdentityRecord;
-    return r && r.version === 1 && Array.isArray(r.modules) ? { ...r, show: { ...DEFAULT_SHOW, ...(r.show ?? {}) }, pictures: r.pictures ?? [], counters: r.counters ?? { picture: 0 } } : null;
+    return r && r.version === 1 && Array.isArray(r.modules) ? { ...r, show: { dmc: !!r.show?.dmc }, pictures: r.pictures ?? [], counters: r.counters ?? { picture: 0 } } : null;
   } catch { return null; }
 }
 
@@ -245,7 +246,8 @@ export function applyPatch(rec: IdentityRecord, patch: IdentityPatch): void {
 }
 
 export function applyVisibility(rec: IdentityRecord, show: Partial<Visibility>): void {
-  for (const k of ['dmc', 'pmc', 'icn', 'toc'] as const) { if (show[k] === undefined) continue; if (typeof show[k] !== 'boolean') throw bad(`"${k}" must be true or false.`, 'BAD_BODY'); rec.show[k] = show[k] as boolean; }
+  // "pmc", "icn" and "toc" were switches once; a client that still sends them is not refused, they are ignored
+  if (show.dmc !== undefined) { if (typeof show.dmc !== 'boolean') throw bad('"dmc" must be true or false.', 'BAD_BODY'); rec.show.dmc = show.dmc; }
   rec.updatedAt = nowIso();
 }
 
