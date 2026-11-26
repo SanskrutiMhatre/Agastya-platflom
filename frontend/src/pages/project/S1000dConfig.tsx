@@ -3,18 +3,17 @@
 //   Codes           which information codes the project offers
 //   Data modules    which of the 21 types the project offers (with each type's suggested codes)
 //   SNS             the project's standard numbering hierarchy (system → subsystem → assembly)
-//   Applicability   the ACT / CCT / PCT definitions, and every reference problem with its data module and XML location
 // Project owners and managers change it; everyone else reads it. The SERVER enforces it when a data module is created.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { referenceApi, s1000dApi, issueLabel, ISSUE_OPTIONS, type ApplicModel, type ImportReport, type ModelCodePlan, type ProjectBundle, type SnsNode } from '../../api';
+import { referenceApi, s1000dApi, issueLabel, ISSUE_OPTIONS, type ImportReport, type ModelCodePlan, type ProjectBundle, type SnsNode } from '../../api';
 import { Icon } from '../../components/Icon';
 import { Alert, Badge, ConfirmModal, Empty, Field, Loading, Modal, errText, useAsync } from '../../components/ui';
 import { useProject } from '../../layouts/ProjectShell';
 import { useUi } from '../../store/ui';
 
-type Section = 'identity' | 'codes' | 'types' | 'sns' | 'applic';
-const SECTIONS: Array<[Section, string]> = [['identity', 'Identity'], ['codes', 'Information codes'], ['types', 'Data module types'], ['sns', 'SNS'], ['applic', 'Applicability']];
+type Section = 'identity' | 'codes' | 'types' | 'sns';
+const SECTIONS: Array<[Section, string]> = [['identity', 'Identity'], ['codes', 'Information codes'], ['types', 'Data module types'], ['sns', 'SNS']];
 
 export function S1000dConfig() {
   const { id, role } = useProject();
@@ -37,7 +36,6 @@ export function S1000dConfig() {
       {section === 'codes' ? <Codes b={b} id={id} can={can} reload={bundle.reload} /> : null}
       {section === 'types' ? <Types b={b} id={id} can={can} reload={bundle.reload} /> : null}
       {section === 'sns' ? <Sns b={b} id={id} can={can} reload={bundle.reload} /> : null}
-      {section === 'applic' ? <Applic b={b} id={id} can={can} reload={bundle.reload} /> : null}
     </div>
   );
 }
@@ -324,91 +322,5 @@ function ImportModal({ id, onClose, onDone }: { id: string; onClose: () => void;
         {err ? <Alert tone="bad">{err}</Alert> : null}{rep ? <ReportView r={rep} /> : null}
       </div>
     </Modal>
-  );
-}
-
-// ── Applicability ────────────────────────────────────────────────────────────
-const blank = (): ApplicModel => ({ attributes: [], conditionTypes: [], conditions: [], products: [] });
-/** The allowed values of an attribute / condition type, edited as text (committed on leaving the box, so a comma can be typed). Labels already on a value are kept. */
-function ValuesInput({ values, disabled, onChange }: { values: Array<{ value: string; label?: string }>; disabled: boolean; onChange: (v: Array<{ value: string; label?: string }>) => void }) {
-  const [text, setText] = useState(values.map((v) => v.value).join(', '));
-  useEffect(() => { setText(values.map((v) => v.value).join(', ')); }, [values.map((v) => v.value).join('\u0001')]);   // eslint-disable-line react-hooks/exhaustive-deps
-  const commit = () => {
-    const next = text.split(',').map((x) => x.trim()).filter(Boolean).map((value) => ({ value, ...(values.find((o) => o.value === value)?.label ? { label: values.find((o) => o.value === value)!.label } : {}) }));
-    onChange(next);
-  };
-  return <input className="v2-input" value={text} disabled={disabled} aria-label="Allowed values" onChange={(e) => setText(e.target.value)} onBlur={commit} onKeyDown={(e) => { if (e.key === 'Enter') commit(); }} />;
-}
-
-function Applic({ b, id, can, reload }: P) {
-  const toast = useUi((s) => s.toast);
-  const data = useAsync(() => s1000dApi.applicability(id), [id]);
-  const [m, setM] = useState<ApplicModel>(blank()); const [dirty, setDirty] = useState(false); const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
-  useEffect(() => { if (data.data) { setM(data.data.model); setDirty(false); } }, [data.data]);
-  if (data.loading && !data.data) return <Loading />;
-  if (!data.data) return <Alert tone="bad">{data.error}</Alert>;
-  const upd = (fn: (x: ApplicModel) => void) => { const n = JSON.parse(JSON.stringify(m)) as ApplicModel; fn(n); setM(n); setDirty(true); };
-  const save = async () => {
-    setBusy(true); setErr('');
-    try { const r = await s1000dApi.saveApplicability(id, m); toast(`Written: ${r.written.map((w) => w.file).join(', ')}`, 'success'); data.reload(); reload(); } catch (e) { setErr(errText(e)); } finally { setBusy(false); }
-  };
-  const th = (t: string[]) => <thead><tr>{t.map((x) => <th key={x}>{x}</th>)}<th /></tr></thead>;
-  const rm = (fn: () => void) => <td style={{ textAlign: 'right' }}>{can ? <button className="icon-btn" aria-label="Remove" onClick={fn}><Icon name="trash" size={14} /></button> : null}</td>;
-  const inp = (v: string, on: (s: string) => void, extra = '') => <input className={`v2-input ${extra}`} value={v} disabled={!can} onChange={(e) => on(e.target.value)} />;
-  const typeSel = (v: string, on: (s: string) => void) => <select className="v2-select" value={v} disabled={!can} onChange={(e) => on(e.target.value)}>{['string', 'integer', 'real', 'boolean'].map((t) => <option key={t}>{t}</option>)}</select>;
-  const problems = data.data.problems;
-  return (
-    <div className="v2-stack" data-testid="s1000d-applic">
-      <Alert tone="warn"><b>Authored and validated — not applied to publishing.</b> {data.data.note}</Alert>
-      <div className="v2-card v2-card-pad v2-stack">
-        <h4 style={{ margin: 0 }}>Product attributes (ACT)</h4>
-        <p className="v2-hint" style={{ margin: 0 }}>What distinguishes one product from another (type, model, version, serial number). Values: comma-separated; leave empty for an open value. {data.data.files.act ? <>Stored in <span className="v2-mono">{data.data.files.act}</span>.</> : 'Written as an applicability cross-reference table data module when you save.'}</p>
-        <table className="v2-table">{th(['Identifier', 'Name', 'Description', 'Type', 'Allowed values'])}<tbody>{m.attributes.map((a, i) => (
-          <tr key={i}><td>{inp(a.id, (v) => upd((x) => { x.attributes[i].id = v; }), 'v2-mono')}</td><td>{inp(a.name, (v) => upd((x) => { x.attributes[i].name = v; }))}</td><td>{inp(a.descr, (v) => upd((x) => { x.attributes[i].descr = v; }))}</td>
-            <td>{typeSel(a.valueDataType, (v) => upd((x) => { x.attributes[i].valueDataType = v as never; }))}</td><td><ValuesInput values={a.values} disabled={!can} onChange={(v) => upd((x) => { x.attributes[i].values = v; })} /></td>{rm(() => upd((x) => { x.attributes.splice(i, 1); }))}</tr>))}</tbody></table>
-        {can ? <div><button className="btn btn-sm" onClick={() => upd((x) => { x.attributes.push({ id: '', name: '', descr: '', valueDataType: 'string', values: [] }); })} data-testid="add-attribute"><Icon name="plus" />Add attribute</button></div> : null}
-      </div>
-      <div className="v2-card v2-card-pad v2-stack">
-        <h4 style={{ margin: 0 }}>Conditions (CCT)</h4>
-        <p className="v2-hint" style={{ margin: 0 }}>Technical or operational conditions (a service bulletin applied, a maintenance level). A condition type lists the values its conditions can have.</p>
-        <table className="v2-table">{th(['Type id', 'Name', 'Description', 'Data type', 'Allowed values'])}<tbody>{m.conditionTypes.map((t, i) => (
-          <tr key={i}><td>{inp(t.id, (v) => upd((x) => { x.conditionTypes[i].id = v; }), 'v2-mono')}</td><td>{inp(t.name, (v) => upd((x) => { x.conditionTypes[i].name = v; }))}</td><td>{inp(t.descr, (v) => upd((x) => { x.conditionTypes[i].descr = v; }))}</td>
-            <td>{typeSel(t.valueDataType, (v) => upd((x) => { x.conditionTypes[i].valueDataType = v as never; }))}</td><td><ValuesInput values={t.values} disabled={!can} onChange={(v) => upd((x) => { x.conditionTypes[i].values = v; })} /></td>{rm(() => upd((x) => { x.conditionTypes.splice(i, 1); }))}</tr>))}</tbody></table>
-        {can ? <div><button className="btn btn-sm" onClick={() => upd((x) => { x.conditionTypes.push({ id: '', name: '', descr: '', valueDataType: 'string', values: [] }); })}><Icon name="plus" />Add condition type</button></div> : null}
-        <table className="v2-table">{th(['Condition id', 'Type', 'Name', 'Description'])}<tbody>{m.conditions.map((c, i) => (
-          <tr key={i}><td>{inp(c.id, (v) => upd((x) => { x.conditions[i].id = v; }), 'v2-mono')}</td>
-            <td><select className="v2-select" value={c.condTypeId} disabled={!can} onChange={(e) => upd((x) => { x.conditions[i].condTypeId = e.target.value; })}><option value="">(choose)</option>{m.conditionTypes.map((t) => <option key={t.id} value={t.id}>{t.id}</option>)}</select></td>
-            <td>{inp(c.name, (v) => upd((x) => { x.conditions[i].name = v; }))}</td><td>{inp(c.descr, (v) => upd((x) => { x.conditions[i].descr = v; }))}</td>{rm(() => upd((x) => { x.conditions.splice(i, 1); }))}</tr>))}</tbody></table>
-        {can ? <div><button className="btn btn-sm" onClick={() => upd((x) => { x.conditions.push({ id: '', condTypeId: m.conditionTypes[0]?.id ?? '', name: '', descr: '' }); })}><Icon name="plus" />Add condition</button></div> : null}
-      </div>
-      <div className="v2-card v2-card-pad v2-stack">
-        <h4 style={{ margin: 0 }}>Products (PCT)</h4>
-        <p className="v2-hint" style={{ margin: 0 }}>Optional: the concrete products, each as the values its attributes take.</p>
-        {m.products.map((p, i) => (
-          <div key={i} className="v2-card v2-card-pad v2-stack" style={{ gap: 6 }}>
-            <div className="v2-row"><input className="v2-input v2-mono" style={{ width: 160 }} value={p.id} disabled={!can} placeholder="product id" onChange={(e) => upd((x) => { x.products[i].id = e.target.value; })} />{can ? <button className="icon-btn" aria-label="Remove product" onClick={() => upd((x) => { x.products.splice(i, 1); })}><Icon name="trash" size={14} /></button> : null}</div>
-            {p.assigns.map((a, j) => (
-              <div key={j} className="v2-row">
-                <select className="v2-select" style={{ width: 220 }} value={`${a.type}:${a.ident}`} disabled={!can} onChange={(e) => upd((x) => { const [t, idn] = e.target.value.split(':'); x.products[i].assigns[j].type = t as never; x.products[i].assigns[j].ident = idn; })}>
-                  <option value=":">(choose)</option>{m.attributes.map((at) => <option key={at.id} value={`prodattr:${at.id}`}>{at.name || at.id}</option>)}{m.conditions.map((c) => <option key={c.id} value={`condition:${c.id}`}>Condition: {c.name || c.id}</option>)}
-                </select>
-                <input className="v2-input" value={a.value} disabled={!can} placeholder="value" onChange={(e) => upd((x) => { x.products[i].assigns[j].value = e.target.value; })} />
-                {can ? <button className="icon-btn" aria-label="Remove value" onClick={() => upd((x) => { x.products[i].assigns.splice(j, 1); })}><Icon name="trash" size={14} /></button> : null}
-              </div>))}
-            {can ? <div><button className="btn btn-sm" onClick={() => upd((x) => { x.products[i].assigns.push({ ident: m.attributes[0]?.id ?? '', type: 'prodattr', value: '' }); })}>Add value</button></div> : null}
-          </div>))}
-        {can ? <div><button className="btn btn-sm" onClick={() => upd((x) => { x.products.push({ id: `prd-${x.products.length + 1}`, assigns: [] }); })}><Icon name="plus" />Add product</button></div> : null}
-      </div>
-      {err ? <Alert tone="bad"><span style={{ whiteSpace: 'pre-wrap' }}>{err}</span></Alert> : null}
-      {can ? <div><button className="btn btn-primary" disabled={busy || !dirty || !m.attributes.length} onClick={save} data-testid="applic-save">Save applicability tables</button></div> : null}
-      <div className="v2-card v2-card-pad v2-stack" data-testid="applic-problems">
-        <h4 style={{ margin: 0 }}>References in this project's data modules</h4>
-        {!problems.length ? <p className="v2-hint" style={{ margin: 0 }}>{data.data.files.act ? 'Every applicability reference resolves.' : 'No applicability tables yet: assertions in data modules cannot be checked.'}</p> : (
-          <table className="v2-table"><thead><tr><th>Data module</th><th>Line</th><th>Location</th><th>Problem</th></tr></thead><tbody>{problems.map((p, i) => (
-            <tr key={i}><td className="v2-mono">{p.file.split('/').pop()}</td><td>{p.line}</td><td className="v2-mono">{p.location}</td><td><Badge tone={p.severity === 'error' ? 'bad' : 'warn'}>{p.severity}</Badge> {p.message}</td></tr>))}</tbody></table>
-        )}
-      </div>
-      <span hidden>{b.version}</span>
-    </div>
   );
 }

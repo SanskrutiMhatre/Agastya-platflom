@@ -5,11 +5,10 @@ import { h, icon, clear, shortcutLabel } from './dom';
 import { TEMPLATES, buildDataModule, defaultNewDmOptions, defaultBrexCode, NewDmOptions } from '../core/templates';
 import { ISSUES, ISSUE_LABEL, SECURITY_LABELS, formatDmc, parseDmc, readDmCode, validateDmcParts, writeDmCode, find, todayParts, DEFAULT_BREX, schemaUrl, dmRefLabel } from '../core/s1000d';
 import { friendlyName, elementDescription } from '../core/elementInfo';
-import { applicPicker, applicElementXml } from './applicPicker';
 import { renameCandidates } from '../core/ops';
 import * as ops from '../core/ops';
 import { buildLabels } from '../view/labels';
-import { elementChildren, textOf, createEl, NS, readXmlFile, escapeAttr, escapeText } from '../core/xml';
+import { elementChildren, textOf, createEl, NS, readXmlFile } from '../core/xml';
 import { parseColWidth } from '../core/units';
 import { ImageStore, StoredBrex } from './storage';
 
@@ -366,13 +365,7 @@ export class Dialogs {
       list?.length ? select([['', none], ...list.map((c): Pair => [c.code, `${c.code} – ${c.title.slice(0, 50)}`])], '') : input('', { maxlength: 3 });
     f.learn = learnOf(pr?.codes.learnCode, '(none)') as Ctl; f.learnEvent = learnOf(pr?.codes.learnEventCode, '(none)') as Ctl;
     const learnRow = h('div', { class: 'form-grid' }, field('Learn code', f.learn, 'Only for learning data modules.'), field('Learn event code', f.learnEvent));
-    // Applicability: choose from the project's ACT/CCT definitions (written as <applic> with <assert>/<evaluate>)
-    const picker = pr?.applic ? applicPicker(pr.applic, () => update()) : null;
-    const applicOut = (): { xml: string; text: string } | null => {
-      const p = picker?.read();
-      return p ? { xml: applicElementXml(p), text: p.text } : null;
-    };
-    const applicField = picker ? field('Applicability', picker.el, "Defined in the project's applicability tables (ACT/CCT). The data module refers to the ACT.") : field('Applicability', f.applic);
+    const applicField = field('Applicability', f.applic);
     const assyBase = o.code.assyCode;
     let assyEdited = false;
     f.assy.addEventListener('input', () => { assyEdited = true; });
@@ -386,7 +379,6 @@ export class Dialogs {
         infoCode: f.info.value.toUpperCase(), infoCodeVariant: f.infov.value.toUpperCase(), itemLocationCode: f.ilc.value,
         ...(schema === 'learning' && f.learn.value.trim() ? { learnCode: f.learn.value.toUpperCase(), ...(f.learnEvent.value.trim() ? { learnEventCode: f.learnEvent.value.toUpperCase() } : {}) } : {}),
       },
-      ...(() => { const a = applicOut(); return a && pr?.applic ? { applicXml: a.xml, applicability: a.text, actRef: { modelIdentCode: pr.applic.act.mic, systemDiffCode: 'A', systemCode: '00', subSystemCode: '0', subSubSystemCode: '0', assyCode: '00', disassyCode: '00', disassyCodeVariant: 'A', infoCode: pr.applic.act.info, infoCodeVariant: 'A', itemLocationCode: 'D' } } : { applicXml: undefined, actRef: undefined }; })(),
       language: f.lang.value.toLowerCase(), country: f.country.value.toUpperCase(), issueNumber: f.issueNo.value, inWork: f.inWork.value,
       techName: f.tech.value, infoName: f.infoName.value, security: f.sec.value, enterpriseCode: f.entCode.value.toUpperCase(), enterpriseName: f.entName.value, applicability: f.applic.value,
       ...(f.orgCode ? { originatorCode: f.orgCode.value.toUpperCase(), originatorName: f.orgName.value } : {}),
@@ -418,7 +410,6 @@ export class Dialogs {
       if (!v.techName.trim()) e.push('Technical name is required');
       if (!/^[A-Z0-9]{5}$/.test(v.enterpriseCode)) e.push('Enterprise code: 5 characters (CAGE / NCAGE)');
       if (!v.enterpriseName.trim()) e.push('Enterprise name is required');
-      if (picker?.incomplete()) e.push('Applicability: choose at least one value, or select "All"');
       if (pr && pr.codes.infoCode.length && !infoTitle.has(v.code.infoCode)) e.push(`Information code ${v.code.infoCode} is not enabled for this project (Project configuration → Information codes).`);
       if (snsOn && pr!.snsEnforced && v.schema !== 'brex' && !/applic|condcross|prdcross/i.test(v.schema)) {
         const sub = `${v.code.subSystemCode}${v.code.subSubSystemCode}`;
@@ -490,35 +481,6 @@ export class Dialogs {
         },
       },
     ], { width: '880px' });
-  }
-
-  /** Create an <applic> definition for a data module from the project's ACT / CCT and (optionally) point `el` at it with applicRefId. */
-  applicDefinition(ed: DocumentEditor, el: Element | null) {
-    const pr = this.app.host?.projectRefs?.() ?? null;
-    if (!pr?.applic) {
-      this.alert('No applicability tables', "This project has no applicability cross-reference table (ACT) yet, so there is nothing to build a definition from. A project owner or manager defines product attributes and conditions under Project settings → S1000D → Applicability.");
-      return;
-    }
-    const errors = h('div', { class: 'form-errors', role: 'alert' });
-    const picker = applicPicker(pr.applic, () => { clear(errors); }, { allowAll: false });
-    const body = h('div', { class: 'newdm' },
-      h('p', { class: 'field-hint' }, el ? `The definition is added to this data module and <${el.nodeName}> is pointed at it (applicRefId).` : 'The definition is added to this data module.'),
-      field('Applies where', picker.el), errors);
-    modal('New applicability definition', body, [
-      { label: 'Cancel' },
-      {
-        label: 'Create', primary: true, action: () => {
-          const p = picker.read();
-          if (!p) { clear(errors); errors.appendChild(h('ul', null, h('li', null, 'Choose at least one value.'))); return false; }
-          const xml = `<applic><displayText><simplePara>${escapeText(p.text)}</simplePara></displayText>${p.inner}</applic>`;
-          const A = pr.applic!.act;
-          const id = ed.addApplicDefinition(xml, el, { modelIdentCode: A.mic, systemDiffCode: 'A', systemCode: '00', subSystemCode: '0', subSubSystemCode: '0', assyCode: '00', disassyCode: '00', disassyCodeVariant: 'A', infoCode: A.info, infoCodeVariant: 'A', itemLocationCode: 'D' });
-          if (!id) return false;
-          this.app.toast(`Applicability ${id} added`, 'info');
-          return undefined;
-        },
-      },
-    ], { width: '640px' });
   }
 
   // ---------------------------------------------------------------- samples & recent

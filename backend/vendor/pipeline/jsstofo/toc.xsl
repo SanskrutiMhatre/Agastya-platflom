@@ -25,6 +25,8 @@
         <fo:block space-after="1.5mm"
                   start-indent="{$indent}"
                   text-align-last="justify">
+            <!-- L&T reference: the contents lines are 20.5 pt apart (1.5 mm gap on a 13.8 pt line is 18 pt) -->
+            <xsl:if test="$lref"><xsl:attribute name="space-after">2.4mm</xsl:attribute></xsl:if>
             <xsl:if test="$bold = '1'">
                 <xsl:attribute name="font-weight">bold</xsl:attribute>
             </xsl:if>

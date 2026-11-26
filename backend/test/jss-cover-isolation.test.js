@@ -30,7 +30,9 @@ const norm = (s) => s.replace(new RegExp(todayForms().join('|'), 'g'), BASELINE_
 // folder (intentionally-blank.svg) by a relative path from the build folder, so the same code gives a different string in every folder, and a fingerprint taken in
 // one checkout could never pass in another (this was the first cause of the failures after the merge); (2) the ORDER of the attributes inside a tag, which is not
 // content and moves whenever a stylesheet is refactored.
-const canon = (s) => s.replace(/url\('(?:\.\.\/)+[^']*?\/backend\/vendor\//g, "url('VENDOR/")
+// (3) WHICH picture the Larsen & Toubro fallback logo is: on 2026-11-26 the owner replaced vendor/pipeline/jss/artwork/lt-logo.png by assets/default-publisher-logo.png (the L&T Precision
+// Engineering logo) for every JSS book, this path included. The one changed file name is mapped back, so the fingerprint still proves that nothing of the LAYOUT moved.
+const canon = (s) => s.replace(/url\('(?:\.\.\/)+[^']*?\/backend\/assets\/default-publisher-logo\.png'/g, "url('VENDOR/pipeline/jss/artwork/lt-logo.png'").replace(/url\('(?:\.\.\/)+[^']*?\/backend\/vendor\//g, "url('VENDOR/")
   .replace(/<([\w:.-]+)((?:\s+[\w:.-]+="[^"]*")+)\s*(\/?)>/g, (m, tag, attrs, close) => `<${tag} ${[...attrs.matchAll(/([\w:.-]+)="([^"]*)"/g)].map((x) => `${x[1]}="${x[2]}"`).sort().join(' ')}${close}>`);
 const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
 const fingerprint = (fo) => sha(canon(norm(fo)));
@@ -41,6 +43,8 @@ const page1 = (pdf) => pages(pdf, 1, 1);
 const PARAMS = {
   'cover.inbr.show': ['jsstofo/frontmatter.xsl'],
   'cover.title.split': ['jsstofo/frontmatter.xsl'],
+  'cover.authority.foot': ['jsstofo/frontmatter.xsl', 'jsstofo/pagesetup.xsl'],   // declared and used in frontmatter.xsl; the page setup holds the cover master and sequence it selects
+  'changenotice.layout': ['jsstofo/frontmatter.xsl'],
   'foreword.documentNo.show': ['jsstofo/frontmatter.xsl'],
   'para.after': ['jsstofo/common.xsl', 'jsstofo/jsstofo.xsl'],                         // used by common.xsl, declared in jsstofo.xsl
   'heading.1.font': ['jsstofo/body.xsl', 'jsstofo/jsstofo.xsl'],
@@ -50,9 +54,17 @@ const PARAMS = {
   'chapter.pageBreak': ['jsstofo/body.xsl', 'jsstofo/jsstofo.xsl'],
   'chapter.divider': ['jsstofo/body.xsl', 'jsstofo/jsstofo.xsl'],
   'roc.layout': ['jsstofo/frontmatter.xsl'], 'abbrev.layout': ['jsstofo/frontmatter.xsl'], 'safety.footer.show': ['jsstofo/frontmatter.xsl'],
+  // the L&T reference layout (owner's request of 2026-11-26): declared in the shared frontmatter.xsl (as $lref, $restricted.scope, $red.color), read by the JSS-only stylesheets
+  'ref.layout': ['jsstofo/frontmatter.xsl', 'jsstofo/headers_footers.xsl', 'jsstofo/jsstofo.xsl', 'jsstofo/pagesetup.xsl'],
+  'restricted.scope': ['jsstofo/frontmatter.xsl', 'jsstofo/headers_footers.xsl'],
+  'red.color': ['jsstofo/common.xsl', 'jsstofo/frontmatter.xsl'],
+  'chapter.title.align': ['jsstofo/body.xsl', 'jsstofo/jsstofo.xsl'],
+  'heading.underline': ['jsstofo/body.xsl', 'jsstofo/jsstofo.xsl'],
 };
+// declared in the shared file with the old behaviour as the default, and read by JSS-only stylesheets as well
+const SHARED_DECLARED = new Set(['ref.layout', 'restricted.scope', 'red.color']);
 // the S1000D direct engine includes jsstofo/frontmatter.xsl and nothing else of the JSS stylesheets: only the parameters declared there can reach it, and every one defaults to the old behaviour
-const SHARED = new Set(['cover.inbr.show', 'cover.title.split', 'foreword.documentNo.show', 'roc.layout', 'abbrev.layout', 'safety.footer.show']);
+const SHARED = new Set(['cover.inbr.show', 'cover.title.split', 'foreword.documentNo.show', 'roc.layout', 'abbrev.layout', 'safety.footer.show', 'changenotice.layout']);
 
 
 let h; let w;
@@ -118,6 +130,10 @@ test('S1000D and the old JSS User Handbook path: the XSL-FO is what it was befor
   for (const n of Object.keys(PARAMS)) assert.ok(!fs.existsSync(path.join(legacy.dir, 'jss-run.xsl')) || !fs.readFileSync(path.join(legacy.dir, 'jss-run.xsl'), 'utf8').includes(n), `${n} is never sent on this path`);
 
   const s = await w.post('/api/projects/sample', {}); assert.equal(s.status, 201); const sid = s.json.project.id;
+  // the sample now starts on the reference (Xignal) style; the baseline was taken on the plain style, so the project is put back on it (the House style chooser's route) and the direct engine
+  assert.equal(s.json.project.templateRef, 'xignal-s1000d');
+  assert.equal((await w.patch(`/api/projects/${sid}`, { templateRef: 'default' })).status, 200);
+  assert.equal((await w.patch(`/api/projects/${sid}`, { pipeline: 's1000dtofo' })).status, 200);
   const direct = await build(sid);
   assert.equal(fingerprint(direct.fo), BASELINE['s1000d-direct'].sha256, 'S1000D direct engine: FO as before');
   for (const f of ['s1000dtofo-run.xsl', 'jss-run.xsl']) if (fs.existsSync(path.join(direct.dir, f))) for (const n of Object.keys(PARAMS)) assert.ok(!fs.readFileSync(path.join(direct.dir, f), 'utf8').includes(n), `${f}: ${n} is never sent to the S1000D engine`);
@@ -147,17 +163,24 @@ test('the exceptions stay small and isolated: each parameter lives in the files 
   for (const files of Object.values(where)) for (const f of files) assert.ok(f.startsWith('jsstofo/'), `${f} is a JSS stylesheet`);
   // the default of each declaration is the value the stylesheets always had
   const jss = fs.readFileSync(path.join(VENDOR, 'jsstofo', 'jsstofo.xsl'), 'utf8'); const fm = fs.readFileSync(path.join(VENDOR, 'jsstofo', 'frontmatter.xsl'), 'utf8');
-  assert.match(fm, /<xsl:param name="cover\.inbr\.show">1<\/xsl:param>/); assert.match(fm, /<xsl:param name="foreword\.documentNo\.show">1<\/xsl:param>/); assert.match(fm, /<xsl:param name="cover\.title\.split">0<\/xsl:param>/);
+  assert.match(fm, /<xsl:param name="cover\.inbr\.show">1<\/xsl:param>/); assert.match(fm, /<xsl:param name="foreword\.documentNo\.show">1<\/xsl:param>/); assert.match(fm, /<xsl:param name="cover\.title\.split">0<\/xsl:param>/); assert.match(fm, /<xsl:param name="cover\.authority\.foot">0<\/xsl:param>/); assert.match(fm, /<xsl:param name="changenotice\.layout">classic<\/xsl:param>/);
   assert.match(jss, /<xsl:param name="chapter\.pageBreak">0<\/xsl:param>/, 'chapter.pageBreak defaults to the old behaviour');
   assert.match(jss, /<xsl:param name="para\.after"><xsl:choose><xsl:when test="\$xjss">2mm<\/xsl:when><xsl:otherwise>3mm<\/xsl:otherwise><\/xsl:choose><\/xsl:param>/);
   for (const n of ['heading.1.font', 'heading.2.font', 'heading.3.font', 'heading.4.font', 'heading.1.gap', 'heading.2.gap', 'heading.3.gap', 'heading.4.gap']) assert.match(jss, new RegExp(`<xsl:param name="${n.replace(/\./g, '\.')}"/>`), `${n} defaults to empty`);
   // who sends them: one function, called for a JSS-authored project only
   const svc = fs.readFileSync(path.join(__dirname, '..', 'src', 'services', 'jss', 'service.ts'), 'utf8'); const pub = fs.readFileSync(path.join(__dirname, '..', 'src', 'services', 'publisher.ts'), 'utf8');
   for (const n of Object.keys(PARAMS)) assert.equal((pub.match(new RegExp(n.replace(/\./g, '\.'), 'g')) || []).length, 0, `${n} is not set in publisher.ts`);
-  for (const n of ['para.after', 'heading.1.font', 'heading.1.bodyIndent', 'heading.1.gap', 'cover.title.split', 'foreword.documentNo.show', 'cover.inbr.show', 'chapter.pageBreak', 'chapter.divider', 'roc.layout', 'abbrev.layout', 'safety.footer.show']) assert.equal((svc.match(new RegExp(`'${n.replace(/\./g, '\.')}'`, 'g')) || []).length, 1, `${n} is set once, in layoutParamsFor`);
+  for (const n of ['para.after', 'heading.1.font', 'heading.1.bodyIndent', 'heading.1.gap', 'cover.title.split', 'foreword.documentNo.show', 'cover.inbr.show', 'chapter.pageBreak', 'chapter.divider', 'roc.layout', 'abbrev.layout', 'safety.footer.show', 'cover.authority.foot', 'changenotice.layout', 'ref.layout', 'restricted.scope', 'chapter.title.align', 'heading.underline', 'red.color']) assert.equal((svc.match(new RegExp(`'${n.replace(/\./g, '\.')}'`, 'g')) || []).length, 1, `${n} is set once, in layoutParamsFor`);
   assert.match(pub, /if \(jssType\) common\.layoutParams = layoutParamsFor\(jssType, common\.layoutParams\);/); assert.match(pub, /const jssType = isJssAuthored\(projectId\) \? jssTypeOfProject\(projectId\) : undefined;/);
-  assert.ok(SHARED.size === 6);
+  assert.ok(SHARED.size === 7);
   for (const n of SHARED) assert.deepEqual(PARAMS[n], ['jsstofo/frontmatter.xsl'], `${n}: declared and used in the one shared file`);
   assert.match(fm, /<xsl:param name="roc\.layout">change-notice<\/xsl:param>/); assert.match(fm, /<xsl:param name="abbrev\.layout">description<\/xsl:param>/); assert.match(fm, /<xsl:param name="safety\.footer\.show">1<\/xsl:param>/);
   assert.match(jss, /<xsl:param name="chapter\.divider">1<\/xsl:param>/, 'chapter.divider defaults to the old behaviour');
+  // the reference layout: every parameter defaults to the old look, the shared three are declared in frontmatter.xsl, the other two in jsstofo.xsl
+  for (const n of SHARED_DECLARED) assert.ok(PARAMS[n].includes('jsstofo/frontmatter.xsl'), `${n}: declared in the one shared file`);
+  assert.match(fm, /<xsl:param name="ref\.layout">0<\/xsl:param>/, 'ref.layout defaults to off'); assert.match(fm, /<xsl:param name="restricted\.scope">all<\/xsl:param>/, 'restricted.scope defaults to every page');
+  assert.match(fm, /<xsl:param name="red\.color">#CC0000<\/xsl:param>/, 'red.color defaults to the red the notices always had');
+  assert.match(jss, /<xsl:param name="chapter\.title\.align">left<\/xsl:param>/, 'chapter.title.align defaults to left'); assert.match(jss, /<xsl:param name="heading\.underline"\/>/, 'heading.underline defaults to none');
+  // the two differences of the systems, in the one function that sends them
+  assert.match(svc, /\['restricted\.scope', naval \? 'reference' : 'cover'\], \['chapter\.title\.align', naval \? 'center' : 'left'\]/, 'Land: RESTRICTED on the cover pages and chapters from the left; Naval: also on the Change Notice and chapters centred');
 });

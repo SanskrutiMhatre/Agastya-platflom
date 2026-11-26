@@ -25,7 +25,7 @@ export async function createSampleProject(user: P.User, folder?: string): Promis
   let name = base;
   for (let n = 2; workspace.nameTaken(workspaceDir, name); n++) name = `${base} (${n})`;
 
-  const card = await P.createProject(user, { name, folder, pipeline: 's1000dtofo' });
+  const card = await P.createProject(user, { name, folder, format: 's1000d' });   // the S1000D wizard's project: the reference (Xignal) style and the direct engine
   const id = card.id;
   const actor = { id: user.id, username: user.username, role: user.role };
 

@@ -97,7 +97,7 @@
     </xsl:template>
 
     <xsl:template match="red">
-        <fo:inline color="#CC0000"><xsl:apply-templates/></fo:inline>
+        <fo:inline color="{$red.color}"><xsl:apply-templates/></fo:inline>
     </xsl:template>
 
     <xsl:template match="br">
@@ -395,11 +395,18 @@
     <!-- Centered page title used by every front-matter page -->
     <xsl:template name="page-title">
         <xsl:param name="text"/>
+        <xsl:param name="color"/>
         <fo:block text-align="center"
                   font-size="{$heading2-size}"
                   font-weight="bold"
                   space-after="6mm"
                   keep-with-next.within-page="always">
+            <!-- L&T reference: the title stands 11 pt lower on the page (first baseline 79 pt), underlined; a page of the red notices (First Aid) prints it in red -->
+            <xsl:if test="$lref">
+                <xsl:attribute name="text-decoration">underline</xsl:attribute>
+                <xsl:attribute name="padding-top">11pt</xsl:attribute>
+                <xsl:if test="$color != ''"><xsl:attribute name="color"><xsl:value-of select="$color"/></xsl:attribute></xsl:if>
+            </xsl:if>
             <xsl:value-of select="$text"/>
         </fo:block>
     </xsl:template>
@@ -420,14 +427,31 @@
     <xsl:template name="red-box">
         <xsl:param name="content"/>
         <xsl:param name="align">justify</xsl:param>
-        <fo:block border="0.8pt solid #CC0000"
-                  padding="3mm"
-                  margin-left="0mm" margin-right="0mm"
-                  color="#CC0000"
-                  text-align="{$align}"
-                  space-after="6mm">
-            <xsl:copy-of select="$content"/>
-        </fo:block>
+        <!-- L&T reference: the box starts 23 pt lower (top at 84 pt), its text 10 pt further in from the top rule and 12 pt from the bottom one, and the block after it 7 pt lower -->
+        <xsl:choose>
+            <xsl:when test="$lref">
+                <fo:block padding-top="23pt">
+                    <fo:block border="0.8pt solid {$red.color}"
+                              padding="18.5pt 3mm 20.5pt 3mm"
+                              margin-left="0mm" margin-right="0mm"
+                              color="{$red.color}"
+                              text-align="{$align}"
+                              space-after="24pt">
+                        <xsl:copy-of select="$content"/>
+                    </fo:block>
+                </fo:block>
+            </xsl:when>
+            <xsl:otherwise>
+                <fo:block border="0.8pt solid {$red.color}"
+                          padding="3mm"
+                          margin-left="0mm" margin-right="0mm"
+                          color="{$red.color}"
+                          text-align="{$align}"
+                          space-after="6mm">
+                    <xsl:copy-of select="$content"/>
+                </fo:block>
+            </xsl:otherwise>
+        </xsl:choose>
     </xsl:template>
 
     <!-- Text nodes are copied verbatim; whitespace-only nodes are stripped by

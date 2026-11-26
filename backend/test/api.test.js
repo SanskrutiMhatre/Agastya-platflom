@@ -292,7 +292,11 @@ test('document types: a User Handbook project starts with its seven chapters and
   assert.equal(def.house.layout.fonts.family, 'Helvetica', 'the default house style is untouched');
 
   const blank = await writer.post('/api/projects', { name: 'Plain' });
-  assert.equal(blank.json.project.templateRef, 'default');
+  // a project made with nothing said about its kind is an S1000D publication on the reference (Xignal) style, like the wizard's (owner's decision of 2026-11-26)
+  assert.equal(blank.json.project.templateRef, 'xignal-s1000d'); assert.equal(blank.json.project.format, 's1000d'); assert.equal(blank.json.project.pipeline, 's1000dtofo');
+  // ... and the plain style is still there when it is asked for by name
+  const plain = await writer.post('/api/projects', { name: 'Plain default', templateRef: 'default' }); assert.equal(plain.status, 201); assert.equal(plain.json.project.templateRef, 'default');
+  assert.equal((await writer.del(`/api/projects/${plain.json.project.id}?confirm=${encodeURIComponent('Plain default')}`)).status, 200);
   assert.equal((await writer.get(`/api/projects/${blank.json.project.id}/pmc`)).json.entries.length, 0);
   for (const x of [id, blank.json.project.id]) assert.equal((await writer.del(`/api/projects/${x}?confirm=${encodeURIComponent(x === id ? 'Handbook' : 'Plain')}`)).status, 200);
 });

@@ -1,5 +1,5 @@
 // S1000D reference configuration, end to end in a real browser: the New project wizard (with its review step), the project's S1000D
-// settings (identity, SNS, applicability), the New data module wizard driven by that configuration, and the Administrator catalogue.
+// settings (identity, SNS), the New data module wizard driven by that configuration, and the Administrator catalogue.
 import { test, expect, type Page } from '@playwright/test';
 
 const PW = 'Correct-Horse-9!';
@@ -101,23 +101,7 @@ test('project settings → S1000D: identity, information codes, SNS editing and 
   await author.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
 });
 
-test('applicability: define attributes, save as data modules, see the validation list', async () => {
-  await author.goto(`/projects/${projectId}/settings/s1000d`);
-  await author.getByTestId('s1000d-tab-applic').click();
-  await expect(author.getByTestId('s1000d-applic')).toContainText('not applied to publishing');
-  await author.getByTestId('add-attribute').click();
-  const row = author.getByTestId('s1000d-applic').locator('tbody tr').first();
-  const cells = row.locator('input');
-  await cells.nth(0).fill('colour'); await cells.nth(1).fill('Colour'); await cells.nth(2).fill('Paint colour'); await cells.nth(3).fill('red, blue');
-  await author.getByTestId('applic-save').click();
-  await expect(author.getByTestId('applic-problems')).toContainText('Every applicability reference resolves');
-  const a = (await api<any>(author, 'get', `/api/projects/${projectId}/applicability`)).json;
-  expect(a.files.act).toMatch(/^DMC-WIZ01-A-00-00-00-00A-00WA-D_/);
-  expect(a.model.attributes[0].values.map((v: any) => v.value)).toEqual(['red', 'blue']);
-  expect(a.filtering).toBe(false);
-});
-
-test('New data module wizard follows the project: fixed MIC and issue, SNS pickers, enabled codes, structured applicability', async () => {
+test('New data module wizard follows the project: fixed MIC and issue, SNS pickers, enabled codes', async () => {
   await author.goto(`/projects/${projectId}/editor`);
   await author.getByRole('complementary', { name: 'Data modules' }).getByRole('button', { name: 'New data module' }).click();
   const dlg = author.getByRole('dialog', { name: 'New data module' });
@@ -134,9 +118,8 @@ test('New data module wizard follows the project: fixed MIC and issue, SNS picke
   const info = dlg.getByLabel('Info code');
   await expect(info.locator('option')).toHaveCount(2);                                      // descript's 040 and proced's 520 are the only enabled codes
   await expect(info).toHaveValue('040');
-  // structured applicability from the project's ACT
-  await dlg.getByLabel('Applicability mode').selectOption('select');
-  await dlg.getByLabel('red').check();
+  // the data module's applicability is a plain field (the applicability tables and their picker were removed from the platform)
+  await expect(dlg.getByLabel('Applicability')).toHaveValue('All');
   await dlg.getByRole('button', { name: 'Create' }).click();
   await expect(author.getByRole('dialog', { name: 'New data module' })).toHaveCount(0);
 });
@@ -169,17 +152,15 @@ test('Administrator → S1000D catalogue: provenance per issue, custom codes out
   await expect(admin.getByTestId('sns-presets')).toContainText('Issue 4.2 only');
 });
 
-test('Generate → Configuration…: choose a configuration, check what it includes (unfiltered Generate is separate)', async () => {
+test('no applicability tools: no Applicability section in the settings, no Configuration… button beside Generate', async () => {
+  await author.goto(`/projects/${projectId}/settings/s1000d`);
+  await expect(author.getByTestId('s1000d-tab-codes')).toBeVisible();
+  await expect(author.getByTestId('s1000d-tab-applic')).toHaveCount(0);
   await author.goto(`/projects/${projectId}/editor`);
-  await author.getByTestId('config-btn').click();
-  const dlg = author.getByTestId('cfg-dialog');
-  await expect(dlg).toContainText('unresolved');                                          // the rule is stated in the dialog
-  await expect(dlg.getByLabel('Value of Colour')).toBeVisible();                          // the ACT attribute defined earlier is offered
-  await expect(author.getByTestId('cfg-check')).toBeDisabled();                            // nothing chosen yet
-  await dlg.getByLabel('Value of Colour').selectOption('red');
-  await author.getByTestId('cfg-check').click();
-  await expect(author.getByTestId('cfg-plan')).toBeVisible();
-  await expect(author.getByTestId('cfg-plan')).toContainText('data module(s) included');
-  await author.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).first().click();
-  await expect(author.getByTestId('generate-btn')).toBeVisible();                          // plain Generate is still there, unchanged
+  await expect(author.getByTestId('generate-btn')).toBeVisible();
+  await expect(author.getByTestId('config-btn')).toHaveCount(0);
+  // a link to the removed Files (CSDB) page lands in the editor, and the navigation has no such item
+  await author.goto(`/projects/${projectId}/csdb`);
+  await expect(author).toHaveURL(new RegExp(`/projects/${projectId}/editor`));
+  await expect(author.getByRole('navigation', { name: 'Project sections' }).getByText('Files (CSDB)')).toHaveCount(0);
 });

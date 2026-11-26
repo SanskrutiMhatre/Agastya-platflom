@@ -47,8 +47,9 @@ test('a build of a reference-layout project carries the default publisher logo; 
   assert.equal((await w.patch(U, { publisherLogo: false })).status, 200);
   assert.equal((await w.get(U)).json.project.publisherLogo, false);
   const off = await build();
-  assert.equal(images(off), 0, 'switched off: no picture on any page (this layout has no other default image)');
+  // the layout's default brand pack (the L&T logos, since 2026-11-26) prints its own header pictures: switching the publisher logo off removes the cover's picture and leaves those
+  assert.ok(images(off) < images(on), `switched off: the publisher logo's picture is gone (${images(off)} pictures, was ${images(on)})`);
 
   assert.equal((await w.patch(U, { publisherLogo: true })).status, 200);
-  assert.ok(images(await build()) >= 1, 'and back on');
+  assert.equal(images(await build()), images(on), 'and back on: the same pictures as the first build');
 });

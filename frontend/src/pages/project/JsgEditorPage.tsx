@@ -10,7 +10,7 @@ import { jsgApi, type JsgDocument, type JsgFinding } from '../../api/jsg';
 import { Icon } from '../../components/Icon';
 import { LazyPdfViewer } from '../../components/pdf/LazyPdfViewer';
 import { ThemeToggle } from '../../components/ThemeToggle';
-import { ConvertButton, DocCodesButton, DocCodesStrip, useSectionCode } from '../../components/DocCodes';
+import { ConvertButton, DocCodesButton, DocCodesStrip, ExportProjectButton, useSectionCode } from '../../components/DocCodes';
 import { Alert, Loading, Spinner, ago, errText } from '../../components/ui';
 import { canBuild, canWrite, useProject } from '../../layouts/ProjectShell';
 import { JsgEditor } from '../../jsg/editor';
@@ -204,6 +204,7 @@ export function JsgEditorPage() {
           <DocCodesButton id={id} writable={writable} refreshKey={savedAt} />
           <ConvertButton id={id} from="jsg" name={summary.project.name} dirty={dirty} saveFirst={save} />
         </> : null}
+        <ExportProjectButton id={id} dirty={dirty} saveFirst={save} />
         <button className="btn btn-sm btn-primary" onClick={() => void generate()} disabled={!canBuild(role) || building || !loaded} data-testid="jsg-generate" title={!canBuild(role) ? 'Reviewers, editors and owners can build the PDF' : 'Save, then build the document as a PDF'}>{building ? <Spinner /> : <Icon name="play" size={12} />}{building ? 'Building…' : 'Generate PDF'}</button>
         <div className="v2-seg" role="group" aria-label="Editor layout">
           <button className={view === 'edit' ? 'on' : ''} onClick={() => setView('edit')} aria-pressed={view === 'edit'} title="Write only">Editor</button>

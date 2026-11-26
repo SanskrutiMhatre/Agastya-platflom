@@ -130,10 +130,15 @@ rotated margin marks of the probe pages are identical. **Not matched yet:** the 
 Marking text (header logo, margin marks) is resolved once per build, in this order: **Settings that are filled in**, then the publication module's own
 directives (`<?agastya company="..."?>`), then the brand pack (`templates/brand/<id>/brand.json` with its logo), then derived values, else left out with a
 note - a missing logo never blocks a build. A directive only fills what Settings leave blank; when Settings override one, the build log says so, so an
-imported file never silently changes what a controlled document prints. Only `neutral` (nothing printed) is seeded into a workspace.
-`backend/templates-optional/brand/lnt-xignal` (the L&T logo and company line taken from the reference PDF) is **not** seeded, because the right to
-redistribute another organisation's logo is not established: copy that folder into `<workspace>/templates/brand/` to use it, then pick it in the project's
-Settings. `GET /api/brand-packs` lists what is installed.
+imported file never silently changes what a controlled document prints. Two packs are seeded into a workspace: `neutral` (nothing printed) and `lnt-xignal` (the L&T
+logo and company line taken from the reference PDF). Since 2026-11-26 the shipped `xignal-s1000d` house template names `lnt-xignal`, so every new S1000D project prints
+the L&T logos, the company line and the watermark of the reference project by default (the owner asked for this; nothing needs choosing). There is no separate
+"Brand pack" screen any more: the logos are the house style's, and the Settings that are filled in still override them. `GET /api/brand-packs` lists what is installed.
+
+**Project archive (Export).** Every project, of any format, has an **Export** button (Project settings > General, the JSS and JSG editor toolbars, the S1000D Packages page)
+that downloads one `<id>.jsspub.zip`: `manifest.json` (format, domain, manual type, S1000D settings), `project/**` (everything but what a build writes again), the house
+style and brand pack the project uses, and the review comments. **Import package** brings it back as a new project in the same format; nothing is overwritten and an
+unsafe archive (a path that escapes, unsafe XML, a newer version) is refused before anything is created. See `docs/CROSS_ENGINE_ARCHITECTURE.md` section 6.
 
 **Golden-master test** (`backend/test/golden-xignal.test.js`): imports the sample through the real importer, publishes with the gate on (the one recorded
 waiver above), then compares geometry - page counts, first/last body lines of the pages that matched, picture boxes, margin marks - with the stored
@@ -286,13 +291,13 @@ Full reference: [docs/S1000D_REFERENCE_CONFIG.md](docs/S1000D_REFERENCE_CONFIG.m
 
 * **Global catalogue → project configuration → data module.** The Administrator maintains the per-issue code catalogue (information, learn, learn-event and
   item-location codes) read from each issue's official default BREX, with file / SHA-256 / rule shown, plus SNS presets (the S1000D 4.2 Maintained SNS tables are
-  read-only presets). Each project owns its configuration (MIC, issue, language, enterprises, BREX, offered codes and DM types, SNS, applicability); owners and
+  read-only presets). Each project owns its configuration (MIC, issue, language, enterprises, BREX, offered codes and DM types, SNS); owners and
   managers change it (**Project settings → S1000D**), and MIC and issue lock once data modules exist.
 * **New project** is a four-step wizard (project → S1000D identity → codes and structure → review) with sensible defaults (Issue 5.0, en-IN, every code, the 21 types).
 * **New data module** wizard follows the project: fixed MIC/issue, system → subsystem from the project SNS, enabled information codes (suggested codes first; the six unconfirmed defaults flagged),
-  learn codes, structured applicability. **The server enforces the same rules for new data modules** (`400 CONFIG_MISMATCH`); editing an existing module is never held to them, and *import without validation* is the escape.
-* **Applicability:** ACT/CCT/PCT authored as real, XSD-checked data modules; references validated with data module + XML location and enforced by the publication gate (errors block build, preview and release). `applicRefId` is authored in the Properties pane (dropdown of the module's definitions + **New...** from the project's ACT/CCT).
-* **Configuration-specific publication:** Editor -> PDF pane -> **Configuration...** builds a separate PDF for a PCT product and/or ad-hoc values (`POST /api/projects/:id/publish/configured`): three-valued applicability evaluation, unresolved properties block the build, filtered PM and content, always stamped NOT RELEASED. The normal Generate is unchanged. See `docs/S1000D_REFERENCE_CONFIG.md` §13.
+  learn codes; the data module's applicability is a plain field. **The server enforces the same rules for new data modules** (`400 CONFIG_MISMATCH`); editing an existing module is never held to them, and *import without validation* is the escape.
+* **Applicability:** ACT/CCT/PCT authored as real, XSD-checked data modules; references validated with data module + XML location and enforced by the publication gate (errors block build, preview and release). **Interface (2026-11-26):** the applicability screens were removed from the platform (the **Applicability** section of Project settings → S1000D, the structured picker of the New data module wizard, the `applicRefId` dropdown and **New...** of the Properties pane); `applicRefId` is a plain id box again. The server side is kept: the ACT/CCT/PCT checks, the publication gate and the `/api/projects/:id/applicability` routes still work on existing data, and the "Applicable to:" notes still print from existing display text.
+* **Configuration-specific publication** (API only since 2026-11-26: the **Configuration...** button of the PDF pane was removed with the other applicability screens): `POST /api/projects/:id/publish/configured` builds a separate PDF for a PCT product and/or ad-hoc values (`POST /api/projects/:id/publish/configured`): three-valued applicability evaluation, unresolved properties block the build, filtered PM and content, always stamped NOT RELEASED. The normal Generate is unchanged. See `docs/S1000D_REFERENCE_CONFIG.md` §13.
 * **PDF rendering:** all 21 data module types print their full content through both engines (support and reference modules via `backend/vendor/pipeline/support-view.xsl`); verified by `backend/test/pdf21.test.js` (21 x 4 issues x 2 engines) and compared with the 20 Nov reference publications.
 * **Default information codes** were checked against the S1000D 4.2 text: crew 131 supported, frontmatter 001 and schedul 000 confirmed, wrngflds corrected to 029; `wrngdata` and `scocontent` remain flagged (§12).
 * The wizard still takes languages, countries, DM types, security classes and enterprises from the Administrator's tables (`GET /api/reference`, English / India default).

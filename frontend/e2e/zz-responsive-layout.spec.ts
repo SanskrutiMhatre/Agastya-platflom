@@ -26,17 +26,9 @@ let pid = '';
 test.beforeAll(async ({ browser, baseURL }) => {
   admin = await adminApi(baseURL);
   owner = await newPerson(admin, browser, baseURL, 'resp', 'Rita Responsive');
-  // organisation defaults, the older table, and a project whose SNS differs from them in every way an import preview reports
-  for (const r of [{ systemCode: '61', title: 'Hydraulic power' }, { systemCode: '62', title: 'Cabin systems with a rather long title that has to wrap on a phone' }, { systemCode: '63', title: 'Avionics' }]) {
-    expect([201, 409]).toContain((await admin.post('/api/sns/defaults', { data: r })).status());
-  }
-  // (the Administrator's older two-column SNS table, which this once also filled, is retired: there is no API to write to it any more)
   const made = await owner.api.post('/api/projects', { data: { name: 'Responsive layout check', pipeline: 's1000dtofo' } });
   expect(made.ok()).toBeTruthy();
   pid = (await made.json()).project.id;
-  for (const r of [{ systemCode: '61', title: 'HYDRAULIC POWER' }, { systemCode: '63', title: 'Avionics' }, { systemCode: '62', title: 'Something else entirely' }]) {
-    expect((await owner.api.post(`/api/projects/${pid}/sns-rows`, { data: r })).status()).toBe(201);
-  }
 });
 test.afterAll(async () => { await owner.page.context().close(); await admin.dispose(); });
 
@@ -78,16 +70,6 @@ async function overflow(page: Page): Promise<string[]> {
 }
 
 const SCREENS: Array<{ name: string; url: () => string; ready: (p: Page) => Promise<void>; as?: 'admin' }> = [
-  {
-    name: 'sns-import-preview', url: () => `/projects/${pid}/settings/sns/import`,
-    ready: async (p) => { await p.getByTestId('sns-import-defaults-preview').click(); await expect(p.getByTestId('sns-import-defaults-result')).toBeVisible(); await p.getByTestId('sns-import-defaults-same').getByRole('button').first().click(); },
-  },
-  {
-    name: 'sns-defaults-merge-legacy', url: () => '/administrator/sns-defaults', as: 'admin',
-    ready: async (p) => { await p.getByTestId('sns-defaults-legacy-preview').click(); await expect(p.getByTestId('sns-defaults-legacy-result')).toBeVisible(); },
-  },
-  { name: 'sns-rows', url: () => `/projects/${pid}/settings/sns/rows`, ready: async (p) => { await expect(p.getByTestId('sns-table')).toBeVisible(); } },
-  { name: 'brand-pack', url: () => `/projects/${pid}/settings/brand`, ready: async (p) => { await expect(p.getByRole('heading').first()).toBeVisible(); } },
   { name: 'publishing-settings', url: () => `/projects/${pid}/settings/publishing`, ready: async (p) => { await expect(p.getByRole('heading').first()).toBeVisible(); } },
   { name: 'publication', url: () => `/projects/${pid}/publication`, ready: async (p) => { await expect(p.getByRole('heading').first()).toBeVisible(); } },
   { name: 'release', url: () => `/projects/${pid}/release`, ready: async (p) => { await expect(p.getByRole('heading').first()).toBeVisible(); } },

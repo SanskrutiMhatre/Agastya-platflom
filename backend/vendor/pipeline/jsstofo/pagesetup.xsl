@@ -23,6 +23,38 @@
                 <fo:region-after region-name="cover-after" extent="10mm" display-align="after"/>
             </fo:simple-page-master>
 
+            <!-- Standard cover with the date and authority block in its foot region (cover.authority.foot = 1): the cover master with a taller foot: the block, then the
+                 classification banner at the very bottom. The foot is as tall as the block that left the body, so the body keeps its room. -->
+            <xsl:if test="$cover.authority.foot = '1' and not($xjss)">
+                <fo:simple-page-master master-name="cover-foot"
+                  page-width="{$page-width}" page-height="{$page-height}"
+                  margin-top="{$page-margin-top}" margin-bottom="{$page-margin-bottom}"
+                  margin-left="{$margin-outer}" margin-right="{$margin-outer}">
+                    <fo:region-body margin-top="12mm" margin-bottom="{$cover-foot-extent}"/>
+                    <fo:region-before region-name="cover-before" extent="10mm" display-align="before"/>
+                    <fo:region-after region-name="cover-foot-after" extent="{$cover-foot-extent}" display-align="after"/>
+                </fo:simple-page-master>
+            </xsl:if>
+
+            <!-- L&T reference (ref.layout = 1): the cover and the title page on 25 mm margins all round (the reference's first section), the classification in the head, and the date and
+                 authority block in a foot region above the classification at the bottom; lref-legend is the page that carries only the "intentionally left blank" legend, with no head or foot. -->
+            <xsl:if test="$lref and not($xjss)">
+                <fo:simple-page-master master-name="cover-lref"
+                  page-width="{$page-width}" page-height="{$page-height}"
+                  margin-top="10mm" margin-bottom="10mm"
+                  margin-left="25mm" margin-right="25mm">
+                    <fo:region-body margin-top="10mm" margin-bottom="{$cover-lref-foot}"/>
+                    <fo:region-before region-name="cover-before" extent="10mm" display-align="before"/>
+                    <fo:region-after region-name="cover-lref-after" extent="{$cover-lref-foot}" display-align="after"/>
+                </fo:simple-page-master>
+                <fo:simple-page-master master-name="lref-legend"
+                  page-width="{$page-width}" page-height="{$page-height}"
+                  margin-top="20mm" margin-bottom="15.8mm"
+                  margin-left="25mm" margin-right="25mm">
+                    <fo:region-body/>
+                </fo:simple-page-master>
+            </xsl:if>
+
             <!-- xignal-jss title page: a recto (binding margin on the left), no running head, and the date / authority block in the foot region, pinned
                  to the bottom of the page. The body starts 6.6 mm below the page margin so the first line sits at 766.4 pt, as the reference. -->
             <xsl:if test="$xjss">
@@ -244,8 +276,28 @@
     <!-- ==================================================================== -->
 
     <!-- Cover page: classification banner, no header rule, no folio -->
+    <xsl:variable name="cover-foot-extent">28mm</xsl:variable>
     <xsl:template name="cover-page-sequence">
         <xsl:param name="content"/>
+        <xsl:param name="foot"/>
+        <xsl:if test="$foot = '1' and not($xjss)">
+            <!-- the date and authority block in the foot region, above the classification banner -->
+            <fo:page-sequence master-reference="cover-foot" force-page-count="no-force">
+                <fo:static-content flow-name="cover-before">
+                    <xsl:call-template name="classification-banner"/>
+                </fo:static-content>
+                <fo:static-content flow-name="cover-foot-after">
+                    <fo:block-container height="{$cover-foot-extent}" display-align="after">
+                        <fo:block><xsl:call-template name="authority-block"/></fo:block>
+                        <xsl:call-template name="classification-banner"/>
+                    </fo:block-container>
+                </fo:static-content>
+                <fo:flow flow-name="xsl-region-body">
+                    <xsl:copy-of select="$content"/>
+                </fo:flow>
+            </fo:page-sequence>
+        </xsl:if>
+        <xsl:if test="not($foot = '1' and not($xjss))">
         <fo:page-sequence master-reference="cover" force-page-count="no-force">
             <!-- xignal-jss prints no classification banner on its cover pages, as the reference. -->
             <xsl:if test="not($xjss)">
@@ -260,6 +312,52 @@
                 <xsl:copy-of select="$content"/>
             </fo:flow>
         </fo:page-sequence>
+        </xsl:if>
+    </xsl:template>
+
+    <!-- L&T reference cover / title page: the foot region is the date and authority block, 25 pt of space, then the classification line (baselines 758 / 772 / 810 pt on the reference). -->
+    <xsl:variable name="cover-lref-foot">24mm</xsl:variable>
+    <xsl:template name="cover-page-sequence-lref">
+        <xsl:param name="content"/>
+        <fo:page-sequence master-reference="cover-lref" force-page-count="no-force">
+            <fo:static-content flow-name="cover-before">
+                <xsl:call-template name="classification-banner"/>
+            </fo:static-content>
+            <fo:static-content flow-name="cover-lref-after">
+                <!-- top aligned: the block starts at the top of the foot region (baselines 758 / 772 pt), the classification 25 pt below it (810 pt), as the reference prints them -->
+                <fo:block-container height="{$cover-lref-foot}">
+                    <fo:block padding-top="2pt" space-after="23pt"><xsl:call-template name="authority-block"/></fo:block>
+                    <xsl:call-template name="classification-banner"/>
+                </fo:block-container>
+            </fo:static-content>
+            <fo:flow flow-name="xsl-region-body">
+                <xsl:copy-of select="$content"/>
+            </fo:flow>
+        </fo:page-sequence>
+    </xsl:template>
+
+    <!-- The page after a cover or title page: with legend = 1 only "This page is intentionally left blank." (no head, no foot, no classification); otherwise nothing at all. -->
+    <xsl:template name="cover-blank-lref">
+        <xsl:param name="legend">0</xsl:param>
+        <xsl:choose>
+            <!-- the legend is centred in a body 261.3 mm high (20 mm from the top, 15.8 mm from the foot): its baseline falls where the reference prints it (431 pt) -->
+            <xsl:when test="$legend = '1'">
+                <fo:page-sequence master-reference="lref-legend" force-page-count="no-force">
+                    <fo:flow flow-name="xsl-region-body">
+                        <fo:block-container height="261.3mm" display-align="center">
+                            <fo:block text-align="center" font-weight="bold">
+                                <xsl:call-template name="fm-label"><xsl:with-param name="override" select="$fm.label.title.blankPage"/><xsl:with-param name="default">This page is intentionally left blank.</xsl:with-param></xsl:call-template>
+                            </fo:block>
+                        </fo:block-container>
+                    </fo:flow>
+                </fo:page-sequence>
+            </xsl:when>
+            <xsl:otherwise>
+                <fo:page-sequence master-reference="cover-lref" force-page-count="no-force">
+                    <fo:flow flow-name="xsl-region-body"><fo:block>&#160;</fo:block></fo:flow>
+                </fo:page-sequence>
+            </xsl:otherwise>
+        </xsl:choose>
     </xsl:template>
 
     <!-- xignal-jss title page: the date and authority block sits in the foot region, 11.2 mm above the bottom margin (last baseline 51.8 pt). -->

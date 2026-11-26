@@ -870,44 +870,6 @@ export class DocumentEditor {
     return true;
   }
 
-  /**
-   * Add an applicability definition (<applic id="...">) to the data module's <referencedApplicGroup> (created in its place when missing:
-   * after <refs>, before everything else in <content>) and, when `forEl` is given, point it at the definition with applicRefId.
-   * One undo step. `applicXml` is a complete <applic> element; its id is chosen here. Returns the new id, or null when it was refused.
-   */
-  addApplicDefinition(applicXml: string, forEl: Element | null, actRef: DmCodeParts | null = null): string | null {
-    const doc = this.doc.xml;
-    const content = elementChildren(doc.documentElement).find((e) => e.nodeName === 'content');
-    if (!content) { this.app.toast('This data module has no <content> to hold applicability definitions.', 'warning'); return null; }
-    let id = '';
-    const ok = this.exec('Add applicability definition', (s) => {
-      let group = elementChildren(content).find((e) => e.nodeName === 'referencedApplicGroup');
-      if (!group) {
-        group = createEl(doc, 'referencedApplicGroup');
-        const refs = elementChildren(content).find((e) => e.nodeName === 'refs');
-        if (refs) refs.after(group); else content.insertBefore(group, content.firstChild);
-      }
-      const parsed = new DOMParser().parseFromString(applicXml, 'application/xml').documentElement;
-      if (!parsed || parsed.nodeName !== 'applic') throw new ops.OpError('The applicability could not be read.');
-      const applic = doc.importNode(parsed, true) as Element;
-      id = ops.uniqueId(doc, 'appl');
-      setAttr(applic, 'id', id);
-      group.appendChild(applic);
-      if (forEl) setAttr(forEl, 'applicRefId', id);
-      // the data module must name the applicability table its assertions refer to (dmStatus: after the originator, before <applic>)
-      const status = doc.getElementsByTagName('dmStatus')[0];
-      if (actRef && status && !elementChildren(status).some((e) => e.nodeName === 'applicCrossRefTableRef')) {
-        const ref = createEl(doc, 'applicCrossRefTableRef'); const dm = createEl(doc, 'dmRef'); const ident = createEl(doc, 'dmRefIdent'); const code = createEl(doc, 'dmCode');
-        writeDmCode(code, actRef); ident.appendChild(code); dm.appendChild(ident); ref.appendChild(dm);
-        const after = new Set(['applic', 'applicRef', 'techStandard', 'brexDmRef', 'qualityAssurance', 'systemBreakdownCode', 'functionalItemCode', 'functionalItemRef', 'skillLevel', 'reasonForUpdate', 'productSafety', 'remarks']);
-        const next = elementChildren(status).find((e) => after.has(e.nodeName));
-        if (next) status.insertBefore(ref, next); else status.appendChild(ref);
-      }
-      return forEl && this.elementSelection === forEl ? { anchor: ops.before(forEl), focus: ops.after(forEl), element: forEl } : s;
-    });
-    return ok ? id : null;
-  }
-
   /** Declares an ICN as an unparsed entity (DOCTYPE) when missing. */
   ensureEntity(icn: string, fileName?: string, notation?: string) {
     const decl = this.doc.doctype?.decls.find((d) => d.kind === 'entity' && d.name === icn);

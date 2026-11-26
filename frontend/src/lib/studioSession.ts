@@ -80,22 +80,15 @@ class StudioSession {
     try { const ref = await referenceApi.get(); if (this.projectId === id) this.reference = ref; } catch { /* keep the last lists (or none): the wizard falls back to text boxes */ }
     if (!id) { this.projectRefs = null; return; }
     try {
-      const [b, a] = await Promise.all([s1000dApi.project(id), s1000dApi.applicability(id).catch(() => null)]);
+      const b = await s1000dApi.project(id);
       if (this.projectId !== id) return;                  // the author moved to another project while this was loading
       const c = b.config;
       const brief = (k: 'infoCode' | 'learnCode' | 'learnEventCode' | 'itemLocationCode') => b.codes[k].map((x) => ({ code: x.code, title: x.title }));
-      const act = a?.files.act ?? null;
-      const m = act ? /^DMC-([A-Za-z0-9]+)-/.exec(act) : null;
       this.projectRefs = {
         mic: c.mic, issue: c.issue, language: c.language, country: c.country, responsiblePartner: c.responsiblePartner, originator: c.originator, security: c.security, brex: c.brex,
         codes: { infoCode: brief('infoCode'), learnCode: brief('learnCode'), learnEventCode: brief('learnEventCode'), itemLocationCode: brief('itemLocationCode') },
         dmTypes: b.dmTypes.map((t) => ({ schema: t.schema, name: t.name, enabled: t.enabled, defaultCode: t.infoCode ?? '', recommended: t.advice?.recommended ?? [], unresolved: t.advice?.unresolved ?? null })),
         sns: b.sns, snsEnforced: c.snsEnforced,
-        applic: a && act && m ? {
-          act: { mic: m[1], info: /-(\w{3})\w-\w_/.exec(act)?.[1] ?? '00W', schemaFile: act },
-          attributes: a.model.attributes.map((x) => ({ id: x.id, name: x.name, values: x.values.map((v) => v.value), type: x.valueDataType })),
-          conditions: a.model.conditions.map((cd) => ({ id: cd.id, name: cd.name, values: a.model.conditionTypes.find((t) => t.id === cd.condTypeId)?.values.map((v) => v.value) ?? [], type: a.model.conditionTypes.find((t) => t.id === cd.condTypeId)?.valueDataType ?? 'string' })),
-        } : null,
       };
     } catch { this.projectRefs = null; }
   }

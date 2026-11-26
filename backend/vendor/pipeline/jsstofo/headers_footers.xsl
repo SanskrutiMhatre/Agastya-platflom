@@ -240,9 +240,15 @@
              callers don't pass it, so nothing changes there. -->
         <xsl:param name="show.release">0</xsl:param>
         <fo:table-cell display-align="center">
-            <xsl:call-template name="classification-banner">
-                <xsl:with-param name="color" select="$color"/>
-            </xsl:call-template>
+            <xsl:choose>
+                <xsl:when test="$restricted.scope = 'all'">
+                    <xsl:call-template name="classification-banner">
+                        <xsl:with-param name="color" select="$color"/>
+                    </xsl:call-template>
+                </xsl:when>
+                <!-- restricted.scope cover / reference: the running pages carry no classification (the reference prints it on the cover, the title page and the Change Notice only) -->
+                <xsl:otherwise><fo:block/></xsl:otherwise>
+            </xsl:choose>
             <xsl:if test="$show.release = '1' and normalize-space($release.label) != ''">
                 <fo:block text-align="{$classification.align}" font-weight="bold">
                     <xsl:value-of select="$release.label"/>
@@ -262,6 +268,46 @@
         -->
         <xsl:param name="classification-color" select="$classification.color"/>
         <xsl:choose>
+        <!-- L&T reference (ref.layout = 1): the book name over the system name on the outer edge, 10 pt on a 12 pt line, over a 0.5 pt rule the width of the text area; the text stands 5.4 pt
+             in from the end of the rule, as the reference's header table sets it. The classification is in the middle column only when restricted.scope = all. -->
+        <xsl:when test="$lref and not($xjss)">
+            <fo:block font-size="{$header-footer-size}" line-height="12pt" border-bottom="0.5pt solid black" padding-top="2.7pt" padding-bottom="0.5pt">
+                <fo:table width="100%" table-layout="fixed">
+                    <!-- the text cell is four sixths of the text width (the reference's two fifths would wrap a long book name onto the first line of the page) -->
+                    <fo:table-column><xsl:attribute name="column-width"><xsl:choose><xsl:when test="$align = 'right'">proportional-column-width(1)</xsl:when><xsl:otherwise>proportional-column-width(4)</xsl:otherwise></xsl:choose></xsl:attribute></fo:table-column>
+                    <fo:table-column column-width="proportional-column-width(1)"/>
+                    <fo:table-column><xsl:attribute name="column-width"><xsl:choose><xsl:when test="$align = 'right'">proportional-column-width(4)</xsl:when><xsl:otherwise>proportional-column-width(1)</xsl:otherwise></xsl:choose></xsl:attribute></fo:table-column>
+                    <fo:table-body>
+                        <fo:table-row>
+                            <xsl:choose>
+                                <xsl:when test="$align = 'right'">
+                                    <fo:table-cell><fo:block/></fo:table-cell>
+                                    <xsl:call-template name="classification-cell">
+                                        <xsl:with-param name="color" select="$classification-color"/>
+                                        <xsl:with-param name="show.release">1</xsl:with-param>
+                                    </xsl:call-template>
+                                    <fo:table-cell text-align="right" padding-right="5.4pt">
+                                        <fo:block><xsl:value-of select="$book.name"/></fo:block>
+                                        <fo:block><xsl:value-of select="$system.name"/></fo:block>
+                                    </fo:table-cell>
+                                </xsl:when>
+                                <xsl:otherwise>
+                                    <fo:table-cell text-align="left" padding-left="5.4pt">
+                                        <fo:block><xsl:value-of select="$book.name"/></fo:block>
+                                        <fo:block><xsl:value-of select="$system.name"/></fo:block>
+                                    </fo:table-cell>
+                                    <xsl:call-template name="classification-cell">
+                                        <xsl:with-param name="color" select="$classification-color"/>
+                                        <xsl:with-param name="show.release">1</xsl:with-param>
+                                    </xsl:call-template>
+                                    <fo:table-cell><fo:block/></fo:table-cell>
+                                </xsl:otherwise>
+                            </xsl:choose>
+                        </fo:table-row>
+                    </fo:table-body>
+                </fo:table>
+            </fo:block>
+        </xsl:when>
         <!-- xignal-jss, no logo: two lines of Arial 10 pt on the outer edge over a 1.13 pt rule, as the reference prints it. Like the reference, it
              prints no classification on its running pages (the cover and the stencil's own pages are not touched). -->
         <xsl:when test="$xjss and normalize-space($meta/headerLogo/graphic/@src) = ''">
@@ -351,6 +397,39 @@
             </xsl:call-template>
         </xsl:if>
         <xsl:choose>
+        <!-- L&T reference (ref.layout = 1): a 0.5 pt rule the width of the text area, then "Page | n" in 10 pt on the outer edge, 5.4 pt in from the end of the rule. -->
+        <xsl:when test="$lref and not($xjss)">
+            <fo:block font-size="{$header-footer-size}" line-height="12pt" border-top="0.5pt solid black" padding-top="1.5pt">
+                <fo:table width="100%" table-layout="fixed">
+                    <fo:table-column column-width="proportional-column-width(2)"/>
+                    <fo:table-column column-width="proportional-column-width(1)"/>
+                    <fo:table-column column-width="proportional-column-width(2)"/>
+                    <fo:table-body>
+                        <fo:table-row>
+                            <xsl:variable name="lfolio">
+                                <fo:block>
+                                    <xsl:text>Page | </xsl:text>
+                                    <xsl:if test="$chapter-number != ''"><xsl:value-of select="$chapter-number"/><xsl:text>-</xsl:text></xsl:if>
+                                    <fo:page-number/>
+                                </fo:block>
+                            </xsl:variable>
+                            <xsl:choose>
+                                <xsl:when test="$align = 'right'">
+                                    <fo:table-cell><fo:block/></fo:table-cell>
+                                    <xsl:call-template name="classification-cell"><xsl:with-param name="color" select="$classification-color"/></xsl:call-template>
+                                    <fo:table-cell text-align="right" padding-right="5.4pt"><xsl:copy-of select="$lfolio"/></fo:table-cell>
+                                </xsl:when>
+                                <xsl:otherwise>
+                                    <fo:table-cell text-align="left" padding-left="5.4pt"><xsl:copy-of select="$lfolio"/></fo:table-cell>
+                                    <xsl:call-template name="classification-cell"><xsl:with-param name="color" select="$classification-color"/></xsl:call-template>
+                                    <fo:table-cell><fo:block/></fo:table-cell>
+                                </xsl:otherwise>
+                            </xsl:choose>
+                        </fo:table-row>
+                    </fo:table-body>
+                </fo:table>
+            </fo:block>
+        </xsl:when>
         <!-- xignal-jss: a 1.13 pt rule, then "Page | n" as a two-cell box on the outer edge (39.2 pt cells, the number centred in its own, a 1.13 pt
              rule between them), which is how the reference draws it. No classification is printed (see running-head); the free cell beside the box stays empty. -->
         <xsl:when test="$xjss">

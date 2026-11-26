@@ -12,7 +12,7 @@ export interface ReferenceData {
 }
 
 /**
- * The PROJECT's S1000D configuration as the wizard needs it (server: GET /api/projects/:id/s1000d + /applicability). A project value
+ * The PROJECT's S1000D configuration as the wizard needs it (server: GET /api/projects/:id/s1000d). A project value
  * always wins over a browser-remembered one, and what the project does not set is left to the author.
  */
 export interface ProjectRefs {
@@ -30,10 +30,4 @@ export interface ProjectRefs {
   /** The project's own SNS (flat: path "21", "21/10", "21/10/00"). Empty = free text. */
   sns: Array<{ path: string; level: number; code: string; title: string }>;
   snsEnforced: boolean;
-  /** The project's applicability definitions; null when it has no ACT. */
-  applic: null | {
-    act: { mic: string; info: string; schemaFile: string };
-    attributes: Array<{ id: string; name: string; values: string[]; type: string }>;
-    conditions: Array<{ id: string; name: string; values: string[]; type: string }>;
-  };
 }

@@ -31,6 +31,17 @@
         </xsl:variable>
         <!-- The chapter's own heading, as the divider page begins with it -->
         <xsl:variable name="chapter-heading">
+          <xsl:choose>
+            <!-- the L&T reference: 18 pt bold underlined, "Chapter N" over the title, no rule beneath; the start is chapter.title.align (left on the Land system, centred on the Naval one) -->
+            <xsl:when test="$lref">
+                <fo:block font-size="{$heading1-size}" font-weight="bold" text-decoration="underline" text-align="{$chapter.title.align}" line-height="1.15" padding-top="9pt" space-after="5pt">
+                    <xsl:text>Chapter </xsl:text><xsl:value-of select="@number"/>
+                </fo:block>
+                <fo:block font-size="{$heading1-size}" font-weight="bold" text-decoration="underline" text-align="{$chapter.title.align}" line-height="1.15" space-after="15pt">
+                    <xsl:value-of select="$ctitle"/>
+                </fo:block>
+            </xsl:when>
+            <xsl:otherwise>
             <fo:block font-size="{$heading1-size}" font-weight="bold" space-after="1mm">
                 <xsl:text>Chapter </xsl:text><xsl:value-of select="@number"/>
             </fo:block>
@@ -38,6 +49,8 @@
                       border-bottom="1pt solid black" padding-bottom="2mm" space-after="6mm">
                 <xsl:value-of select="$ctitle"/>
             </fo:block>
+            </xsl:otherwise>
+          </xsl:choose>
         </xsl:variable>
         <!-- Divider page; belongs to the chapter's first page-sequence -->
         <xsl:variable name="divider">
@@ -47,6 +60,44 @@
                     <xsl:with-param name="title" select="string($ctitle)"/>
                     <xsl:with-param name="topics" select="$csections[not(@split)][not(starts-with(@id, 'dm-'))]"/>
                 </xsl:call-template>
+            </xsl:when>
+            <!-- the L&T reference: the topic list between double rules, a 15 mm number column, the sub-topics' numbers under the titles' start -->
+            <xsl:when test="$lref">
+            <fo:block id="{concat('chapter-', @number)}">
+                <xsl:copy-of select="$chapter-heading"/>
+                <xsl:if test="section">
+                    <fo:block space-after="13pt">This chapter covers the following topics:</fo:block>
+                    <fo:table table-layout="fixed" width="100%" break-after="page" border-top="1.5pt double black" border-bottom="1.5pt double black">
+                        <fo:table-column column-width="15mm"/>
+                        <fo:table-column column-width="proportional-column-width(1)"/>
+                        <fo:table-body>
+                            <xsl:for-each select="section[not(@split)]">
+                                <fo:table-row height="19.8pt">
+                                    <fo:table-cell padding="0pt 5.4pt" border-bottom="0.5pt solid black" display-align="center">
+                                        <fo:block font-weight="bold"><xsl:call-template name="section-number"/></fo:block>
+                                    </fo:table-cell>
+                                    <fo:table-cell padding="0pt 5.4pt" border-bottom="0.5pt solid black" display-align="center">
+                                        <fo:block font-weight="bold"><xsl:value-of select="title"/></fo:block>
+                                    </fo:table-cell>
+                                </fo:table-row>
+                                <xsl:for-each select="section">
+                                    <fo:table-row height="19.8pt">
+                                        <fo:table-cell border-bottom="0.5pt solid black"><fo:block/></fo:table-cell>
+                                        <fo:table-cell padding="0pt 5.4pt" border-bottom="0.5pt solid black" display-align="center">
+                                            <fo:list-block provisional-distance-between-starts="51pt" provisional-label-separation="0pt">
+                                                <fo:list-item>
+                                                    <fo:list-item-label end-indent="label-end()"><fo:block><xsl:call-template name="section-number"/></fo:block></fo:list-item-label>
+                                                    <fo:list-item-body start-indent="body-start()"><fo:block><xsl:value-of select="title"/></fo:block></fo:list-item-body>
+                                                </fo:list-item>
+                                            </fo:list-block>
+                                        </fo:table-cell>
+                                    </fo:table-row>
+                                </xsl:for-each>
+                            </xsl:for-each>
+                        </fo:table-body>
+                    </fo:table>
+                </xsl:if>
+            </fo:block>
             </xsl:when>
             <xsl:otherwise>
             <fo:block id="{concat('chapter-', @number)}">
@@ -109,7 +160,10 @@
 
         <!-- The Xignal reference has no end-of-chapter marker. -->
         <xsl:variable name="end-marker">
-            <xsl:if test="not($xjss)">
+            <xsl:if test="$lref">
+                <fo:block text-align="center" space-before="8mm"><xsl:text>---End of Chapter---</xsl:text></fo:block>
+            </xsl:if>
+            <xsl:if test="not($xjss) and not($lref)">
                 <fo:block text-align="center" space-before="8mm" font-size="{$table-font-size}">
                     <xsl:text>--------- End of Chapter ---------</xsl:text>
                 </fo:block>
@@ -154,7 +208,7 @@
                     <xsl:with-param name="chapter-number" select="@number"/>
                     <xsl:with-param name="first">1</xsl:with-param>
                     <!-- The Xignal reference follows the divider with a blank verso, so the chapter's text opens on a right-hand page (1-3). -->
-                    <xsl:with-param name="last"><xsl:choose><xsl:when test="$xjss">1</xsl:when><xsl:otherwise>0</xsl:otherwise></xsl:choose></xsl:with-param>
+                    <xsl:with-param name="last"><xsl:choose><xsl:when test="$xjss or $lref">1</xsl:when><xsl:otherwise>0</xsl:otherwise></xsl:choose></xsl:with-param>
                 </xsl:call-template>
                 <xsl:call-template name="emit-orientation-runs">
                     <xsl:with-param name="sections" select="$csections/descendant-or-self::section"/>
@@ -489,16 +543,21 @@
             <xsl:if test="$hbreak = '1'">
                 <xsl:attribute name="break-before">page</xsl:attribute>
             </xsl:if>
+            <xsl:if test="$lref and parent::chapter and not(preceding-sibling::section)">
+                <xsl:attribute name="padding-top">23pt</xsl:attribute>
+            </xsl:if>
             <fo:list-item>
                 <fo:list-item-label end-indent="label-end()">
                     <fo:block font-weight="bold" font-size="{$hsize}">
                         <xsl:if test="$hfont != ''"><xsl:attribute name="font-family"><xsl:value-of select="$hfont"/></xsl:attribute></xsl:if>
+                        <xsl:if test="contains(concat(' ', $heading.underline, ' '), concat(' ', $lvl, ' '))"><xsl:attribute name="text-decoration">underline</xsl:attribute></xsl:if>
                         <xsl:call-template name="section-number"/>
                     </fo:block>
                 </fo:list-item-label>
                 <fo:list-item-body start-indent="body-start()">
                     <fo:block font-weight="bold" font-size="{$hsize}">
                         <xsl:if test="$hfont != ''"><xsl:attribute name="font-family"><xsl:value-of select="$hfont"/></xsl:attribute></xsl:if>
+                        <xsl:if test="contains(concat(' ', $heading.underline, ' '), concat(' ', $lvl, ' '))"><xsl:attribute name="text-decoration">underline</xsl:attribute></xsl:if>
                         <!-- Anchor the heading so an internalRef/dmRef to this
                              section (or a data module) links straight to it. Only
                              the CANONICAL holder of an @id is anchored: when the

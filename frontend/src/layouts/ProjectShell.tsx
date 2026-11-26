@@ -44,7 +44,7 @@ export function ProjectShell() {
   const jssDoc = summary.project.authoring === 'jss-xml';                      // a JSS document has no S1000D publication tree to explore
   const jsg = summary.project.format === 'jsg';                                // a JSG document is one XML file too: no publication tree, no S1000D tools
   const jsgUhb = jsg && summary.project.manualType === 'uhb';
-  const s1000d = (summary.project.format ?? 's1000d') === 's1000d';           // validation (schemas, BREX) and the CSDB belong to S1000D only
+  const s1000d = (summary.project.format ?? 's1000d') === 's1000d';           // validation (schemas, BREX) belongs to S1000D only
   const items: Item[] = isCir ? [
     { to: `/projects/${id}/editor`, label: 'Editor', icon: 'editor' },
     { to: `/projects/${id}/graphics`, label: 'Graphics', icon: 'image' },
@@ -56,7 +56,6 @@ export function ProjectShell() {
     ...(jssDoc || jsg ? [{ to: `/projects/${id}/ancillary`, label: 'Ancillary pages', icon: 'file' as const }] : []),
     ...(s1000d ? [
       { to: `/projects/${id}/validation`, label: 'Validation', icon: 'shield' as const, badge: v && v.error > 0 ? { text: String(v.error), tone: 'bad' as const } : null },
-      { to: `/projects/${id}/csdb`, label: 'Files (CSDB)', icon: 'layers' as const },
     ] : []),
     { to: `/projects/${id}/release`, label: 'Release', icon: 'rocket', badge: rel?.pending ? { text: '!', tone: 'warn' } : rel?.released ? { text: `R${rel.number}`, tone: 'ok' } : null },
     { to: `/projects/${id}/settings`, label: 'Settings', icon: 'settings' },

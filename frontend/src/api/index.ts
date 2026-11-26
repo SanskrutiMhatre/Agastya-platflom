@@ -13,7 +13,9 @@ export interface AdminQueues { approvals: number; changes: number; folderRequest
 
 export interface FormatInfo { id: 's1000d' | 'jss' | 'jsg'; label: string; description: string; ready: boolean; domains: Array<{ id: string; label: string; manualTypes: Array<{ id: string; label: string; ready: boolean; notReady?: string; note?: string }> }> }
 /** The server's first guess at what an upload is; the person confirms or corrects it (components/importSource.ts). */
-export interface PackageDetection { token: string; name: string; format: 's1000d' | 'jss' | 'jsg' | 'unknown'; kind: 'package' | 'document'; dataModules: number; publicationModules: number; graphics: number; other: number; entries: number; olderTool: boolean; docType?: string }
+export interface PackageDetection { token: string; name: string; format: 's1000d' | 'jss' | 'jsg' | 'unknown'; kind: 'package' | 'document'; dataModules: number; publicationModules: number; graphics: number; other: number; entries: number; olderTool: boolean; docType?: string;
+  /** The upload is a project archive made by this platform (the Export of a project): its format and what it was (it comes back as the same project, in the same format). */
+  archive?: { format: 's1000d' | 'jss' | 'jsg'; domain: string | null; manualType: string | null; name: string } }
 export interface ProjectCard {
   id: string; name: string; type: string; pipeline: 's1000dtofo' | 's1000dtojss'; templateRef: string; folder: string; status: string;
   format: 's1000d' | 'jss' | 'jsg'; domain: string | null; manualType: string | null; authoring: 'jss-xml' | null; jssDocType: string | null; autoAddToPublication: boolean; sideText: { enabled: boolean; publisher: string; draftNote: boolean }; headerLogo: boolean;
@@ -113,7 +115,7 @@ export const workspaceApi = {
   createSample: (folder?: string) => post<{ project: ProjectCard }>('/api/projects/sample', { folder }).then((r) => r.project),
   createJsgSample: (folder?: string, kind: 'uhb' | 'ispl' = 'uhb') => post<{ project: ProjectCard }>('/api/projects/sample-jsg', { folder, kind }).then((r) => r.project),
   copyProject: (id: string, b: { name?: string; folder?: string }) => post<{ project: ProjectCard }>(`/api/projects/${id}/copy`, b).then((r) => r.project),
-  updateProject: (id: string, b: { name?: string; folder?: string; pipeline?: string; autoAddToPublication?: boolean; sideText?: { enabled?: boolean; publisher?: string; draftNote?: boolean }; headerLogo?: boolean }) => patch<{ project: ProjectCard }>(`/api/projects/${id}`, b).then((r) => r.project),
+  updateProject: (id: string, b: { name?: string; folder?: string; pipeline?: string; templateRef?: string; autoAddToPublication?: boolean; sideText?: { enabled?: boolean; publisher?: string; draftNote?: boolean }; headerLogo?: boolean }) => patch<{ project: ProjectCard }>(`/api/projects/${id}`, b).then((r) => r.project),
   deleteProject: (id: string, confirmName: string) => del(`/api/projects/${id}?confirm=${encodeURIComponent(confirmName)}`),
   open: (id: string) => post(`/api/projects/${id}/open`),
   summary: (id: string) => get<Summary>(`/api/projects/${id}/summary`),

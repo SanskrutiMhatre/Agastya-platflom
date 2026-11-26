@@ -81,7 +81,23 @@ What cannot be carried (reported each time): JSG front pages (made by the target
 - JSS and JSG editors (toolbar): **Codes** — the four switches (all off), the publication identity, the table of sections and pictures with their codes; **Convert** — choose the target, see the findings, open the new project.
 - A strip under the toolbar appears only for what is switched on.
 
-## 6. Status
+## 6. Project archive: Export of a whole project (2026-11-26)
+
+`backend/src/services/projectArchive.ts`; routes `GET /api/projects/:id/export` (any format; needs read access) and the archive branch of `POST /api/xengine/import`;
+`POST /api/projects/import/detect` adds `archive: { format, domain, manualType, name }` when the upload is one.
+
+- **File:** `<project id>.jsspub.zip`, the older tool's layout (`manifest.json`, `comments.json`, `project/**`, `templates/<ref>.house.json`, `templates/brand/<id>/**`). The manifest has
+  `generator: "Agastya"`, `manifestVersion: 1`, the `format`, `domain`, `manualType`, `templateRef`, and for S1000D the project's `settings` (the same record a project package carries).
+- **What is left out:** what a build writes again (the PDF, the FO, the driver stylesheets, `_` files, the validation and publish state, backups).
+- **Restore:** always a NEW project of the same format; nothing is overwritten. Names and XML are checked before anything is created (zip-slip, the XML safety guard, a newer
+  manifest, no `project.json`); a failure part-way removes the half-made project. The house style and brand pack are written only when the workspace has none of that name. For S1000D the configuration is
+  derived from the data modules (they win, as for every import), and a project with no data module yet gets its model code, issue and language back from the manifest. Review comments come back under the
+  person who imports, each naming its first author and date; resolved ones stay resolved.
+- **Different format:** an archive is imported as what it holds. To change format, import it and use Convert (section 4).
+- **Verified:** `backend/test/project-archive.test.js` (JSS edited with a comment, JSG, S1000D with a data module and settings, the imported copy exported again, refusals, read access).
+- **Not verified:** a real older-tool `.jsspub.zip` was never seen; ours follows its documented layout, so that tool reading ours (and ours reading its) is untested.
+
+## 7. Status
 
 **Completed and verified by automated tests** (`xengine-identity` 11, `xengine-legacy-import` 5, `xengine-content-types` 2, `xengine-convert` 7, the owner's `jss-rwi` 7 on the real RWI sample, `jss-naval` and `jss-cover-isolation` 6 unchanged: 64 backend tests; frontend 252 unit tests):
 - chapters, front matter, heading pages, false errors and inline notices of the older tool's packages (both layouts); imported codes kept; export of such a project without false errors;

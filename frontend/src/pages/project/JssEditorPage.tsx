@@ -15,7 +15,7 @@ import { canBuild, canWrite, useProject } from '../../layouts/ProjectShell';
 import { JssEditor, type GraphicInfo } from '../../jss/editor';
 import { JssParseError, parseJss } from '../../jss/xml';
 import { PackagePanel } from '../../jss/PackagePanel';
-import { ConvertButton, DocCodesButton, DocCodesStrip, useSectionCode } from '../../components/DocCodes';
+import { ConvertButton, DocCodesButton, DocCodesStrip, ExportProjectButton, useSectionCode } from '../../components/DocCodes';
 import { useProgress } from '../../lib/progress';
 import { useUi } from '../../store/ui';
 
@@ -180,6 +180,7 @@ export function JssEditorPage() {
         <PackagePanel id={id} writable={writable} dirty={dirty} saveFirst={save} onImported={() => { setDirty(false); void load(); ctx.reload(); }} />
         <DocCodesButton id={id} writable={writable} refreshKey={savedAt} />
         <ConvertButton id={id} from="jss" name={summary.project.name} dirty={dirty} saveFirst={save} />
+        <ExportProjectButton id={id} dirty={dirty} saveFirst={save} />
         <button className="btn btn-sm btn-primary" onClick={() => void generate()} disabled={!canBuild(role) || building || !loaded} data-testid="jss-generate" title={!canBuild(role) ? 'Reviewers, editors and owners can build the PDF' : 'Save, then build the whole publication as a PDF'}>{building ? <Spinner /> : <Icon name="play" size={12} />}{building ? 'Building…' : 'Generate PDF'}</button>
         <div className="v2-seg" role="group" aria-label="Editor layout">
           <button className={view === 'edit' ? 'on' : ''} onClick={() => setView('edit')} aria-pressed={view === 'edit'} title="Write only">Editor</button>

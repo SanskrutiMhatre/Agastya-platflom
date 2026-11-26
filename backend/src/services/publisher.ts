@@ -110,11 +110,15 @@ function injectDirectFrontMatter(projectId: string, pmText: string, effective: a
   }
 }
 
-/** The chapter-title size of a JSS document: 20-22 pt. A size already in that range is kept; anything else (the stencil's 18 pt, a value not in points, none) becomes 21 pt. */
-export function clampChapterTitleSize(v: unknown): string {
+/**
+ * The chapter-title size of a JSS document. The Xignal JSS layout keeps the owner's decision of 2026-11-24: 20-22 pt, anything else becomes 21 pt. Every other JSS document is set
+ * as the L&T reference sets it (the owner's request of 2026-11-26): 18 pt; a size between 18 and 22 pt that Settings names is kept, anything else (a value not in points, none) becomes 18 pt.
+ */
+export function clampChapterTitleSize(v: unknown, profile?: unknown): string {
   const m = /^\s*(\d+(?:\.\d+)?)\s*pt\s*$/i.exec(String(v ?? ''));
   const n = m ? Number(m[1]) : NaN;
-  return `${n >= 20 && n <= 22 ? n : 21}pt`;
+  if (profile === 'xignal-jss') return `${n >= 20 && n <= 22 ? n : 21}pt`;
+  return `${n >= 18 && n <= 22 ? n : 18}pt`;
 }
 
 /**
@@ -134,10 +138,13 @@ export function applyJssFrontMatter(projectId: string, project: any, effective: 
   }
 }
 
+const LT_LOGO_FILE = path.resolve(__dirname, '..', '..', 'assets', 'default-publisher-logo.png');      // the owner's L&T Precision Engineering Logo.png, under a name without spaces or an ampersand
+
 /**
  * The emblem, the publisher logos and the first-aid figures a JSS document prints when its project has not supplied them (or names a file that is not in its Media
- * folder): the pictures of the JSS-0251 stencils, shipped in vendor/pipeline/jss/artwork. They are referenced where they are, never copied into the project, and a
- * file the project does have always wins. A publisher gets the Larsen & Toubro logo only when it is Larsen & Toubro; another publisher with no logo prints none.
+ * folder): the pictures of the JSS-0251 stencils, shipped in vendor/pipeline/jss/artwork, and the L&T Precision Engineering logo the owner supplied (assets/default-publisher-logo.png,
+ * 2026-11-26) for a Larsen & Toubro publisher. They are referenced where they are, never copied into the project, and a file the project does have always wins. A publisher gets
+ * the logo only when it is Larsen & Toubro; another publisher with no logo prints none.
  */
 export function applyDefaultArtwork(projectId: string, effective: any, dir: string, log: (m: string) => void): void {
   const art = (f: string): string => relFromProject(projectId, path.join(config.pipelineDir, 'jss', 'artwork', f), dir);
@@ -149,7 +156,7 @@ export function applyDefaultArtwork(projectId: string, effective: any, dir: stri
     branding.publishers = branding.publishers.map((pub: any) => {
       if (has(pub?.logo) || !/l\s*&\s*t\b|larsen/i.test(`${pub?.name ?? ''} ${(pub?.addressLines ?? []).join(' ')}`)) return pub;
       used.push(`the logo of ${String(pub.name ?? 'a publisher').replace(/,\s*$/, '')}`);
-      return { ...pub, logo: art('lt-logo.png') };
+      return { ...pub, logo: relFromProject(projectId, LT_LOGO_FILE, dir) };
     });
   }
   effective.branding = branding;
@@ -167,8 +174,8 @@ function prepareInput(projectId: string, project: any, effective: any, useDirect
     // A JSS document is rendered as authored: only the shared frame is added (from Settings), then it goes straight to the JSS stylesheets.
     // The cover names the document as its stencil does ("TECHNICAL MANUAL" / "PART II MAINTENANCE"), unless Settings word it themselves.
     applyJssFrontMatter(projectId, project, effective);
-    // Chapter titles are set at 20-22 pt in a JSS document, whatever an older template or Settings say.
-    effective.layout = { ...(effective.layout ?? {}), chapterTitleSize: clampChapterTitleSize(effective.layout?.chapterTitleSize) };
+    // Chapter titles are set at 18 pt as the L&T reference sets them (20-22 pt on the Xignal JSS layout), whatever an older template or Settings say.
+    effective.layout = { ...(effective.layout ?? {}), chapterTitleSize: clampChapterTitleSize(effective.layout?.chapterTitleSize, effective.layout?.profile) };
     const book = composeBook(projectId, effective);
     fs.writeFileSync(path.join(dir, COMPOSED_NAME), book.text, 'utf8');
     // Code No. and Rev No. are the author's, written on the document; they reach the cover as the same layout parameters Settings would set.

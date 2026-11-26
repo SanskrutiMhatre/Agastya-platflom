@@ -16,6 +16,38 @@
          historical behaviour as the default; only the JSS authoring build sets it to 0, and only for the stencils that have no INBR line (see services/jss/registry.ts). -->
     <xsl:param name="cover.inbr.show">1</xsl:param>
 
+    <!-- Where the standard cover prints its date and "Under the Authority of" block: 0 = at the end of the cover's body (as always), 1 = in the foot region of the first page,
+         above the classification banner (as the xignal-jss cover already does). Only the JSS authoring build sets 1 (services/jss/service.ts layoutParamsFor). -->
+    <xsl:param name="cover.authority.foot">0</xsl:param>
+    <!--
+      changenotice.layout   classic (default): the Change Notice page as it has always been printed (3 ruled rows, table font).
+                            grid: the pro-forma of the L&T User Handbook: the publisher letterhead, a header row and 11 ruled rows (12 pt), the Pages / Enclosures /
+                            Sheets lines, and the codes box with its note. Only the JSS authoring build sends it (services/jss/service.ts layoutParamsFor), so the
+                            S1000D direct engine, which shares this file, and the old JSS path print what they printed before.
+    -->
+    <xsl:param name="changenotice.layout">classic</xsl:param>
+
+    <!--
+      ref.layout          0 (default): every page as it has always been printed. 1: the L&T reference layout (the Naval stencil of NTG Mumbai, 40 pages), for the JSS authoring build only
+                          (services/jss/service.ts layoutParamsFor): the cover and the title page on 25 mm margins with the Code No. / Rev No. lines (the title page follows the cover's blank
+                          back), page titles underlined, the running head and foot as the reference prints them, the chapter divider and the section headings as it sets them.
+      restricted.scope    all (default): the classification in the running head and foot of every page, as always. cover: on the cover and the title page only (the Land system).
+                          reference: on the cover, the title page and the Change Notice page (the Naval system, as the reference prints it).
+      red.color           the red of the notices and boxes: #CC0000 as always; the reference prints #FF0000.
+      Declared here, in the file both engines include, with the old behaviour as the default; the S1000D direct engine and the old JSS path never send them.
+    -->
+    <xsl:param name="ref.layout">0</xsl:param>
+    <xsl:param name="restricted.scope">all</xsl:param>
+    <xsl:param name="red.color">#CC0000</xsl:param>
+    <xsl:variable name="lref" select="$ref.layout = '1'"/>
+    <!-- the Change Notice letterhead logo and the gap under it: 26 pt and 21.6 pt as always; 34 pt and 5.6 pt under the reference layout (a taller picture, the same page height: the table still starts at 163 pt and the page still holds its 15 rows and the codes box) -->
+    <!-- the space above the date and authority block: 6 mm as always; none under the reference layout, where the block sits in the foot region of the cover master -->
+    <xsl:variable name="authority.gap"><xsl:choose><xsl:when test="$lref">0pt</xsl:when><xsl:otherwise>6mm</xsl:otherwise></xsl:choose></xsl:variable>
+    <xsl:variable name="cn.logo.height"><xsl:choose><xsl:when test="$lref">34pt</xsl:when><xsl:otherwise>26pt</xsl:otherwise></xsl:choose></xsl:variable>
+    <xsl:variable name="cn.logo.gap"><xsl:choose><xsl:when test="$lref">5.6pt</xsl:when><xsl:otherwise>21.6pt</xsl:otherwise></xsl:choose></xsl:variable>
+    <!-- the size of the tables on the front-matter pages: the reference sets them in 12 pt; the old layouts in the table size -->
+    <xsl:variable name="fm.table.size"><xsl:choose><xsl:when test="$lref">12pt</xsl:when><xsl:otherwise><xsl:value-of select="$table-font-size"/></xsl:otherwise></xsl:choose></xsl:variable>
+
     <!-- Whether the Foreword prints its "L&T Document No.:" line. The stencil forewords (UHB, MM, ORM) have none. Default 1 = as before; only the JSS authoring build sets 0. -->
     <xsl:param name="foreword.documentNo.show">1</xsl:param>
 
@@ -167,11 +199,12 @@
                 <xsl:call-template name="fm-label"><xsl:with-param name="override" select="$fm.label.titleJoint.publishedBy"/><xsl:with-param name="default">Jointly Prepared &amp; Published by:</xsl:with-param></xsl:call-template>
             </fo:block>
             <xsl:call-template name="publisher-row"/>
-            <xsl:call-template name="authority-block"/>
+            <xsl:if test="$cover.authority.foot != '1'"><xsl:call-template name="authority-block"/></xsl:if>
         </xsl:variable>
 
         <xsl:call-template name="cover-page-sequence">
             <xsl:with-param name="content" select="$content"/>
+            <xsl:with-param name="foot" select="$cover.authority.foot"/>
         </xsl:call-template>
         <xsl:call-template name="cover-blank-verso"/>
     </xsl:template>
@@ -274,11 +307,12 @@
                 </fo:block>
             </xsl:for-each>
 
-            <xsl:call-template name="authority-block"/>
+            <xsl:if test="$cover.authority.foot != '1'"><xsl:call-template name="authority-block"/></xsl:if>
         </xsl:variable>
 
         <xsl:call-template name="cover-page-sequence">
             <xsl:with-param name="content" select="$content"/>
+            <xsl:with-param name="foot" select="$cover.authority.foot"/>
         </xsl:call-template>
         <xsl:call-template name="cover-blank-verso"/>
     </xsl:template>
@@ -362,6 +396,96 @@
             <xsl:with-param name="content" select="$content"/>
         </xsl:call-template>
         <xsl:call-template name="cover-blank-verso"/>
+    </xsl:template>
+
+    <!-- ==================================================================== -->
+    <!--   2c. COVER AND TITLE PAGE, L&T reference layout (ref.layout = 1)      -->
+    <!-- ==================================================================== -->
+    <!--
+      The reference prints the cover (page 1), a blank back with nothing on it (2), the title page - the same page again (3) - and a back that carries only "This page is
+      intentionally left blank." (4); the proprietary notice is then page i. Both pages: the classification top and bottom (12 pt, bold, underlined, red), Code No. and Rev No. right
+      aligned, the notice boxes with a thin red rule, the emblem 104 pt tall, the title in 16 pt bold underlined, the date and the authority in the foot above the classification.
+      Text sizes and positions measured on Stencil_Naval_system_NTG Mumbai.pdf pages 1 and 3.
+    -->
+    <xsl:template name="lref-box">
+        <xsl:param name="content"/>
+        <xsl:param name="before">0pt</xsl:param>
+        <fo:block border="0.75pt solid {$red.color}" padding="2.5pt 6pt 2.5pt 6pt" margin-left="0mm" margin-right="0mm"
+                  color="{$red.color}" text-align="justify" space-before="{$before}">
+            <xsl:copy-of select="$content"/>
+        </fo:block>
+    </xsl:template>
+
+    <xsl:template match="titlePage" mode="lref-cover">
+        <xsl:variable name="content">
+            <fo:block text-align="right">
+                <fo:block><fo:inline font-weight="bold">Code No.: </fo:inline><xsl:value-of select="$cover.codeNo"/></fo:block>
+                <fo:block><fo:inline font-weight="bold">Rev No.: </fo:inline><xsl:value-of select="$cover.revNo"/></fo:block>
+            </fo:block>
+
+            <xsl:call-template name="lref-box">
+                <xsl:with-param name="before">14pt</xsl:with-param>
+                <xsl:with-param name="content"><fo:block><xsl:apply-templates select="disclosureNotice/node()"/></fo:block></xsl:with-param>
+            </xsl:call-template>
+
+            <fo:block-container height="104pt" space-before="18pt">
+                <fo:block text-align="center" line-height="0">
+                    <xsl:if test="$meta/emblem/@src">
+                        <fo:external-graphic src="url('{$meta/emblem/@src}')" content-height="104pt" scaling="uniform"/>
+                    </xsl:if>
+                </fo:block>
+            </fo:block-container>
+
+            <fo:block text-align="center" font-weight="bold" font-family="{$cover.title.font-family}" font-size="{$cover.title.font-size}"
+                      text-decoration="underline" space-before="17pt" space-after="3.6pt">
+                <xsl:choose>
+                    <xsl:when test="$cover.title.split = '1' and contains(documentType, '&#10;')">
+                        <xsl:call-template name="cover-title-lines"><xsl:with-param name="text" select="string(documentType)"/></xsl:call-template>
+                    </xsl:when>
+                    <xsl:otherwise><xsl:value-of select="documentType"/></xsl:otherwise>
+                </xsl:choose>
+            </fo:block>
+            <fo:block text-align="center" font-weight="bold" font-family="{$cover.title.font-family}" font-size="{$cover.title.font-size}"
+                      text-decoration="underline" space-after="3.6pt">
+                <xsl:call-template name="fm-label"><xsl:with-param name="override" select="$fm.label.title.for"/><xsl:with-param name="default">FOR</xsl:with-param></xsl:call-template>
+            </fo:block>
+            <fo:block text-align="center" font-weight="bold" font-family="{$cover.title.font-family}" font-size="{$cover.title.font-size}"
+                      text-decoration="underline">
+                <xsl:value-of select="$system.name"/>
+            </fo:block>
+
+            <xsl:call-template name="lref-box">
+                <xsl:with-param name="before">14pt</xsl:with-param>
+                <xsl:with-param name="content"><fo:block><xsl:apply-templates select="repairNotice/node()"/></fo:block></xsl:with-param>
+            </xsl:call-template>
+
+            <fo:block text-align="center" space-before="22pt" space-after="4pt">
+                <xsl:call-template name="fm-label"><xsl:with-param name="override" select="$fm.label.title.publishedBy"/><xsl:with-param name="default">Prepared &amp; Published by</xsl:with-param></xsl:call-template>
+            </fo:block>
+            <xsl:for-each select="$meta/publishers/publisher[1]">
+                <xsl:if test="logo/@src">
+                    <fo:block text-align="center" line-height="0">
+                        <fo:external-graphic src="url('{logo/@src}')" scaling="uniform">
+                            <xsl:attribute name="content-height">
+                                <xsl:choose>
+                                    <xsl:when test="logo/@height"><xsl:value-of select="logo/@height"/></xsl:when>
+                                    <xsl:otherwise>80pt</xsl:otherwise>
+                                </xsl:choose>
+                            </xsl:attribute>
+                            <xsl:if test="logo/@width"><xsl:attribute name="content-width"><xsl:value-of select="logo/@width"/></xsl:attribute></xsl:if>
+                        </fo:external-graphic>
+                    </fo:block>
+                </xsl:if>
+                <fo:block text-align="center" line-height="16pt">
+                    <xsl:for-each select="name | addressLine"><fo:block><xsl:value-of select="."/></fo:block></xsl:for-each>
+                </fo:block>
+            </xsl:for-each>
+        </xsl:variable>
+
+        <xsl:call-template name="cover-page-sequence-lref"><xsl:with-param name="content" select="$content"/></xsl:call-template>
+        <xsl:if test="$blank.versos = '1'"><xsl:call-template name="cover-blank-lref"/></xsl:if>
+        <xsl:call-template name="cover-page-sequence-lref"><xsl:with-param name="content" select="$content"/></xsl:call-template>
+        <xsl:if test="$blank.versos = '1'"><xsl:call-template name="cover-blank-lref"><xsl:with-param name="legend">1</xsl:with-param></xsl:call-template></xsl:if>
     </xsl:template>
 
     <!-- Shared cover-page furniture -->
@@ -469,9 +593,10 @@
     </xsl:template>
 
     <xsl:template name="authority-block">
-        <fo:table table-layout="fixed" width="100%" space-before="6mm">
-            <fo:table-column column-width="proportional-column-width(1)"/>
-            <fo:table-column column-width="proportional-column-width(1)"/>
+        <fo:table table-layout="fixed" width="100%" space-before="{$authority.gap}">
+            <!-- L&T reference: the date at the left, the authority on two lines (left aligned) from 47% of the text width (x = 284 pt on the reference) -->
+            <fo:table-column><xsl:attribute name="column-width"><xsl:choose><xsl:when test="$lref">proportional-column-width(47)</xsl:when><xsl:otherwise>proportional-column-width(1)</xsl:otherwise></xsl:choose></xsl:attribute></fo:table-column>
+            <fo:table-column><xsl:attribute name="column-width"><xsl:choose><xsl:when test="$lref">proportional-column-width(53)</xsl:when><xsl:otherwise>proportional-column-width(1)</xsl:otherwise></xsl:choose></xsl:attribute></fo:table-column>
             <fo:table-body>
                 <fo:table-row>
                     <fo:table-cell display-align="after">
@@ -481,7 +606,8 @@
                             <xsl:value-of select="$meta/year"/>
                         </fo:block>
                     </fo:table-cell>
-                    <fo:table-cell text-align="right">
+                    <fo:table-cell>
+                        <xsl:attribute name="text-align"><xsl:choose><xsl:when test="$lref">left</xsl:when><xsl:otherwise>right</xsl:otherwise></xsl:choose></xsl:attribute>
                         <fo:block>Under the Authority of</fo:block>
                         <fo:block>Secretary, Ministry of Defence, Govt. of India</fo:block>
                     </fo:table-cell>
@@ -521,7 +647,7 @@
                 </xsl:with-param>
             </xsl:call-template>
             <xsl:if test="applicability">
-                <fo:block border="0.8pt solid #CC0000" padding="2mm" color="#CC0000"
+                <fo:block border="0.8pt solid {$red.color}" padding="2mm" color="{$red.color}"
                           margin-left="0mm" margin-right="0mm"
                           text-align="center" font-weight="bold">
                     <xsl:value-of select="applicability"/>
@@ -534,21 +660,45 @@
     <!--                             4. FOREWORD                               -->
     <!-- ==================================================================== -->
     <xsl:template match="foreword">
-        <fo:block break-before="page" border="0.8pt solid black" padding="4mm"
-                  margin-left="0mm" margin-right="0mm">
+        <xsl:choose>
+            <!-- L&T reference: the box 23 pt lower, its text on 20.5 pt lines (1.7), the title 25 pt in from the top rule -->
+            <xsl:when test="$lref">
+                <fo:block break-before="page" padding-top="23pt">
+                    <fo:block border="0.8pt solid black" padding="25pt 4mm 13pt 4mm" margin-left="0mm" margin-right="0mm" line-height="20.5pt">
+                        <xsl:call-template name="foreword-content"/>
+                    </fo:block>
+                </fo:block>
+            </xsl:when>
+            <xsl:otherwise>
+                <fo:block break-before="page" border="0.8pt solid black" padding="4mm"
+                          margin-left="0mm" margin-right="0mm">
+                    <xsl:call-template name="foreword-content"/>
+                </fo:block>
+            </xsl:otherwise>
+        </xsl:choose>
+    </xsl:template>
+
+    <xsl:template name="foreword-content">
             <fo:block text-align="center" font-weight="bold" font-size="{$heading2-size}"
                       space-after="4mm">
+                <xsl:if test="$lref"><xsl:attribute name="space-after">5pt</xsl:attribute><xsl:attribute name="text-decoration">underline</xsl:attribute></xsl:if>
                 <xsl:call-template name="fm-heading"><xsl:with-param name="override" select="$fm.title.foreword"/><xsl:with-param name="default">FOREWORD</xsl:with-param></xsl:call-template>
             </fo:block>
             <xsl:if test="$foreword.documentNo.show != '0'">
                 <fo:block space-after="4mm">
+                    <xsl:if test="$lref"><xsl:attribute name="space-after">20.5pt</xsl:attribute></xsl:if>
                     <xsl:call-template name="fm-label"><xsl:with-param name="override" select="$fm.label.foreword.documentNo"/><xsl:with-param name="default">L&amp;T Document No.: </xsl:with-param></xsl:call-template>
                     <xsl:value-of select="$meta/ltDocumentNo"/>
                 </fo:block>
             </xsl:if>
-            <xsl:apply-templates select="para"/>
+            <xsl:choose>
+                <!-- the first paragraph indented 42 pt, 10.5 pt before the address block -->
+                <xsl:when test="$lref">
+                    <fo:block text-indent="42pt" space-after="10.5pt"><xsl:apply-templates select="para"/></fo:block>
+                </xsl:when>
+                <xsl:otherwise><xsl:apply-templates select="para"/></xsl:otherwise>
+            </xsl:choose>
             <xsl:apply-templates select="deflist"/>
-        </fo:block>
     </xsl:template>
 
     <!-- ==================================================================== -->
@@ -571,7 +721,7 @@
                  parent's actual content width. -->
             <xsl:choose>
             <xsl:when test="$roc.layout = 'amendments'">
-                <fo:table table-layout="fixed" font-size="{$table-font-size}">
+                <fo:table table-layout="fixed" font-size="{$fm.table.size}">
                     <fo:table-column column-width="proportional-column-width(14.7)"/>
                     <fo:table-column column-width="proportional-column-width(20.3)"/>
                     <fo:table-column column-width="proportional-column-width(30.6)"/>
@@ -600,7 +750,7 @@
                 </fo:table>
             </xsl:when>
             <xsl:otherwise>
-            <fo:table table-layout="fixed" font-size="{$table-font-size}">
+            <fo:table table-layout="fixed" font-size="{$fm.table.size}">
                 <fo:table-column column-width="proportional-column-width(1.2)"/>
                 <fo:table-column column-width="proportional-column-width(1)"/>
                 <fo:table-column column-width="proportional-column-width(2.6)"/>
@@ -699,7 +849,7 @@
                 </fo:inline>
                 <xsl:call-template name="fm-label"><xsl:with-param name="override" select="$fm.label.handbooks.introAfter"/><xsl:with-param name="default"> comprises of the following:</xsl:with-param></xsl:call-template>
             </fo:block>
-            <fo:table table-layout="fixed" width="100%" font-size="{$table-font-size}">
+            <fo:table table-layout="fixed" width="100%" font-size="{$fm.table.size}">
                 <fo:table-column column-width="18mm"/>
                 <fo:table-column column-width="proportional-column-width(1)"/>
                 <fo:table-column column-width="35mm"/>
@@ -739,15 +889,18 @@
                 <xsl:with-param name="content">
                     <fo:block font-weight="bold" font-size="{$heading2-size}" space-after="4mm"
                               text-decoration="underline">
+                        <xsl:if test="$lref"><xsl:attribute name="space-after">14.3pt</xsl:attribute></xsl:if>
                         <xsl:call-template name="fm-label"><xsl:with-param name="override" select="$fm.label.safety.heading"/><xsl:with-param name="default">SAFETY WARNING</xsl:with-param></xsl:call-template>
                     </fo:block>
                     <xsl:for-each select="line">
                         <fo:block>
-                            <xsl:if test="@emphasis = 'strong'">
+                            <xsl:if test="@emphasis = 'strong' or $lref">
                                 <xsl:attribute name="font-weight">bold</xsl:attribute>
                             </xsl:if>
                             <xsl:if test="@space-before">
                                 <xsl:attribute name="space-before"><xsl:value-of select="@space-before"/></xsl:attribute>
+                                <!-- the reference leaves two blank lines between the groups: 10 pt more than the stencil's 6 mm -->
+                                <xsl:if test="$lref"><xsl:attribute name="padding-top">10pt</xsl:attribute></xsl:if>
                             </xsl:if>
                             <xsl:apply-templates/>
                         </fo:block>
@@ -756,6 +909,7 @@
             </xsl:call-template>
             <xsl:if test="$safety.footer.show != '0'">
             <fo:block text-align="center" font-weight="bold" text-decoration="underline">
+                <xsl:if test="$lref"><xsl:attribute name="color">black</xsl:attribute></xsl:if>
                 <xsl:call-template name="fm-label"><xsl:with-param name="override" select="$fm.label.safety.footer"/><xsl:with-param name="default">FOR FIRST AID IN CASE OF ELECTRIC SHOCK SEE THE FOLLOWING PAGE</xsl:with-param></xsl:call-template>
             </fo:block>
             </xsl:if>
@@ -768,6 +922,7 @@
     <xsl:template match="firstAid">
         <fo:block break-before="page">
             <xsl:call-template name="page-title">
+                <xsl:with-param name="color" select="$red.color"/>
                 <xsl:with-param name="text">
                     <xsl:call-template name="fm-heading">
                         <xsl:with-param name="override" select="$fm.title.firstAid"/>
@@ -790,7 +945,7 @@
               page alone). Letting the cells carry the border removes the
               nesting the two disagreed about.
             -->
-            <fo:table table-layout="fixed" width="100%" font-size="{$table-font-size}">
+            <fo:table table-layout="fixed" width="100%" font-size="{$fm.table.size}">
                 <!-- The artwork column follows the artwork, plus its 2mm gutter.
                      Fixed at 36mm it did not: narrowing the picture left a
                      36mm hole instead of giving the step text more width, so
@@ -939,6 +1094,9 @@
     <!--                          11. CHANGE NOTICE                            -->
     <!-- ==================================================================== -->
     <xsl:template match="changeNotice">
+        <xsl:choose>
+        <xsl:when test="$changenotice.layout = 'grid'"><xsl:call-template name="change-notice-grid"/></xsl:when>
+        <xsl:otherwise>
         <fo:block break-before="page">
             <xsl:call-template name="page-title">
                 <xsl:with-param name="text">
@@ -959,7 +1117,7 @@
                 </fo:block>
             </xsl:if>
 
-            <fo:table table-layout="fixed" width="100%" font-size="{$table-font-size}" space-after="6mm">
+            <fo:table table-layout="fixed" width="100%" font-size="{$fm.table.size}" space-after="6mm">
                 <fo:table-column column-width="proportional-column-width(1.3)"/>
                 <fo:table-column column-width="proportional-column-width(1)"/>
                 <fo:table-column column-width="proportional-column-width(1)"/>
@@ -993,7 +1151,7 @@
                 <fo:block>Enclosures&#160;&#160;&#160;&#160;:</fo:block>
             </fo:block>
 
-            <fo:table table-layout="fixed" width="100%" font-size="{$table-font-size}">
+            <fo:table table-layout="fixed" width="100%" font-size="{$fm.table.size}">
                 <fo:table-column column-width="proportional-column-width(1.6)"/>
                 <fo:table-column column-width="proportional-column-width(1)"/>
                 <fo:table-body>
@@ -1013,6 +1171,126 @@
                 </fo:table-body>
             </fo:table>
         </fo:block>
+        </xsl:otherwise>
+        </xsl:choose>
+    </xsl:template>
+
+    <!-- ==================================================================== -->
+    <!--   11b. CHANGE NOTICE, grid layout (changenotice.layout = grid)        -->
+    <!-- Measured on the L&T User Handbook page: Arial 12 pt, a 1 pt rule on every line, columns 334 : 200 : 153 : 236, a 40 pt header row and rows of 22.3 pt   -->
+    <!-- (15 of them by the owner's request of 2026-11-26, the row height unchanged and what follows pushed down), the Pages line over the Enclosures / Sheets line, -->
+    <!-- a 178 pt box split 69.5 : 30.5 (the codes and the note, justified). The letterhead is the publisher's logo alone: no name beside it.                  -->
+    <!-- ==================================================================== -->
+    <xsl:template name="change-notice-grid">
+        <xsl:variable name="rule">1pt solid black</xsl:variable>
+        <xsl:variable name="logo" select="$meta/publishers/publisher[1]/logo/@src"/>
+        <fo:block break-before="page" font-size="12pt">
+            <xsl:if test="$restricted.scope = 'reference'"><xsl:call-template name="classification-banner"/></xsl:if>
+            <fo:block text-align="center" font-size="{$heading2-size}" font-weight="bold" padding-top="7.3pt" space-after="0pt" keep-with-next.within-page="always">
+                <xsl:if test="$lref"><xsl:attribute name="text-decoration">underline</xsl:attribute></xsl:if>
+                <xsl:call-template name="fm-heading">
+                    <xsl:with-param name="override" select="$fm.title.changeNotice"/>
+                    <xsl:with-param name="default">CHANGE NOTICE</xsl:with-param>
+                </xsl:call-template>
+            </fo:block>
+            <!-- the publisher letterhead: the publisher's logo, and nothing beside it -->
+            <xsl:if test="$logo">
+                <fo:block start-indent="9pt" space-before="-9pt" space-after="{$cn.logo.gap}" line-height="{$cn.logo.height}">
+                    <fo:external-graphic src="url('{$logo}')" content-height="{$cn.logo.height}" scaling="uniform"/>
+                </fo:block>
+            </xsl:if>
+
+            <fo:table table-layout="fixed" width="100%" border-collapse="collapse">
+                <fo:table-column column-width="proportional-column-width(334)"/>
+                <fo:table-column column-width="proportional-column-width(200)"/>
+                <fo:table-column column-width="proportional-column-width(153)"/>
+                <fo:table-column column-width="proportional-column-width(236)"/>
+                <fo:table-header>
+                    <fo:table-row height="37.6pt" font-weight="bold" line-height="17.3pt">
+                        <fo:table-cell border="{$rule}" padding="1.2pt 3.5pt 0 3.5pt" display-align="before"><fo:block>
+                            <xsl:call-template name="fm-label"><xsl:with-param name="override" select="$fm.label.change.colTitle"/><xsl:with-param name="default">TITLE OF PUBLICATION</xsl:with-param></xsl:call-template>
+                        </fo:block></fo:table-cell>
+                        <fo:table-cell border="{$rule}" padding="1.2pt 3.5pt 0 3.5pt" display-align="before"><fo:block>
+                            <xsl:call-template name="fm-label"><xsl:with-param name="override" select="$fm.label.change.colCode"/><xsl:with-param name="default">CODE No. AND DATE</xsl:with-param></xsl:call-template>
+                        </fo:block></fo:table-cell>
+                        <fo:table-cell border="{$rule}" padding="1.2pt 3.5pt 0 3.5pt" display-align="before"><fo:block>
+                            <xsl:call-template name="fm-label"><xsl:with-param name="override" select="$fm.label.change.colPrevious"/><xsl:with-param name="default">PREVIOUS CHANGE</xsl:with-param></xsl:call-template>
+                        </fo:block></fo:table-cell>
+                        <fo:table-cell border="{$rule}" padding="1.2pt 3.5pt 0 3.5pt" display-align="before"><fo:block>
+                            <xsl:call-template name="fm-label"><xsl:with-param name="override" select="$fm.label.change.colNoticeNo"/><xsl:with-param name="default">CHANGE NOTICE No. AND DATE</xsl:with-param></xsl:call-template>
+                        </fo:block></fo:table-cell>
+                    </fo:table-row>
+                </fo:table-header>
+                <fo:table-body>
+                    <xsl:call-template name="change-notice-grid-rows"><xsl:with-param name="count" select="15"/></xsl:call-template>
+                </fo:table-body>
+            </fo:table>
+
+            <!-- the Pages line over the Enclosures / Sheets line: the colons end where the pro-forma has them -->
+            <fo:table table-layout="fixed" width="100%" space-before="20.8pt">
+                <fo:table-column column-width="305pt"/>
+                <fo:table-column column-width="137pt"/>
+                <fo:table-column column-width="proportional-column-width(1)"/>
+                <fo:table-body>
+                    <fo:table-row height="22.9pt">
+                        <fo:table-cell display-align="center"><fo:block>&#160;</fo:block></fo:table-cell>
+                        <fo:table-cell display-align="center"><fo:block text-align="right">No. of Pages:</fo:block></fo:table-cell>
+                        <fo:table-cell><fo:block>&#160;</fo:block></fo:table-cell>
+                    </fo:table-row>
+                    <fo:table-row height="22.9pt">
+                        <fo:table-cell display-align="center"><fo:block text-align="right">Enclosures:</fo:block></fo:table-cell>
+                        <fo:table-cell display-align="center"><fo:block text-align="right">Sheets:</fo:block></fo:table-cell>
+                        <fo:table-cell><fo:block>&#160;</fo:block></fo:table-cell>
+                    </fo:table-row>
+                </fo:table-body>
+            </fo:table>
+
+            <fo:table table-layout="fixed" width="100%" space-before="8.8pt" border-collapse="collapse">
+                <fo:table-column column-width="proportional-column-width(695)"/>
+                <fo:table-column column-width="proportional-column-width(305)"/>
+                <fo:table-body>
+                    <fo:table-row height="175.8pt">
+                        <fo:table-cell border="{$rule}" padding="1.7pt 4.2pt 0 4.2pt">
+                            <fo:block font-weight="bold">CODES FOR INCORPORATION OF CHANGES:</fo:block>
+                            <fo:list-block provisional-distance-between-starts="24.5pt" provisional-label-separation="0pt">
+                                <xsl:call-template name="change-notice-code"><xsl:with-param name="code">(R)</xsl:with-param><xsl:with-param name="text">By Replacement/addition of sheet(s)</xsl:with-param><xsl:with-param name="before">25.8pt</xsl:with-param></xsl:call-template>
+                                <xsl:call-template name="change-notice-code"><xsl:with-param name="code">(H)</xsl:with-param><xsl:with-param name="text">By Hand-correction</xsl:with-param></xsl:call-template>
+                                <xsl:call-template name="change-notice-code"><xsl:with-param name="code">(P)</xsl:with-param><xsl:with-param name="text">By pasting the enclosed matter</xsl:with-param></xsl:call-template>
+                                <xsl:call-template name="change-notice-code"><xsl:with-param name="code">(A)</xsl:with-param><xsl:with-param name="text">Additional information - only to be filed in the publication</xsl:with-param><xsl:with-param name="before">23.4pt</xsl:with-param></xsl:call-template>
+                            </fo:list-block>
+                        </fo:table-cell>
+                        <fo:table-cell border="{$rule}" padding="1.7pt 6pt 0 5.8pt">
+                            <fo:block font-weight="bold">NOTE:</fo:block>
+                            <fo:block text-align="justify" line-height="14.3pt" space-before="7pt">This document should be filed pasted in the copy of the Publication before the CONTENTS Page. After carrying out (R), (H) or (P) entry should be made in Record of Changes Page.</fo:block>
+                        </fo:table-cell>
+                    </fo:table-row>
+                </fo:table-body>
+            </fo:table>
+            <xsl:if test="$restricted.scope = 'reference'"><fo:block space-before="10pt"><xsl:call-template name="classification-banner"/></fo:block></xsl:if>
+        </fo:block>
+    </xsl:template>
+
+    <xsl:template name="change-notice-grid-rows">
+        <xsl:param name="count"/>
+        <xsl:if test="$count &gt; 0">
+            <fo:table-row height="21.3pt">
+                <fo:table-cell border="1pt solid black"><fo:block>&#160;</fo:block></fo:table-cell>
+                <fo:table-cell border="1pt solid black"><fo:block>&#160;</fo:block></fo:table-cell>
+                <fo:table-cell border="1pt solid black"><fo:block>&#160;</fo:block></fo:table-cell>
+                <fo:table-cell border="1pt solid black"><fo:block>&#160;</fo:block></fo:table-cell>
+            </fo:table-row>
+            <xsl:call-template name="change-notice-grid-rows"><xsl:with-param name="count" select="$count - 1"/></xsl:call-template>
+        </xsl:if>
+    </xsl:template>
+
+    <xsl:template name="change-notice-code">
+        <xsl:param name="code"/>
+        <xsl:param name="text"/>
+        <xsl:param name="before">22.8pt</xsl:param>
+        <fo:list-item space-before="{$before}">
+            <fo:list-item-label end-indent="label-end()"><fo:block font-weight="bold" font-size="10.5pt"><xsl:value-of select="$code"/></fo:block></fo:list-item-label>
+            <fo:list-item-body start-indent="body-start()"><fo:block><xsl:value-of select="$text"/></fo:block></fo:list-item-body>
+        </fo:list-item>
     </xsl:template>
 
     <!-- ==================================================================== -->
@@ -1030,7 +1308,7 @@
             </xsl:call-template>
             <xsl:choose>
             <xsl:when test="$abbrev.layout = 'numbered'">
-                <fo:table table-layout="fixed" width="100%" font-size="{$table-font-size}">
+                <fo:table table-layout="fixed" width="100%" font-size="{$fm.table.size}">
                     <fo:table-column column-width="proportional-column-width(22.5)"/>
                     <fo:table-column column-width="proportional-column-width(40)"/>
                     <fo:table-column column-width="proportional-column-width(107.5)"/>
@@ -1070,7 +1348,7 @@
                 </fo:table>
             </xsl:when>
             <xsl:otherwise>
-            <fo:table table-layout="fixed" width="100%" font-size="{$table-font-size}">
+            <fo:table table-layout="fixed" width="100%" font-size="{$fm.table.size}">
                 <fo:table-column column-width="50mm"/>
                 <fo:table-column column-width="proportional-column-width(1)"/>
                 <fo:table-header>
@@ -1223,7 +1501,7 @@
                                                             </fo:block>
                                                         </fo:table-cell>
                                                         <fo:table-cell display-align="center" padding-left="2mm">
-                                                            <fo:block font-size="{$table-font-size}">
+                                                            <fo:block font-size="{$fm.table.size}">
                                                                 <xsl:apply-templates/>
                                                             </fo:block>
                                                         </fo:table-cell>

@@ -1,5 +1,12 @@
 # The two SNS systems (kept separate on purpose)
 
+> **Update 2026-11-26 (owner's request).** The duplicate SNS screens were removed from the interface: **Project settings > SNS** (system 2, the row model) and
+> **Administrator > SNS defaults**. Numbering is now reached through one place only: system 1 (Administrator > Numbering (SNS) / SNS presets, and the SNS section of
+> the S1000D configuration). **Nothing was deleted from the backend:** the `.sns.json` files, the `sns-defaults` rows in `config_items` and the routes `/api/projects/:id/sns-rows`
+> and `/api/sns/defaults` are still there and still tested (`sns-separation.test.js`), and a project package still carries both (`packageSettings`). The two systems remain
+> separate in storage. The table below describes the backend as it is; the "Studio / UI" row for system 2 is historical. `/projects/:id/settings/sns/*` and
+> `/admin/sns-defaults` redirect to the S1000D settings and to the SNS presets.
+
 The platform has **two independent SNS (Standard Numbering System) implementations**. They were built at different times for different jobs. The owner decided
 (2026-11-22) to **keep both, side by side, and not to merge, rename, delete or migrate either into the other**. This page says what each one is, where it lives,
 what touches it, and how that separation is enforced and tested.

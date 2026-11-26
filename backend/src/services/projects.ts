@@ -181,7 +181,11 @@ export async function createProject(user: User, input: CreateProjectInput): Prom
   const folder = group ? resolveFolderForFiling(user, group) : '';
 
   let fmt: ResolvedFormat | null = null;
-  if (!input.from && input.format !== undefined) { try { fmt = resolveFormat(input); } catch (e) { throw bad((e as Error).message, 'FORMAT_NOT_READY'); } }
+  // A project made with nothing said about its kind (no format, document profile, house template or engine) is an S1000D publication and starts exactly as the wizard's
+  // S1000D project does: on the reference (Xignal) house style with its logos, margin marks and furniture. There is no path that makes an S1000D project on the plain
+  // `default` template unless that template (or an engine) is asked for by name. (A copy keeps what its source was.)
+  const unspecified = !input.from && input.format === undefined && !input.profile && !input.templateRef && !input.pipeline && (input.type === undefined || input.type === 'S1000D');
+  if (!input.from && (input.format !== undefined || unspecified)) { try { fmt = resolveFormat(unspecified ? { ...input, format: 's1000d' } : input); } catch (e) { throw bad((e as Error).message, 'FORMAT_NOT_READY'); } }
   const profile = input.from ? undefined : fmt ? profileById(fmt.profile) : profileById(input.profile);
   if (!fmt && input.profile && !input.from && !profile) throw bad('Unknown document type.');
 
@@ -269,7 +273,7 @@ export async function createProject(user: User, input: CreateProjectInput): Prom
   return projectCard(store.getProjectRow(id), 'owner', user.role === 'admin' ? 'admin' : 'project');
 }
 
-export async function updateProject(user: User, id: string, patch: { name?: string; folder?: string; pipeline?: string; autoAddToPublication?: boolean; sideText?: { enabled?: boolean; publisher?: string; draftNote?: boolean }; headerLogo?: boolean; publisherLogo?: boolean }): Promise<ProjectCard> {
+export async function updateProject(user: User, id: string, patch: { name?: string; folder?: string; pipeline?: string; templateRef?: string; autoAddToPublication?: boolean; sideText?: { enabled?: boolean; publisher?: string; draftNote?: boolean }; headerLogo?: boolean; publisherLogo?: boolean }): Promise<ProjectCard> {
   const row = store.getProjectRow(id);
   if (!row) throw notFound();
   assertNotCir(id, 'change');
@@ -289,6 +293,17 @@ export async function updateProject(user: User, id: string, patch: { name?: stri
   if (patch.autoAddToPublication !== undefined) updateProjectJson(id, (pj) => { pj.autoAddToPublication = patch.autoAddToPublication === true; });
   if (patch.pipeline !== undefined) {
     updateProjectJson(id, (pj) => { pj.pipeline = patch.pipeline === 's1000dtofo' ? 's1000dtofo' : 's1000dtojss'; });
+  }
+  if (patch.templateRef !== undefined) {
+    // The house style of an existing project (an older S1000D project made before the reference style was the default keeps the one it was made with until its owner
+    // chooses). It must be one of the templates installed in the workspace; the engine a document profile of that name builds with goes with it, so choosing the
+    // S1000D reference style also gives the direct S1000D engine that style is measured on.
+    const ref = String(patch.templateRef);
+    if (!/^[a-z0-9][a-z0-9._-]{0,63}$/i.test(ref) || !fs.existsSync(path.join(workspace.templatesDir(workspaceDir), `${ref}.house.json`))) throw bad('Choose one of the house styles installed in this workspace.', 'UNKNOWN_TEMPLATE');
+    if (readProjectJson(id).type === 'JSS' || readProjectJson(id).format === 'jsg') throw bad('A JSS or JSG document keeps the style of its manual type.', 'TEMPLATE_FIXED');
+    const profile = profileById(ref);
+    updateProjectJson(id, (pj) => { pj.templateRef = ref; if (profile?.pipeline) pj.pipeline = profile.pipeline; });
+    registryDb.upsertProject({ id, name: readProjectJson(id).name || id, type: row.type, template: ref, now });
   }
   if (patch.folder !== undefined) {
     const group = String(patch.folder || '').trim();

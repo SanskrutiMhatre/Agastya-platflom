@@ -15,6 +15,7 @@ import * as pk from '../services/packages';
 import { generateDml } from '../services/dispatch';
 import { isCirProject, createProject, deleteProject } from '../services/projects';
 import { adoptFromContents } from '../services/projectConfig';
+import { readManifestOf } from '../services/projectArchive';
 import { restoreSettings, type RestoreReport } from '../services/packageSettings';
 import { projectDirFor } from '../context';
 import { buildHtmlPublication } from '../services/htmlPublish';
@@ -67,11 +68,12 @@ export function registerPackageRoutes(app: Express): void {
     const f = (req as any).file as Express.Multer.File | undefined; if (!f) throw bad('No package uploaded.', 'NO_FILE');
     try {
       const found = detectPackage(f.path, f.originalname);
+      const man = /\.zip$/i.test(f.originalname) ? await readManifestOf(f.path) : null;      // an archive made by this platform (a project's Export) says so in its manifest
       const token = (await import('crypto')).randomBytes(16).toString('hex'); const keep = path.join(uploadTmp(), `${token}.upload`);
       fs.renameSync(f.path, keep);
       for (const [k, v] of pending) if (Date.now() - v.at > 3600_000) { pending.delete(k); try { fs.unlinkSync(v.file); } catch { /* gone */ } }
       pending.set(token, { userId: (req as any).auth.user.id, file: keep, name: f.originalname, at: Date.now() });
-      res.json({ token, name: f.originalname, ...found });
+      res.json({ token, name: f.originalname, ...found, ...(man ? { archive: { format: man.format, domain: man.domain ?? null, manualType: man.manualType ?? null, name: man.name ?? '' } } : {}) });
     } catch (e) { try { fs.unlinkSync(f.path); } catch { /* moved or gone */ } throw e; }
   }));
 

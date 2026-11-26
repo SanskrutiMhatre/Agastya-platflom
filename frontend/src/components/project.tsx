@@ -127,8 +127,8 @@ export function CreateProjectModal({ folders, defaultFolder = '', startWith, onC
       const sp = sourceProblem(file.name, source, found); if (sp) return sp;
       if (!confirmed) return 'Confirm what this file is.';
       if (!name.trim()) return 'Enter a project name.';
-      const tp = targetProblem(source as SourceFormat, fmt, manualType); if (tp) return tp;
-      return formatProblem();
+      const tp = targetProblem(source as SourceFormat, fmt, manualType, found); if (tp) return tp;
+      return found.archive ? '' : formatProblem();
     }
     return '';
   };
@@ -161,7 +161,7 @@ export function CreateProjectModal({ folders, defaultFolder = '', startWith, onC
   };
   const chosenFile = async (f: File | undefined) => {
     if (!f) return; setErr(''); setRefusal([]); setFound(null); setDetecting(true); setFile(f); setSource(''); setConfirmed(false);
-    try { const d = await workspaceApi.detectPackage(f); setFound(d); setSource(guessedSource(d)); if (!name.trim()) setName(f.name.replace(/(\.jsspub)?\.(zip|xml)$/i, '')); }   // a guess only: nothing is chosen for the person, and the target is left as it was
+    try { const d = await workspaceApi.detectPackage(f); setFound(d); setSource(guessedSource(d)); if (d.archive) { setFmt(d.archive.format); setDomain(d.archive.domain ?? ''); setManualType(d.archive.manualType ?? ''); } if (!name.trim()) setName(f.name.replace(/(\.jsspub)?\.(zip|xml)$/i, '')); }   // a guess only: nothing is chosen for the person, and the target is left as it was
     catch (e) { setErr(errText(e)); setFile(null); } finally { setDetecting(false); }
   };
   /** Leaving the result of a conversion: the lists behind the dialog learn of the new project. */
@@ -220,7 +220,7 @@ export function CreateProjectModal({ folders, defaultFolder = '', startWith, onC
         ) : null}
         {stepId === 'project' ? (<>{nameAndFolder}{formatPicker}</>) : null}
         {done ? (<>
-          <p data-testid="wiz-done">A new {FORMAT_NAME[done.to]} project, <b>{done.project.name}</b>, was made from {FORMAT_NAME[done.from]} content: {done.counts.sections} {done.to === 's1000d' ? 'data module' : 'section'}{done.counts.sections === 1 ? '' : 's'}{done.counts.pictures ? `, ${done.counts.pictures} ${done.to === 's1000d' ? 'graphic' : 'picture'}${done.counts.pictures === 1 ? '' : 's'}` : ''}.</p>
+          <p data-testid="wiz-done">A new {FORMAT_NAME[done.to]} project, <b>{done.project.name}</b>, was made from {FORMAT_NAME[done.from]} content: {done.restored ? `restored from a project archive (${done.restored.files} file${done.restored.files === 1 ? '' : 's'}${done.restored.comments ? `, ${done.restored.comments} review comment${done.restored.comments === 1 ? '' : 's'}` : ''})` : null}{done.restored ? null : <>{done.counts.sections} {done.to === 's1000d' ? 'data module' : 'section'}{done.counts.sections === 1 ? '' : 's'}{done.counts.pictures ? `, ${done.counts.pictures} ${done.to === 's1000d' ? 'graphic' : 'picture'}${done.counts.pictures === 1 ? '' : 's'}` : ''}</>}.</p>
           <div data-testid="import-as-findings"><FindingsList list={done.findings} /></div>
         </>) : null}
         {!done && stepId === 'import' ? (<>
@@ -248,7 +248,7 @@ export function CreateProjectModal({ folders, defaultFolder = '', startWith, onC
           })() : null}
           {found && file && confirmed && source ? (<>
             {nameAndFolder}{formatPicker}
-            {targetProblem(source, fmt, manualType) ? <Alert tone="warn">{targetProblem(source, fmt, manualType)}</Alert> : null}
+            {targetProblem(source, fmt, manualType, found) ? <Alert tone="warn">{targetProblem(source, fmt, manualType, found)}</Alert> : null}
             <p className="v2-hint" style={{ margin: 0 }}>{source === fmt
               ? `This imports the ${FORMAT_NAME[source]} package as a new ${FORMAT_NAME[fmt]} project. Whatever the importer repaired, set aside or could not accept is listed afterwards. The Administrator's enterprise lists are checked and reported; they are not a reason to refuse the package.`
               : `This makes a new ${FORMAT_NAME[fmt]} project from the ${FORMAT_NAME[source]} content. Whatever the new format cannot hold is listed afterwards. The document codes in the file are kept.`}</p>

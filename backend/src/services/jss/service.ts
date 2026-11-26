@@ -359,14 +359,26 @@ export const STENCIL_HEADING_FONT = 'Arial Narrow,Arial,Liberation Sans,DejaVu S
  *   cover.title.split          the MM and ORM covers set their title on two lines
  *   foreword.documentNo.show   the Land stencils' foreword has no "L&T Document No." line; the Naval handbooks' has (the registry says which)
  *   cover.inbr.show            only a cover whose stencil has an INBR No. line (UHB2) keeps it
+ *   cover.authority.foot       the cover's date and "Under the Authority of" block sits in the foot of the first page, not in its body (docs/JSS_VENDOR_EXCEPTIONS.md)
+ *   changenotice.layout        the Change Notice page is printed as the L&T User Handbook pro-forma (grid: 11 ruled rows, 12 pt, codes box), not as the 3-row classic page
+ *   ref.layout                 the L&T reference layout (Stencil_Naval_system_NTG Mumbai, owner's request of 2026-11-26) for every JSS type of both systems: cover, blank back, title page and its back,
+ *                              running head and foot, underlined page titles and headings, the chapter divider. Not sent for the Xignal JSS template, which has a layout of its own.
+ *   restricted.scope           the one difference of the Land system: RESTRICTED on the cover and the title page only ("cover"); the Naval system also prints it on the Change Notice page ("reference")
+ *   chapter.title.align        the other difference: the Land system's chapter titles start at the left, the Naval system's are centred
+ *   heading.underline, red.color   the reference underlines every section heading and prints its notices in pure red
  *   roc.layout, abbrev.layout, safety.footer.show   the list stencils' Amendments table, numbered abbreviations and safety warning without the first-aid line (registry: listFrame)
  *   chapter.divider            the list stencils and Part IV have no chapter divider page: the chapter opens with its heading (registry: chapterDivider)
  *   chapter.pageBreak          a page break the author places directly in a chapter (the figure sheet of the SMT / STE list) breaks the page, as it does in a section
  */
 export function layoutParamsFor(type: JssDocType, base: Array<[string, string]>): Array<[string, string]> {
   const set: Array<[string, string]> = [
-    ['para.after', '0mm'], ['heading.1.font', STENCIL_HEADING_FONT], ['heading.1.bodyIndent', '7mm'], ['heading.1.gap', '8mm'], ['cover.title.split', '1'], ['foreword.documentNo.show', type.forewordDocumentNo ? '1' : '0'], ['chapter.pageBreak', '1'],
+    ['para.after', '0mm'], ['heading.1.font', STENCIL_HEADING_FONT], ['heading.1.bodyIndent', '7mm'], ['heading.1.gap', '8mm'], ['cover.title.split', '1'], ['foreword.documentNo.show', type.forewordDocumentNo ? '1' : '0'], ['chapter.pageBreak', '1'], ['cover.authority.foot', '1'], ['changenotice.layout', 'grid'],
   ];
+  // The L&T reference layout, unless the project is on the Xignal JSS layout (its own profile). The two differences of the systems are the next two parameters.
+  if (!base.some(([n, v]) => n === 'layout.profile' && v === 'xignal-jss')) {
+    const naval = type.domain === 'naval';
+    set.push(['ref.layout', '1'], ['restricted.scope', naval ? 'reference' : 'cover'], ['chapter.title.align', naval ? 'center' : 'left'], ['heading.underline', '1 2 3 4'], ['red.color', '#FF0000']);
+  }
   if (!type.coverInbr) set.push(['cover.inbr.show', '0']);
   if (type.listFrame) set.push(['roc.layout', 'amendments'], ['abbrev.layout', 'numbered'], ['safety.footer.show', '0']);
   if (type.chapterDivider === false) set.push(['chapter.divider', '0']);

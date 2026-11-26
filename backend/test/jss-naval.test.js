@@ -304,11 +304,14 @@ for (const id of IDS) {
 // ── the frame, by stencil family ──────────────────────────────────────────────────────────────────────────────────────────────────
 
 const flat = (s) => s.replace(/\s+/g, ' ');
+// The front-matter tables are 12 pt, as the L&T reference sets them (owner's request of 2026-11-26), so a column head such as "Change Notice No." wraps inside its cell and the
+// page text interleaves the cells of the row: a head is found when every word of it is on the page.
+const hasHead = (t, phrase) => phrase.split(/\s+/).every((word) => t.includes(word));
 
 test('the handbook family (User Handbook, TM Parts I-III, Design Specification) keeps the Record of Changes, Associated Handbooks and Change Notice pages and the chapter divider', async () => {
   for (const id of ['naval-uhb', 'naval-tm-2']) {
     const t = flat(text(await build((await create(id, `F ${id}`)).U)));
-    assert.match(t, /ASSOCIATED HANDBOOKS/); assert.match(t, /CHANGE NOTICE/); assert.match(t, /RECORD OF CHANGES/); assert.match(t, /Change Notice No\./); assert.match(t, /Initials with Date/);
+    assert.match(t, /ASSOCIATED HANDBOOKS/); assert.match(t, /CHANGE NOTICE/); assert.match(t, /RECORD OF CHANGES/); assert.ok(hasHead(t, 'Change Notice No.'), `${id}: Record of Changes column head`); assert.ok(hasHead(t, 'Initials with Date'), `${id}: Record of Changes column head`);
     assert.match(t, /LIST OF ABBREVIATIONS/); assert.match(t, /This chapter covers the following topics/, `${id}: the chapter divider`);
     assert.match(t, /FOR FIRST AID IN CASE OF ELECTRIC SHOCK SEE (OVERLEAF|THE FOLLOWING PAGE)/, `${id}: the safety warning keeps its first-aid line`);
     assert.ok(!/Authority with Ref No\. & Date/.test(t) && !/Abbreviations issued/.test(t), `${id}: nothing of the list family's tables`);
@@ -319,9 +322,9 @@ test('the handbook family (User Handbook, TM Parts I-III, Design Specification) 
 test('the list stencils (MRLS, Complete Equipment Schedule, List of SMT / STE) have the Amendments table, numbered abbreviations, no first-aid line and no chapter divider', async () => {
   for (const id of ['naval-mrls', 'naval-ces', 'naval-smt-ste']) {
     const f = await build((await create(id, `F ${id}`)).U); const raw = text(f); const t = flat(raw);
-    assert.match(t, /AMENDMENTS/); for (const h of ['Sr. No.', 'Page No.', 'Para Reference', 'Amendment / Required', 'Authority with Ref No. & Date']) assert.ok(t.includes(h), `${id}: Amendments column "${h}"`);
+    assert.match(t, /AMENDMENTS/); for (const h of ['Sr. No.', 'Page No.', 'Para Reference', 'Amendment / Required', 'Authority with Ref No. & Date']) assert.ok(hasHead(t, h), `${id}: Amendments column "${h}"`);
     assert.ok(!/Change Notice No\./.test(t) && !/Initials with Date/.test(t), `${id}: not the Change Notice table`);
-    assert.match(t, /ABBREVIATIONS/); assert.ok(t.includes('Abbreviations issued') && /\bFor\b/.test(t) && !/Abbreviations Description/.test(t), `${id}: numbered abbreviations (Sr. No. | Abbreviations issued | For)`);
+    assert.match(t, /ABBREVIATIONS/); assert.ok(hasHead(t, 'Abbreviations issued') && /\bFor\b/.test(t) && !/Abbreviations Description/.test(t), `${id}: numbered abbreviations (Sr. No. | Abbreviations issued | For)`);
     assert.ok(!/ASSOCIATED HANDBOOKS/.test(t) && !/CHANGE NOTICE NO\. AND DATE/.test(t), `${id}: no Associated Handbooks or Change Notice page`);
     assert.match(t, /WARNING/); assert.ok(!/SEE (THE FOLLOWING PAGE|OVERLEAF)/.test(t), `${id}: no first-aid line under the WARNING`);
     assert.match(t, /FIRST AID IN CASE OF ELECTRIC SHOCK/, `${id}: the first-aid page itself stays`);
@@ -338,7 +341,7 @@ test('the list stencils (MRLS, Complete Equipment Schedule, List of SMT / STE) h
 test('the Part IV volumes keep the handbook frame but have no chapter divider', async () => {
   for (const id of ['naval-tm-4-1', 'naval-tm-4-2']) {
     const raw = text(await build((await create(id, `F ${id}`)).U)); const t = flat(raw);
-    assert.match(t, /RECORD OF CHANGES/); assert.match(t, /Change Notice No\./); assert.ok(!/This chapter covers the following topics/.test(t), `${id}: no divider`);
+    assert.match(t, /RECORD OF CHANGES/); assert.ok(hasHead(t, 'Change Notice No.'), `${id}: Record of Changes column head`); assert.ok(!/This chapter covers the following topics/.test(t), `${id}: no divider`);
     const pages = raw.split('\f'); assert.ok(pages.some((p) => /Chapter 1/.test(p) && /Page \| 1-1/.test(flat(p))), `${id}: the chapter opens on page 1-1`);
   }
 });

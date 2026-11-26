@@ -8,22 +8,24 @@
       "width": "210mm",
       "height": "297mm",
       "marginTop": "10mm",
-      "marginBottom": "2.5mm",
+      "marginBottom": "7mm",
       "marginInner": "25mm",
       "marginOuter": "15mm",
       "bodyMarginTop": "10mm",
-      "bodyMarginBottom": "11mm",
+      "bodyMarginBottom": "6.5mm",
       "headerExtent": "10mm",
-      "footerExtent": "11mm"
+      "footerExtent": "6.5mm"
     },
     "fonts": {
       "family": "Arial,Liberation Sans",
       "bodySize": "12pt",
       "lineHeight": 1.15,
-      "headerFooterSize": "9pt",
+      "headerFooterSize": "10pt",
+      "coverTitleSize": "16pt",
       "tableSize": "10pt"
     },
-    "chapterTitleSize": "21pt",
+    "chapterTitleSize": "18pt",
+    "classification": { "size": "12pt", "color": "#FF0000" },
     "headings": [
       {
         "level": 1,
@@ -306,5 +308,5 @@
       ]
     }
   },
-  "revision": 2
+  "revision": 3
 }

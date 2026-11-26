@@ -292,23 +292,6 @@ export class AttributesPanel {
       if (v === '' && !d.required) v = null;
       if (!ed.setAttribute(el, d.name, v)) this.render(true); // refused (e.g. an id that is already used): show the real value again
     };
-    if (d.name === 'applicRefId' && this.app.host) {
-      // PLATFORM ONLY (standalone Studio keeps the plain id box): applicRefId points at an <applic> definition of THIS data module. Offer exactly those,
-      // described by what they assert, and let the author create a new one from the project's applicability tables.
-      const defs = Array.from(ed.doc.xml.getElementsByTagName('applic')).filter((a) => a.getAttribute('id'));
-      const sel = h('select', { class: 'attr-input', 'data-attr': d.name, 'aria-label': d.name });
-      sel.appendChild(h('option', { value: '' }, '(not set)'));
-      for (const a of defs) {
-        const id = a.getAttribute('id')!;
-        const text = (a.getElementsByTagName('displayText')[0]?.textContent ?? '').replace(/\s+/g, ' ').trim();
-        sel.appendChild(h('option', { value: id }, text ? `${id} – ${text.slice(0, 60)}` : id));
-      }
-      if (isSet && !defs.some((a) => a.getAttribute('id') === value)) sel.appendChild(h('option', { value: value! }, `${value} (no such definition)`));
-      sel.value = value ?? '';
-      sel.addEventListener('change', () => commit(sel.value === '' ? null : sel.value));
-      const mk = h('button', { class: 'btn btn-sm', title: "Create an applicability definition from the project's product attributes and conditions", 'data-testid': 'applic-new', on: { click: () => this.app.dialogs.applicDefinition(ed, el) } }, 'New…');
-      return h('div', { class: 'attr-row' + (isSet ? ' set' : '') }, label, sel, h('span', { class: 'attr-row-actions' }, mk, ...(isSet && !d.required ? [h('button', { class: 'icon-btn', title: 'Remove attribute', on: { click: () => ed.setAttribute(el, d.name, null) } }, icon('close', 13))] : [])));
-    }
     if (d.enumValues && !d.openEnum && d.enumValues.length <= 600) {
       const sel = h('select', { class: 'attr-input', 'data-attr': d.name, 'aria-label': d.name });
       sel.appendChild(h('option', { value: '' }, d.default ? `(default: ${d.default})` : '(not set)'));

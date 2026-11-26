@@ -258,22 +258,23 @@ test('UHB end to end: what the author writes is what the PDF prints, in the sten
     const pg = await doc.getPage(n); const vp = pg.getViewport({ scale: 1 }); const items = (await pg.getTextContent()).items.filter((i) => i.str.trim());
     assert.ok(Math.abs(vp.width / 72 * 25.4 - 210) < 0.5 && Math.abs(vp.height / 72 * 25.4 - 297) < 0.5, `page ${n} is A4 portrait`);
     const sz = (i) => Math.round(Math.hypot(i.transform[2], i.transform[3]) * 10) / 10;
-    if (!bodyStarted && items.some((i) => sz(i) >= 20 && sz(i) <= 22 && /Leading Particulars/.test(i.str))) bodyStarted = true;     // chapter titles are 20-22 pt (21), not the stencil's 18
+    if (!bodyStarted && items.some((i) => sz(i) >= 17.5 && sz(i) <= 22 && /Leading Particulars/.test(i.str))) bodyStarted = true;     // chapter titles are 18 pt as the L&T reference sets them (owner's request of 2026-11-26; 20-22 pt only on the Xignal JSS layout)
     if (!bodyStarted) continue;                                             // the frame has its own page setups (the stencil's front matter sections)
     const body = items.filter((i) => sz(i) >= 11 && sz(i) < 30 && !/intentionally left blank/.test(i.str)); if (!body.length) continue;
     const left = Math.min(...body.map((i) => i.transform[4])) / 72 * 25.4;
     (n % 2 ? geo.recto : geo.verso).push(left); for (const i of body) sizes.add(sz(i));
-    const head = items.filter((i) => sz(i) === 9); if (head.length) headerTop.push((vp.height - Math.max(...head.map((i) => i.transform[5] + 9))) / 72 * 25.4);
+    const head = items.filter((i) => sz(i) === 10); if (head.length) headerTop.push((vp.height - Math.max(...head.map((i) => i.transform[5] + 10))) / 72 * 25.4);      // the running head is 10 pt, as the L&T reference sets it
   }
   if (haveStencils) {
     const page = await stencilBodyPage(path.join(STENCILS, 'UHB.docx'));
     const near = (a, b, tol, what) => assert.ok(Math.abs(a - b) <= tol, `${what}: ${a.toFixed(1)} mm in the PDF, ${b} mm in the stencil`);
-    assert.ok(geo.recto.length >= 3 && geo.verso.length >= 3, 'body pages of both hands were measured');
+    // the L&T reference starts every chapter on a right-hand page after the divider's blank back, so a small chapter has no left-hand page with text: the left-hand margin is measured when there is one
+    assert.ok(geo.recto.length >= 3, 'body pages of the right hand were measured');
     for (const l of geo.recto) near(l, page.inner, 0.6, 'recto left margin = the stencil inner margin');
     for (const l of geo.verso) near(l, page.outer, 0.6, 'verso left margin = the stencil outer margin');
     for (const y of headerTop) near(y, page.header, 1.2, 'running head distance from the top');
     const sz = await stencilHeadingSizes(path.join(STENCILS, 'UHB.docx'));
-    for (const want of [21 /* the chapter title: 20-22 pt by decision, the stencil's Heading 1 is 18 */, sz.Heading2, sz.Normal]) assert.ok(sizes.has(want), `the PDF sets type at ${want} pt as the stencil does (saw ${[...sizes]})`);
+    for (const want of [18 /* the chapter title: 18 pt, the stencil's Heading 1 and the L&T reference */, sz.Heading2, sz.Normal]) assert.ok(sizes.has(want), `the PDF sets type at ${want} pt as the stencil does (saw ${[...sizes]})`);
     assert.equal(page.w, 210); assert.ok(Math.abs(page.h - 297) < 0.3);
   }
 });
@@ -318,14 +319,15 @@ test('six heading levels, a notice holding nested lists, and full-width notices 
     // body text starts at the page's inner/outer margin (25 / 15 mm); a notice or table that kept its heading's indent would start 28 mm further in
     if (mark) { sawNotice = true; const band = items.find((i) => /WARNING/.test(i.str)); assert.ok(band, 'the notice band is printed'); assert.ok(mm(band.transform[4]) < 33, `the notice spans the full width (band at ${mm(band.transform[4]).toFixed(1)} mm)`); }
     if (cell) { sawTable = true; assert.ok(mm(cell.transform[4]) < 33, `the table spans the full width (first cell at ${mm(cell.transform[4]).toFixed(1)} mm)`); }
-    if (items.some((i) => /intentionally left blank/.test(i.str))) blanks.push({ n, head: items.filter((i) => size(i) === 9).length, y: items.filter((i) => size(i) === 9).map((i) => Math.round(mm(vp.height - i.transform[5]))) });
+    // the pages behind the cover and the title page (1-4) are the reference's: no running head and foot there; every other blank page keeps them (10 pt, as the reference sets them)
+    if (n > 4 && items.some((i) => /intentionally left blank/.test(i.str))) blanks.push({ n, head: items.filter((i) => size(i) === 10).length, y: items.filter((i) => size(i) === 10).map((i) => Math.round(mm(vp.height - i.transform[5]))) });
   }
   assert.ok(sawNotice && sawTable, 'the deep notice and table were found in the PDF');
   const flat = text(f).replace(/\s+/g, ' ');
   assert.match(flat, /first/i); assert.match(flat, /nested a/i); assert.match(flat, /nested b/i); assert.match(flat, /second/i);      // a notice prints in capitals
   if (process.env.JSS_DUMP_BLANKS) console.log(JSON.stringify(blanks));
   assert.ok(blanks.length > 0, 'the document has blank pad pages');
-  for (const b of blanks) assert.ok(b.head >= 2, `blank page ${b.n} carries its running head and foot (9 pt lines found: ${b.head})`);
+  for (const b of blanks) assert.ok(b.head >= 2, `blank page ${b.n} carries its running head and foot (10 pt lines found: ${b.head})`);
 });
 
 test('ancillary pages: choose which are printed, edit one by hand, keep the edit through a rebuild, and reset it', { timeout: 600000 }, async () => {
@@ -381,7 +383,7 @@ test('default artwork: a project with no emblem, logo or first-aid picture of it
   const pdf = await build(bare.U); const f1 = fo(bare);
   if (process.env.JSS_SAVE_PDF) fs.copyFileSync(pdf, process.env.JSS_SAVE_PDF);                        // debugging aid: keep the PDF to look at
   const srcs = [...f1.matchAll(/src="([^"]*)"/g)].map((m) => m[1]);
-  assert.match(f1, /artwork\/emblem\.png/, `the emblem (pictures in the FO: ${srcs.join(' | ')})`); assert.match(f1, /artwork\/lt-logo\.png/, 'the Larsen & Toubro logo'); assert.match(f1, /artwork\/first-aid\.png/, 'the first-aid figures');
+  assert.match(f1, /artwork\/emblem\.png/, `the emblem (pictures in the FO: ${srcs.join(' | ')})`); assert.match(f1, /assets\/default-publisher-logo\.png/, 'the L&T Precision Engineering logo the owner supplied'); assert.match(f1, /artwork\/first-aid\.png/, 'the first-aid figures');
   assert.ok(!fs.existsSync(path.join(bare.dir, 'Media', 'default-emblem.png')) && !fs.readdirSync(path.join(bare.dir)).includes('artwork'), 'nothing is copied into the project');
   const bareImages = images(pdf); assert.ok(bareImages >= 3, `the PDF carries the pictures (${bareImages})`);
 
@@ -389,7 +391,7 @@ test('default artwork: a project with no emblem, logo or first-aid picture of it
   fs.mkdirSync(path.join(own.dir, 'Media'), { recursive: true });
   for (const n of ['Satya.png', 'JACKSON.png', 'stamp1.png']) fs.writeFileSync(path.join(own.dir, 'Media', n), PNG);          // the names the UHB template uses
   await build(own.U); const f2 = fo(own);
-  assert.ok(!/artwork\/(emblem|lt-logo|first-aid)\.png/.test(f2), 'the project\'s own files are used, not the defaults');
+  assert.ok(!/(artwork\/(emblem|first-aid)|assets\/default-publisher-logo)\.png/.test(f2), 'the project\'s own files are used, not the defaults');
   assert.match(f2, /Media\/Satya\.png/); assert.match(f2, /Media\/stamp1\.png/);
 });
 
@@ -403,7 +405,7 @@ test('default artwork reaches every JSS book: one built from S1000D modules too;
   };
   const viaJss = await make({ name: 'Legacy JSS art', profile: 'uhb' });
   assert.match(viaJss.fo, /artwork\/emblem\.png/, 'a JSS book built from S1000D modules prints the stencil emblem');
-  assert.match(viaJss.fo, /artwork\/lt-logo\.png/, 'and the Larsen & Toubro logo');
+  assert.match(viaJss.fo, /assets\/default-publisher-logo\.png/, 'and the L&T logo');
   const direct = await make({ name: 'Direct S1000D art', pipeline: 's1000dtofo', profile: 'xignal-s1000d' });
-  assert.ok(!/artwork\/(emblem|lt-logo|first-aid)\.png/.test(direct.fo), 'the direct S1000D engine never gets the JSS artwork');
+  assert.ok(!/(artwork\/(emblem|first-aid)|assets\/default-publisher-logo)\.png/.test(direct.fo), 'the direct S1000D engine never gets the JSS artwork');
 });

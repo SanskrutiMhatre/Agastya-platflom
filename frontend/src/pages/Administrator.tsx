@@ -19,7 +19,6 @@ import { useApp } from '../store/appSettings';
 import { useUi } from '../store/ui';
 import { Audit, Users } from './Settings';
 import { CatalogueSection, SnsPresetsSection, ExtensionsSection, CoverageSection } from './AdminS1000d';
-import { SnsDefaultsAdmin } from './SnsDefaultsAdmin';
 
 const REFERENCE: Array<[string, string]> = [
   ['country-codes', 'Country codes'], ['language-codes', 'Language codes'], ['dm-types', 'DM types'],
@@ -30,7 +29,7 @@ const REFERENCE: Array<[string, string]> = [
 // Grouped by what they are for: everyone, S1000D only, JSS, JSG, and the system. Nothing S1000D-specific (business rules, information codes, SNS) appears
 // under JSS or JSG. The names are the plain ones; the technical sections are folded under "Advanced".
 const SHARED: Array<[string, string]> = [['language-codes', 'Language codes'], ['country-codes', 'Country codes'], ['security-classes', 'Security classifications'], ['languages', 'Interface languages'], ['pdf-customisations', 'PDF customisations']];
-const S1000D_ITEMS: Array<[string, string]> = [['s1000d-catalogue', 'Information codes'], ['sns-presets', 'Numbering (SNS)'], ['sns-defaults', 'SNS defaults'], ['dm-types', 'Data module types'], ['pm-templates', 'Publication templates'], ['rpc-cages', 'Responsible partner companies'], ['originator-cages', 'Originator companies'], ['ddn', 'Data dispatch notes'], ['ddn-metadata', 'DDN metadata']];
+const S1000D_ITEMS: Array<[string, string]> = [['s1000d-catalogue', 'Information codes'], ['sns-presets', 'Numbering (SNS)'], ['dm-types', 'Data module types'], ['pm-templates', 'Publication templates'], ['rpc-cages', 'Responsible partner companies'], ['originator-cages', 'Originator companies'], ['ddn', 'Data dispatch notes'], ['ddn-metadata', 'DDN metadata']];
 const S1000D_ADVANCED: Array<[string, string]> = [['extensions', 'Extension profiles'], ['coverage', 'Standards coverage']];
 const GROUPS: Array<{ title: string; items: Array<[string, string]>; advanced?: Array<[string, string]> }> = [
   { title: 'People and access', items: [['roles', 'Roles'], ['users', 'Users']] },
@@ -87,7 +86,7 @@ export function AdministratorPage() {
             <Route path="coverage" element={<CoverageSection />} />
             <Route path="users" element={<Users />} />
             {REFERENCE.map(([id]) => <Route key={id} path={id} element={<ConfigTable key={id} collection={id} />} />)}
-            <Route path="sns-defaults" element={<SnsDefaultsAdmin />} />
+            <Route path="sns-defaults" element={<Navigate to="../sns-presets" replace />} />   {/* the second SNS screen was removed (2026-11-26): Numbering (SNS) is the one */}
             <Route path="audit-logs" element={<AuditSection />} />
             <Route path="maintenance" element={<MaintenanceSection />} />
             <Route path="visual-settings" element={<VisualSection />} />

@@ -223,6 +223,10 @@
     <!-- 0 = a chapter that has sections opens with its own heading ("Chapter 1" and the title) at the top of its first page and goes straight on to the sections, with no divider page
          in front (the list stencils: MRLS, Complete Equipment Schedule, List of SMT / STE, Part IV Vol 1 and 2). 1 (the default, as before) = the divider page with its topics list. -->
     <xsl:param name="chapter.divider">1</xsl:param>
+    <!-- ref.layout = 1 only (frontmatter.xsl): where a chapter's title starts on its divider page (left, as always; the reference's Naval system centres it), and which section-heading levels
+         (space separated, e.g. "1 2 3 4") are underlined. The defaults are the old look. -->
+    <xsl:param name="chapter.title.align">left</xsl:param>
+    <xsl:param name="heading.underline"/>
 
     <!-- ==================================================================== -->
     <!--                         CONTENT PARAMETERS                            -->
@@ -443,6 +447,11 @@
         <xsl:choose>
             <xsl:when test="$xjss">
                 <xsl:apply-templates select="frontmatter/titlePage[1] | frontmatter/titlePageJoint[not(../titlePage)]" mode="xjss-cover"/>
+            </xsl:when>
+            <!-- the L&T reference layout: the cover, its blank back, the title page and its back (frontmatter.xsl); a jointly published book keeps its joint cover first -->
+            <xsl:when test="$lref and frontmatter/titlePage">
+                <xsl:apply-templates select="frontmatter/titlePageJoint"/>
+                <xsl:apply-templates select="frontmatter/titlePage[1]" mode="lref-cover"/>
             </xsl:when>
             <xsl:otherwise>
                 <xsl:apply-templates select="frontmatter/titlePageJoint | frontmatter/titlePage"/>

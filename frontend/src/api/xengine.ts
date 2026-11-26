@@ -23,6 +23,8 @@ export interface ConvertResult {
   counts: { chapters: number; sections: number; pictures: number };
   identity?: { modelIdentCode: string; modules: number; pictures: number; imported: number };
   imported?: { dms: number; media: number; withProblems: number };
+  /** A project archive that came back as itself: how many files and review comments were restored. */
+  restored?: { files: number; comments: number };
 }
 export interface Conversion { from: Format; to: Format; how: string }
 

@@ -4,6 +4,7 @@
 //   <DocCodesButton>   the toolbar button: opens the codes, the four switches (all off at first) and the publication identity
 //   <DocCodesStrip>    the strip under the toolbar: only what is switched on, nothing at all while everything is off
 //   <ConvertButton>    "Convert to ..." as a new project, with what could not be carried over
+//   <ExportProjectButton>  "Export": the whole project as one archive (.jsspub.zip), for every format; a project made here or imported and edited
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -127,6 +128,26 @@ export function FindingsList({ list }: { list: XFinding[] }) {
       <h3 style={{ fontSize: 13, margin: '0 0 4px' }}>{title} ({items.length})</h3>
       <ul style={{ margin: 0, paddingLeft: 18 }}>{items.map((f, i) => <li key={i} style={{ marginBottom: 2 }}>{f.message}{f.where ? <span className="v2-hint"> — {f.where}</span> : null}</li>)}</ul>
     </section>) : null; })}</>;
+}
+
+/**
+ * Export the whole project as one archive (.jsspub.zip: its files, house style, logos and review comments), for any format. What is open is saved first. The archive comes
+ * back as the same project through Import (it is a new project; nothing is replaced).
+ */
+export function ExportProjectButton({ id, dirty = false, saveFirst, small = true, label = 'Export' }: { id: string; dirty?: boolean; saveFirst?: () => Promise<boolean>; small?: boolean; label?: string }) {
+  const toast = useUi((s) => s.toast); const [busy, setBusy] = useState(false);
+  const go = async () => {
+    setBusy(true);
+    try {
+      if (dirty && saveFirst && !(await saveFirst())) return;
+      const r = await fetch(`/api/projects/${encodeURIComponent(id)}/export`, { credentials: 'same-origin' });
+      if (!r.ok) { const b = await r.json().catch(() => null) as { error?: string } | null; throw new Error(b?.error ?? `The export failed (${r.status}).`); }
+      const file = /filename="?([^";]+)"?/.exec(r.headers.get('Content-Disposition') ?? '')?.[1] ?? `${id}.jsspub.zip`;
+      const a = document.createElement('a'); a.href = URL.createObjectURL(await r.blob()); a.download = file; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+      toast('Project exported.', 'success');
+    } catch (e) { toast(errText(e), 'error'); } finally { setBusy(false); }
+  };
+  return <button type="button" className={small ? 'btn btn-sm' : 'btn'} onClick={() => void go()} disabled={busy} data-testid="export-project-archive" title="Download the whole project as one file (.jsspub.zip): its files, house style, logos and review comments. Import brings it back as a new project.">{busy ? <Spinner /> : <Icon name="download" size={12} />}{label}</button>;
 }
 
 /** Converting the open document to another format: a new project is made, this one is not changed. */

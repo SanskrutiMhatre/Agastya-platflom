@@ -19,6 +19,7 @@ export const isDocumentFile = (fileName: string): boolean => /\.xml$/i.test(file
 
 /** What the first guess found, in one sentence. */
 export function detectionSentence(d: PackageDetection): string {
+  if (d.archive) return `A project archive made by this platform: a ${FORMAT_NAME[d.archive.format]} project${d.archive.name ? ` ("${d.archive.name}")` : ''}. It comes back as the same project, in the same format.`;
   const n = (k: number, one: string, many = `${one}s`): string => `${k} ${k === 1 ? one : many}`;
   if (d.kind === 'document') return d.format === 'unknown' ? 'This .xml file is neither a JSS book nor a JSG document (its root element is not <jssbook> or <jsgdoc>).' : `A ${FORMAT_NAME[d.format]} document${d.docType === 'ispl' ? ' (Illustrated Spare Parts List)' : ''}.`;
   if (d.format === 'unknown') return `No S1000D data modules or publication module were found among its ${n(d.entries, 'file')}.`;
@@ -26,11 +27,12 @@ export function detectionSentence(d: PackageDetection): string {
 }
 
 /** The source the first guess points at, or '' when it found nothing the person must not be left to assume. */
-export const guessedSource = (d: PackageDetection): SourceFormat | '' => (d.format === 'unknown' ? '' : d.format);
+export const guessedSource = (d: PackageDetection): SourceFormat | '' => (d.archive ? d.archive.format : d.format === 'unknown' ? '' : d.format);
 
 /** Why `source` cannot be what this upload is ('' when it can). */
 export function sourceProblem(fileName: string, source: SourceFormat | '', d: PackageDetection): string {
   if (!source) return 'Say what this file is.';
+  if (d.archive) return source === d.archive.format ? '' : `This archive holds a ${FORMAT_NAME[d.archive.format]} project, not a ${FORMAT_NAME[source]} one. Choose ${FORMAT_NAME[d.archive.format]}.`;
   const doc = isDocumentFile(fileName);
   if (source === 's1000d') {
     if (doc) return 'An .xml file is one document, not a package of S1000D data modules. Choose JSS document or JSG document, or upload the package (.zip).';
@@ -46,7 +48,9 @@ export function sourceProblem(fileName: string, source: SourceFormat | '', d: Pa
 }
 
 /** Why the source cannot become `target` with this manual type ('' when it can). */
-export function targetProblem(source: SourceFormat, target: Target, manualType: string): string {
+export function targetProblem(source: SourceFormat, target: Target, manualType: string, d?: PackageDetection | null): string {
+  // a project archive comes back as itself: same format, its manual type as it was
+  if (d?.archive) return target === d.archive.format ? '' : `A ${FORMAT_NAME[d.archive.format]} project archive is imported as ${FORMAT_NAME[d.archive.format]}. To change its format, import it, then convert the new project (Convert).`;
   if (source !== 's1000d' && source === target) return `A ${FORMAT_NAME[source]} document is already ${FORMAT_NAME[source]}. Choose another manual type to import it as.`;
   if (target === 'jsg' && source !== 'jsg' && manualType && manualType !== 'uhb') return 'Only a JSG User Handbook can be made from an S1000D package or a JSS document: an Illustrated Spare Parts List has no counterpart there. Choose User Handbook.';
   return '';

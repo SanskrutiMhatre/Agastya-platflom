@@ -147,3 +147,108 @@ JSS book** (written in the editor, built from S1000D modules or imported) whose 
 paths in the isolation guard, so `legacy-jss-uhb` and `s1000d-via-jss` were **re-captured on 2026-11-25**. Shown to be the whole cause: with `applyDefaultArtwork` switched off, all three builds gave the previous
 values again, byte for byte; with it on, the only differences in the XSL-FO are the `src` of the emblem, publisher-logo and first-aid pictures (12 lines in the old JSS path, 8 in S1000D through JSS) and the
 first-aid box height (115 mm to 145 mm) in the old JSS path. `s1000d-direct` did not move.
+
+---
+
+## Exception: `cover.authority.foot` (approved 2026-11-26, the owner's request "move the date and name to the footer of the first page")
+
+**Reason.** The standard JSS cover printed the month and year, and the "Under the Authority of / Secretary, Ministry of Defence, Govt. of India" block, at the end of the
+cover's body, right under the publisher. The owner asked for them in the **footer of the first page**. The Xignal-layout cover (`mode="xjss-cover"`) already does this (the
+reference prints them in the foot region); the standard cover now can too.
+
+**Affected files (two).**
+1. `backend/vendor/pipeline/jsstofo/frontmatter.xsl`: a top-level `<xsl:param name="cover.authority.foot">0</xsl:param>`; in the `titlePage` and `titlePageJoint` templates the call
+   to `authority-block` is wrapped in `<xsl:if test="$cover.authority.foot != '1'">`, and the call to `cover-page-sequence` passes the parameter on as `foot`.
+2. `backend/vendor/pipeline/jsstofo/pagesetup.xsl`: a page master `cover-foot` (the cover master with a 28 mm foot region), written only when the parameter is `1` and the layout
+   is not Xignal; `cover-page-sequence` takes an optional `foot` parameter and, when it is `1`, uses that master and prints the authority block above the classification banner
+   in the foot region. The blank verso that follows the cover keeps the plain cover master.
+
+**Whether the files are shared: `frontmatter.xsl` yes** (the S1000D direct engine reaches it through `frontmatter-shared.xsl`), **`pagesetup.xsl` no** (the S1000D engine has its own).
+The S1000D engine's own `cover-page-sequence` does not declare `foot`; XSLT 1.0 ignores a parameter the called template does not declare.
+
+**Isolation measures.**
+* The default is `0`: a build that does not send the parameter prints the block in the body exactly as before (S1000D direct, S1000D through JSS, the old JSS path).
+* The parameter is sent from one place, `layoutParamsFor` in `backend/src/services/jss/service.ts`, so only a JSS-authored document moves the block. The Xignal JSS layout ignores it.
+* No S1000D engine stylesheet was touched.
+
+**To undo.** Remove the `xsl:param`, the two `xsl:if` wrappers and the two `foot` with-params from `frontmatter.xsl`, the `cover-foot` master and the `foot` branch from
+`pagesetup.xsl`, and the `cover.authority.foot` entry from `layoutParamsFor`.
+
+
+---
+
+## Exception: `changenotice.layout` (approved 2026-11-26, the owner's request "make the Change Notice page exactly like the picture", for JSS only)
+
+**Reason.** The Change Notice of a JSS publication was the old three-row page (table font, wide logo, "No. of Pages / No. of Sheets / Enclosures" stacked on the right). The owner's reference
+page (the L&T User Handbook) is a pro-forma: the publisher letterhead, a header row and ruled rows in 12 pt (**fifteen** since the owner's request of 2026-11-26), the Pages line over the Enclosures / Sheets line, and a bordered
+box that holds the codes for incorporation of changes (R, H, P, A) and, to its right, the justified note. The measurements behind the page are in the comment of the new template.
+
+**Affected file (one).** `backend/vendor/pipeline/jsstofo/frontmatter.xsl`: a top-level `<xsl:param name="changenotice.layout">classic</xsl:param>`; the `changeNotice` template
+now chooses: `grid` calls the new named template `change-notice-grid` (with its helpers `change-notice-grid-rows` and `change-notice-code`), anything else runs the old body, which is
+untouched inside `xsl:otherwise`. The grid page reads the same configuration as the classic one (the four column headings through `fm.label.change.*`, the page title through
+`fm.title.changeNotice`, the publisher logo and name of the book's metadata); the row count is fixed at fifteen (the `rows` attribute of `<changeNotice>` belongs to
+the classic layout). The row height is the pro-forma's; the extra rows push the Pages lines and the codes box down, and all of it still fits on the one page (checked on the 24 ready JSS types that print a Change Notice).
+The letterhead is the publisher's logo alone (the logo of the book's first publisher, the one the cover prints): the publisher name is no longer printed beside it.
+
+**Whether the file is shared: yes** (the S1000D direct engine reaches it through `frontmatter-shared.xsl`).
+
+**Isolation measures.**
+* The default is `classic`: a build that does not send the parameter prints the page it always printed (S1000D direct, S1000D through JSS, the old JSS path). The fingerprints of
+  `jss-cover-isolation.test.js` did not move.
+* The parameter is sent from one place, `layoutParamsFor` in `backend/src/services/jss/service.ts`, so only a JSS-authored document gets the pro-forma.
+* No S1000D engine stylesheet was touched. The running head and foot of the page are the JSS pages' own and were not changed.
+* `backend/test/jss-change-notice.test.js`: the stylesheet with and without the parameter (the rest of the book is the same) and a real JSS UHB build (the page text of the pro-forma, on one page).
+
+**Not reproduced.** The reference page shows a black line-art emblem with the name "L&T Defence"; the page prints the logo the project is configured with (the L&T artwork) and no name.
+
+**To undo.** Remove the `xsl:param`, the `xsl:choose` wrapper of the `changeNotice` template and the three `change-notice-*` templates from `frontmatter.xsl`, and the
+`changenotice.layout` entry from `layoutParamsFor`.
+
+
+---
+
+## Exceptions: the L&T reference layout (approved 2026-11-26, the owner's request "JSS Styling Standardization": every JSS document of both systems as `Stencil_Naval_system_NTG Mumbai` is set)
+
+**Reason.** The owner named the Naval stencil of NTG Mumbai (40 pages, a Word file and its PDF) as the default styling of all JSS documentation - header and footer, page layout, fonts, watermarks, logos, front pages,
+chapters and ancillary pages - "including the placement and formatting of every element", with exactly two differences between the Land and the Naval system (below). Most of it is page setup and type, which the house template
+`jss-stencil.house.json` carries (revision 3: 10 pt running head and foot, 12 pt classification, 16 pt cover title, 18 pt chapter title, 7 mm bottom margin, 6.5 mm body bottom margin and footer). The rest needed the vendored
+stylesheets; it is switched on by one parameter, `ref.layout`, sent only for a JSS-authored document that is not on the Xignal JSS layout (that layout keeps its own profile).
+
+**Parameters** (every default is the old behaviour; all are sent from `layoutParamsFor` in `backend/src/services/jss/service.ts` and nowhere else):
+
+| parameter | default | JSS-authored value | what it does |
+|---|---|---|---|
+| `ref.layout` | `0` | `1` | the reference layout: cover (page 1), its blank back with nothing on it (2), the title page (3, the cover again) and its back with only the legend (4), cover and title page on 25 mm margins with Code No. / Rev No. right aligned, thin red-ruled notice boxes, the date and authority block in a foot region above the classification (baselines 758 / 772 / 810 pt), running head and foot as the reference draws them (10 pt, book name over system name, 0.5 pt rules, 5.4 pt inset), page titles underlined and 11 pt lower, the red notice pages 23 pt lower with the box padded, a 12 pt front-matter table size, the Foreword on 20.5 pt lines, the contents lines 20.5 pt apart, the chapter divider (title 18 pt underlined, topics between double rules, `---End of Chapter---`), section headings underlined, the first section of a chapter 23 pt lower |
+| `restricted.scope` | `all` | Land `cover`, Naval `reference` | where the classification prints: `all` = every page (as always); `cover` = the cover and the title page only (**Land**); `reference` = the cover, the title page and the Change Notice page (**Naval**, as the reference prints it). Neither prints it in the running head and foot |
+| `chapter.title.align` | `left` | Land `left`, Naval `center` | where a chapter's title starts on its divider page (**the second difference between the systems**) |
+| `heading.underline` | none | `1 2 3 4` | the section-heading levels that are underlined |
+| `red.color` | `#CC0000` | `#FF0000` | the red of the notices and boxes (the reference prints pure red) |
+
+**Affected files.** `jsstofo/frontmatter.xsl` (declares `ref.layout`, `restricted.scope`, `red.color` and the variables built on them - the file the S1000D direct engine includes - and holds the reference cover / title page,
+the Foreword, safety, authority-block and Change Notice edits), `jsstofo/common.xsl`, `body.xsl`, `headers_footers.xsl`, `pagesetup.xsl`, `toc.xsl`, `jsstofo.xsl` (JSS-only: the page setup, the running head and foot, the divider,
+the heading and the page-title / red-box blocks; `chapter.title.align` and `heading.underline` are declared in `jsstofo.xsl`). **Shared: yes, for the three declared in `frontmatter.xsl`.**
+
+**Isolation measures.**
+* Every edit is behind `$lref` / a parameter whose default is the old value, and the old structure is emitted untouched in the `xsl:otherwise` branch (for the red box and the Foreword the old FO is byte-identical, not just equal in
+  effect). `test/jss-cover-isolation.test.js` fingerprints (S1000D direct, S1000D through the JSS pipeline, the old JSS User Handbook) did not move; its parameter table now lists the five new parameters, where each is declared and
+  used, and that the shared three default to the old behaviour. One normalisation was added (see "logo" below).
+* Not sent to the Xignal JSS layout (`layout.profile = xignal-jss`), which keeps its own cover, head and foot.
+* `test/jss-reference-layout.test.js` (new): both systems' cover / blank back / title page / back, the running head at the reference's 40 pt, 18 pt chapters, RESTRICTED on pages 1 and 3 only (Land) or also on the Change Notice
+  (Naval), the chapter at the left margin (Land) or centred (Naval), and the same positions in both systems.
+
+**The two differences between the systems** (everything else is the same code with the same values): `restricted.scope` (Land: cover and title page; Naval: those and the Change Notice) and `chapter.title.align` (Land: left;
+Naval: centre). The reading of "the Land system shows the watermark only on the first two pages": the first two printed pages of the cover are page 1 and the title page (page 3); the NOT RELEASED watermark is a different thing and
+stays status-driven in both systems.
+
+**The logo.** The L&T Precision Engineering logo the owner supplied (`backend/assets/L&T Precision Engineering Logo.png`, identical to `assets/default-publisher-logo.png`) is the Larsen & Toubro fallback for every JSS book
+(`applyDefaultArtwork` in `publisher.ts`; before: `vendor/pipeline/jss/artwork/lt-logo.png`), on the cover, the title page and the Change Notice letterhead (34 pt tall under the reference layout; the page keeps its 15 rows
+and codes box on one page). A project's own `Media/publisher-logo.png` still wins. The isolation guard maps the one changed file name back, so its fingerprints still prove the layout of the old paths is unchanged.
+
+**Chapter title size.** `clampChapterTitleSize` (publisher.ts) now returns 18 pt (a Settings size between 18 and 22 pt is kept) for every JSS document except the Xignal JSS layout, which keeps the 20-22 pt of the owner's
+decision of 2026-11-24. The two decisions concern different layouts; the reference decision (18 pt) is the later one.
+
+**Not reproduced.** The reference's system pictures (the first-aid figure sheet with its "Figure. N" labels, the symbol icons) and the default texts of the Cautions / Notes page; the reference's hyperlinked e-mail address and
+its sample address block (the Foreword prints the project's own); the NOT RELEASED watermark (a blank stencil has none).
+
+**To undo.** Remove the `lref`-guarded branches and the three parameters from `frontmatter.xsl`, the two from `jsstofo.xsl`, the `ref.layout` / `restricted.scope` / `chapter.title.align` / `heading.underline` /
+`red.color` entry from `layoutParamsFor`, and restore revision 2 of `jss-stencil.house.json` (the previous copy is kept as `jss-stencil.house.json.rev2.bak` in a workspace that has been upgraded).

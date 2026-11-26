@@ -72,9 +72,7 @@ test('the Xignal sample imports, passes the publish gate with one recorded waive
   const explore = (await author.get(`/api/projects/${id}/explore`)).json;
   assert.equal(explore.counts.dms, 32, 'all 32 data modules of the sample are in the project');
 
-  // The reference carries L&T's logo and company line. That third-party pack is not seeded into workspaces (the Xignal template uses the neutral
-  // pack), so this test installs it into its own throwaway workspace and selects it for this project, exactly as an L&T project would.
-  fs.cpSync(path.join(__dirname, '..', 'templates-optional', 'brand', 'lnt-xignal'), path.join(process.env.AGASTYA_WORKSPACE_DIR, 'templates', 'brand', 'lnt-xignal'), { recursive: true });
+  // The reference carries L&T's logo and company line: the seeded pack `lnt-xignal` (the Xignal template's default since 2026-11-26), selected here for this project as well.
   const st = (await author.get(`/api/projects/${id}/settings`)).json;
   assert.equal((await author.put(`/api/projects/${id}/settings`, { project: { ...st.project, brandPack: 'lnt-xignal' } })).status, 200);
 

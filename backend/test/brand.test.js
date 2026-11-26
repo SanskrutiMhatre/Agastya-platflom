@@ -10,15 +10,14 @@ const os = require('node:os');
 
 const brand = require('../vendor/engine/brand');
 const TEMPLATES = path.join(__dirname, '..', 'templates');                  // seeded into every workspace
-const OPTIONAL = path.join(__dirname, '..', 'templates-optional');          // installed on purpose (third-party logo)
+const OPTIONAL = TEMPLATES;                                                 // the L&T pack is seeded since 2026-11-26 (the owner asked for its logos to be the default)
 const NOW = new Date(2026, 10, 20, 9, 5, 7);   // 2026-11-20 09:05:07 local
 
 const pm = (issue, inWork, extra = '') =>
   `<pm><identAndStatusSection><pmAddress><pmIdent><pmCode modelIdentCode="RDR"/>` +
   `<issueInfo issueNumber="${issue}" inWork="${inWork}"/></pmIdent></pmAddress></identAndStatusSection>${extra}</pm>`;
 
-test('brand packs: the shipped packs load, a pack with a logo exposes it, the neutral pack has none, and the L&T pack is NOT in the seed', () => {
-  assert.equal(brand.loadBrandPack(TEMPLATES, 'lnt-xignal'), null, 'a third-party logo is not seeded into every workspace');
+test('brand packs: the shipped packs load, a pack with a logo exposes it, the neutral pack has none, and the L&T pack is in the seed (the default logos)', () => {
   const lnt = brand.loadBrandPack(OPTIONAL, 'lnt-xignal');
   assert.ok(lnt, 'lnt-xignal pack exists');
   assert.equal(lnt.company, 'L&T Precision Engineering and Systems');
@@ -32,8 +31,7 @@ test('brand packs: the shipped packs load, a pack with a logo exposes it, the ne
   assert.equal(neutral.logoMissing, false, 'a pack that names no logo is not "missing" one');
 
   const listed = brand.listBrandPacks(TEMPLATES).map((b) => b.id).sort();
-  assert.deepEqual(listed, ['neutral']);
-  assert.deepEqual(brand.listBrandPacks(OPTIONAL).map((b) => b.id), ['lnt-xignal']);
+  assert.deepEqual(listed, ['lnt-xignal', 'neutral']);
 });
 
 test('brand packs: unknown ids and path-escaping ids are refused, a pack naming an absent logo is flagged', () => {
@@ -200,9 +198,10 @@ test('markings: the header logo is the Settings path, then the publication comme
   assert.doesNotThrow(() => brand.resolveMarkings({ layout: null, pmText: null, brand: null }));
 });
 
-test('the Xignal house template ships no company text of its own and uses the neutral pack, so nothing third-party is printed by default', () => {
+test('the Xignal house template ships no company text of its own: the logo and company line come from its default brand pack, the L&T one (decision of 2026-11-26)', () => {
   const h = require('../templates/xignal-s1000d.house.json');
   assert.equal(h.layout.profile, 'xignal');
   assert.equal(String((h.layout.marks.company || {}).text || ''), '');
-  assert.equal(h.brandPack, 'neutral');
+  assert.equal(h.brandPack, 'lnt-xignal');
+  assert.ok(brand.loadBrandPack(TEMPLATES, h.brandPack), 'and that pack is seeded into every workspace');
 });

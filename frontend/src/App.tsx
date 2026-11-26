@@ -23,7 +23,6 @@ import { PublicationPage } from './pages/project/PublicationPage';
 import { ValidationPage } from './pages/project/ValidationPage';
 import { ReleasePage } from './pages/project/ReleasePage';
 import { AncillaryRoute } from './pages/project/AncillaryRoute';
-import { CsdbPage } from './pages/project/CsdbPage';
 import { ProjectSettingsPage } from './pages/project/ProjectSettingsPage';
 
 // The editors (the S1000D Studio: CodeMirror, pdfmake, the schema engine; the JSS editor) are large and only this route needs them: EditorRoute loads the one that fits.
@@ -77,7 +76,7 @@ export function App() {
         <Route path="graphics" element={<ProjectGraphicsPage />} />
         <Route path="ancillary" element={<AncillaryRoute />} />
         <Route path="release" element={<ReleasePage />} />
-        <Route path="csdb" element={<CsdbPage />} />
+        <Route path="csdb" element={<Navigate to="../editor" replace />} />   {/* the Files (CSDB) page was removed; an old link lands in the editor */}
         <Route path="settings/*" element={<ProjectSettingsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/overview" replace />} />

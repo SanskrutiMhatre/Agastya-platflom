@@ -5,7 +5,6 @@
 //   Generate       the whole publication, built by the server (what the final manual is)
 //
 // Both are rendered by the server from the saved file, exactly as the final PDF prints them; "Refresh on save" re-renders the preview after each save.
-// "Configuration…" (a PDF for one product or variant) appears only when the project has applicability definitions to select from.
 // Release, watermark and publication settings are not here.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -15,13 +14,11 @@ import { ApiError } from '../../../api/client';
 import { Icon } from '../../../components/Icon';
 import { LazyPdfViewer } from '../../../components/pdf/LazyPdfViewer';
 import { PublishRefusal } from '../../../components/PublishRefusal';
-import { Spinner, ago, errText, useAsync } from '../../../components/ui';
-import { s1000dApi } from '../../../api';
+import { Spinner, ago, errText } from '../../../components/ui';
 import { canBuild, type ProjectCtx } from '../../../layouts/ProjectShell';
 import { useProgress } from '../../../lib/progress';
 import { studio, useStudio } from '../../../lib/studioSession';
 import { channelFor, openPopout, type Mode, type ToEditor, type ToPopout } from '../../../lib/previewBus';
-import { ConfigurationDialog } from './ConfigurationDialog';
 import { refusalOf, type Refusal } from '../../../lib/waivers';
 
 /**
@@ -101,9 +98,6 @@ export function PdfPane({ ctx, savedTick, onOpenAt, onPopped }: { ctx: ProjectCt
     } catch (e) { fail(mine, e, 'quick'); } finally { if (mine === run.current) setBusy(null); }
   }, [active, id, mayBuild]);
 
-  const [configuring, setConfiguring] = useState(false);
-  const applic = useAsync(() => (summary.project.format === 's1000d' ? s1000dApi.applicability(id).catch(() => null) : Promise.resolve(null)), [id, summary.project.format]);
-  const hasApplicability = !!applic.data?.files.act;
   const generate = useCallback(async (allowRuleBreaks = false) => {
     const mine = ++run.current;
     setBusy('build'); setProblem(null); setNote(''); progress.clear();
@@ -150,7 +144,6 @@ export function PdfPane({ ctx, savedTick, onOpenAt, onPopped }: { ctx: ProjectCt
           <button className="btn btn-sm" onClick={() => void generate()} disabled={busy !== null} data-testid="generate-btn" title="Build the whole publication">
             {busy === 'build' ? <Spinner /> : <Icon name="rocket" size={12} />}Generate
           </button>
-          {hasApplicability ? <button className="btn btn-sm" onClick={() => setConfiguring(true)} disabled={busy !== null || !mayBuild} data-testid="config-btn" title="Publish for a product or configuration (applicability)"><Icon name="settings" size={12} />Configuration…</button> : null}
           <button className={`btn btn-sm ${popped.build ? 'is-on' : ''}`} onClick={() => pop('build')} title="Open Generate in its own window" aria-label="Open Generate in a separate window" data-testid="popout-build"><Icon name="external" size={12} /></button>
         </span>}
         <span className="spacer" />
@@ -168,7 +161,6 @@ export function PdfPane({ ctx, savedTick, onOpenAt, onPopped }: { ctx: ProjectCt
           {problem.file && /\.xml$/i.test(problem.file) ? <div style={{ marginTop: 6 }}><button className="btn btn-sm" onClick={() => onOpenAt(problem.file!.split('/').pop()!, problem.line)}>Open {problem.file.split('/').pop()}{problem.line ? ` at line ${problem.line}` : ''}</button></div> : null}
         </div>
       ) : null}
-      {configuring ? <ConfigurationDialog id={id} onClose={() => setConfiguring(false)} onBuilt={(url, label, n) => { setSrc(url); setShown(label); setNote(n); ctx.reload(); }} /> : null}
       {popped.quick || popped.build ? <div className="v2-hint" style={{ padding: '4px 10px' }} data-testid="popped-note">{popped.quick && popped.build ? 'Quick preview and Generate are open in their own windows.' : popped.quick ? 'Quick preview is open in its own window.' : 'Generate is open in its own window.'}</div> : null}
       {shown ? <div className="v2-hint v2-trunc" style={{ padding: '4px 10px' }} title={shown} data-testid="pdf-shown">{shown}</div> : null}
       <div style={{ flex: 1, minHeight: 0, position: 'relative' }} data-testid="pdf-pane">

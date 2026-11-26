@@ -47,7 +47,8 @@ test.before(async () => {
   pm = await person(admin, 'project_manager', 'meera', 'Meera Rao');
   alice = await person(pm, 'author', 'alice', 'Alice Author');
   carol = await person(admin, 'author', 'carol', 'Carol Author');
-  pid = (await alice.post('/api/projects', { name: 'Alice Pump' })).json.project.id;
+  // the review flow is layout-independent; this test also reads the plain layout's "Release 1" foot text, so the project asks for the plain style (a bare project is on the reference layout since 2026-11-26)
+  pid = (await alice.post('/api/projects', { name: 'Alice Pump', templateRef: 'default' })).json.project.id;
   assert.equal((await alice.post(`/api/projects/${pid}/dms`, { file: DM, xml: h.sample(DM) })).status, 201);
   const pmc = (await alice.get(`/api/projects/${pid}/pmc`)).json;
   assert.equal((await alice.put(`/api/projects/${pid}/pmc`, { meta: pmc.meta, entries: [{ type: 'folder', title: 'Chapter 1', children: [{ type: 'include', title: 'Pump', href: `csdb/${DM}` }] }] })).status, 200);

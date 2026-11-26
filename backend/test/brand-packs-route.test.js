@@ -8,7 +8,6 @@ const path = require('path');
 const { boot } = require('./helpers');
 
 const PW = 'Correct-Horse-9!';
-const OPTIONAL = path.join(__dirname, '..', 'templates-optional', 'brand', 'lnt-xignal');
 let h; let admin; let author;
 
 test.before(async () => {
@@ -22,17 +21,13 @@ test.before(async () => {
 });
 test.after(async () => { await h.close(); });
 
-test('brand packs: signed-in users list what is installed; the L&T pack is not there until it is copied in', async () => {
+test('brand packs: signed-in users list what is installed: the seeded packs are the neutral one and the L&T one (the default logos)', async () => {
   assert.equal((await new h.Client('anon').get('/api/brand-packs')).status, 401);
   const first = await author.get('/api/brand-packs');
   assert.equal(first.status, 200);
-  assert.deepEqual(first.json.packs.map((p) => p.id), ['neutral']);
-  assert.equal(first.json.packs[0].hasLogo, false);
-
-  fs.cpSync(OPTIONAL, path.join(process.env.AGASTYA_WORKSPACE_DIR, 'templates', 'brand', 'lnt-xignal'), { recursive: true });
-  const second = (await author.get('/api/brand-packs')).json.packs;
-  assert.deepEqual(second.map((p) => p.id).sort(), ['lnt-xignal', 'neutral']);
-  const lnt = second.find((p) => p.id === 'lnt-xignal');
+  assert.deepEqual(first.json.packs.map((p) => p.id).sort(), ['lnt-xignal', 'neutral']);
+  assert.equal(first.json.packs.find((p) => p.id === 'neutral').hasLogo, false);
+  const lnt = first.json.packs.find((p) => p.id === 'lnt-xignal');
   assert.equal(lnt.hasLogo, true);
   assert.equal(lnt.company, 'L&T Precision Engineering and Systems');
 });
