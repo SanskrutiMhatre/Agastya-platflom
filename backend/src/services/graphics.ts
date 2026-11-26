@@ -15,6 +15,7 @@ import fs from 'fs';
 import path from 'path';
 import { projectDirFor } from '../context';
 import { bad, conflict, notFound } from './http';
+import { removeReleasingRenderer } from './renderer';
 import { csdbDir, DM_FILE_RE, listMedia } from './csdb';
 import { readProjectJson, mediaRel, csdbRel } from './projects';
 import { assetProblem } from './mediaFormats';
@@ -88,5 +89,6 @@ export function deleteGraphic(projectId: string, name: string, force: boolean): 
     throw conflict(`${base} is used by ${g.usedBy.length} data module${g.usedBy.length === 1 ? '' : 's'} (${g.usedBy.slice(0, 3).join(', ')}${g.usedBy.length > 3 ? ', …' : ''}). Deleting it would leave those figures blank.`, 'GRAPHIC_IN_USE', { usedBy: g.usedBy });
   }
   const pj = readProjectJson(projectId);
-  fs.unlinkSync(path.join(projectDirFor(projectId), g.dir === 'csdb' ? csdbRel(pj) : mediaRel(pj), base));
+  const file = path.join(projectDirFor(projectId), g.dir === 'csdb' ? csdbRel(pj) : mediaRel(pj), base);
+  removeReleasingRenderer(() => fs.unlinkSync(file), `The picture ${base}`);               // a picture the last build used can be held open by the warm renderer (services/renderer.ts)
 }

@@ -18,6 +18,7 @@ import path from 'path';
 import { config, nowIso, vendor } from '../config';
 import { store, registryDb, workspace, projectDirFor, workspaceDir, docIndex, audit } from '../context';
 import { bad, conflict, forbidden, notFound } from './http';
+import { removeReleasingRenderer } from './renderer';
 import { chapterEntries, profileById } from './profiles';
 import * as PC from './projectConfig';
 import * as SNS from './sns';
@@ -307,7 +308,7 @@ export function deleteProject(user: User, id: string): void {
   const row = store.getProjectRow(id);
   if (!row) throw notFound();
   assertNotCir(id, 'delete');
-  workspace.deleteProject(workspaceDir, id);
+  removeReleasingRenderer(() => workspace.deleteProject(workspaceDir, id), 'The project');   // a built project's pictures can be held open by the warm renderer (services/renderer.ts); the rows below go only once the folder is gone
   registryDb.deleteProject(id);
   store.clearProjectGovernance(id);
   PC.deleteProjectConfig(id);
