@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Main dashboard: my work, projects, attention list, activity and system health.">
+<title>Workspace - Agastya</title>
+<script>try{var t=localStorage.getItem('agastya-mock-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="components.css">
+<style>
+.proj td:first-child { max-width: 0; width: 100%; }
+.wk { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: var(--space-4); align-items: start; }
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); margin-bottom: var(--space-4); }
+.stat .d { display: flex; align-items: center; gap: var(--space-1); }
+.resume { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); padding: var(--space-4); }
+.resume a { display: flex; flex-direction: column; gap: var(--space-1h); padding: var(--space-3); border: 1px solid var(--border-default); border-radius: var(--radius-lg); color: var(--text-primary); text-decoration: none; background: var(--surface-panel); }
+.resume a:hover { border-color: var(--border-control); box-shadow: var(--shadow-1); }
+.resume .t { font-weight: var(--fw-semibold); } .resume .c { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-tertiary); }
+.feed li { display: flex; gap: var(--space-3); padding: var(--space-2) var(--space-4); align-items: flex-start; }
+.feed li + li { border-top: 1px solid var(--border-subtle); } .feed .who { font-weight: var(--fw-medium); }
+.todo li { display: flex; gap: var(--space-3); padding: var(--space-3) var(--space-4); align-items: flex-start; cursor: pointer; }
+.todo li:hover { background: var(--surface-hover); } .todo li + li { border-top: 1px solid var(--border-subtle); }
+.todo .ico { margin-top: 2px; } .health li { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-4); } .health li + li { border-top: 1px solid var(--border-subtle); } .health .k { margin-left: auto; color: var(--text-secondary); }
+.filters { display: flex; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border-subtle); align-items: center; flex-wrap: wrap; }
+.todo li:nth-child(1) .ico { color: var(--danger); } .todo li:nth-child(2) .ico { color: var(--info); } .todo li:nth-child(3) .ico { color: var(--warning); }
+@media (max-width: 1280px) { .wk { grid-template-columns: minmax(0, 1fr); } .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="i-activity" viewBox="0 0 24 24"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></symbol>
+<symbol id="i-archive" viewBox="0 0 24 24"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></symbol>
+<symbol id="i-book" viewBox="0 0 24 24"><path d="M10 2v7.751a.25.25 0 00.407.195l2.28-1.834a.5.5 0 01.627 0l2.28 1.834A.25.25 0 0016 9.751V2"/><path d="M4 19.5v-15A2.5 2.5 0 016.5 2H19a1 1 0 011 1v18a1 1 0 01-1 1H6.5a1 1 0 010-5H20"/></symbol>
+<symbol id="i-book2" viewBox="0 0 24 24"><path d="M12 5v16"/><path d="M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+<symbol id="i-cpu" viewBox="0 0 24 24"><path d="M12 20v2"/><path d="M12 2v2"/><path d="M17 20v2"/><path d="M17 2v2"/><path d="M2 12h2"/><path d="M2 17h2"/><path d="M2 7h2"/><path d="M20 12h2"/><path d="M20 17h2"/><path d="M20 7h2"/><path d="M7 20v2"/><path d="M7 2v2"/><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="8" y="8" width="8" height="8" rx="1"/></symbol>
+<symbol id="i-dashboard" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></symbol>
+<symbol id="i-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></symbol>
+<symbol id="i-disk" viewBox="0 0 24 24"><path d="M10 16h.01"/><path d="M2.212 11.577a2 2 0 0 0-.212.896V18a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5.527a2 2 0 0 0-.212-.896L18.55 5.11A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><path d="M21.946 12.013H2.054"/><path d="M6 16h.01"/></symbol>
+<symbol id="i-filter" viewBox="0 0 24 24"><path d="M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z"/></symbol>
+<symbol id="i-flag" viewBox="0 0 24 24"><path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528"/></symbol>
+<symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+<symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol>
+<symbol id="i-image" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></symbol>
+<symbol id="i-monitor" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></symbol>
+<symbol id="i-offline" viewBox="0 0 24 24"><path d="M12 20h.01"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/><path d="M5 12.859a10 10 0 0 1 5.17-2.69"/><path d="M19 12.859a10 10 0 0 0-2.007-1.523"/><path d="M2 8.82a15 15 0 0 1 4.177-2.643"/><path d="M22 8.82a15 15 0 0 0-11.288-3.764"/><path d="m2 2 20 20"/></symbol>
+<symbol id="i-ok" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16 9-5.5 5.5L8 12"/></symbol>
+<symbol id="i-pen" viewBox="0 0 24 24"><path d="M13 21h8"/><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></symbol>
+<symbol id="i-server" viewBox="0 0 24 24"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></symbol>
+<symbol id="i-settings" viewBox="0 0 24 24"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+<symbol id="i-stamp" viewBox="0 0 24 24"><path d="M14 13V8.5C14 7 15 7 15 5a3 3 0 0 0-6 0c0 2 1 2 1 3.5V13"/><path d="M20 15.5a2.5 2.5 0 0 0-2.5-2.5h-11A2.5 2.5 0 0 0 4 15.5V17a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1z"/><path d="M5 22h14"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
+<symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m17 8-5-5-5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3"/><path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662"/></symbol>
+<symbol id="i-warn" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+<symbol id="i-xcircle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></symbol></svg>
+<div class="app">
+<header class="topbar">
+  <div class="brand"><span class="brand-mark"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-book"/></svg></span>Agastya</div>
+  <nav class="crumbs" aria-label="Breadcrumb"><span class="sep">/</span><strong>Overview</strong></nav>
+  <span class="grow"></span>
+  <a class="search-trigger" href="editor.html#palette" aria-label="Search and commands"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-search"/></svg><span>Search projects, modules, commands…</span><span class="kbd-group"><kbd>Ctrl</kbd><kbd>K</kbd></span></a>
+  
+  <span class="icon-btn" role="img" aria-label="Offline, on-premises" data-tip="Offline · on-premises" tabindex="0"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-offline"/></svg></span>
+  <button class="icon-btn" data-tip="Notifications" aria-label="Notifications (3 unread)"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-bell"/></svg><span class="dot"></span></button>
+  <div class="seg theme-switch" role="group" aria-label="Colour theme"><button type="button" data-theme-set="system" aria-pressed="false" aria-label="Follow system" data-tip="Follow system"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-monitor"/></svg></button><button type="button" data-theme-set="light" aria-pressed="false" aria-label="Light" data-tip="Light"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-sun"/></svg></button><button type="button" data-theme-set="dark" aria-pressed="false" aria-label="Dark" data-tip="Dark"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-moon"/></svg></button></div>
+  <button class="icon-btn" data-tip="Account" aria-label="Account"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-user"/></svg></button>
+</header>
+<nav class="sidenav" aria-label="Main">
+  <a class="nav-item" href="workspace.html" aria-current="page"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-dashboard"/></svg><span>Overview</span></a><a class="nav-item" href="workspace.html#projects"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-folder"/></svg><span>Projects</span><span class="count">12</span></a><a class="nav-item" href="#"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-pen"/></svg><span>My work</span><span class="count">7</span></a><a class="nav-item" href="#"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-stamp"/></svg><span>Reviews</span><span class="count">3</span></a>
+  <div class="nav-group">Library</div>
+  <a class="nav-item" href="#"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-image"/></svg><span>Graphics</span></a><a class="nav-item" href="#"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-book2"/></svg><span>CIR</span></a><a class="nav-item" href="#"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-database"/></svg><span>Reference data</span></a>
+  <div class="nav-group">Operations</div>
+  <a class="nav-item" href="#"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-activity"/></svg><span>Activity</span></a><a class="nav-item" href="#"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-archive"/></svg><span>Backup</span></a>
+  <div class="nav-group">Platform</div>
+  <a class="nav-item" href="admin.html"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-shield"/></svg><span>Administrator</span></a><a class="nav-item" href="#"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-settings"/></svg><span>Settings</span></a>
+  <div style="margin-top:auto;padding:var(--space-3);font-size:var(--fs-xs)" class="faint">Offline · on-premises<br>v2.0.0 · Renderer ready</div>
+</nav>
+<main class="main" id="main"><div class="page">
+  <div class="page-head">
+    <div><h1>Good afternoon, Rita</h1><p>3 items need your attention · last backup 02:00 · all services running offline</p></div>
+    <div class="row"><button class="btn"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-upload"/></svg>Import package</button><button class="btn primary"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>New project</button></div>
+  </div>
+
+  <section class="kpis" aria-label="Summary">
+    <div class="card stat"><div class="v">14</div><div class="l">Open validation errors</div><div class="d" style="color:var(--danger)"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-xcircle"/></svg>across 2 projects</div></div>
+    <div class="card stat"><div class="v">3</div><div class="l">Waiting for review</div><div class="d muted"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-clock"/></svg>oldest 2 days</div></div>
+    <div class="card stat"><div class="v">42</div><div class="l">Data modules in draft</div><div class="d muted">of 187 total</div></div>
+    <div class="card stat"><div class="v">2 h</div><div class="l">Since last publication build</div><div class="d" style="color:var(--success)"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-ok"/></svg>Hydraulic Power MM, 142 pages</div></div>
+  </section>
+
+  <div class="wk">
+    <div class="stack" style="gap:var(--space-4)">
+      <section class="card" aria-labelledby="resume-h">
+        <div class="card-head"><h3 id="resume-h"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-history"/></svg>Continue where you left off</h3><a href="#">All recent</a></div>
+        <div class="resume">
+          <a href="editor.html"><span class="row"><span class="badge accent">S1000D</span><span class="badge warning">Draft</span></span><span class="t">Remove main hydraulic pump</span><span class="c">DMC-AGSTY-A-29-10-00-00A-520A-A</span><span class="faint">Edited 12 min ago · step 4 of 9</span></a>
+          <a href="editor.html"><span class="row"><span class="badge accent">JSS Land</span><span class="badge warning">Draft</span></span><span class="t">2.3 Brief description of mechanical sub-systems</span><span class="c">UHB · Chapter 2</span><span class="faint">Edited yesterday</span></a>
+          <a href="validation.html"><span class="row"><span class="badge accent">S1000D</span><span class="badge danger">3 errors</span></span><span class="t">Fault isolation - low pressure</span><span class="c">DMC-AGSTY-A-29-10-00-00A-421A-A</span><span class="faint">Validated 40 min ago</span></a>
+        </div>
+      </section>
+
+      <section class="card" id="projects" aria-labelledby="proj-h">
+        <div class="card-head"><h3 id="proj-h"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-folder"/></svg>Projects</h3><div class="row"><input class="input search" style="width:220px" placeholder="Search projects…" aria-label="Search projects"><button class="btn sm" aria-label="Filter"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-filter"/></svg>Filter</button></div></div>
+        <div class="filters"><div class="seg" role="group" aria-label="Status"><button aria-pressed="true">All 12</button><button aria-pressed="false">Released 4</button><button aria-pressed="false">In review 3</button><button aria-pressed="false">Not released 5</button></div><span class="grow"></span><span class="faint">Sorted by last activity</span></div>
+        <div class="table-wrap"><table class="table proj">
+          <thead><tr><th>Project</th><th>Status</th><th>Modules complete</th><th>Validation</th><th>Updated</th></tr></thead>
+          <tbody>
+            <tr>
+  <td><a href="project.html" class="row" style="gap:var(--space-3);color:var(--text-primary)"><span class="avatar" style="width:24px;height:24px">RA</span><span class="stack" style="gap:0;min-width:0"><span class="trunc" style="font-weight:var(--fw-medium)">Hydraulic Power System - Maintenance Manual</span><span class="faint" style="font-size:var(--fs-xs)">S1000D 5.0</span></span></a></td>
+  <td><span class="badge warning">Not released</span></td>
+  <td style="width:140px"><div class="row" style="gap:var(--space-2)"><div class="progress grow" role="progressbar" aria-valuenow="83" aria-valuemin="0" aria-valuemax="100" aria-label="Modules complete"><i style="width:82.6086956521739%"></i></div><span class="faint num" style="width:48px">38/46</span></div></td>
+  <td><span class="badge danger"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-xcircle"/></svg>14 errors</span></td>
+  <td class="faint" style="white-space:nowrap">12 min ago</td>
+</tr>
+            <tr>
+  <td><a href="project.html" class="row" style="gap:var(--space-3);color:var(--text-primary)"><span class="avatar" style="width:24px;height:24px">RA</span><span class="stack" style="gap:0;min-width:0"><span class="trunc" style="font-weight:var(--fw-medium)">Land Vehicle UHB - JSS 0251</span><span class="faint" style="font-size:var(--fs-xs)">JSS Land</span></span></a></td>
+  <td><span class="badge warning">Not released</span></td>
+  <td style="width:140px"><div class="row" style="gap:var(--space-2)"><div class="progress grow" role="progressbar" aria-valuenow="53" aria-valuemin="0" aria-valuemax="100" aria-label="Modules complete"><i style="width:52.5%"></i></div><span class="faint num" style="width:48px">21/40</span></div></td>
+  <td><span class="badge success"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-ok"/></svg>Clean</span></td>
+  <td class="faint" style="white-space:nowrap">Yesterday</td>
+</tr>
+            <tr>
+  <td><a href="project.html" class="row" style="gap:var(--space-3);color:var(--text-primary)"><span class="avatar" style="width:24px;height:24px">PM</span><span class="stack" style="gap:0;min-width:0"><span class="trunc" style="font-weight:var(--fw-medium)">Modular Bridge - User Handbook</span><span class="faint" style="font-size:var(--fs-xs)">JSG</span></span></a></td>
+  <td><span class="badge info">In review</span></td>
+  <td style="width:140px"><div class="row" style="gap:var(--space-2)"><div class="progress grow" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" aria-label="Modules complete"><i style="width:100%"></i></div><span class="faint num" style="width:48px">56/56</span></div></td>
+  <td><span class="badge success"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-ok"/></svg>Clean</span></td>
+  <td class="faint" style="white-space:nowrap">2 days ago</td>
+</tr>
+            <tr>
+  <td><a href="project.html" class="row" style="gap:var(--space-3);color:var(--text-primary)"><span class="avatar" style="width:24px;height:24px">AM</span><span class="stack" style="gap:0;min-width:0"><span class="trunc" style="font-weight:var(--fw-medium)">Fire Control Radar - IETP</span><span class="faint" style="font-size:var(--fs-xs)">S1000D 4.2</span></span></a></td>
+  <td><span class="badge success">Released</span></td>
+  <td style="width:140px"><div class="row" style="gap:var(--space-2)"><div class="progress grow" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" aria-label="Modules complete"><i style="width:100%"></i></div><span class="faint num" style="width:48px">212/212</span></div></td>
+  <td><span class="badge success"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-ok"/></svg>Clean</span></td>
+  <td class="faint" style="white-space:nowrap">3 weeks ago</td>
+</tr>
+            <tr>
+  <td><a href="project.html" class="row" style="gap:var(--space-3);color:var(--text-primary)"><span class="avatar" style="width:24px;height:24px">SK</span><span class="stack" style="gap:0;min-width:0"><span class="trunc" style="font-weight:var(--fw-medium)">Naval Gearbox - TM-1</span><span class="faint" style="font-size:var(--fs-xs)">JSS Naval</span></span></a></td>
+  <td><span class="badge info">In review</span></td>
+  <td style="width:140px"><div class="row" style="gap:var(--space-2)"><div class="progress grow" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100" aria-label="Modules complete"><i style="width:100%"></i></div><span class="faint num" style="width:48px">34/34</span></div></td>
+  <td><span class="badge danger"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-xcircle"/></svg>2 errors</span></td>
+  <td class="faint" style="white-space:nowrap">5 days ago</td>
+</tr>
+          </tbody>
+        </table></div>
+      </section>
+    </div>
+
+    <aside class="stack" style="gap:var(--space-4)" aria-label="Attention and activity">
+      <section class="card" aria-labelledby="att-h"><div class="card-head"><h3 id="att-h"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-flag"/></svg>Needs your attention</h3><span class="badge danger">3</span></div>
+        <ul class="todo">
+          <li><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-xcircle"/></svg><div><div style="font-weight:var(--fw-medium)">14 validation errors block the publish gate</div><div class="faint">Hydraulic Power MM · BREX rule 009 (11), XSD (3)</div></div></li>
+          <li><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-stamp"/></svg><div><div style="font-weight:var(--fw-medium)">Review requested by Paul Manager</div><div class="faint">Modular Bridge UHB · due Friday</div></div></li>
+          <li><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-warn"/></svg><div><div style="font-weight:var(--fw-medium)">2 data modules reference a missing graphic</div><div class="faint">ICN-AGSTY-A-291000-A-00A01-A-001-01</div></div></li>
+        </ul>
+      </section>
+      <section class="card" aria-labelledby="act-h"><div class="card-head"><h3 id="act-h"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-activity"/></svg>Recent activity</h3><a href="#">Full activity</a></div>
+        <ul class="feed">
+          <li><span class="avatar">PM</span><div><span class="who">Paul Manager</span> approved <a href="#">Naval Gearbox TM-1</a><div class="faint">8 min ago</div></div></li>
+          <li><span class="avatar">RA</span><div><span class="who">Rita Author</span> built the publication <a href="publication.html">Hydraulic Power MM</a><div class="faint">2 h ago · 142 pages · 38 s</div></div></li>
+          <li><span class="avatar">AM</span><div><span class="who">Anil Menon</span> imported 18 data modules<div class="faint">Yesterday 16:40</div></div></li>
+        </ul>
+      </section>
+      <section class="card" aria-labelledby="sys-h"><div class="card-head"><h3 id="sys-h"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-server"/></svg>System</h3><span class="badge success"><span class="dot success"></span>Healthy</span></div>
+        <ul class="health">
+          <li><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-cpu"/></svg><span>PDF renderer</span><span class="k">ready</span></li>
+          <li><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-archive"/></svg><span>Last backup</span><span class="k">02:00 · 1.8 GB</span></li>
+          <li><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-disk"/></svg><span>Workspace disk</span><span class="k">62 % free</span></li>
+          <li><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-database"/></svg><span>Database</span><span class="k">integrity ok</span></li>
+        </ul>
+      </section>
+    </aside>
+  </div>
+</div></main>
+</div>
+<script>(function(){var K='agastya-mock-theme',r=document.documentElement;function get(){try{return localStorage.getItem(K)||'system'}catch(e){return'system'}}
+function apply(v){if(v==='light'||v==='dark')r.setAttribute('data-theme',v);else r.removeAttribute('data-theme');
+document.querySelectorAll('[data-theme-set]').forEach(function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-theme-set')===v))})}
+apply(get());document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('[data-theme-set]');if(!b)return;var v=b.getAttribute('data-theme-set');
+try{if(v==='system')localStorage.removeItem(K);else localStorage.setItem(K,v)}catch(x){}apply(v)})})();</script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Index of the proposed design-system mockups: six screens in light and dark themes using one shared token file.">
+<title>Agastya mockups</title>
+<script>try{var t=localStorage.getItem('agastya-mock-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="components.css">
+<style>
+body { overflow: auto; } .container { max-width: 1120px; margin: 0 auto; padding: var(--space-8) var(--space-6) var(--space-12); }
+.hero { display: flex; justify-content: space-between; gap: var(--space-6); align-items: flex-start; flex-wrap: wrap; margin-bottom: var(--space-6); }
+.hero h1 { font-size: var(--fs-3xl); } .hero p { max-width: 62ch; margin-top: var(--space-2); color: var(--text-secondary); }
+.grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.stretch { color: var(--text-primary); text-decoration: none; } .stretch::after { content: ""; position: absolute; inset: 0; border-radius: var(--radius-lg); } .stretch:focus-visible { outline: none; } .stretch:focus-visible::after { outline: 2px solid var(--focus-ring); outline-offset: 2px; } .shot a.badge { position: relative; z-index: 1; text-decoration: none; } .shot a.badge:hover { border-color: var(--border-control); }
+.shot { position: relative; display: grid; grid-template-columns: 40px 1fr; gap: var(--space-3); padding: var(--space-4); color: var(--text-primary); align-items: start; } .shot p { margin-top: 2px; }
+.tile-ic { width: 40px; height: 40px; border-radius: var(--radius-lg); background: var(--surface-selected); color: var(--text-link); display: grid; place-items: center; }
+h2.sec { font-size: var(--fs-lg); margin: var(--space-8) 0 var(--space-3); }
+.swgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2) var(--space-4); }
+.swc { display: grid; grid-template-columns: 36px 1fr; grid-template-rows: auto auto; column-gap: var(--space-2); align-items: center; font-size: var(--fs-xs); }
+.swc i { grid-row: 1 / 3; width: 36px; height: 36px; border-radius: var(--radius-md); border: 1px solid var(--border-control); } .swc span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.notes li { margin: var(--space-1) 0; color: var(--text-secondary); } .notes { padding-left: var(--space-5); list-style: disc; }
+.top { position: sticky; top: 0; z-index: var(--z-sticky); background: var(--surface-chrome); border-bottom: 1px solid var(--border-default); }
+.top .in { max-width: 1120px; margin: 0 auto; padding: 0 var(--space-6); height: var(--header-h); display: flex; align-items: center; gap: var(--space-3); }
+@media (max-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr); } .swgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="i-book" viewBox="0 0 24 24"><path d="M10 2v7.751a.25.25 0 00.407.195l2.28-1.834a.5.5 0 01.627 0l2.28 1.834A.25.25 0 0016 9.751V2"/><path d="M4 19.5v-15A2.5 2.5 0 016.5 2H19a1 1 0 011 1v18a1 1 0 01-1 1H6.5a1 1 0 010-5H20"/></symbol>
+<symbol id="i-dashboard" viewBox="0 0 24 24"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></symbol>
+<symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+<symbol id="i-monitor" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></symbol>
+<symbol id="i-pen" viewBox="0 0 24 24"><path d="M13 21h8"/><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></symbol>
+<symbol id="i-settings" viewBox="0 0 24 24"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol></svg>
+<div class="top"><div class="in"><span class="brand-mark" style="width:28px;height:28px;border-radius:var(--radius-md);background:var(--accent);color:var(--text-on-accent);display:grid;place-items:center"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-book"/></svg></span><strong>Agastya</strong><span class="faint">design system mockups</span><span style="flex:1"></span><div class="seg theme-switch" role="group" aria-label="Colour theme"><button type="button" data-theme-set="system" aria-pressed="false" aria-label="Follow system" data-tip="Follow system"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-monitor"/></svg></button><button type="button" data-theme-set="light" aria-pressed="false" aria-label="Light" data-tip="Light"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-sun"/></svg></button><button type="button" data-theme-set="dark" aria-pressed="false" aria-label="Dark" data-tip="Dark"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-moon"/></svg></button></div></div></div>
+<main class="container" id="main">
+  <div class="hero"><div><h1>Design system mockups</h1><p>Six screens built only from <code>tokens.css</code> and <code>components.css</code> in this folder. No frameworks, no web fonts, no network. Use the theme switch (system, light, dark) on any page; the choice is remembered in this browser only.</p></div>
+    <div class="card" style="padding:var(--space-3) var(--space-4);min-width:260px"><div class="faint" style="font-size:var(--fs-xs)">Verified</div><div style="font-weight:var(--fw-semibold)">218 colour-pair checks, 0 failures</div><div class="faint" style="font-size:var(--fs-xs)">WCAG 2.2 AA, both themes</div></div></div>
+
+  <h2 class="sec" style="margin-top:0">Screens</h2>
+  <div class="grid">
+    <div class="card link shot"><span class="tile-ic"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-dashboard"/></svg></span><div><h3><a class="stretch" href="workspace.html">1 · Main dashboard</a></h3><p class="muted">Resume, projects table, attention list, activity and system health. Global navigation on the left.</p><div class="row wrap" style="margin-top:var(--space-2)"><span class="badge accent">Global shell</span><span class="badge">Comfortable density</span></div></div></div>
+    <div class="card link shot"><span class="tile-ic"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-folder"/></svg></span><div><h3><a class="stretch" href="project.html">2 · Project dashboard</a></h3><p class="muted">Readiness summary, publish gate alert, areas of work, status by SNS chapter, timeline and team.</p><div class="row wrap" style="margin-top:var(--space-2)"><span class="badge accent">Project shell</span><span class="badge">Alert · progress · stat</span></div></div></div>
+    <div class="card link shot"><span class="tile-ic"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-pen"/></svg></span><div><h3><a class="stretch" href="editor.html">3 · Editor workspace</a></h3><p class="muted">Activity bar, explorer tree, document tabs, toolbar, canvas, properties, problems and status bar.</p><div class="row wrap" style="margin-top:var(--space-2)"><span class="badge accent">Project shell</span><span class="badge">Compact density</span><a class="badge" href="editor.html#palette">Open command palette</a></div></div></div>
+    <div class="card link shot"><span class="tile-ic"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-book"/></svg></span><div><h3><a class="stretch" href="publication.html">4 · Publication and PDF preview</a></h3><p class="muted">Structure checklist, white paper on a themed viewer canvas, build settings and history.</p><div class="row wrap" style="margin-top:var(--space-2)"><span class="badge accent">Project shell</span><span class="badge">Paper stays white</span></div></div></div>
+    <div class="card link shot"><span class="tile-ic"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-shield"/></svg></span><div><h3><a class="stretch" href="validation.html">5 · Validation report</a></h3><p class="muted">Severity summary, filters, issue table, source excerpt with syntax tokens and the waiver form.</p><div class="row wrap" style="margin-top:var(--space-2)"><span class="badge accent">Project shell</span><span class="badge">Error state field</span></div></div></div>
+    <div class="card link shot"><span class="tile-ic"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-settings"/></svg></span><div><h3><a class="stretch" href="admin.html">6 · Administration</a></h3><p class="muted">Users, appearance defaults with a two-theme contrast check, storage, audit log, toast and confirm dialog.</p><div class="row wrap" style="margin-top:var(--space-2)"><span class="badge accent">Global shell</span><a class="badge" href="admin.html#confirm-disable">Open confirm dialog</a></div></div></div>
+  </div>
+
+  <h2 class="sec">Tokens in the current theme</h2>
+  <div class="swgrid" aria-label="Token swatches">
+    <div class="swc"><i style="background:var(--surface-canvas)"></i><span class="mono">--surface-canvas</span><span class="faint">page</span></div><div class="swc"><i style="background:var(--surface-panel)"></i><span class="mono">--surface-panel</span><span class="faint">panel</span></div><div class="swc"><i style="background:var(--surface-raised)"></i><span class="mono">--surface-raised</span><span class="faint">menus, dialogs</span></div><div class="swc"><i style="background:var(--surface-inset)"></i><span class="mono">--surface-inset</span><span class="faint">inputs, wells</span></div>
+    <div class="swc"><i style="background:var(--surface-hover)"></i><span class="mono">--surface-hover</span><span class="faint">hover</span></div><div class="swc"><i style="background:var(--surface-selected)"></i><span class="mono">--surface-selected</span><span class="faint">selected</span></div><div class="swc"><i style="background:var(--surface-selected-inactive)"></i><span class="mono">--surface-selected-inactive</span><span class="faint">selected, no focus</span></div><div class="swc"><i style="background:var(--border-control)"></i><span class="mono">--border-control</span><span class="faint">control edge 3:1</span></div>
+    <div class="swc"><i style="background:var(--accent)"></i><span class="mono">--accent</span><span class="faint">primary action</span></div><div class="swc"><i style="background:var(--focus-ring)"></i><span class="mono">--focus-ring</span><span class="faint">focus</span></div><div class="swc"><i style="background:var(--danger)"></i><span class="mono">--danger</span><span class="faint">error text</span></div><div class="swc"><i style="background:var(--warning)"></i><span class="mono">--warning</span><span class="faint">warning text</span></div>
+    <div class="swc"><i style="background:var(--success)"></i><span class="mono">--success</span><span class="faint">success text</span></div><div class="swc"><i style="background:var(--info)"></i><span class="mono">--info</span><span class="faint">info text</span></div><div class="swc"><i style="background:var(--danger-subtle)"></i><span class="mono">--danger-subtle</span><span class="faint">error fill</span></div><div class="swc"><i style="background:var(--warning-subtle)"></i><span class="mono">--warning-subtle</span><span class="faint">warning fill</span></div>
+    <div class="swc"><i style="background:var(--doc-page)"></i><span class="mono">--doc-page</span><span class="faint">S1000D page</span></div><div class="swc"><i style="background:var(--paper)"></i><span class="mono">--paper</span><span class="faint">print sheet</span></div><div class="swc"><i style="background:var(--viewer-canvas)"></i><span class="mono">--viewer-canvas</span><span class="faint">PDF canvas</span></div><div class="swc"><i style="background:var(--tooltip-bg)"></i><span class="mono">--tooltip-bg</span><span class="faint">tooltip</span></div>
+  </div>
+
+  <h2 class="sec">How to read these</h2>
+  <ul class="notes">
+    <li>Every colour is a token. The only literal colours in the pages are inside <code>tokens.css</code>.</li>
+    <li>Dark surfaces are lighter steps plus a hairline ring, not shadows. Light surfaces use shadows sparingly.</li>
+    <li>Status is never colour alone: each state also carries an icon, a label or a shape.</li>
+    <li>Focus rings, selected and selected-inactive rows, disabled and error states are shown on the editor and validation pages; hover on any control.</li>
+    <li>The layout is tuned for 1366 x 768 and above and does not scroll the page sideways; panels scroll inside.</li>
+  </ul>
+</main>
+<script>(function(){var K='agastya-mock-theme',r=document.documentElement;function get(){try{return localStorage.getItem(K)||'system'}catch(e){return'system'}}
+function apply(v){if(v==='light'||v==='dark')r.setAttribute('data-theme',v);else r.removeAttribute('data-theme');
+document.querySelectorAll('[data-theme-set]').forEach(function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-theme-set')===v))})}
+apply(get());document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('[data-theme-set]');if(!b)return;var v=b.getAttribute('data-theme-set');
+try{if(v==='system')localStorage.removeItem(K);else localStorage.setItem(K,v)}catch(x){}apply(v)})})();</script>
+</body>
+</html>

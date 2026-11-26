@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Project dashboard: readiness, areas of work, data module status, activity and team.">
+<title>Project overview - Agastya</title>
+<script>try{var t=localStorage.getItem('agastya-mock-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="components.css">
+<style>
+.proj-head { display: flex; gap: var(--space-4); align-items: flex-start; justify-content: space-between; flex-wrap: wrap; margin-bottom: var(--space-4); }
+.proj-head .meta { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; margin-top: var(--space-2); color: var(--text-secondary); }
+.ready { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.ready > div { padding: var(--space-4); } .ready > div + div { border-left: 1px solid var(--border-subtle); }
+.ready .big { font-size: var(--fs-2xl); font-weight: var(--fw-semibold); line-height: 1.1; font-variant-numeric: tabular-nums; margin: var(--space-1) 0 var(--space-2); }
+.ready .lab { display: flex; gap: var(--space-2); align-items: center; color: var(--text-secondary); font-size: var(--fs-xs); font-weight: var(--fw-medium); }
+.tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); margin: var(--space-4) 0; }
+.tile { display: grid; grid-template-columns: 36px 1fr; gap: var(--space-3); padding: var(--space-4); color: var(--text-primary); text-decoration: none; align-content: start; }
+.tile:hover { text-decoration: none; } .tile p { font-size: var(--fs-xs); margin-top: 2px; }
+.tile-ic { width: 36px; height: 36px; border-radius: var(--radius-lg); background: var(--surface-selected); color: var(--text-link); display: grid; place-items: center; }
+.tile-stat { grid-column: 2; display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; padding-top: var(--space-2); border-top: 1px dashed var(--border-default); font-size: var(--fs-xs); color: var(--text-secondary); }
+.cols { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: var(--space-4); align-items: start; }
+.stackbar { height: 12px; border-radius: 6px; overflow: hidden; display: flex; gap: 2px; background: var(--surface-inset); }
+.stackbar i { display: block; height: 100%; } .stackbar .approved { background: var(--success-solid); } .stackbar .review { background: var(--info-solid); } .stackbar .draft { background: var(--warning-solid); } .stackbar .error { background: var(--danger-solid); } .stackbar .empty { background: var(--border-control); opacity: .5; }
+.legend { display: flex; gap: var(--space-4); flex-wrap: wrap; margin-top: var(--space-3); font-size: var(--fs-xs); color: var(--text-secondary); } .legend span { display: inline-flex; align-items: center; gap: var(--space-1h); }
+.legend .sw { width: 10px; height: 10px; border-radius: 3px; }
+.sw.approved { background: var(--success-solid); } .sw.review { background: var(--info-solid); } .sw.draft { background: var(--warning-solid); } .sw.error { background: var(--danger-solid); }
+.team li { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-4); } .team li + li { border-top: 1px solid var(--border-subtle); }
+.tl li { display: grid; grid-template-columns: 16px 1fr; gap: var(--space-3); padding: var(--space-2) var(--space-4); position: relative; }
+.tl li::before { content: ""; position: absolute; left: calc(var(--space-4) + 3px); top: 22px; bottom: -8px; width: 1px; background: var(--border-default); } .tl li:last-child::before { display: none; }
+.tl .dot { margin-top: 5px; }
+@media (max-width: 1280px) { .cols { grid-template-columns: minmax(0, 1fr); } .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="i-back" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></symbol>
+<symbol id="i-book" viewBox="0 0 24 24"><path d="M10 2v7.751a.25.25 0 00.407.195l2.28-1.834a.5.5 0 01.627 0l2.28 1.834A.25.25 0 0016 9.751V2"/><path d="M4 19.5v-15A2.5 2.5 0 016.5 2H19a1 1 0 011 1v18a1 1 0 01-1 1H6.5a1 1 0 010-5H20"/></symbol>
+<symbol id="i-download" viewBox="0 0 24 24"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></symbol>
+<symbol id="i-explore" viewBox="0 0 24 24"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></symbol>
+<symbol id="i-fileCheck" viewBox="0 0 24 24"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="m9 15 2 2 4-4"/></symbol>
+<symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></symbol>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+<symbol id="i-image" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></symbol>
+<symbol id="i-layers" viewBox="0 0 24 24"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"/><path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></symbol>
+<symbol id="i-monitor" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></symbol>
+<symbol id="i-more" viewBox="0 0 24 24"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></symbol>
+<symbol id="i-pen" viewBox="0 0 24 24"><path d="M13 21h8"/><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+<symbol id="i-rocket" viewBox="0 0 24 24"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09"/><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></symbol>
+<symbol id="i-settings" viewBox="0 0 24 24"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+<symbol id="i-stamp" viewBox="0 0 24 24"><path d="M14 13V8.5C14 7 15 7 15 5a3 3 0 0 0-6 0c0 2 1 2 1 3.5V13"/><path d="M20 15.5a2.5 2.5 0 0 0-2.5-2.5h-11A2.5 2.5 0 0 0 4 15.5V17a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1z"/><path d="M5 22h14"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3"/><path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><path d="M16 3.128a4 4 0 0 1 0 7.744"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><circle cx="9" cy="7" r="4"/></symbol>
+<symbol id="i-xcircle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></symbol></svg>
+<div class="app project" data-density="comfortable">
+<header class="topbar">
+  <a class="brand" href="workspace.html" aria-label="Agastya home"><span class="brand-mark"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-book"/></svg></span></a>
+  <nav class="crumbs" aria-label="Breadcrumb"><a href="workspace.html">Projects</a><span class="sep">/</span><strong>Hydraulic Power System - Maintenance Manual</strong></nav>
+  <span class="grow"></span>
+  <a class="search-trigger" href="editor.html#palette" style="min-width:220px" aria-label="Command palette"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-search"/></svg><span>Commands…</span><span class="kbd-group"><kbd>Ctrl</kbd><kbd>K</kbd></span></a>
+  <button class="btn"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-shield"/></svg>Validate</button><button class="btn primary"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-pen"/></svg>Open editor</button>
+  <div class="seg theme-switch" role="group" aria-label="Colour theme"><button type="button" data-theme-set="system" aria-pressed="false" aria-label="Follow system" data-tip="Follow system"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-monitor"/></svg></button><button type="button" data-theme-set="light" aria-pressed="false" aria-label="Light" data-tip="Light"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-sun"/></svg></button><button type="button" data-theme-set="dark" aria-pressed="false" aria-label="Dark" data-tip="Dark"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-moon"/></svg></button></div>
+  <button class="icon-btn" data-tip="Account" aria-label="Account"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-user"/></svg></button>
+</header>
+<nav class="activity" aria-label="Project">
+  <a class="act-btn" href="workspace.html" data-tip="All projects" aria-label="Back to all projects"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-back"/></svg></a>
+  <span style="width:24px;height:1px;background:var(--border-default);margin:var(--space-1) 0"></span>
+  <a class="act-btn" href="project.html" data-tip="Project overview" aria-label="Project overview" aria-current="true"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-home"/></svg></a>
+  <a class="act-btn" href="editor.html" data-tip="Editor" aria-label="Editor"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-pen"/></svg></a>
+  <a class="act-btn" href="#" data-tip="Structure" aria-label="Structure"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-explore"/></svg></a>
+  <a class="act-btn" href="publication.html" data-tip="Publication" aria-label="Publication"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-book"/></svg></a>
+  <a class="act-btn" href="#" data-tip="Graphics" aria-label="Graphics"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-image"/></svg></a>
+  <a class="act-btn" href="validation.html" data-tip="Validation" aria-label="Validation"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-shield"/></svg><span class="pip">14</span></a>
+  <a class="act-btn" href="#" data-tip="Review and release" aria-label="Review and release"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-rocket"/></svg></a>
+  <span class="spacer"></span>
+  <a class="act-btn" href="#" data-tip="Project settings" aria-label="Project settings"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-settings"/></svg></a>
+</nav>
+<main class="main" id="main"><div class="page">
+  <div class="proj-head">
+    <div>
+      <h1>Hydraulic Power System - Maintenance Manual</h1>
+      <div class="meta"><span class="badge accent">S1000D Issue 5.0</span><span class="badge warning">Not released</span><span class="mono">MIC AGSTY</span><span>·</span><span>Owner Rita Author</span><span>·</span><span>Updated 12 min ago</span></div>
+    </div>
+    <div class="row"><button class="btn"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-download"/></svg>Export project</button><button class="btn" aria-label="More"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-more"/></svg></button></div>
+  </div>
+
+  <div class="alert danger" role="alert"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-xcircle"/></svg><div class="grow"><strong>Publish gate: blocked.</strong> 14 validation errors must be fixed or waived before a release can be built. <a href="validation.html">Open the report</a></div><button class="btn sm">Waive BREX only…</button></div>
+
+  <section class="card" style="margin-top:var(--space-4)" aria-label="Publication readiness">
+    <div class="ready">
+      <div><div class="lab"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-fileCheck"/></svg>Modules complete</div><div class="big">38 <span class="faint" style="font-size:var(--fs-md);font-weight:400">/ 46</span></div><div class="progress" role="progressbar" aria-valuenow="83" aria-valuemin="0" aria-valuemax="100" aria-label="Modules complete"><i class="success" style="width:83%"></i></div></div>
+      <div><div class="lab"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-shield"/></svg>Validation</div><div class="big" style="color:var(--danger)">14 <span style="font-size:var(--fs-md);font-weight:400" class="muted">errors</span></div><div class="faint">3 XSD · 11 BREX · 0 waived</div></div>
+      <div><div class="lab"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-stamp"/></svg>Review</div><div class="big">Not submitted</div><div class="faint">Submit when validation is clean</div></div>
+      <div><div class="lab"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-book"/></svg>Last build</div><div class="big">2 h ago</div><div class="faint">142 pages · NOT RELEASED watermark</div></div>
+    </div>
+  </section>
+
+  <section class="tiles" aria-label="Areas of work">
+    <a class="card link tile" href="editor.html">
+  <span class="tile-ic"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-pen"/></svg></span><div><h3>Editor</h3><p class="muted">Write and edit data modules with live validation.</p></div><div class="tile-stat"><span class="badge warning">42 drafts</span><span>3 open tabs</span></div></a>
+    <a class="card link tile" href="#">
+  <span class="tile-ic"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-explore"/></svg></span><div><h3>Structure</h3><p class="muted">SNS, applicability and cross-references.</p></div><div class="tile-stat"><span>12 chapters</span><span>·</span><span>0 orphan modules</span></div></a>
+    <a class="card link tile" href="publication.html">
+  <span class="tile-ic"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-book"/></svg></span><div><h3>Publication</h3><p class="muted">Arrange chapters and build the PDF.</p></div><div class="tile-stat"><span class="badge success">Built 2 h ago</span></div></a>
+    <a class="card link tile" href="#">
+  <span class="tile-ic"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-image"/></svg></span><div><h3>Graphics</h3><p class="muted">ICN library used by this project.</p></div><div class="tile-stat"><span>86 graphics</span><span class="badge danger">2 missing</span></div></a>
+    <a class="card link tile" href="validation.html">
+  <span class="tile-ic"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-shield"/></svg></span><div><h3>Validation</h3><p class="muted">XSD, BREX and link checks.</p></div><div class="tile-stat"><span class="badge danger">14 errors</span><span>8 warnings</span></div></a>
+    <a class="card link tile" href="#">
+  <span class="tile-ic"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-rocket"/></svg></span><div><h3>Review and release</h3><p class="muted">Submit for approval, watermark, release log.</p></div><div class="tile-stat"><span class="badge">Not submitted</span></div></a>
+  </section>
+
+  <div class="cols">
+    <div class="stack" style="gap:var(--space-4)">
+      <section class="card" aria-labelledby="st-h">
+        <div class="card-head"><h3 id="st-h"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-layers"/></svg>Data module status by chapter</h3><span class="faint">46 modules</span></div>
+        <div class="card-body">
+          <div class="stackbar" role="img" aria-label="38 approved or in review, 5 draft, 3 with errors"><i class="approved" style="width:52%" title="Approved"></i><i class="review" style="width:20%" title="In review"></i><i class="draft" style="width:16%" title="Draft"></i><i class="error" style="width:8%" title="Has errors"></i><i class="empty" style="width:4%" title="Empty"></i></div>
+          <div class="legend"><span><i class="sw approved"></i>Approved 24</span><span><i class="sw review"></i>In review 9</span><span><i class="sw draft"></i>Draft 7</span><span><i class="sw error"></i>Has errors 3</span><span class="faint">Empty 3</span></div>
+        </div>
+        <div class="table-wrap"><table class="table">
+          <thead><tr><th>SNS chapter</th><th class="num">Modules</th><th style="width:30%">Progress</th><th>Validation</th></tr></thead>
+          <tbody>
+            <tr><td><span class="mono faint">29-00</span>&nbsp; General</td><td class="num">6</td><td><div class="progress"><i class="success" style="width:100%"></i></div></td><td><span class="badge success">Clean</span></td></tr>
+            <tr><td><span class="mono faint">29-10</span>&nbsp; Main hydraulic power system</td><td class="num">18</td><td><div class="progress"><i class="success" style="width:72%"></i></div></td><td><span class="badge danger">11 errors</span></td></tr>
+            <tr><td><span class="mono faint">29-20</span>&nbsp; Auxiliary hydraulic power system</td><td class="num">12</td><td><div class="progress"><i class="success" style="width:66%"></i></div></td><td><span class="badge danger">3 errors</span></td></tr>
+            <tr><td><span class="mono faint">29-30</span>&nbsp; Indicating</td><td class="num">10</td><td><div class="progress"><i class="success" style="width:100%"></i></div></td><td><span class="badge warning">2 warnings</span></td></tr>
+          </tbody>
+        </table></div>
+      </section>
+    </div>
+    <aside class="stack" style="gap:var(--space-4)">
+      <section class="card" aria-labelledby="ac-h"><div class="card-head"><h3 id="ac-h"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-history"/></svg>Timeline</h3><a href="#">All</a></div>
+        <ul class="tl">
+          <li><span class="dot success"></span><div><strong>Publication built</strong> by Rita Author<div class="faint">2 h ago · 142 pages · 38 s</div></div></li>
+          <li><span class="dot danger"></span><div><strong>Validation run</strong> - 14 errors<div class="faint">2 h ago · XSD, BREX</div></div></li>
+          <li><span class="dot accent"></span><div><strong>18 data modules imported</strong> by Anil Menon<div class="faint">Yesterday 16:40</div></div></li>
+          <li><span class="dot"></span><div><strong>Project created</strong><div class="faint">12 Nov · template Xignal S1000D</div></div></li>
+        </ul>
+      </section>
+      <section class="card" aria-labelledby="tm-h"><div class="card-head"><h3 id="tm-h"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-users"/></svg>Team</h3><button class="btn sm"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>Invite</button></div>
+        <ul class="team">
+          <li><span class="avatar">RA</span><div class="grow"><div style="font-weight:var(--fw-medium)">Rita Author</div><div class="faint">Owner · edits 214 this month</div></div><span class="badge">Author</span></li>
+          <li><span class="avatar">AM</span><div class="grow"><div style="font-weight:var(--fw-medium)">Anil Menon</div><div class="faint">Edits 96 this month</div></div><span class="badge">Author</span></li>
+          <li><span class="avatar">PM</span><div class="grow"><div style="font-weight:var(--fw-medium)">Paul Manager</div><div class="faint">Reviewer</div></div><span class="badge info">Project manager</span></li>
+        </ul>
+      </section>
+    </aside>
+  </div>
+</div></main>
+<footer class="statusbar"><span class="item"><span class="dot success"></span>Renderer ready</span><span class="item">Workspace: C:\Agastya\workspace</span><span class="grow"></span><span class="item">Offline · on-premises</span></footer>
+</div>
+<script>(function(){var K='agastya-mock-theme',r=document.documentElement;function get(){try{return localStorage.getItem(K)||'system'}catch(e){return'system'}}
+function apply(v){if(v==='light'||v==='dark')r.setAttribute('data-theme',v);else r.removeAttribute('data-theme');
+document.querySelectorAll('[data-theme-set]').forEach(function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-theme-set')===v))})}
+apply(get());document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('[data-theme-set]');if(!b)return;var v=b.getAttribute('data-theme-set');
+try{if(v==='system')localStorage.removeItem(K);else localStorage.setItem(K,v)}catch(x){}apply(v)})})();</script>
+</body>
+</html>

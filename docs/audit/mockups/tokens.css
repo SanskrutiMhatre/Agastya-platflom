@@ -1,0 +1,288 @@
+/* =============================================================================
+   Agastya design tokens - PROPOSAL (audit mockups). Generated from tokens.def.mjs; every colour pair below was contrast-checked
+   in BOTH themes (WCAG 2.2: text >= 4.5:1, UI components >= 3:1). See docs/audit/07-DESIGN-SYSTEM-PROPOSAL.md and 08-DARK-LIGHT-THEME-STRATEGY.md.
+
+   Theme selection (three states, one mechanism):
+     - no attribute            -> follows the OS (prefers-color-scheme)
+     - data-theme="light"      -> forced light
+     - data-theme="dark"       -> forced dark
+   The dark block is emitted twice (media query + attribute) because CSS cannot share one declaration list between the two selectors.
+   ============================================================================= */
+
+/* ---- 1. theme-independent tokens (type, space, shape, layers, motion, layout, density) ---- */
+:root {
+  --font-ui: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Cascadia Mono", "Cascadia Code", Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-paper: Arial, "Liberation Sans", Helvetica, sans-serif;           /* JSS print sheet (user decision: Arial kept) */
+  --font-paper-serif: "Times New Roman", Times, serif;                      /* JSG print sheet */
+
+  --fs-2xs: 11px; --fs-xs: 12px; --fs-sm: 13px; --fs-md: 14px; --fs-lg: 16px; --fs-xl: 20px; --fs-2xl: 24px; --fs-3xl: 28px;
+  --lh-tight: 1.25; --lh-ui: 1.4; --lh-prose: 1.55;
+  --fw-regular: 400; --fw-medium: 500; --fw-semibold: 600;
+
+  --space-0: 2px; --space-1: 4px; --space-1h: 6px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 20px; --space-6: 24px; --space-8: 32px; --space-10: 40px; --space-12: 48px;
+
+  --radius-xs: 2px; --radius-sm: 4px; --radius-md: 6px; --radius-lg: 8px; --radius-xl: 12px; --radius-pill: 999px;
+
+  --z-sticky: 10; --z-rail: 20; --z-resize: 25; --z-menu: 100; --z-popover: 110; --z-scrim: 200; --z-modal: 210; --z-palette: 220; --z-toast: 300; --z-tooltip: 400;
+
+  --dur-fast: 80ms; --dur-base: 140ms; --dur-slow: 220ms; --ease: cubic-bezier(0.2, 0, 0, 1);
+
+  --header-h: 48px; --activity-w: 48px; --nav-w: 232px; --tree-w: 272px; --props-w: 312px; --status-h: 24px; --tab-h: 36px; --problems-h: 208px;
+  --content-max: 1280px; --reading-max: 880px; --form-max: 560px;
+
+  /* density: comfortable (default for dashboards, admin, forms) */
+  --control-h: 32px; --row-h: 36px; --table-row-h: 40px; --icon-btn: 32px; --pad-ctl: 12px;
+}
+[data-density="compact"] { --control-h: 28px; --row-h: 28px; --table-row-h: 32px; --icon-btn: 28px; --pad-ctl: 10px; }
+@media (prefers-reduced-motion: reduce) { :root { --dur-fast: 0.01ms; --dur-base: 0.01ms; --dur-slow: 0.01ms; } }
+
+/* ---- 2. LIGHT (default) ---- */
+:root {
+  color-scheme: light;
+  --surface-canvas: #f3f5f8;
+  --surface-panel: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-inset: #eceff4;
+  --surface-chrome: #eaeef4;
+  --surface-hover: #e9edf3;
+  --surface-pressed: #dde3ec;
+  --surface-selected: #e6eeff;
+  --surface-selected-hover: #d9e5ff;
+  --surface-selected-inactive: #e1e6ee;
+  --surface-disabled: #eef1f5;
+  --scrim: rgba(16,22,34,0.40);
+  --text-primary: #1a2030;
+  --text-secondary: #475266;
+  --text-tertiary: #5b6579;
+  --text-disabled: #98a1b3;
+  --text-on-accent: #ffffff;
+  --text-link: #2456c9;
+  --border-subtle: #e3e7ee;
+  --border-default: #d3d9e3;
+  --border-control: #7d889d;
+  --focus-ring: #2456c9;
+  --accent: #2456c9;
+  --accent-hover: #1b45a6;
+  --accent-pressed: #163a8c;
+  --danger: #b42323;
+  --danger-subtle: #fdecec;
+  --danger-border: #f1bcbc;
+  --danger-solid: #b42323;
+  --warning: #8a4f00;
+  --warning-subtle: #fff4e0;
+  --warning-border: #f0cf9a;
+  --warning-solid: #ffb020;
+  --success: #17703f;
+  --success-subtle: #e3f5ea;
+  --success-border: #a9dcbd;
+  --success-solid: #17703f;
+  --info: #0e6f8c;
+  --info-subtle: #e1f3f9;
+  --info-border: #a5d6e6;
+  --info-solid: #0e6f8c;
+  --text-on-warning-solid: #1a2030;
+  --tooltip-bg: #1f2633;
+  --tooltip-text: #f3f5f8;
+  --find-match: #ffe58a;
+  --find-current: #ffb15c;
+  --syntax-tag: #1f7a35;
+  --syntax-attr: #6f42c1;
+  --syntax-value: #b3261e;
+  --syntax-comment: #606b7d;
+  --syntax-pi: #8a5d00;
+  --syntax-bracket: #5f6a7f;
+  --syntax-entity: #005cc5;
+  --doc-page: #ffffff;
+  --doc-text: #1b1f27;
+  --doc-muted: #5b6372;
+  --doc-rule: #d6dbe4;
+  --doc-warning: #c8102e;
+  --doc-caution: #8a4f00;
+  --doc-note: #3f5f8f;
+  --doc-selection: #2456c9;
+  --paper: #ffffff;
+  --paper-ink: #000000;
+  --paper-muted: #4a5160;
+  --paper-rule: #9aa3b2;
+  --paper-accent: #1d4ed8;
+  --paper-warning: #c8102e;
+  --viewer-canvas: #d5dae3;
+  --shadow-1: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.10);
+  --shadow-2: 0 4px 12px rgba(16, 24, 40, 0.12), 0 1px 3px rgba(16, 24, 40, 0.08);
+  --shadow-3: 0 16px 40px rgba(16, 24, 40, 0.20), 0 2px 8px rgba(16, 24, 40, 0.10);
+  --scrollbar-thumb: #b9c1cf; --scrollbar-track: transparent;
+}
+
+/* ---- 3. DARK: OS preference, unless the page was forced to light ---- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-canvas: #111419;
+    --surface-panel: #171b22;
+    --surface-raised: #1e232c;
+    --surface-inset: #0d1015;
+    --surface-chrome: #0e1116;
+    --surface-hover: #222833;
+    --surface-pressed: #2b3240;
+    --surface-selected: #1b2a47;
+    --surface-selected-hover: #223457;
+    --surface-selected-inactive: #232a36;
+    --surface-disabled: #1a1f27;
+    --scrim: rgba(0,0,0,0.62);
+    --text-primary: #e6e9f0;
+    --text-secondary: #aab3c3;
+    --text-tertiary: #939db0;
+    --text-disabled: #5d6676;
+    --text-on-accent: #ffffff;
+    --text-link: #86abff;
+    --border-subtle: #262c37;
+    --border-default: #333a47;
+    --border-control: #6b768c;
+    --focus-ring: #86abff;
+    --accent: #3666df;
+    --accent-hover: #2f5fd2;
+    --accent-pressed: #274fb0;
+    --danger: #ff8a82;
+    --danger-subtle: #3a1f22;
+    --danger-border: #6e3036;
+    --danger-solid: #c93f3a;
+    --warning: #f2b450;
+    --warning-subtle: #37290f;
+    --warning-border: #6b5120;
+    --warning-solid: #f2b450;
+    --success: #5fd093;
+    --success-subtle: #12301f;
+    --success-border: #2a5e41;
+    --success-solid: #25804f;
+    --info: #6ec5e8;
+    --info-subtle: #0f2e3a;
+    --info-border: #1f5568;
+    --info-solid: #1f7f9f;
+    --text-on-warning-solid: #1a2030;
+    --tooltip-bg: #2b3240;
+    --tooltip-text: #e6e9f0;
+    --find-match: #5e4d0e;
+    --find-current: #8a4a10;
+    --syntax-tag: #7ee787;
+    --syntax-attr: #d2a8ff;
+    --syntax-value: #ffa198;
+    --syntax-comment: #8b949e;
+    --syntax-pi: #e3b341;
+    --syntax-bracket: #8b949e;
+    --syntax-entity: #79c0ff;
+    --doc-page: #1b2029;
+    --doc-text: #e1e5ec;
+    --doc-muted: #a1a9b8;
+    --doc-rule: #3a404c;
+    --doc-warning: #ff6b72;
+    --doc-caution: #f0b44a;
+    --doc-note: #8fb2ff;
+    --doc-selection: #86abff;
+    --paper: #ffffff;
+    --paper-ink: #000000;
+    --paper-muted: #4a5160;
+    --paper-rule: #9aa3b2;
+    --paper-accent: #1d4ed8;
+    --paper-warning: #c8102e;
+    --viewer-canvas: #0b0d11;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.45);
+    --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+    --shadow-3: 0 16px 40px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+    --scrollbar-thumb: #3b4352; --scrollbar-track: transparent;
+  }
+}
+
+/* ---- 4. DARK: forced by the user ---- */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-canvas: #111419;
+  --surface-panel: #171b22;
+  --surface-raised: #1e232c;
+  --surface-inset: #0d1015;
+  --surface-chrome: #0e1116;
+  --surface-hover: #222833;
+  --surface-pressed: #2b3240;
+  --surface-selected: #1b2a47;
+  --surface-selected-hover: #223457;
+  --surface-selected-inactive: #232a36;
+  --surface-disabled: #1a1f27;
+  --scrim: rgba(0,0,0,0.62);
+  --text-primary: #e6e9f0;
+  --text-secondary: #aab3c3;
+  --text-tertiary: #939db0;
+  --text-disabled: #5d6676;
+  --text-on-accent: #ffffff;
+  --text-link: #86abff;
+  --border-subtle: #262c37;
+  --border-default: #333a47;
+  --border-control: #6b768c;
+  --focus-ring: #86abff;
+  --accent: #3666df;
+  --accent-hover: #2f5fd2;
+  --accent-pressed: #274fb0;
+  --danger: #ff8a82;
+  --danger-subtle: #3a1f22;
+  --danger-border: #6e3036;
+  --danger-solid: #c93f3a;
+  --warning: #f2b450;
+  --warning-subtle: #37290f;
+  --warning-border: #6b5120;
+  --warning-solid: #f2b450;
+  --success: #5fd093;
+  --success-subtle: #12301f;
+  --success-border: #2a5e41;
+  --success-solid: #25804f;
+  --info: #6ec5e8;
+  --info-subtle: #0f2e3a;
+  --info-border: #1f5568;
+  --info-solid: #1f7f9f;
+  --text-on-warning-solid: #1a2030;
+  --tooltip-bg: #2b3240;
+  --tooltip-text: #e6e9f0;
+  --find-match: #5e4d0e;
+  --find-current: #8a4a10;
+  --syntax-tag: #7ee787;
+  --syntax-attr: #d2a8ff;
+  --syntax-value: #ffa198;
+  --syntax-comment: #8b949e;
+  --syntax-pi: #e3b341;
+  --syntax-bracket: #8b949e;
+  --syntax-entity: #79c0ff;
+  --doc-page: #1b2029;
+  --doc-text: #e1e5ec;
+  --doc-muted: #a1a9b8;
+  --doc-rule: #3a404c;
+  --doc-warning: #ff6b72;
+  --doc-caution: #f0b44a;
+  --doc-note: #8fb2ff;
+  --doc-selection: #86abff;
+  --paper: #ffffff;
+  --paper-ink: #000000;
+  --paper-muted: #4a5160;
+  --paper-rule: #9aa3b2;
+  --paper-accent: #1d4ed8;
+  --paper-warning: #c8102e;
+  --viewer-canvas: #0b0d11;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --shadow-3: 0 16px 40px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --scrollbar-thumb: #3b4352; --scrollbar-track: transparent;
+}
+
+/* ---- 5. legacy aliases: lets the CURRENT css (platform.css, app.css, jss/jsg inline css, --x-* compat) keep working while it is migrated ----
+   Delete a line when its last consumer is gone (the lint in 08-DARK-LIGHT-THEME-STRATEGY.md reports consumers).
+   Note the intentional corrections: --text-faint now maps to text-tertiary (>= 4.5:1 on every surface); --info is theme-aware; --sel is defined for dark. */
+:root {
+  --bg: var(--surface-canvas); --bg-elev: var(--surface-panel); --bg-sunken: var(--surface-inset); --bg-hover: var(--surface-hover); --bg-active: var(--surface-pressed);
+  --border: var(--border-default); --border-strong: var(--border-control);
+  --text: var(--text-primary); --text-muted: var(--text-secondary); --text-faint: var(--text-tertiary);
+  --accent-strong: var(--accent-hover); --accent-soft: var(--surface-selected); --accent-text: var(--text-on-accent);
+  --danger-soft: var(--danger-subtle); --warning-soft: var(--warning-subtle); --success-soft: var(--success-subtle); --toast-error: var(--danger-solid);
+  --xml-tag: var(--syntax-tag); --xml-attr: var(--syntax-attr); --xml-value: var(--syntax-value); --xml-comment: var(--syntax-comment); --xml-pi: var(--syntax-pi); --xml-bracket: var(--syntax-bracket); --xml-text: var(--text-primary); --xml-entity: var(--syntax-entity);
+  --x-text: var(--text-primary); --x-text-muted: var(--text-secondary); --x-text-faint: var(--text-tertiary); --x-line: var(--border-default); --x-line-strong: var(--border-control);
+  --x-surface: var(--surface-panel); --x-surface-alt: var(--surface-inset); --x-accent: var(--text-link); --x-white: var(--surface-panel);
+  --x-error: var(--danger); --x-ok: var(--success); --x-warn: var(--warning);
+  --page-bg: var(--doc-page); --page-text: var(--doc-text); --page-muted: var(--doc-muted); --page-rule: var(--doc-rule); --sel: var(--doc-selection);
+  --radius: var(--radius-md);
+}

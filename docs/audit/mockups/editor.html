@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="Editor workspace: activity bar, explorer, document canvas, properties, problems, status bar and command palette.">
+<title>Editor - Agastya</title>
+<script>try{var t=localStorage.getItem('agastya-mock-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="components.css">
+<style>
+.app.project { --problems-h: 148px; --tree-w: 248px; --props-w: 288px; }
+.ed { display: grid; min-height: 0; grid-template-columns: var(--tree-w) 1px minmax(0, 1fr) 1px var(--props-w); grid-template-rows: minmax(0, 1fr) var(--problems-h); grid-template-areas: "tree rz1 center rz2 props" "tree rz1 problems rz2 props"; background: var(--surface-panel); }
+.pane { min-height: 0; min-width: 0; display: flex; flex-direction: column; background: var(--surface-panel); }
+.pane-head { display: flex; align-items: center; gap: var(--space-1); height: 32px; padding: 0 var(--space-2) 0 var(--space-3); font-size: var(--fs-2xs); font-weight: var(--fw-semibold); letter-spacing: .06em; text-transform: uppercase; color: var(--text-secondary); flex: none; }
+.pane-head .grow { flex: 1; }
+.tree-pane { grid-area: tree; } .props { grid-area: props; } .center { grid-area: center; background: var(--surface-canvas); } .problems { grid-area: problems; border-top: 1px solid var(--border-default); }
+.rz1 { grid-area: rz1; } .rz2 { grid-area: rz2; }
+.tree-pane .search-box { padding: 0 var(--space-2) var(--space-2); } .tree-scroll { overflow: auto; flex: 1; }
+.tree-foot { border-top: 1px solid var(--border-subtle); padding: var(--space-1h) var(--space-3); color: var(--text-secondary); font-size: var(--fs-xs); display: flex; gap: var(--space-3); }
+.toolbar { display: flex; align-items: center; gap: 2px; height: 36px; padding: 0 var(--space-2); background: var(--surface-panel); border-bottom: 1px solid var(--border-default); flex: none; }
+.toolbar .vsep { width: 1px; height: 18px; background: var(--border-default); margin: 0 var(--space-1h); }
+.toolbar .select { width: 116px; height: 28px; flex: none; } .toolbar > * { flex: none; } .toolbar .seg { margin-left: var(--space-2); }
+.pathbar { display: flex; align-items: center; gap: var(--space-1); height: 24px; padding: 0 var(--space-3); font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-tertiary); background: var(--surface-panel); border-bottom: 1px solid var(--border-subtle); flex: none; overflow: hidden; white-space: nowrap; }
+.pathbar b { color: var(--text-link); font-weight: var(--fw-medium); }
+.doc-scroll { flex: 1; overflow: auto; padding: var(--space-4) var(--space-4) var(--space-8); }
+.doc-page { max-width: 700px; margin: 0 auto; padding: 28px 44px 48px; background: var(--doc-page); color: var(--doc-text); border: 1px solid var(--doc-rule); border-radius: 2px; box-shadow: var(--shadow-1); font-size: 14.5px; line-height: var(--lh-prose); }
+.doc-page h1 { font-size: 22px; margin: 0 0 4px; } .doc-page h2 { font-size: 17px; margin: 22px 0 8px; padding-bottom: 3px; border-bottom: 1px solid var(--doc-rule); display: flex; gap: 10px; }
+.doc-page h2 .n, .doc-page .stepno { color: var(--doc-selection); font-weight: var(--fw-semibold); font-variant-numeric: tabular-nums; }
+.doc-page .idbar { display: flex; gap: 10px; align-items: baseline; font-size: 12px; color: var(--doc-muted); border: 1px solid var(--doc-rule); border-radius: 6px; padding: 6px 10px; margin-bottom: 18px; }
+.doc-page .idbar .mono { margin-left: auto; color: var(--doc-muted); }
+.doc-page table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 6px 0 10px; } .doc-page th, .doc-page td { border: 1px solid var(--doc-rule); padding: 4px 8px; text-align: left; } .doc-page th { background: color-mix(in srgb, var(--doc-rule) 35%, var(--doc-page)); }
+.adm { margin: 12px 0; padding: 8px 12px 10px; border-radius: 4px; } .adm b.lab { display: block; letter-spacing: .14em; font-size: 12.5px; font-weight: 800; margin-bottom: 2px; }
+.adm.warning { border: 2px solid var(--doc-warning); background: color-mix(in srgb, var(--doc-warning) 7%, var(--doc-page)); } .adm.warning b.lab { color: var(--doc-warning); text-align: center; }
+.adm.caution { border: 2px solid var(--doc-caution); background: color-mix(in srgb, var(--doc-caution) 8%, var(--doc-page)); } .adm.caution b.lab { color: var(--doc-caution); text-align: center; }
+.adm.note { border-left: 4px solid var(--doc-note); background: color-mix(in srgb, var(--doc-note) 7%, var(--doc-page)); } .adm.note b.lab { color: var(--doc-note); }
+.step { position: relative; padding-left: 34px; margin: 6px 0; } .step > .stepno { position: absolute; left: 0; top: 0; min-width: 24px; }
+.step.sel > .body { outline: 2px solid var(--doc-selection); outline-offset: 3px; border-radius: 3px; }
+.substeps { margin: 4px 0 2px; } .substeps li { position: relative; padding-left: 28px; margin: 3px 0; } .substeps li::before { content: attr(data-n); position: absolute; left: 4px; color: var(--doc-muted); }
+.chip { display: inline-flex; align-items: center; gap: 4px; padding: 0 6px; border: 1px solid var(--border-default); background: var(--surface-inset); color: var(--text-link); border-radius: 4px; font-size: 12.5px; line-height: 1.5; }
+.fig { margin: 12px 0; border: 1px dashed var(--doc-rule); border-radius: 4px; padding: 14px; text-align: center; color: var(--doc-muted); font-size: 13px; }
+.fig svg { width: 100%; max-width: 360px; height: auto; display: block; margin: 0 auto 6px; color: var(--doc-muted); }
+.props .tabs { padding: 0 var(--space-1); flex: none; } .props .tab { padding: 0 var(--space-2); } .props-body { overflow: auto; flex: 1; padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-3); }
+.el-title { display: flex; flex-direction: column; gap: 2px; } .el-title .mono { color: var(--syntax-tag); font-weight: var(--fw-semibold); font-size: var(--fs-md); }
+.sec-h { font-size: var(--fs-2xs); font-weight: var(--fw-semibold); letter-spacing: .06em; text-transform: uppercase; color: var(--text-tertiary); margin: var(--space-1) 0; }
+.attr { display: grid; grid-template-columns: 116px 1fr; gap: var(--space-2); align-items: center; } .attr label { font-size: var(--fs-xs); color: var(--text-secondary); overflow-wrap: anywhere; line-height: 1.25; } .attr label .req { color: var(--danger); }
+.attr .input, .attr .select { height: 26px; font-size: var(--fs-xs); }
+.attr-err { grid-column: 2; margin-top: -4px; }
+.chips { display: flex; gap: var(--space-1h); flex-wrap: wrap; } .chips .btn { height: 24px; font-family: var(--font-mono); font-size: var(--fs-xs); font-weight: var(--fw-regular); }
+.problems .tabs { padding: 0 var(--space-2); height: 32px; flex: none; align-items: stretch; } .problems .tab { height: 32px; font-size: var(--fs-xs); } .problems .grow-r { margin-left: auto; align-self: center; display: flex; gap: var(--space-2); align-items: center; }
+.plist { overflow: auto; flex: 1; } .prob { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto auto; gap: var(--space-3); align-items: center; height: var(--row-h); padding: 0 var(--space-3); cursor: pointer; border-bottom: 1px solid var(--border-subtle); }
+.prob .mono { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prob:hover { background: var(--surface-hover); } .prob.sel { background: var(--surface-selected); } .prob .ico { color: var(--danger); } .prob.w .ico { color: var(--warning); }
+@media (max-width: 1200px) { .app.project { --tree-w: 232px; --props-w: 280px; } }
+@media (max-width: 1060px) { .ed { grid-template-columns: var(--tree-w) 1px minmax(0, 1fr); grid-template-areas: "tree rz1 center" "tree rz1 problems"; } .props, .rz2 { display: none; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="i-back" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></symbol>
+<symbol id="i-bold" viewBox="0 0 24 24"><path d="M6 12h9a4 4 0 010 8H7a1 1 0 01-1-1V5a1 1 0 011-1h7a4 4 0 010 8"/></symbol>
+<symbol id="i-book" viewBox="0 0 24 24"><path d="M10 2v7.751a.25.25 0 00.407.195l2.28-1.834a.5.5 0 01.627 0l2.28 1.834A.25.25 0 0016 9.751V2"/><path d="M4 19.5v-15A2.5 2.5 0 016.5 2H19a1 1 0 011 1v18a1 1 0 01-1 1H6.5a1 1 0 010-5H20"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="i-edit" viewBox="0 0 24 24"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></symbol>
+<symbol id="i-explore" viewBox="0 0 24 24"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></symbol>
+<symbol id="i-file" viewBox="0 0 24 24"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></symbol>
+<symbol id="i-filter" viewBox="0 0 24 24"><path d="M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z"/></symbol>
+<symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+<symbol id="i-folderOpen" viewBox="0 0 24 24"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></symbol>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+<symbol id="i-image" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
+<symbol id="i-italic" viewBox="0 0 24 24"><line x1="19" x2="10" y1="4" y2="4"/><line x1="14" x2="5" y1="20" y2="20"/><line x1="15" x2="9" y1="4" y2="20"/></symbol>
+<symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
+<symbol id="i-list" viewBox="0 0 24 24"><path d="M3 5h.01"/><path d="M3 12h.01"/><path d="M3 19h.01"/><path d="M8 5h13"/><path d="M8 12h13"/><path d="M8 19h13"/></symbol>
+<symbol id="i-listOrdered" viewBox="0 0 24 24"><path d="M11 5h10"/><path d="M11 12h10"/><path d="M11 19h10"/><path d="M4 4h1v5"/><path d="M4 9h2"/><path d="M6.5 20H3.4c0-1 2.6-1.925 2.6-3.5a1.5 1.5 0 0 0-2.6-1.02"/></symbol>
+<symbol id="i-monitor" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401"/></symbol>
+<symbol id="i-ok" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16 9-5.5 5.5L8 12"/></symbol>
+<symbol id="i-pen" viewBox="0 0 24 24"><path d="M13 21h8"/><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+<symbol id="i-redo" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13"/></symbol>
+<symbol id="i-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+<symbol id="i-rocket" viewBox="0 0 24 24"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09"/><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05"/></symbol>
+<symbol id="i-save" viewBox="0 0 24 24"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></symbol>
+<symbol id="i-settings" viewBox="0 0 24 24"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
+<symbol id="i-sup" viewBox="0 0 24 24"><path d="m4 19 8-8"/><path d="m12 19-8-8"/><path d="M20 12h-4c0-1.5.442-2 1.5-2.5S20 8.334 20 7.002c0-.472-.17-.93-.484-1.29a2.105 2.105 0 0 0-2.617-.436c-.42.239-.738.614-.899 1.06"/></symbol>
+<symbol id="i-table" viewBox="0 0 24 24"><path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></symbol>
+<symbol id="i-tree" viewBox="0 0 24 24"><path d="M8 5h13"/><path d="M13 12h8"/><path d="M13 19h8"/><path d="M3 10a2 2 0 0 0 2 2h3"/><path d="M3 5v12a2 2 0 0 0 2 2h3"/></symbol>
+<symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3"/><path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662"/></symbol>
+<symbol id="i-warn" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+<symbol id="i-xcircle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></symbol></svg>
+<div class="app project" data-density="compact">
+<header class="topbar">
+  <a class="brand" href="workspace.html" aria-label="Agastya home"><span class="brand-mark"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-book"/></svg></span></a>
+  <nav class="crumbs" aria-label="Breadcrumb"><a href="project.html">Hydraulic Power System MM</a><span class="sep">/</span><span>29-10</span><span class="sep">/</span><strong class="mono" style="font-size:var(--fs-sm)">DMC-AGSTY-A-29-10-00-00A-520A-A</strong><span class="badge warning" style="margin-left:var(--space-2)">Draft</span></nav>
+  <span class="grow"></span>
+  <a class="search-trigger" href="#palette" style="min-width:220px" aria-label="Command palette"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-search"/></svg><span>Commands…</span><span class="kbd-group"><kbd>Ctrl</kbd><kbd>K</kbd></span></a>
+  <button class="btn"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-shield"/></svg>Validate<kbd>F7</kbd></button><button class="btn primary"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-book"/></svg>Build PDF</button>
+  <div class="seg theme-switch" role="group" aria-label="Colour theme"><button type="button" data-theme-set="system" aria-pressed="false" aria-label="Follow system" data-tip="Follow system"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-monitor"/></svg></button><button type="button" data-theme-set="light" aria-pressed="false" aria-label="Light" data-tip="Light"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-sun"/></svg></button><button type="button" data-theme-set="dark" aria-pressed="false" aria-label="Dark" data-tip="Dark"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-moon"/></svg></button></div>
+  <button class="icon-btn" data-tip="Account" aria-label="Account"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-user"/></svg></button>
+</header>
+<nav class="activity" aria-label="Project">
+  <a class="act-btn" href="workspace.html" data-tip="All projects" aria-label="Back to all projects"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-back"/></svg></a>
+  <span style="width:24px;height:1px;background:var(--border-default);margin:var(--space-1) 0"></span>
+  <a class="act-btn" href="project.html" data-tip="Project overview" aria-label="Project overview"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-home"/></svg></a>
+  <a class="act-btn" href="editor.html" data-tip="Editor" aria-label="Editor" aria-current="true"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-pen"/></svg></a>
+  <a class="act-btn" href="#" data-tip="Structure" aria-label="Structure"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-explore"/></svg></a>
+  <a class="act-btn" href="publication.html" data-tip="Publication" aria-label="Publication"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-book"/></svg></a>
+  <a class="act-btn" href="#" data-tip="Graphics" aria-label="Graphics"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-image"/></svg></a>
+  <a class="act-btn" href="validation.html" data-tip="Validation" aria-label="Validation"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-shield"/></svg><span class="pip">14</span></a>
+  <a class="act-btn" href="#" data-tip="Review and release" aria-label="Review and release"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-rocket"/></svg></a>
+  <span class="spacer"></span>
+  <a class="act-btn" href="#" data-tip="Project settings" aria-label="Project settings"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-settings"/></svg></a>
+</nav>
+<main class="ed" id="main">
+  <aside class="pane tree-pane" aria-label="Explorer">
+    <div class="pane-head">Explorer<span class="grow"></span><button class="icon-btn" data-tip="New data module" aria-label="New data module"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg></button><button class="icon-btn" data-tip="Collapse all" aria-label="Collapse all"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-tree"/></svg></button><button class="icon-btn" data-tip="Filter" aria-label="Filter"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-filter"/></svg></button></div>
+    <div class="search-box"><input class="input search" placeholder="Filter by title, code or file…" aria-label="Filter data modules"></div>
+    <div class="tree-scroll"><ul class="tree focused" role="tree" aria-label="Data modules by SNS">
+      <li class="node group" role="treeitem" style="--depth:0"><span class="twist"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-down"/></svg></span><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-folderOpen"/></svg><span class="label trunc">29 Hydraulic power</span><span class="meta">46</span></li>
+      <li class="node group" role="treeitem" style="--depth:1"><span class="twist"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-down"/></svg></span><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-folderOpen"/></svg><span class="label trunc">29-10 Main hydraulic</span><span class="meta">18</span></li>
+      <li class="node" role="treeitem" style="--depth:2"><span class="twist"></span><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-file"/></svg><span class="label trunc">Pump - Description</span><span class="dot success" title="success"></span></li>
+      <li class="node" role="treeitem" aria-selected="true" style="--depth:2"><span class="twist"></span><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-file"/></svg><span class="label trunc">Remove main pump</span><span class="dot warning" title="warning"></span></li>
+      <li class="node" role="treeitem" style="--depth:2"><span class="twist"></span><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-file"/></svg><span class="label trunc">Install main pump</span><span class="dot warning" title="warning"></span></li>
+      <li class="node" role="treeitem" style="--depth:2"><span class="twist"></span><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-file"/></svg><span class="label trunc">Fault isolation</span><span class="dot danger" title="danger"></span></li>
+      <li class="node" role="treeitem" style="--depth:2"><span class="twist"></span><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-file"/></svg><span class="label trunc">Pump - Parts data</span><span class="dot success" title="success"></span></li>
+      <li class="node group" role="treeitem" style="--depth:1"><span class="twist"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-right"/></svg></span><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-folder"/></svg><span class="label trunc">29-20 Auxiliary</span><span class="meta">12</span></li>
+      <li class="node group" role="treeitem" style="--depth:1"><span class="twist"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-right"/></svg></span><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-folder"/></svg><span class="label trunc">29-30 Indicating</span><span class="meta">10</span></li>
+      <li class="node group" role="treeitem" style="--depth:0"><span class="twist"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-right"/></svg></span><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-folder"/></svg><span class="label trunc">Front matter and ancillary</span><span class="meta">8</span></li>
+      <li class="node group" role="treeitem" style="--depth:0"><span class="twist"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-right"/></svg></span><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-image"/></svg><span class="label trunc">Graphics</span><span class="meta">86</span></li>
+    </ul></div>
+    <div class="tree-foot"><span>46 modules</span><span style="color:var(--danger)">3 errors</span><span style="color:var(--warning)">7 drafts</span></div>
+  </aside>
+  <div class="panel-resize rz1" role="separator" aria-orientation="vertical" aria-label="Resize explorer"></div>
+
+  <section class="pane center" aria-label="Document">
+    <div class="doctabs" role="tablist" aria-label="Open documents">
+      <div class="doctab" role="tab" aria-selected="true"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-file"/></svg><span class="trunc">520A Remove main hydraulic pump</span><span class="mod" title="Unsaved changes" aria-label="Unsaved changes">●</span><span class="x" aria-label="Close"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-x"/></svg></span></div>
+      <div class="doctab" role="tab" aria-selected="false"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-file"/></svg><span class="trunc">421A Fault isolation</span><span class="dot danger" title="3 errors"></span><span class="x"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-x"/></svg></span></div>
+      <div class="doctab" role="tab" aria-selected="false"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-file"/></svg><span class="trunc">040A Description</span><span class="x"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-x"/></svg></span></div>
+      <button class="icon-btn" style="align-self:center;width:24px;height:24px" aria-label="New data module"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg></button>
+    </div>
+    <div class="toolbar" role="toolbar" aria-label="Formatting">
+      <button class="icon-btn" data-tip="Save (Ctrl+S)" aria-label="Save"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-save"/></svg></button><button class="icon-btn" data-tip="Undo" aria-label="Undo"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-undo"/></svg></button><button class="icon-btn" data-tip="Redo" aria-label="Redo" disabled><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-redo"/></svg></button>
+      <span class="vsep"></span>
+      <select class="select" aria-label="Paragraph style"><option>Step</option><option>Paragraph</option></select>
+      <button class="icon-btn" data-tip="Bold" aria-label="Bold"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-bold"/></svg></button><button class="icon-btn" data-tip="Italic" aria-label="Italic"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-italic"/></svg></button><button class="icon-btn" data-tip="Superscript" aria-label="Superscript"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-sup"/></svg></button>
+      <span class="vsep"></span>
+      <button class="icon-btn" data-tip="Bulleted list" aria-label="Bulleted list"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-list"/></svg></button><button class="icon-btn" data-tip="Numbered list" aria-label="Numbered list" aria-pressed="true"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-listOrdered"/></svg></button><button class="icon-btn" data-tip="Table" aria-label="Insert table"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-table"/></svg></button><button class="icon-btn" data-tip="Cross-reference" aria-label="Insert cross-reference"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-link"/></svg></button><button class="icon-btn" data-tip="Graphic" aria-label="Insert graphic"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-image"/></svg></button>
+      <button class="btn sm subtle" aria-haspopup="menu"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-warn"/></svg>Warning<svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-down"/></svg></button>
+      <span class="grow"></span>
+            <div class="seg" role="group" aria-label="View"><button aria-pressed="true">Design</button><button aria-pressed="false">Tags</button><button aria-pressed="false">XML</button></div>
+    </div>
+    <div class="pathbar" aria-label="Element path">dmodule › content › procedure › mainProcedure › proceduralStep[3] › <b>para</b></div>
+    <div class="doc-scroll"><article class="doc-page" aria-label="Remove main hydraulic pump">
+      <div class="idbar"><span>▸ Identification and status</span><span class="mono">DMC-AGSTY-A-29-10-00-00A-520A-A · 001-00 · EN-US</span></div>
+      <h1>Main hydraulic pump - Remove procedure</h1>
+      <h2><span class="n">1</span>Preliminary requirements</h2>
+      <table><thead><tr><th style="width:44%">Support equipment</th><th>Part number</th><th style="width:60px">Qty</th></tr></thead><tbody><tr><td>Pump removal tool</td><td class="mono">TL-29-103</td><td>1</td></tr><tr><td>Blanking plug set, hydraulic</td><td class="mono">BP-29-210</td><td>1</td></tr></tbody></table>
+      <div class="adm warning"><b class="lab">WARNING</b>Hydraulic fluid under pressure can cause injury. Release the pressure in the system before you disconnect any hose.</div>
+      <h2><span class="n">2</span>Procedure</h2>
+      <div class="step"><span class="stepno">1</span><div class="body">Put the aircraft in the maintenance configuration. Refer to <span class="chip"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-link"/></svg>DMC-…-00-00A-040A-A</span>.</div></div>
+      <div class="step"><span class="stepno">2</span><div class="body">Release the pressure in the hydraulic system:
+        <ol class="substeps" style="list-style:none"><li data-n="(a)">Set the HYD PRESS switch to OFF.</li><li data-n="(b)">Operate the brake pedals until the accumulator pressure gauge shows 0 bar.</li></ol></div></div>
+      <div class="adm caution"><b class="lab">CAUTION</b>Do not let fluid fall on the electrical connectors. Use the blanking plugs.</div>
+      <div class="step sel"><span class="stepno">3</span><div class="body">Disconnect the pressure hose (5) from the pump (3) and install the blanking plugs. See <span class="chip">Fig 1</span>.</div></div>
+      <div class="step"><span class="stepno">4</span><div class="body">Remove the four bolts (4) and the pump (3) from the gearbox.</div></div>
+      <div class="fig"><svg viewBox="0 0 360 120" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="20" y="30" width="120" height="60" rx="6"/><circle cx="80" cy="60" r="18"/><path d="M140 50h70M140 70h70"/><rect x="210" y="36" width="110" height="48" rx="6" stroke-dasharray="5 4"/></svg>Figure 1 - Main hydraulic pump installation (ICN-AGSTY-A-291000-A-00A01-A-001-01)</div>
+      <div class="adm note"><b class="lab">NOTE</b>Keep the removed bolts. They are not replaced at installation.</div>
+    </article></div>
+  </section>
+
+  <section class="pane problems" aria-label="Problems">
+    <div class="tabs" role="tablist"><button class="tab" role="tab" aria-selected="true">Problems<span class="badge danger">3</span></button><button class="tab" role="tab" aria-selected="false">Output</button><button class="tab" role="tab" aria-selected="false">References</button><button class="tab" role="tab" aria-selected="false">History</button>
+      <span class="grow-r"><div class="seg" role="group" aria-label="Scope"><button aria-pressed="true">This module</button><button aria-pressed="false">Project</button></div><button class="icon-btn" style="width:24px;height:24px" aria-label="Collapse panel"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-down"/></svg></button></span></div>
+    <ul class="plist" role="listbox" aria-label="Problems in this module">
+      <li class="prob sel" role="option" aria-selected="true"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-xcircle"/></svg><span class="trunc">Duplicate ID "stp-0003" in this data module</span><span class="badge">XSD</span><span class="mono faint">proceduralStep[3]/@id</span></li>
+      <li class="prob" role="option"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-xcircle"/></svg><span class="trunc">Rule 009: a warning must precede the first step that causes the hazard</span><span class="badge">BREX</span><span class="mono faint">mainProcedure/proceduralStep[2]</span></li>
+      <li class="prob" role="option"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-warn"/></svg><span class="trunc">Reference to ICN-AGSTY-A-291000-A-00A01-A-001-01 not found in the graphics library</span><span class="badge">LINK</span><span class="mono faint">figure/graphic/@infoEntityIdent</span></li>
+    </ul>
+  </section>
+  <div class="panel-resize rz2" role="separator" aria-orientation="vertical" aria-label="Resize properties"></div>
+
+  <aside class="pane props" aria-label="Properties">
+    <div class="tabs" role="tablist"><button class="tab" role="tab" aria-selected="true">Element</button><button class="tab" role="tab" aria-selected="false">Document</button><button class="tab" role="tab" aria-selected="false">Comments<span class="badge accent">2</span></button></div>
+    <div class="props-body">
+      <div class="el-title"><span class="mono">proceduralStep</span><span class="muted">Procedural step · 3 of 4</span></div>
+      <div><div class="sec-h">Attributes</div><div class="stack" style="gap:var(--space-2)">
+        <div class="attr"><label class="mono" for="a-id">id</label><input class="input" id="a-id" value="stp-0003" aria-invalid="true" aria-describedby="e-id"></div>
+        <div class="field attr-err"><span class="error" id="e-id"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-xcircle"/></svg>Used twice in this module</span></div>
+        <div class="attr"><label class="mono" for="a-applicRefId">applicRefId</label><select class="select" id="a-applicRefId"><option>All configurations</option></select></div>
+        <div class="attr"><label class="mono" for="a-changeMark">changeMark</label><select class="select" id="a-changeMark"><option>1 - changed</option></select></div>
+        <div class="attr"><label class="mono" for="a-changeType">changeType</label><select class="select" id="a-changeType"><option>modify</option></select></div>
+        <div class="attr"><label class="mono" for="a-reasonForUpdateRefIds">reasonForUpdateRefIds</label><input class="input" id="a-reasonForUpdateRefIds" placeholder="rfu-0001"></div>
+        <div class="attr"><label class="mono" for="a-securityClassification">securityClassification</label><select class="select" id="a-securityClassification" disabled><option>inherited (01)</option></select></div>
+      </div></div>
+      <div><div class="sec-h">Insert inside this step</div><div class="chips"><button class="btn sm">title</button><button class="btn sm">para</button><button class="btn sm">randomList</button><button class="btn sm">warning</button><button class="btn sm">caution</button><button class="btn sm">note</button></div></div>
+      <div class="alert info"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-info"/></svg><div>Applies to all configurations. Rule BREX-014 requires a task-card reference for steps that change the part list.</div></div>
+    </div>
+  </aside>
+</main>
+<footer class="statusbar" role="status">
+  <span class="item save-state dirty" aria-live="polite"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-edit"/></svg>Unsaved changes</span><span class="item">Auto-save in 4 s</span>
+  <button class="item"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-xcircle"/></svg>2 errors</button><button class="item"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-warn"/></svg>1 warning</button><span class="item"><svg class="ico sm" aria-hidden="true" focusable="false"><use href="#i-ok"/></svg>Schema S1000D 5.0</span>
+  <span class="grow"></span><span class="item mono">Ln 48, Col 12</span><span class="item">proceduralStep[3]</span><span class="item">Procedural · EN-US</span><span class="item">UTF-8</span><button class="item">100 %</button>
+</footer>
+</div>
+
+<div class="palette-scrim" id="palette" role="dialog" aria-modal="true" aria-label="Command palette">
+  <div class="palette">
+    <div class="q"><svg class="ico lg" aria-hidden="true" focusable="false"><use href="#i-search"/></svg><input placeholder="Type a command or search data modules…" value="insert w" aria-label="Command"><span class="kbd-group"><kbd>Esc</kbd></span></div>
+    <div class="grp">Insert</div>
+    <div class="opt active"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-warn"/></svg><span>Insert <b>w</b>arning</span><span class="faint">Document</span><span class="kbd-group k"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>W</kbd></span></div>
+    <div class="opt"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-listOrdered"/></svg><span>Insert <b>w</b>arning step above</span><span class="faint">Document</span></div>
+    <div class="grp">Go to</div>
+    <div class="opt"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-file"/></svg><span>Remove main hydraulic pump</span><span class="faint mono">DMC-…-520A-A</span></div>
+    <div class="opt"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-shield"/></svg><span>Validation report</span><span class="faint">Project</span><span class="kbd-group k"><kbd>G</kbd><kbd>V</kbd></span></div>
+    <div class="grp">Project</div>
+    <div class="opt"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-book"/></svg><span>Build publication PDF</span><span class="faint">Project</span><span class="kbd-group k"><kbd>Ctrl</kbd><kbd>B</kbd></span></div>
+    <div class="foot"><span><kbd>↑</kbd> <kbd>↓</kbd> navigate</span><span><kbd>Enter</kbd> run</span><a href="#_" style="margin-left:auto"><kbd>Esc</kbd> close</a></div>
+  </div>
+</div>
+<div class="toast-stack" aria-live="polite"><div class="toast"><svg class="ico" aria-hidden="true" focusable="false"><use href="#i-ok"/></svg><div><strong>Saved</strong><div class="muted">520A Remove main hydraulic pump · 14:32</div></div></div></div>
+<script>(function(){var K='agastya-mock-theme',r=document.documentElement;function get(){try{return localStorage.getItem(K)||'system'}catch(e){return'system'}}
+function apply(v){if(v==='light'||v==='dark')r.setAttribute('data-theme',v);else r.removeAttribute('data-theme');
+document.querySelectorAll('[data-theme-set]').forEach(function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-theme-set')===v))})}
+apply(get());document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('[data-theme-set]');if(!b)return;var v=b.getAttribute('data-theme-set');
+try{if(v==='system')localStorage.removeItem(K);else localStorage.setItem(K,v)}catch(x){}apply(v)})})();</script>
+</body>
+</html>

@@ -1,0 +1,672 @@
+{
+ "unreferencedFiles": [
+  {
+   "file": "frontend/src/api/publish.ts",
+   "onlyTests": false,
+   "lines": 10
+  },
+  {
+   "file": "frontend/src/studio/export/pdfmake.d.ts",
+   "onlyTests": false,
+   "lines": 25
+  }
+ ],
+ "depsFrontend": {
+  "name": "agastya-platform-v2-frontend",
+  "deps": 18,
+  "devDeps": 11,
+  "notFound": [
+   {
+    "kind": "dependencies",
+    "dep": "codemirror",
+    "version": "^6.0.2"
+   },
+   {
+    "kind": "devDependencies",
+    "dep": "autoprefixer",
+    "version": "^10.4.19"
+   },
+   {
+    "kind": "devDependencies",
+    "dep": "postcss",
+    "version": "^8.4.39"
+   },
+   {
+    "kind": "devDependencies",
+    "dep": "typescript",
+    "version": "^5.5.3"
+   }
+  ]
+ },
+ "depsBackend": {
+  "name": "agastya-platform-v2-backend",
+  "deps": 7,
+  "devDeps": 6,
+  "notFound": [
+   {
+    "kind": "dependencies",
+    "dep": "jpeg-js",
+    "version": "^0.4.4"
+   },
+   {
+    "kind": "devDependencies",
+    "dep": "typescript",
+    "version": "^5.5.3"
+   }
+  ]
+ },
+ "depsRoot": {
+  "name": "agastya-platform-v2",
+  "deps": 0,
+  "devDeps": 0,
+  "notFound": []
+ },
+ "cssClassesDefined": 628,
+ "consoleLog": {
+  "total": 0,
+  "files": 0,
+  "top": []
+ },
+ "consoleWarnErr": {
+  "total": 6,
+  "files": 4,
+  "top": [
+   [
+    "frontend/src/studio/ui/app.ts",
+    2
+   ],
+   [
+    "frontend/src/studio/ui/panels.ts",
+    2
+   ],
+   [
+    "frontend/src/studio/export/pdf-publication.ts",
+    1
+   ],
+   [
+    "frontend/src/studio/ui/editor.ts",
+    1
+   ]
+  ]
+ },
+ "debugger": {
+  "total": 0,
+  "files": 0,
+  "top": []
+ },
+ "todo": {
+  "total": 0,
+  "files": 0,
+  "top": []
+ },
+ "eslintDisable": {
+  "total": 21,
+  "files": 11,
+  "top": [
+   [
+    "frontend/src/pages/project/JsgEditorPage.tsx",
+    5
+   ],
+   [
+    "frontend/src/pages/project/JssEditorPage.tsx",
+    5
+   ],
+   [
+    "frontend/src/pages/project/editor/PdfPane.tsx",
+    3
+   ],
+   [
+    "frontend/src/components/DocCodes.tsx",
+    1
+   ],
+   [
+    "frontend/src/components/pdf/PdfJsViewer.tsx",
+    1
+   ],
+   [
+    "frontend/src/components/ui.tsx",
+    1
+   ],
+   [
+    "frontend/src/jss/dom.ts",
+    1
+   ],
+   [
+    "frontend/src/pages/project/AncillaryPage.tsx",
+    1
+   ]
+  ]
+ },
+ "tsIgnore": {
+  "total": 0,
+  "files": 0,
+  "top": []
+ },
+ "anyCasts": {
+  "total": 44,
+  "files": 11,
+  "top": [
+   [
+    "frontend/src/pages/project/reused/PublishSettings.tsx",
+    12
+   ],
+   [
+    "frontend/src/components/pdf/PdfJsViewer.tsx",
+    9
+   ],
+   [
+    "frontend/src/jsg/editor.ts",
+    5
+   ],
+   [
+    "frontend/src/api/settings.ts",
+    4
+   ],
+   [
+    "frontend/src/lib/pmcTree.ts",
+    4
+   ],
+   [
+    "frontend/src/lib/configPath.ts",
+    3
+   ],
+   [
+    "frontend/src/api/index.ts",
+    2
+   ],
+   [
+    "frontend/src/lib/publicationSettings.ts",
+    2
+   ]
+  ]
+ },
+ "commentedCode": {
+  "total": 0,
+  "files": 0,
+  "top": []
+ },
+ "windowDialogs": {
+  "total": 16,
+  "files": 9,
+  "top": [
+   [
+    "frontend/src/jsg/ispl-editor.ts",
+    5
+   ],
+   [
+    "frontend/src/pages/project/JsgEditorPage.tsx",
+    2
+   ],
+   [
+    "frontend/src/pages/project/PublicationPage.tsx",
+    2
+   ],
+   [
+    "frontend/src/studio/ui/dialogs.ts",
+    2
+   ],
+   [
+    "frontend/src/jsg/editor.ts",
+    1
+   ],
+   [
+    "frontend/src/pages/project/AncillaryPage.tsx",
+    1
+   ],
+   [
+    "frontend/src/pages/project/EditorPage.tsx",
+    1
+   ],
+   [
+    "frontend/src/pages/project/JsgAncillaryPage.tsx",
+    1
+   ]
+  ]
+ },
+ "nativeTitle": {
+  "total": 237,
+  "files": 45,
+  "top": [
+   [
+    "frontend/src/pages/project/editor/EditorSide.tsx",
+    17
+   ],
+   [
+    "frontend/src/pages/project/DocPublicationPage.tsx",
+    16
+   ],
+   [
+    "frontend/src/pages/Overview.tsx",
+    13
+   ],
+   [
+    "frontend/src/pages/AdminS1000d.tsx",
+    12
+   ],
+   [
+    "frontend/src/pages/project/PublicationPage.tsx",
+    12
+   ],
+   [
+    "frontend/src/pages/project/reused/PublishSettings.tsx",
+    10
+   ],
+   [
+    "frontend/src/pages/project/S1000dConfig.tsx",
+    10
+   ],
+   [
+    "frontend/src/pages/Workspace.tsx",
+    10
+   ]
+  ]
+ },
+ "passwordInputs": {
+  "total": 11,
+  "files": 2,
+  "top": [
+   [
+    "frontend/src/pages/AuthScreens.tsx",
+    8
+   ],
+   [
+    "frontend/src/pages/Settings.tsx",
+    3
+   ]
+  ]
+ },
+ "showPasswordToggle": {
+  "total": 8,
+  "files": 5,
+  "top": [
+   [
+    "frontend/src/studio/ui/editor.ts",
+    3
+   ],
+   [
+    "frontend/src/studio/ui/panels.ts",
+    2
+   ],
+   [
+    "frontend/src/components/pdf/PdfJsViewer.tsx",
+    1
+   ],
+   [
+    "frontend/src/studio/view/design.ts",
+    1
+   ],
+   [
+    "frontend/src/studio/view/xmlview.ts",
+    1
+   ]
+  ]
+ },
+ "selectNative": {
+  "total": 40,
+  "files": 18,
+  "top": [
+   [
+    "frontend/src/components/project.tsx",
+    7
+   ],
+   [
+    "frontend/src/pages/project/S1000dConfig.tsx",
+    6
+   ],
+   [
+    "frontend/src/pages/project/ProjectSettingsPage.tsx",
+    4
+   ],
+   [
+    "frontend/src/components/GraphicsView.tsx",
+    3
+   ],
+   [
+    "frontend/src/pages/project/ReleasePage.tsx",
+    3
+   ],
+   [
+    "frontend/src/pages/project/reused/PublishSettings.tsx",
+    2
+   ],
+   [
+    "frontend/src/pages/project/ValidationPage.tsx",
+    2
+   ],
+   [
+    "frontend/src/pages/Settings.tsx",
+    2
+   ]
+  ]
+ },
+ "outlineNone": {
+  "total": 10,
+  "per": {
+   "frontend/src/studio/styles/app.css": 7,
+   "frontend/src/studio/styles/document.css": 2,
+   "frontend/src/styles/platform.css": 1
+  }
+ },
+ "focusVisible": 9,
+ "ariaLabel": {
+  "total": 240,
+  "files": 49,
+  "top": [
+   [
+    "frontend/src/pages/project/DocPublicationPage.tsx",
+    16
+   ],
+   [
+    "frontend/src/pages/project/JsgAncillaryPage.tsx",
+    16
+   ],
+   [
+    "frontend/src/studio/ui/panels.ts",
+    15
+   ],
+   [
+    "frontend/src/jss/editor.ts",
+    13
+   ],
+   [
+    "frontend/src/pages/project/editor/EditorSide.tsx",
+    13
+   ],
+   [
+    "frontend/src/pages/project/PublicationPage.tsx",
+    11
+   ],
+   [
+    "frontend/src/components/GraphicsView.tsx",
+    10
+   ],
+   [
+    "frontend/src/pages/project/S1000dConfig.tsx",
+    10
+   ]
+  ]
+ },
+ "roleDialog": {
+  "total": 1,
+  "files": 1,
+  "top": [
+   [
+    "frontend/src/components/ui.tsx",
+    1
+   ]
+  ]
+ },
+ "focusTrap": {
+  "total": 49,
+  "files": 11,
+  "top": [
+   [
+    "frontend/src/studio/ui/dialogs.ts",
+    17
+   ],
+   [
+    "frontend/src/studio/ui/app.ts",
+    11
+   ],
+   [
+    "frontend/src/studio/ui/panels.ts",
+    6
+   ],
+   [
+    "frontend/src/jss/dom.ts",
+    4
+   ],
+   [
+    "frontend/src/studio/view/xmlview.ts",
+    3
+   ],
+   [
+    "frontend/src/jsg/shared.ts",
+    2
+   ],
+   [
+    "frontend/src/studio/ui/findbar.ts",
+    2
+   ],
+   [
+    "frontend/src/jsg/editor.ts",
+    1
+   ]
+  ]
+ },
+ "hardcodedColors": {
+  "total": 266,
+  "tokenDefinitions": 96,
+  "files": 21,
+  "top": [
+   [
+    "frontend/src/jsg/shared.ts",
+    105
+   ],
+   [
+    "frontend/src/jss/style.ts",
+    37
+   ],
+   [
+    "frontend/src/jsg/ispl-editor.ts",
+    24
+   ],
+   [
+    "frontend/src/components/pdf/PdfJsViewer.tsx",
+    19
+   ],
+   [
+    "frontend/src/studio/styles/document.css",
+    19
+   ],
+   [
+    "frontend/src/jsg/ispl-preview.ts",
+    15
+   ],
+   [
+    "frontend/src/studio/styles/app.css",
+    8
+   ],
+   [
+    "frontend/src/styles/platform.css",
+    8
+   ],
+   [
+    "frontend/src/studio/export/pdf-theme.ts",
+    6
+   ],
+   [
+    "frontend/src/jsg/editor.ts",
+    5
+   ],
+   [
+    "frontend/src/components/ReviewReader.tsx",
+    3
+   ],
+   [
+    "frontend/src/pages/project/ReleasePage.tsx",
+    3
+   ],
+   [
+    "frontend/src/components/pdf/LazyPdfViewer.tsx",
+    2
+   ],
+   [
+    "frontend/src/jss/editor.ts",
+    2
+   ]
+  ]
+ },
+ "themeSelectors": {
+  "dataThemeDark": 3,
+  "prefersDark": 0
+ },
+ "endpointCount": 217,
+ "loc": {
+  "frontendSrc": 32285,
+  "frontendTests": 4284,
+  "css": 1356
+ },
+ "capturedOn": "2026-11-27",
+ "unusedExportsNotReferencedAnywhere": [
+  "components/lists.tsx::ShowMore",
+  "jss/model.ts::cloneDoc",
+  "jss/ops.ts::cellAt",
+  "lib/pmcTree.ts::moduleIds",
+  "lib/pmcTree.ts::labelFor",
+  "lib/roles.ts::canManageRole",
+  "lib/roles.ts::canChooseBrandPack",
+  "lib/roles.ts::canEditSns",
+  "lib/roles.ts::canEditSnsDefaults",
+  "studio/core/ops.ts::mergeAdjacentFormatting",
+  "studio/core/table.ts::cellStart",
+  "studio/core/xml.ts::serializeRaw",
+  "studio/core/xml.ts::formatXmlText",
+  "studio/core/xml.ts::elementIndexAtOffset",
+  "studio/core/xml.ts::resolvePath",
+  "studio/export/pdf-theme.ts::CONTENT_H"
+ ],
+ "unusedExportCounts": {
+  "total": 240,
+  "notReferencedAnywhere": 16,
+  "onlyTests": 27,
+  "usedInOwnFileOnly": 223
+ },
+ "cssClassesNeverReferencedAsLiterals": [
+  "sev-error",
+  "sev-warning",
+  "sev-info",
+  "cm-scroller",
+  "cm-gutters",
+  "cm-activeLineGutter",
+  "cm-activeLine",
+  "cm-content",
+  "cm-cursor",
+  "cm-dropCursor",
+  "cm-searchMatch",
+  "cm-searchMatch-selected",
+  "cm-panels",
+  "cm-tooltip",
+  "cm-tooltip-autocomplete",
+  "cm-selectionBackground",
+  "type-cards",
+  "type-card",
+  "type-card-title",
+  "type-card-desc",
+  "type-card-code",
+  "toast-warning",
+  "toast-error",
+  "applic-rows",
+  "applic-row",
+  "applic-vals",
+  "applic-tools",
+  "x-block",
+  "x-inline",
+  "x-para",
+  "x-simplePara",
+  "x-description",
+  "x-levelledPara",
+  "x-title",
+  "x-content",
+  "x-identAndStatusSection",
+  "x-dmAddress",
+  "x-dmStatus",
+  "x-dmIdent",
+  "x-dmAddressItems",
+  "x-dmTitle",
+  "x-techName",
+  "x-infoName",
+  "x-applic",
+  "x-reasonForUpdate",
+  "x-remarks",
+  "x-dataRestrictions",
+  "x-enterpriseName",
+  "x-dmRef",
+  "x-internalRef",
+  "x-pmRef",
+  "x-dmCode",
+  "x-warning",
+  "x-caution",
+  "x-note",
+  "x-warningAndCautionPara",
+  "x-notePara",
+  "x-attentionListItemPara",
+  "x-randomList",
+  "x-sequentialList",
+  "x-attentionRandomList",
+  "x-attentionSequentialList",
+  "x-listItem",
+  "x-attentionRandomListItem",
+  "x-attentionSequentialListItem",
+  "x-definitionList",
+  "x-definitionListItem",
+  "x-listItemTerm",
+  "x-listItemDefinition",
+  "x-definitionListHeader",
+  "x-emphasis",
+  "x-verbatimText",
+  "x-acronym",
+  "x-acronymTerm",
+  "x-acronymDefinition",
+  "x-quantity",
+  "x-inlineSignificantData",
+  "x-footnote",
+  "x-changeInline",
+  "x-externalPubRef",
+  "x-figure",
+  "x-graphic",
+  "x-resize-nw",
+  "x-resize-ne",
+  "x-resize-sw",
+  "x-resize-se",
+  "x-resize-n",
+  "x-resize-s",
+  "x-resize-e",
+  "x-resize-w",
+  "x-legend",
+  "x-preliminaryRqmts",
+  "x-closeRqmts",
+  "x-reqCondGroup",
+  "x-reqSupportEquips",
+  "x-reqSupplies",
+  "x-reqSpares",
+  "x-reqSafety",
+  "x-reqPersons",
+  "x-reqTechInfoGroup",
+  "x-proceduralStep",
+  "x-crewDrillStep",
+  "x-isolationStep",
+  "x-isolationStepQuestion",
+  "x-yesAnswer",
+  "x-noAnswer",
+  "x-challengeAndResponse",
+  "x-response",
+  "x-structureObjectRule",
+  "x-objectPath",
+  "x-supportEquipDescr",
+  "x-supplyDescr",
+  "x-spareDescr",
+  "x-supplyRqmtDescr",
+  "x-name",
+  "x-identNumber",
+  "x-partAndSerialNumber",
+  "x-manufacturerCode",
+  "x-partNumber",
+  "x-reqQuantity",
+  "x-reqCondNoRef",
+  "x-reqCond",
+  "markedContent",
+  "endOfContent",
+  "is-collapsed",
+  "v2-nav-head",
+  "v2-crumbs",
+  "v2-page-narrow",
+  "stat",
+  "v2-pside",
+  "v2-pside-head",
+  "v2-quick",
+  "v2-brandprev",
+  "v2-subtabs",
+  "v2-subtab"
+ ]
+}
