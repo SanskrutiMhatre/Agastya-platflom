@@ -68,6 +68,7 @@ export const JSS_CSS = `
 .jss-sec-head { display: flex; align-items: baseline; margin-top: 4.2mm; margin-bottom: 2.1mm; font-weight: 700; text-align: left; break-after: avoid; }
 .jss-sec-no { flex: none; }
 .jss-sec-title { flex: 1; min-width: 0; }
+.jss-sec-code { flex: none; margin-left: 3mm; padding: 0 1.5mm; border: 1px solid #d0d7e2; border-radius: 3px; background: #eef2f7; color: #475569; font: 400 7pt/1.5 ui-monospace, Consolas, monospace; text-transform: none; user-select: none; }
 .jss-sec.d1 > .jss-sec-head { font-size: 14pt; text-transform: uppercase; }
 .jss-sec.d1 > .jss-sec-head .jss-sec-no { width: 8mm; }
 .jss-sec.d2 > .jss-sec-head { margin-left: 8mm; font-size: 12pt; } .jss-sec.d2 > .jss-sec-head .jss-sec-no { width: 12.7mm; }

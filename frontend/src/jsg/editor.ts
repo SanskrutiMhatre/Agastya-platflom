@@ -9,7 +9,7 @@
 import { isClause, newClause, newFigure, newList, newNotice, newPara, newTable, META_FIELDS, plain, text,
   type Align, type Appendix, type Block, type Cell, type Chapter, type Clause, type Figure, type Graphic, type Inline, type JsgDoc, type List, type ListType, type Mark, type Notice, type Orientation, type Para, type Part, type Section, type Table } from './model';
 import { parseJsg, serializeJsg } from './xml';
-import { BASE_CSS, escH, injectCss, mk, openMenu, pickGraphic, tabbedBar, type BarTab, type GraphicInfo, type JsgEditorLike, type JsgEditorOptions, type JsgFinding, type JsgHost, type MenuItem } from './shared';
+import { BASE_CSS, escH, injectCss, mk, openMenu, pickGraphic, tabbedBar, type BarTab, type GraphicInfo, type JsgEditorLike, type JsgEditorOptions, type JsgFinding, type JsgHost, type MenuItem, type SectionBadge } from './shared';
 
 export type { GraphicInfo, JsgFinding, JsgHost, JsgEditorOptions } from './shared';
 
@@ -76,8 +76,9 @@ export class JsgEditor implements JsgEditorLike {
     else if (mod && (k === 'y' || (k === 'z' && e.shiftKey)) && !this.findBar.contains(e.target as Node)) { e.preventDefault(); this.redo(); }
   };
 
+  private badge: SectionBadge | undefined;
   constructor(host: HTMLElement, opts: JsgEditorOptions) {
-    this.root = host; this.doc = opts.doc; this.host = opts.host; this.readOnly = opts.readOnly;
+    this.root = host; this.doc = opts.doc; this.host = opts.host; this.readOnly = opts.readOnly; this.badge = opts.sectionBadge;
     injectCss('jsg-editor-css', BASE_CSS);
     this.root.innerHTML = '';
     this.root.classList.add('jsg-ed'); if (this.readOnly) this.root.classList.add('jsg-ro');
@@ -98,6 +99,9 @@ export class JsgEditor implements JsgEditorLike {
 
   destroy(): void { document.removeEventListener('keydown', this.onKey); if (this.histTimer) clearTimeout(this.histTimer); this.clearHits(); this.root.innerHTML = ''; this.root.classList.remove('jsg-ed', 'jsg-ro'); }
   isDirty(): boolean { return this.dirty; }
+  /** Show (or stop showing) a code beside each section heading. The document is not touched; the sheet is drawn again where it stood. */
+  setSectionBadge(fn: SectionBadge | undefined): void { this.badge = fn; const keep = this.sheet.parentElement?.scrollTop ?? 0; this.render(); if (this.sheet.parentElement) this.sheet.parentElement.scrollTop = keep; }
+  private codeEl(s: { id?: string; title: string }, chapter: number): HTMLElement | null { const t = this.badge?.(s, chapter); if (!t) return null; const e = this.el('span', 'jsg-code', t); e.setAttribute('contenteditable', 'false'); e.title = 'Data module code of this section (kept in the backend, not in the document)'; return e; }
   markSaved(): void { this.dirty = false; this.host.onDirty(false); }
   getXml(): string { return serializeJsg(this.doc); }
   getDoc(): JsgDoc { return this.doc; }
@@ -177,7 +181,7 @@ export class JsgEditor implements JsgEditorLike {
     const cs = this.matchCase.checked; const needle = cs ? q : q.toLowerCase(); const out: Range[] = [];
     const walker = document.createTreeWalker(this.sheet, NodeFilter.SHOW_TEXT, { acceptNode: (n) => {
       const el = n.parentElement; if (!el) return NodeFilter.FILTER_REJECT;
-      if (el.closest('.jsg-card,.jsg-orient,.jsg-tag,button,.jsg-num,.jsg-ttools,.jsg-clause .n,.jsg-li .m')) return NodeFilter.FILTER_REJECT;
+      if (el.closest('.jsg-card,.jsg-orient,.jsg-tag,button,.jsg-num,.jsg-ttools,.jsg-code,.jsg-clause .n,.jsg-li .m')) return NodeFilter.FILTER_REJECT;
       return el.closest('[contenteditable]') ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
     } });
     for (let n = walker.nextNode(); n; n = walker.nextNode()) {
@@ -470,7 +474,7 @@ export class JsgEditor implements JsgEditorLike {
       h.append(this.el('span', 'jsg-num', `CHAPTER ${ci + 1}`)); h.append(this.titleEl(ch, 'title', 'Chapter title')); s.appendChild(h);
       ch.sections.forEach((sec, si) => {
         const sh = this.el('div', 'jsg-sectionh'); sh.id = `jsg-sec-${ci}-${si}`;
-        sh.append(this.el('span', 'jsg-num', `SECTION ${si + 1}`)); sh.append(this.titleEl(sec, 'title', 'Section title')); s.appendChild(sh);
+        sh.append(this.el('span', 'jsg-num', `SECTION ${si + 1}`)); sh.append(this.titleEl(sec, 'title', 'Section title')); const code = this.codeEl(sec, ci + 1); if (code) sh.append(code); s.appendChild(sh);
         if (sec.orientation !== 'portrait') s.appendChild(this.el('div', 'jsg-orient', `This section prints on ${sec.orientation === 'a3-landscape' ? 'A3 landscape' : 'landscape'} pages`));
         const slot = (list: Array<any>, i: number): Slot => ({ list, index: i });
         const walk = (list: Container, prefix: string): void => list.forEach((x, i) => {
@@ -493,6 +497,7 @@ export class JsgEditor implements JsgEditorLike {
   private appendix(s: HTMLElement, a: Appendix, ai: number, focus: unknown, setFocus: (e: HTMLElement) => void): void {
     const h = this.el('div', 'jsg-app'); h.id = `jsg-app-${ai}`;
     h.append(document.createTextNode('APPENDIX ‘')); h.append(this.titleEl(a, 'label', 'A1')); h.append(document.createTextNode('’')); h.append(document.createElement('br')); h.append(this.titleEl(a, 'title', 'Appendix title'));
+    const code = this.codeEl({ id: a.id, title: `${a.label ? `${a.label} ` : ''}${a.title}`.trim() }, this.doc.chapters.length + ai + 1); if (code) h.append(code);
     s.appendChild(h);
     a.children.forEach((x, i) => { const e = this.blockEl(x, { list: a.children, index: i }); s.appendChild(e); if (focus === x) setFocus(e); });
   }

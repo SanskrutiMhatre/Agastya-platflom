@@ -15,6 +15,7 @@ import { canBuild, canWrite, useProject } from '../../layouts/ProjectShell';
 import { JssEditor, type GraphicInfo } from '../../jss/editor';
 import { JssParseError, parseJss } from '../../jss/xml';
 import { PackagePanel } from '../../jss/PackagePanel';
+import { ConvertButton, DocCodesButton, DocCodesStrip, useSectionCode } from '../../components/DocCodes';
 import { useProgress } from '../../lib/progress';
 import { useUi } from '../../store/ui';
 
@@ -100,6 +101,10 @@ export function JssEditorPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded, id, writable]);
 
+  // the sections' document codes beside their headings, when the author has switched them on
+  const sectionCode = useSectionCode(id, savedAt);
+  useEffect(() => { editorRef.current?.setSectionBadge(sectionCode); }, [sectionCode, loaded]);
+
   const applyFindings = (findings: JssFinding[]) => editorRef.current?.setFindings(findings);
 
   const save = useCallback(async (): Promise<boolean> => {
@@ -173,6 +178,8 @@ export function JssEditorPage() {
         <button className="btn btn-sm" onClick={() => void check()} disabled={!loaded || checking} data-testid="jss-check" title="Check the document for problems without saving or building">{checking ? <Spinner /> : <Icon name="search" size={12} />}Check</button>
         <button className="btn btn-sm" onClick={() => void save()} disabled={!writable || !dirty || saving} data-testid="jss-save" title={!writable ? 'You have read-only access' : !dirty ? 'Nothing to save' : 'Save the document (Ctrl+S)'}>{saving ? <Spinner /> : <Icon name="check" size={12} />}Save</button>
         <PackagePanel id={id} writable={writable} dirty={dirty} saveFirst={save} onImported={() => { setDirty(false); void load(); ctx.reload(); }} />
+        <DocCodesButton id={id} writable={writable} refreshKey={savedAt} />
+        <ConvertButton id={id} from="jss" name={summary.project.name} dirty={dirty} saveFirst={save} />
         <button className="btn btn-sm btn-primary" onClick={() => void generate()} disabled={!canBuild(role) || building || !loaded} data-testid="jss-generate" title={!canBuild(role) ? 'Reviewers, editors and owners can build the PDF' : 'Save, then build the whole publication as a PDF'}>{building ? <Spinner /> : <Icon name="play" size={12} />}{building ? 'Building…' : 'Generate PDF'}</button>
         <div className="v2-seg" role="group" aria-label="Editor layout">
           <button className={view === 'edit' ? 'on' : ''} onClick={() => setView('edit')} aria-pressed={view === 'edit'} title="Write only">Editor</button>
@@ -181,6 +188,7 @@ export function JssEditorPage() {
         </div>
         <ThemeToggle />
       </header>
+      <DocCodesStrip id={id} refreshKey={savedAt} />
       {!writable ? <Alert tone="warn">You have {role} access to this project: you can read the document, but changes cannot be saved.</Alert> : null}
       {stale ? <Alert tone="warn">Someone else saved this document after you opened it, so your save was refused. <button className="btn btn-sm" onClick={() => { if (!dirty || window.confirm('Reload the saved document? Your unsaved changes will be lost.')) void load(); }}>Reload the saved document</button></Alert> : null}
       {error ? <Alert tone="bad">{error}</Alert> : null}

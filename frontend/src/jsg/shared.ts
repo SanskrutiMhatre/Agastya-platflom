@@ -15,7 +15,9 @@ export interface JsgHost {
   onCheckRequested(): void;
   notify(message: string, kind: 'info' | 'error'): void;
 }
-export interface JsgEditorOptions { doc: JsgDoc; readOnly: boolean; host: JsgHost }
+/** The text shown beside a section's (or appendix's) heading: its document code. `chapter` is the number the section's chapter has in the document's outline (appendices count on after the chapters). */
+export type SectionBadge = (s: { id?: string; title: string }, chapter: number) => string | null;
+export interface JsgEditorOptions { doc: JsgDoc; readOnly: boolean; host: JsgHost; sectionBadge?: SectionBadge }
 
 /** What the editor page needs from either editor. */
 export interface JsgEditorLike {
@@ -24,6 +26,8 @@ export interface JsgEditorLike {
   markSaved(): void;
   getXml(): string;
   setFindings(f: JsgFinding[]): void;
+  /** Show (or stop showing) a document code beside each section heading; the document itself is not touched. */
+  setSectionBadge?(fn: SectionBadge | undefined): void;
 }
 
 export const escH = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -70,6 +74,7 @@ export const BASE_CSS = `
 .jsg-chapter{color:#0000ff;font-weight:bold;text-transform:uppercase;font-size:22pt;line-height:1.15;text-align:center;margin:60px 0 6px}
 .jsg-sectionh{color:#0000ff;font-weight:bold;text-transform:uppercase;font-size:22pt;text-align:center;margin:36px 0 12px}
 .jsg-num{display:block;font-size:22pt}
+.jsg-code{display:block;width:fit-content;margin:4px auto 0;padding:0 6px;border:1px solid #d0d7e2;border-radius:3px;background:#eef2f7;color:#475569;font:400 9pt/1.5 ui-monospace,Consolas,monospace;text-transform:none;user-select:none}
 .jsg-clause{color:#0000ff;font-weight:bold;text-transform:uppercase;margin:12pt 0 6pt;display:flex;gap:10px}
 .jsg-clause .n{flex:0 0 auto;min-width:34px}.jsg-clause .t{flex:1}
 .jsg-p{text-align:justify;margin:3pt 0}

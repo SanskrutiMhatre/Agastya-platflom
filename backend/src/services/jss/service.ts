@@ -14,6 +14,7 @@ import path from 'path';
 import { config, vendor } from '../../config';
 import { projectDirFor } from '../../context';
 import { bad, conflict, HttpError } from '../http';
+import { syncIdentity } from '../xengine/project';
 import { parseTree, walk, norm, type MNode } from '../miniXml';
 import { wellFormedError } from '../wellFormed';
 import { readProjectJson, updateProjectJson, pmRel } from '../projects';
@@ -140,6 +141,7 @@ export async function writeSource(projectId: string, xml: string, baseHash?: str
   const type = jssTypeOfProject(projectId);
   if (type && declared && declared !== type.id) throw bad(`This project is a ${type.label}; the document says it is "${declared}".`, 'DOCTYPE_MISMATCH');
   fs.writeFileSync(abs, xml, 'utf8');
+  syncIdentity(projectId, 'jss', xml);                 // the document codes kept in the backend (services/xengine) follow the document; never refuses a save
   return { hash: sha(xml), report: await validateJss(projectId, xml) };
 }
 

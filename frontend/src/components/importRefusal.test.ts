@@ -27,6 +27,13 @@ describe('why a package import was refused', () => {
     expect(refusalReasons(new ApiError(422, 'x', 'IMPORT_REFUSED'))).toEqual([]);
   });
 
+  it('reads the package importer\'s own refusal too: "<file>: <reason>" lines, grouped by reason', () => {
+    const e = new ApiError(400, 'Nothing was imported.', 'IMPORT_REFUSED', { problems: ['Pkg/DMC-A.xml: same file name as Pkg/DMC-B.xml in this import', 'DMC-C.xml: same file name as Pkg/DMC-B.xml in this import', 'The package holds no data modules.'] });
+    const r = refusalReasons(e);
+    expect(r[0]).toEqual({ message: 'same file name as Pkg/DMC-B.xml in this import', count: 2, files: ['DMC-A.xml', 'DMC-C.xml'] });
+    expect(r[1]).toEqual({ message: 'The package holds no data modules.', count: 1, files: [] });
+  });
+
   it('points an author at the Administrator lists only when the reason is an unregistered enterprise', () => {
     expect(refusalHint([{ message: notRegistered('00000'), count: 21, files: [] }])).toMatch(/RPC CAGE codes and Originator CAGE codes/);
     expect(refusalHint([{ message: 'The file is not well-formed XML.', count: 1, files: [] }])).toBeNull();

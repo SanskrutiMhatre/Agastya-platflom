@@ -7,6 +7,9 @@ import { useUi } from '../store/ui';
 import { Icon } from './Icon';
 import { Badge, Field, Modal, ago, errText, Alert, useAsync } from './ui';
 import { refusalHint, refusalReasons, type RefusalReason } from './importRefusal';
+import { xengineApi, type ConvertResult } from '../api/xengine';
+import { FindingsList } from './DocCodes';
+import { FORMAT_NAME, SOURCE_CHOICES, detectionSentence, guessedSource, sourceProblem, targetProblem, type SourceFormat } from './importSource';
 
 const ROLE_TONE: Record<ProjectRole, 'accent' | 'ok' | 'warn' | undefined> = { owner: 'accent', manager: 'accent', editor: 'ok', reviewer: 'warn', viewer: undefined };
 export const RoleBadge = ({ role }: { role: ProjectRole }) => <Badge tone={ROLE_TONE[role]}>{role === 'manager' ? 'project manager' : role}</Badge>;
@@ -36,10 +39,11 @@ export function ProjectCardView({ p, onOpen }: { p: ProjectCard; onOpen?: () => 
 type StepId = 'start' | 'project' | 'model' | 'codes' | 'review' | 'import';
 const TITLES: Record<StepId, string> = { start: 'How to start', project: 'Project', model: 'Model and identity', codes: 'Codes and structure', review: 'Review', import: 'Import a package' };
 
-export function CreateProjectModal({ folders, defaultFolder = '', onClose, onCreated }: { folders: string[]; defaultFolder?: string; onClose: () => void; onCreated: (p: ProjectCard) => void }) {
+export function CreateProjectModal({ folders, defaultFolder = '', startWith, onClose, onCreated }: { folders: string[]; defaultFolder?: string; /** 'import': open on "Import a package" (the Projects page's Import package button) */ startWith?: 'import'; onClose: () => void; onCreated: (p: ProjectCard) => void }) {
   const toast = useUi((s) => s.toast);
-  const [way, setWay] = useState<'create' | 'import' | null>(null);
-  const [stepId, setStepId] = useState<StepId>('start');
+  const nav = useNavigate();
+  const [way, setWay] = useState<'create' | 'import' | null>(startWith === 'import' ? 'import' : null);
+  const [stepId, setStepId] = useState<StepId>(startWith === 'import' ? 'import' : 'start');
   const [name, setName] = useState('');
   const [folder, setFolder] = useState(defaultFolder);
   const [fmt, setFmt] = useState<'s1000d' | 'jss' | 'jsg'>('s1000d');
@@ -63,6 +67,11 @@ export function CreateProjectModal({ folders, defaultFolder = '', onClose, onCre
   const [notes, setNotes] = useState<string[]>([]);
   const [found, setFound] = useState<PackageDetection | null>(null);
   const [detecting, setDetecting] = useState(false);
+  // An import is asked about in two steps: what the file IS (the server's guess, which the person confirms or corrects), then what it is to BECOME (the manual type below).
+  const [file, setFile] = useState<File | null>(null);
+  const [source, setSource] = useState<SourceFormat | ''>('');
+  const [confirmed, setConfirmed] = useState(false);
+  const [done, setDone] = useState<ConvertResult | null>(null);   // a conversion's result: the new project and what could not be carried over
   const formats = useAsync(() => workspaceApi.formats(), []);
   const ref = useAsync(() => referenceApi.get(), []);
   const presets = useAsync(() => s1000dApi.presets(), []);
@@ -113,7 +122,14 @@ export function CreateProjectModal({ folders, defaultFolder = '', onClose, onCre
       if (brexMode === 'project' && !brexDmc.trim()) return 'Enter the project BREX data module code.';
     }
     if (s === 'codes' && codeMode === 'selected' && !codes.size) return 'Choose at least one information code, or offer every code.';
-    if (s === 'import') { if (!found) return 'Choose a package (.zip).'; if (!name.trim()) return 'Enter a project name.'; if (found.format === 'unknown' && fmt === 's1000d') return 'No S1000D data modules were found in this package.'; return formatProblem(); }
+    if (s === 'import') {
+      if (!found || !file) return 'Choose a package (.zip) or a document (.xml).';
+      const sp = sourceProblem(file.name, source, found); if (sp) return sp;
+      if (!confirmed) return 'Confirm what this file is.';
+      if (!name.trim()) return 'Enter a project name.';
+      const tp = targetProblem(source as SourceFormat, fmt, manualType); if (tp) return tp;
+      return formatProblem();
+    }
     return '';
   };
   const next = async () => {
@@ -129,10 +145,13 @@ export function CreateProjectModal({ folders, defaultFolder = '', onClose, onCre
     const p = problem(stepId === 'import' ? 'import' : 'project'); if (p) { setErr(p); return; }
     setBusy(true); setErr(''); setRefusal([]);
     try {
-      let card: ProjectCard;
-      if (way === 'import') card = (await workspaceApi.importProject({ token: found!.token, name: name.trim(), folder: folder.trim(), format: fmt, ...(fmt !== 's1000d' ? { domain, manualType } : {}) })).project;
-      else card = await workspaceApi.createProject({ name: name.trim(), folder: folder.trim(), format: fmt, ...(fmt === 's1000d' ? { s1000d: config() } : { domain, manualType }) });
-      toast(`${way === 'import' ? 'Imported' : 'Created'} "${card.name}"`, 'success');
+      if (way === 'import') {
+        // one importer for every pair of formats (services/xengine): S1000D into S1000D is the platform's current package importer, the others convert. The result lists what was repaired, set aside or could not be carried over, so it is shown before the project is opened
+        setDone(await xengineApi.importAs(file!, source as SourceFormat, fmt, name.trim(), { folder: folder.trim(), ...(fmt !== 's1000d' ? { domain, manualType } : {}) }));
+        setBusy(false); return;
+      }
+      const card: ProjectCard = await workspaceApi.createProject({ name: name.trim(), folder: folder.trim(), format: fmt, ...(fmt === 's1000d' ? { s1000d: config() } : { domain, manualType }) });
+      toast(`Created "${card.name}"`, 'success');
       onCreated(card); onClose();
     } catch (e) {
       // a refused package: the reasons are in the response, and the author needs to read them (this used to say "the report says why" with no report to read)
@@ -141,10 +160,12 @@ export function CreateProjectModal({ folders, defaultFolder = '', onClose, onCre
     }
   };
   const chosenFile = async (f: File | undefined) => {
-    if (!f) return; setErr(''); setRefusal([]); setFound(null); setDetecting(true);
-    try { const d = await workspaceApi.detectPackage(f); setFound(d); if (!name.trim()) setName(f.name.replace(/\.zip$/i, '')); if (d.format === 's1000d') pickFormat('s1000d'); }
-    catch (e) { setErr(errText(e)); } finally { setDetecting(false); }
+    if (!f) return; setErr(''); setRefusal([]); setFound(null); setDetecting(true); setFile(f); setSource(''); setConfirmed(false);
+    try { const d = await workspaceApi.detectPackage(f); setFound(d); setSource(guessedSource(d)); if (!name.trim()) setName(f.name.replace(/(\.jsspub)?\.(zip|xml)$/i, '')); }   // a guess only: nothing is chosen for the person, and the target is left as it was
+    catch (e) { setErr(errText(e)); setFile(null); } finally { setDetecting(false); }
   };
+  /** Leaving the result of a conversion: the lists behind the dialog learn of the new project. */
+  const leave = () => { if (done) onCreated(done.project); onClose(); };
 
   const rpcPick = (list: Array<{ cage: string; name: string }> | undefined, v: { code: string; name: string }, set: (x: { code: string; name: string }) => void, optional: boolean) =>
     list?.length ? (
@@ -156,7 +177,7 @@ export function CreateProjectModal({ folders, defaultFolder = '', onClose, onCre
   /** Format, then (for JSS / JSG) domain and manual type: the three questions that decide the project's kind. Nothing about engines. */
   const formatPicker = (
     <>
-      <Field label="Manual type" hint="What kind of publication this project makes.">
+      <Field label={way === 'import' ? 'Import it as' : 'Manual type'} hint={way === 'import' ? 'The kind of project to make from the file. Choose a different kind from the file\'s own to convert it.' : 'What kind of publication this project makes.'}>
         <div className="v2-row wrap" role="radiogroup" aria-label="Format">
           {(formats.data ?? []).map((f) => (
             <button key={f.id} type="button" role="radio" aria-checked={fmt === f.id} disabled={!f.ready && f.id !== 'jss'} data-testid={`wiz-format-${f.id}`} className={`btn ${fmt === f.id ? 'btn-primary' : ''}`} title={f.ready ? f.description : `${f.description} Coming soon.`} onClick={() => pickFormat(f.id)}>{f.label}{f.ready ? '' : ' (coming soon)'}</button>
@@ -182,10 +203,13 @@ export function CreateProjectModal({ folders, defaultFolder = '', onClose, onCre
   );
 
   return (
-    <Modal title={`New project — ${TITLES[stepId]}${order().length > 2 ? ` (${pos + 1} of ${order().length})` : ''}`} onClose={onClose} width={680} buttons={<>
+    <Modal title={done ? 'Import finished' : `New project — ${TITLES[stepId]}${order().length > 2 ? ` (${pos + 1} of ${order().length})` : ''}`} onClose={done ? leave : onClose} width={680} buttons={done ? <>
+      <button className="btn" onClick={leave} data-testid="wiz-done-close">Close</button>
+      <button className="btn btn-primary" onClick={() => { leave(); nav(`/projects/${done.project.id}`); }} data-testid="wiz-done-open">Open “{done.project.name}”</button>
+    </> : <>
       <button className="btn" onClick={onClose}>Cancel</button>
       {pos > 0 ? <button className="btn" onClick={back} data-testid="wiz-back">Back</button> : null}
-      {stepId === 'start' ? null : last ? <button className="btn btn-primary" disabled={busy || detecting} onClick={submit} data-testid="wiz-create">{way === 'import' ? 'Import and create project' : 'Create project'}</button> : <button className="btn btn-primary" onClick={() => void next()} data-testid="wiz-next">Next</button>}
+      {stepId === 'start' ? null : last ? <button className="btn btn-primary" disabled={busy || detecting || (way === 'import' && !confirmed)} onClick={submit} data-testid="wiz-create">{busy ? 'Working…' : way === 'import' ? 'Import and create project' : 'Create project'}</button> : <button className="btn btn-primary" onClick={() => void next()} data-testid="wiz-next">Next</button>}
     </>}>
       <div className="v2-stack" data-testid={`wiz-step-${stepId}`}>
         {stepId === 'start' ? (
@@ -195,13 +219,40 @@ export function CreateProjectModal({ folders, defaultFolder = '', onClose, onCre
           </div>
         ) : null}
         {stepId === 'project' ? (<>{nameAndFolder}{formatPicker}</>) : null}
-        {stepId === 'import' ? (<>
-          <Field label="Package" hint="A .zip of data modules, graphics and the publication module."><input type="file" accept=".zip,application/zip" onChange={(e) => void chosenFile(e.target.files?.[0])} data-testid="wiz-import-file" /></Field>
-          {detecting ? <p className="v2-hint">Looking at the package…</p> : null}
-          {found ? (found.format === 's1000d'
-            ? <Alert tone="ok">This looks like an <b>S1000D</b> package: {found.dataModules} data module{found.dataModules === 1 ? '' : 's'}, {found.publicationModules} publication module{found.publicationModules === 1 ? '' : 's'}, {found.graphics} graphic{found.graphics === 1 ? '' : 's'}. Please confirm the manual type below.</Alert>
-            : <Alert tone="warn">No S1000D data modules were found in this package ({found.entries} files). Choose the manual type it belongs to.</Alert>) : null}
-          {found ? (<>{nameAndFolder}{formatPicker}</>) : null}
+        {done ? (<>
+          <p data-testid="wiz-done">A new {FORMAT_NAME[done.to]} project, <b>{done.project.name}</b>, was made from {FORMAT_NAME[done.from]} content: {done.counts.sections} {done.to === 's1000d' ? 'data module' : 'section'}{done.counts.sections === 1 ? '' : 's'}{done.counts.pictures ? `, ${done.counts.pictures} ${done.to === 's1000d' ? 'graphic' : 'picture'}${done.counts.pictures === 1 ? '' : 's'}` : ''}.</p>
+          <div data-testid="import-as-findings"><FindingsList list={done.findings} /></div>
+        </>) : null}
+        {!done && stepId === 'import' ? (<>
+          <Field label="Package or document" hint="A .zip of data modules, graphics and the publication module (the older publishing tool's export too), or one JSS or JSG document (.xml)."><input type="file" accept=".zip,.xml,application/zip,text/xml" onChange={(e) => void chosenFile(e.target.files?.[0])} data-testid="wiz-import-file" /></Field>
+          {detecting ? <p className="v2-hint">Looking at the file…</p> : null}
+          {found && file ? (() => {
+            const why = source ? sourceProblem(file.name, source, found) : '';
+            const guess = guessedSource(found);
+            return (
+              <div className="v2-card" data-testid="wiz-source" style={{ padding: '10px 14px' }}>
+                <b>What is this file?</b>
+                <p style={{ margin: '4px 0 8px' }} data-testid="wiz-detected">{guess ? 'The first look found: ' : 'The first look could not tell. '}{detectionSentence(found)} <span className="v2-muted">That is only a guess: check it, and choose again if it is wrong.</span></p>
+                <div className="v2-row wrap" role="radiogroup" aria-label="This file is">
+                  {SOURCE_CHOICES.map((c) => (
+                    <button key={c.id} type="button" role="radio" aria-checked={source === c.id} className={`btn ${source === c.id ? 'btn-primary' : ''}`} title={c.hint} data-testid={`wiz-source-${c.id}`}
+                      onClick={() => { setSource(c.id); setConfirmed(false); setErr(''); }}>{c.label}{guess === c.id ? ' (detected)' : ''}</button>
+                  ))}
+                </div>
+                {why ? <div style={{ marginTop: 8 }}><Alert tone="bad"><span data-testid="wiz-source-problem">{why}</span></Alert></div> : null}
+                {source && !why ? (confirmed
+                  ? <p className="v2-hint" style={{ margin: '8px 0 0' }} data-testid="wiz-source-confirmed">Confirmed: this is {source === 's1000d' ? 'an' : 'a'} {FORMAT_NAME[source]} {source === 's1000d' ? 'package' : 'document'}. Choose another button above if that is wrong.</p>
+                  : <div style={{ marginTop: 8 }}><button type="button" className="btn btn-primary" data-testid="wiz-source-confirm" onClick={() => { setConfirmed(true); setErr(''); }}>Yes, this is {source === 's1000d' ? 'an' : 'a'} {FORMAT_NAME[source]} {source === 's1000d' ? 'package' : 'document'}</button></div>) : null}
+              </div>
+            );
+          })() : null}
+          {found && file && confirmed && source ? (<>
+            {nameAndFolder}{formatPicker}
+            {targetProblem(source, fmt, manualType) ? <Alert tone="warn">{targetProblem(source, fmt, manualType)}</Alert> : null}
+            <p className="v2-hint" style={{ margin: 0 }}>{source === fmt
+              ? `This imports the ${FORMAT_NAME[source]} package as a new ${FORMAT_NAME[fmt]} project. Whatever the importer repaired, set aside or could not accept is listed afterwards. The Administrator's enterprise lists are checked and reported; they are not a reason to refuse the package.`
+              : `This makes a new ${FORMAT_NAME[fmt]} project from the ${FORMAT_NAME[source]} content. Whatever the new format cannot hold is listed afterwards. The document codes in the file are kept.`}</p>
+          </>) : null}
         </>) : null}
         {stepId === 'model' ? (<>
           <div className="v2-grid cols-2">

@@ -27,6 +27,10 @@ export interface MapResult {
   doc: JssDocument; modules: ModuleOut[];
   chapters: Array<{ number: number; stencilTitle: string; sourceTitle: string | null; unmatched: boolean }>;
   droppedEntries: number;
+  /** the keys of the chapters' own heading pages (they only introduce the chapter, so they are not sections) */
+  headings: string[];
+  /** the chapter (1-based) each heading page introduces */
+  headingChapter: Record<string, number>;
   /** every picture file that has to be in Media: the package's own, and a placeholder for each missing one */
   mediaFiles: Array<{ media: string; from?: SourcePicture; placeholderFor?: string; used: boolean }>;
   counts: { paragraphs: number; lists: number; tables: number; figures: number; sections: number };
@@ -39,7 +43,7 @@ const LISTS = new Set(['sequentialList', 'randomList']);
 const NOTICES: Record<string, Notice['k']> = { note: 'note', warning: 'warning', danger: 'warning', caution: 'caution' };
 const NOTICE_PARAS = new Set(['notePara', 'warningAndCautionPara', 'attentionSequentialList', 'attentionRandomList']);
 
-interface Ctx { maxDepth: number; m: SourceModule; pkg: RwiPackage; findings: Findings; where: string; ids: Set<string>; prefix: string; out: ModuleOut; counts: MapResult['counts']; warned: Set<string> }
+interface Ctx { maxDepth: number; m: SourceModule; pkg: RwiPackage; findings: Findings; where: string; ids: Set<string>; prefix: string; out: ModuleOut; counts: MapResult['counts']; warned: Set<string>; iso: number }
 
 function uniqueId(ctx: Ctx, original: string, kind: 'fig' | 'tbl'): string {
   const clean = (original || kind).replace(/[^A-Za-z0-9_.-]/g, '-');
@@ -73,7 +77,11 @@ function inlineNode(n: Node, ctx: Ctx): Inline[] {
     case 'emphasis': { const t = e.getAttribute('emphasisType'); return [{ t: 'mark', mark: t === 'em02' ? 'i' : t === 'em03' ? 'u' : 'b', children: inner() }]; }
     case 'subScript': return [{ t: 'mark', mark: 'sub', children: inner() }];
     case 'superScript': return [{ t: 'mark', mark: 'sup', children: inner() }];
-    case 'internalRef': case 'acronym': case 'acronymTerm': case 'name': case 'shortName': case 'verbatimText': case 'inlineSignificantData': case 'quantity': case 'quantityValue': case 'quantityUnitOfMeasure': case 'changeInline': return inner();
+    case 'internalRef': case 'acronym': case 'acronymTerm': case 'acronymDefinition': case 'name': case 'shortName': case 'verbatimText': case 'inlineSignificantData': case 'quantity': case 'quantityValue': case 'quantityUnitOfMeasure': case 'changeInline': case 'notePara': case 'warningAndCautionPara': return inner();
+    // a note, warning or caution inside a table cell or a paragraph: JSS has them only as blocks, so its words stay, led by its kind
+    case 'note': case 'warning': case 'caution': case 'danger': return [{ t: 'mark', mark: 'b', children: [{ t: 'text', text: `${e.tagName === 'note' ? 'NOTE' : e.tagName === 'caution' ? 'CAUTION' : 'WARNING'}: ` }] }, ...inner()];
+    // a reference to another document: its title, not its code
+    case 'dmRef': { const tt = e.getElementsByTagName('techName')[0]?.textContent?.trim(); const ii = e.getElementsByTagName('infoName')[0]?.textContent?.trim(); const s = [tt, ii].filter(Boolean).join(' - '); return s ? [{ t: 'text', text: s }] : []; }
     case 'title': return [];
     default: warnOnce(ctx, `unsupported-${e.tagName}`, `The source contains an element this editor does not have ("${e.tagName}"); only its text was kept.`); return inner();
   }
@@ -282,14 +290,193 @@ function mapBody(children: Element[], depth: number, ctx: Ctx): Array<Block | Se
 }
 function flatten(s: Section): Array<Block | Section> { return [lead(s.title), ...s.children.flatMap((n) => (isSection(n) ? flatten(n) : [n]))]; }
 
+// ── procedures, fault isolation, crew drills and parts lists ─────────────────────────────────────────────────────────────────
+// What the older publishing tool maps (vendor/pipeline/s1000dtojss/schemas.xsl), carried into JSS blocks the same way: preliminary and close-up requirements are a section of tables
+// (conditions, personnel, equipment, consumables, spares) and the safety notices; a titled step is a section; untitled steps are one numbered list (lettered inside, roman inside that);
+// an isolation step is a section with its action, its question and its Yes / No answers; a crew drill is a section, its steps a list, its challenge / response pairs a table;
+// an illustrated parts catalogue is its figures and one table (figure-item, part number, CAGE, nomenclature with indenture dots, quantity, unit).
+
+/** The content roots (the first element of a document's content) that are mapped. Anything else keeps only its text, and is reported. */
+export const MAPPED_CONTENT = new Set(['description', 'procedure', 'faultReporting', 'faultIsolation', 'crew', 'illustratedPartsCatalog']);
+
+const STEPS = new Set(['proceduralStep', 'crewDrillStep']);
+const CHALLENGES = new Set(['challengeAndResponse', 'challengeResponse']);
+const WRAPPERS = new Set(['mainProcedure', 'faultIsolationProcedure', 'isolationProcedure', 'isolationMainProcedure', 'isolationStepAnswer', 'operatorInstructions', 'descrCrew', 'faultReporting', 'faultIsolation', 'crew', 'procedure']);
+const LEAVES = new Set(['faultDescr', 'isolatedFaultDescr', 'correctiveActionDescr', 'symptomDescr', 'action']);
+const textOf = (e: Element | undefined | null): string => squash(e?.textContent ?? '').trim();
+const titleOf = (e: Element): string => textOf(kids(e).find((x) => x.tagName === 'title'));
+const firstOf = (e: Element, tag: string): Element | undefined => e.getElementsByTagName(tag)[0];
+
+function boldLead(label: string, text: string): Para { return { k: 'para', inline: [{ t: 'mark', mark: 'b', children: [{ t: 'text', text: label }] }, ...(text ? [{ t: 'text' as const, text }] : [])] }; }
+
+function simpleTable(title: string, head: string[], rows: string[][], ctx: Ctx, widths = '', center: number[] = []): Table {
+  ctx.counts.tables++;
+  const id = uniqueId(ctx, '', 'tbl'); ctx.out.tables.push({ id, original: '' });
+  const cell = (s: string, i: number): Cell => ({ parts: s ? [{ k: 'inline', inline: [{ t: 'text', text: s }] }] : [], ...(center.includes(i) ? { align: 'center' as const } : {}) });
+  const body = rows.length ? rows : [head.map((_, i) => (i === 0 ? 'None' : ''))];
+  return { k: 'table', id, ...(widths ? { widths } : {}), ...(title ? { title } : {}), head: [{ cells: head.map((h, i) => ({ parts: [{ k: 'inline', inline: [{ t: 'text', text: h }] }], ...(center.includes(i) ? { align: 'center' as const } : {}) })) }], body: body.map((r) => ({ cells: r.map(cell) })) };
+}
+
+/** A paragraph of everything an element says (its own paragraphs run together), led in bold when it has a label. Nothing when it says nothing. */
+function leafPara(e: Element, ctx: Ctx, label = ''): Para | null {
+  const body: Inline[] = [];
+  for (let n = e.firstChild; n; n = n.nextSibling) {
+    if (n.nodeType === 1 && ['para', 'simplePara'].includes((n as Element).tagName)) { if (body.length) body.push({ t: 'text', text: ' ' }); body.push(...inlineChildren(n as Element, ctx)); }
+    else body.push(...inlineNode(n, ctx));
+  }
+  const t = tidy(body); if (!hasContent(t)) return null;
+  ctx.counts.paragraphs++;
+  return { k: 'para', inline: label ? [{ t: 'mark', mark: 'b', children: [{ t: 'text', text: label }] }, ...t] : t };
+}
+
+/** The tables and notices a requirements group holds, the way the older tool prints them (a table that is declared but empty prints one "None" row). */
+function mapRequirements(e: Element, depth: number, ctx: Ctx, heading: string): Array<Block | Section> {
+  const body: Array<Block | Section> = []; const has = (tag: string): Element | undefined => kids(e).find((c) => c.tagName === tag);
+  const dur = has('productionMaintData') ? firstOf(has('productionMaintData')!, 'taskDuration') : undefined;
+  const pd = dur?.getAttribute('procedureDuration') ?? ''; if (pd && pd !== '-') body.push(boldLead('Estimated task time: ', `${pd} ${dur?.getAttribute('unitOfMeasure') ?? ''}`.trim()));
+  const conds = has('reqCondGroup');
+  if (conds) {
+    const rows = kids(conds).filter((c) => ['reqCondNoRef', 'reqCondDm', 'reqCondExternalPub'].includes(c.tagName)).map((c) => {
+      const refs = [...Array.from(c.getElementsByTagName('dmRef')).map((d) => tidy(inlineNode(d, ctx)).map((r) => (r.t === 'text' ? r.text : '')).join('')), ...Array.from(c.getElementsByTagName('externalPubRef')).map((x) => textOf(firstOf(x, 'externalPubTitle') ?? firstOf(x, 'externalPubCode')))].filter(Boolean);
+      return [textOf(firstOf(c, 'reqCond')), refs.join('; ') || '-'];
+    });
+    body.push(simpleTable('Required conditions', ['Action/Condition', 'Data module/Technical publication'], rows, ctx, '1* 70mm'));
+  }
+  const persons = has('reqPersons');
+  if (persons) {
+    const rows = Array.from(persons.getElementsByTagName('person')).map((p) => [firstOf(p, 'personCategory')?.getAttribute('personCategoryCode') ?? '', firstOf(p, 'personSkill')?.getAttribute('skillLevelCode') ?? '', `${textOf(firstOf(p, 'estimatedTime'))} ${firstOf(p, 'estimatedTime')?.getAttribute('unitOfMeasure') ?? ''}`.trim()]);
+    body.push(simpleTable('Required personnel', ['Category', 'Skill level', 'Estimated time'], rows, ctx, '1* 30mm 32mm'));
+  }
+  for (const [tag, label, item] of [['reqSupportEquips', 'Support equipment', 'supportEquipDescr'], ['reqSupplies', 'Consumables, materials and expendables', 'supplyDescr'], ['reqSpares', 'Spares', 'spareDescr']] as const) {
+    const g = has(tag); if (!g) continue;
+    const rows = Array.from(g.getElementsByTagName(item)).map((d) => {
+      const ident = firstOf(d, 'identNumber'); const id = ident ? `${textOf(firstOf(ident, 'manufacturerCode'))} ${textOf(firstOf(ident, 'partNumber'))}`.trim() : '';
+      const q = firstOf(d, 'reqQuantity'); const unit = q?.getAttribute('unitOfMeasure') ?? '';
+      return [textOf(firstOf(d, 'name') ?? firstOf(d, 'descrForPart')), id || '-', `${textOf(q)}${unit && unit !== 'EA' ? ` ${unit}` : ''}`.trim(), textOf(firstOf(d, 'remarks'))];
+    });
+    body.push(simpleTable(label, ['Name', 'Identification', 'Quantity', 'Remark'], rows, ctx, '1* 45mm 22mm 28mm'));
+  }
+  const safety = has('reqSafety');
+  if (safety) {
+    body.push(boldLead('Safety conditions', ''));
+    const notes = [...Array.from(safety.getElementsByTagName('warning')), ...Array.from(safety.getElementsByTagName('caution'))];
+    if (notes.length) for (const n of notes) body.push(mapNotice(n, ctx)); else { ctx.counts.paragraphs++; body.push({ k: 'para', inline: [{ t: 'text', text: 'None' }] }); }
+  }
+  if (!body.length) return [];
+  if (depth > ctx.maxDepth) { ctx.out.flattened++; warnOnce(ctx, 'heading-flattened', 'Some headings were nested deeper than this handbook allows; each was turned into a bold line above its text, and nothing was removed.'); return [lead(heading), ...body]; }
+  ctx.counts.sections++;
+  return [{ k: 'section', title: heading, children: body }];
+}
+
+/** A titled part of a procedure: a section, or - too deep for the handbook - a bold line above its content. */
+function sectionOf(title: string, inner: Element[], depth: number, ctx: Ctx, level: number): Array<Block | Section> {
+  if (depth > ctx.maxDepth) {
+    ctx.out.flattened++; warnOnce(ctx, 'heading-flattened', 'Some headings were nested deeper than this handbook allows; each was turned into a bold line above its text, and nothing was removed.');
+    return [lead(title), ...mapContainer(inner, depth, ctx, level).flatMap((n) => (isSection(n) ? flatten(n) : [n]))];
+  }
+  ctx.counts.sections++;
+  return [{ k: 'section', title, children: orderFix(mapContainer(inner, depth + 1, ctx, level), ctx) }];
+}
+
+/** A run of sibling steps: titled procedural steps are sections, the rest one numbered list (it ends where a picture or table stands between steps; a notice stays inside its step). */
+function mapSteps(steps: Element[], depth: number, ctx: Ctx, level: number): Array<Block | Section> {
+  const out: Array<Block | Section> = []; let list: List | null = null; let split = false;
+  const newList = (): List => { ctx.counts.lists++; const l: List = { k: 'list', type: (['number', 'alpha', 'roman'][Math.min(level, 2)]) as List['type'], items: [] }; out.push(l); return l; };
+  for (const s of steps) {
+    const title = titleOf(s);
+    if (title && s.tagName === 'proceduralStep') { list = null; out.push(...sectionOf(title, kids(s).filter((x) => x.tagName !== 'title'), depth, ctx, level)); continue; }
+    const before: Array<Block | Section> = []; const after: Array<Block | Section> = []; const parts: Part[] = []; const nested: Element[] = []; let first = true; let sawText = false;
+    const addText = (inl: Inline[]): void => { if (!hasContent(inl)) return; parts.push(first ? { k: 'inline', inline: inl } : { k: 'para', inline: inl }); first = false; sawText = true; };
+    if (title) addText([{ t: 'mark', mark: 'b', children: [{ t: 'text', text: title }] }]);
+    for (const c of kids(s)) {
+      if (c.tagName === 'title') continue;
+      if (c.tagName === 'para' || c.tagName === 'simplePara') {
+        for (const b of paraBlocks(c, ctx, level + 1)) {
+          if (b.k === 'para') { addText(b.inline); ctx.counts.paragraphs--; }
+          else if (b.k === 'list') { parts.push(b); first = false; sawText = true; } else after.push(b);
+        }
+      } else if (STEPS.has(c.tagName)) nested.push(c);
+      else if (LISTS.has(c.tagName)) { parts.push(mapList(c, ctx, level + 1)); first = false; sawText = true; }
+      else if (NOTICES[c.tagName]) addText(tidy(inlineNode(c, ctx)));
+      else (sawText || nested.length ? after : before).push(...mapContainer([c], depth, ctx, level));
+    }
+    if (nested.length) for (const b of mapSteps(nested, depth, ctx, level + 1)) { if (b.k === 'list') { parts.push(b); first = false; } else after.push(b); }
+    if (before.length) { list = null; out.push(...before); split = true; }
+    if (!list) list = newList();
+    list.items.push({ parts: parts.length ? parts : [{ k: 'inline', inline: [] }] });
+    if (after.length) { out.push(...after); list = null; split = true; }
+  }
+  if (split) warnOnce(ctx, 'steps-split', 'A picture or table between steps ends the numbered list: a list in this editor cannot hold one. The steps after it are a new list that begins again at 1.');
+  return out;
+}
+
+/** The content of a procedure, a fault isolation, a crew document: its parts in the order they stand. */
+function mapContainer(children: Element[], depth: number, ctx: Ctx, level = 0): Array<Block | Section> {
+  const out: Array<Block | Section> = []; let i = 0;
+  const run = (set: Set<string>): Element[] => { const r: Element[] = []; while (i < children.length && set.has(children[i].tagName)) r.push(children[i++]); return r; };
+  while (i < children.length) {
+    const c = children[i];
+    if (STEPS.has(c.tagName)) { out.push(...mapSteps(run(STEPS), depth, ctx, level)); continue; }
+    if (CHALLENGES.has(c.tagName)) {
+      const rows = run(CHALLENGES).map((e) => [textOf(firstOf(e, 'challenge')), textOf(firstOf(e, 'response'))]);
+      out.push(simpleTable('', ['Challenge', 'Response'], rows, ctx, '1* 1*')); continue;
+    }
+    i++;
+    const inner = kids(c).filter((x) => x.tagName !== 'title');
+    switch (c.tagName) {
+      case 'title': break;
+      case 'preliminaryRqmts': out.push(...mapRequirements(c, depth, ctx, 'Preliminary Requirements')); break;
+      case 'closeRqmts': out.push(...mapRequirements(c, depth, ctx, 'Requirements After Job Completion')); break;
+      case 'crewDrill': case 'subCrewDrill': out.push(...sectionOf(titleOf(c) || textOf(kids(c).find((x) => x.tagName === 'crewProcedureName')) || 'Crew Drill', inner.filter((x) => x.tagName !== 'crewProcedureName'), depth, ctx, level)); break;
+      case 'crewRefCard': out.push(...sectionOf(titleOf(c) || 'Quick Reference Card', inner, depth, ctx, level)); break;
+      case 'isolationStep': out.push(...sectionOf(titleOf(c) || `Isolation Step ${++ctx.iso}`, inner, depth, ctx, level)); break;
+      case 'isolationProcedureEnd': out.push(...sectionOf(titleOf(c) || 'Isolation procedure end', inner, depth, ctx, level)); break;
+      case 'isolationStepQuestion': { const p = leafPara(c, ctx, 'Question: '); if (p) out.push(p); break; }
+      case 'yesAnswer': { const p = leafPara(c, ctx, 'Yes: '); if (p) out.push(p); break; }
+      case 'noAnswer': { const p = leafPara(c, ctx, 'No: '); if (p) out.push(p); break; }
+      case 'listOfChoices': {
+        const items = kids(c).filter((x) => x.tagName === 'choice').map((x): ListItem => ({ parts: [{ k: 'inline', inline: leafPara(x, ctx)?.inline ?? [] }] })).filter((x) => x.parts.some((p) => p.k === 'inline' && hasContent(p.inline)));
+        if (items.length) { ctx.counts.lists++; out.push({ k: 'list', type: 'bullet', items }); }
+        break;
+      }
+      default:
+        if (WRAPPERS.has(c.tagName)) out.push(...mapContainer(inner, depth, ctx, level));
+        else if (LEAVES.has(c.tagName)) { const p = leafPara(c, ctx); if (p) out.push(p); }
+        else out.push(...mapBody([c], depth, ctx));
+    }
+  }
+  return out;
+}
+
+/** An illustrated parts catalogue: its figures, then one table of its parts, the way the older tool prints it. */
+function mapCatalog(top: Element, ctx: Ctx): Array<Block | Section> {
+  const out: Array<Block | Section> = mapBody(kids(top).filter((c) => c.tagName === 'figure'), 3, ctx);
+  const rows: string[][] = [];
+  for (const s of kids(top).filter((c) => c.tagName === 'catalogSeqNumber')) {
+    const fig = s.getAttribute('figureNumber') ?? ''; const item = s.getAttribute('item') ?? ''; const n = Number(s.getAttribute('indenture'));
+    const dots = n > 1 ? '. '.repeat(n - 1) : '';
+    for (const it of kids(s).filter((c) => c.tagName === 'itemSeqNumber')) {
+      const t = (tag: string): string => textOf(firstOf(it, tag));
+      rows.push([fig || item ? `${fig}-${item}` : '', t('partNumber'), t('manufacturerCode'), dots + t('descrForPart'), t('quantityPerNextHigherAssy'), t('unitOfIssue')]);
+    }
+  }
+  if (rows.length) out.push(simpleTable('Illustrated Parts List', ['Fig. Item', 'Part Number', 'CAGE', 'Nomenclature', 'Qty', 'Unit'], rows, ctx, '18mm 22mm 32mm 1* 18mm 14mm', [0, 4, 5]));
+  return out;
+}
+
 /** One document -> its section. */
 function mapModule(m: SourceModule, out: ModuleOut, pkg: RwiPackage, findings: Findings, ids: Set<string>, counts: MapResult['counts'], title: string, maxDepth: number): Section {
-  const ctx: Ctx = { maxDepth, m, pkg, findings, where: m.heading || title || m.file, ids, prefix: `dm${m.code.disassyCode ?? ''}${m.code.disassyCodeVariant ?? ''}`.replace(/[^A-Za-z0-9]/g, '') || 'dm', out, counts, warned: new Set() };
+  const ctx: Ctx = { maxDepth, m, pkg, findings, where: m.heading || title || m.file, ids, prefix: `dm${m.code.disassyCode ?? ''}${m.code.disassyCodeVariant ?? ''}`.replace(/[^A-Za-z0-9]/g, '') || 'dm', out, counts, warned: new Set(), iso: 0 };
   const top = kids(m.content).find((c) => c.tagName === 'description') ?? kids(m.content)[0];
   const parts = top ? kids(top) : [];
   const levelled = parts.filter((c) => c.tagName === 'levelledPara');
   let section: Section;
-  if (levelled.length === 1 && kids(levelled[0]).some((c) => c.tagName === 'title')) {
+  if (top && top.tagName !== 'description' && MAPPED_CONTENT.has(top.tagName)) {
+    // a procedure, a fault isolation, a crew document or a parts catalogue: its parts in order, named by the document's own title (it has no first heading)
+    const name = m.heading || title || [m.techName, m.infoName].filter(Boolean).join(' - ') || m.file;
+    section = { k: 'section', title: name, children: orderFix(top.tagName === 'illustratedPartsCatalog' ? mapCatalog(top, ctx) : mapContainer(parts, 3, ctx), ctx) };
+    findings.add('info', 'content-mapped', `A ${top.tagName} document was written as sections, numbered lists and tables; links, applicability and other S1000D-only details are not carried (the original stays with the package).`, name);
+  } else if (levelled.length === 1 && kids(levelled[0]).some((c) => c.tagName === 'title')) {
     const lp = levelled[0]; const rest = parts.filter((c) => c !== lp);
     const own = mapBody(kids(lp).filter((c) => c.tagName !== 'title'), 3, ctx);
     const after = mapBody(rest, 3, ctx);
@@ -306,37 +493,61 @@ function mapModule(m: SourceModule, out: ModuleOut, pkg: RwiPackage, findings: F
 // ── the whole package ────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 const collectRefs = (e: PmEntrySource, into: string[]): void => { for (const o of e.order) { if ('ref' in o) into.push(o.ref.key); else collectRefs(o.entry, into); } };
+const anyRef = (e: PmEntrySource): boolean => e.refs.length > 0 || e.children.some(anyRef);
+const isNumber = (s: string | null): boolean => !!s && /^[ \t]*[0-9]{1,3}[ \t]*$/.test(s);
+function walkEntries(entries: PmEntrySource[], parent: PmEntrySource | null, into: Array<{ entry: PmEntrySource; parent: PmEntrySource | null }>): void { for (const e of entries) { into.push({ entry: e, parent }); walkEntries(e.children, e, into); } }
 
 /** `maxDepth`: the deepest heading level the project's stencil allows (the chapter is level 1). */
 export function mapPackage(pkg: RwiPackage, modules: SourceModule[], pub: SourcePublication, chapterTitles: string[], findings: Findings, maxDepth: number): MapResult {
   const byKey = new Map(modules.map((m) => [m.key, m]));
+  const bodyKeys = new Set(modules.map((m) => m.key));            // front-matter pages and chapter heading pages are not in this list (they are read elsewhere); a reference to one is skipped
   const counts = { paragraphs: 0, lists: 0, tables: 0, figures: 0, sections: 0 };
-  // 1. which publication entry is which chapter
-  const taken = new Set<PmEntrySource>(); const chapters: MapResult['chapters'] = []; const keysByChapter: string[][] = chapterTitles.map(() => []);
+  // 1. which publication entry is which chapter. The entry may be anywhere in the contents list (a publication-titled entry and a "Chapter" folder around the chapters is the
+  //    older publishing tool's layout), and a folder named by a number ("1", "3") around it holds the chapter's documents, the titled entry holding only its heading page.
+  const taken = new Set<PmEntrySource>(); const chapters: MapResult['chapters'] = []; const keysByChapter: string[][] = chapterTitles.map(() => []); const assigned = new Set<string>();
+  const all: Array<{ entry: PmEntrySource; parent: PmEntrySource | null }> = []; walkEntries(pub.entries, null, all);
+  const headingChapter: Record<string, number> = {};
+  const headingKeys = new Set<string>();                           // a chapter's heading page ("Chapter 1 - ...", the page that only introduces the chapter): not a section
+  const bodyOf = (e: PmEntrySource, heading: PmEntrySource | null = null): string[] => { const k: string[] = []; collectRefs(e, k); const h: string[] = []; if (heading && heading !== e) collectRefs(heading, h); return k.filter((x) => bodyKeys.has(x) && !assigned.has(x) && !h.includes(x)); };
+  const scopes: PmEntrySource[] = [];
   chapterTitles.forEach((t, i) => {
-    const entry = pub.entries.find((e) => e.title && norm(e.title) === norm(t) && (e.refs.length || e.children.some((c) => c.refs.length || c.children.length)) && !taken.has(e));
-    chapters.push({ number: i + 1, stencilTitle: t, sourceTitle: entry?.title ?? null, unmatched: !entry });
-    if (entry) { taken.add(entry); collectRefs(entry, keysByChapter[i]); }
+    let scope: PmEntrySource | null = null; let hit: PmEntrySource | null = null;
+    for (const { entry, parent } of all) {
+      if (!entry.title || norm(entry.title) !== norm(t) || taken.has(entry)) continue;
+      const s = parent && isNumber(parent.title) && !taken.has(parent) ? parent : entry;
+      if (bodyOf(s, entry).length) { scope = s; hit = entry; break; }
+    }
+    chapters.push({ number: i + 1, stencilTitle: t, sourceTitle: hit?.title ?? null, unmatched: !hit });
+    if (hit && scope) {
+      taken.add(hit); taken.add(scope); scopes.push(scope); const keys = bodyOf(scope, hit); keysByChapter[i].push(...keys); keys.forEach((k) => assigned.add(k));
+      if (scope !== hit) { const h: string[] = []; collectRefs(hit, h); h.filter((k) => bodyKeys.has(k)).forEach((k) => { headingKeys.add(k); headingChapter[k] = i + 1; }); }
+    }
     else findings.add('warning', 'chapter-absent', `The package has no chapter called "${t}"; the chapter was left empty.`, t);
   });
   let dropped = 0;
-  for (const e of pub.entries) {
-    if (taken.has(e)) continue;
-    const keys: string[] = []; collectRefs(e, keys);
-    if (!keys.length) { dropped++; findings.add('warning', 'entry-dropped', `An empty heading${e.title ? ` "${e.title}"` : ''} in the package's contents list was left out.`, e.title ?? undefined); continue; }
-    // a heading that is not one of this handbook's chapters: its documents go to the last chapter, said so
-    const last = keysByChapter.length - 1; keysByChapter[last].push(...keys);
-    findings.add('warning', 'chapter-unknown', `The package has a heading "${e.title ?? '(untitled)'}" that is not a chapter of this handbook; its ${keys.length} section${keys.length === 1 ? '' : 's'} were added to the last chapter.`, e.title ?? undefined);
-  }
+  // documents under headings that are not one of this handbook's chapters go to the last chapter, said so (a heading that holds only front-matter pages is not a chapter and not a problem)
+  const leftover = (e: PmEntrySource, heading: string | null): void => {
+    if (taken.has(e)) return;
+    const own = e.refs.map((r) => r.key).filter((k) => bodyKeys.has(k) && !assigned.has(k)); const title = e.title ?? heading;
+    if (own.length) {
+      keysByChapter[keysByChapter.length - 1].push(...own); own.forEach((k) => assigned.add(k));
+      findings.add('warning', 'chapter-unknown', `The package has a heading "${title ?? '(untitled)'}" that is not a chapter of this handbook; its ${own.length} section${own.length === 1 ? '' : 's'} were added to the last chapter.`, title ?? undefined);
+    }
+    for (const c of e.children) leftover(c, title);
+    if (!anyRef(e) && !e.children.length) { dropped++; findings.add('warning', 'entry-dropped', `An empty heading${e.title ? ` "${e.title}"` : ''} in the package's contents list was left out.`, e.title ?? undefined); }
+  };
+  for (const e of pub.entries) leftover(e, null);
   // a titled heading INSIDE a chapter that groups documents has no counterpart in JSS (a section needs content): its documents are listed directly, said so
-  const groupings = (es: PmEntrySource[], top: boolean): void => { for (const e of es) { if (!top && e.title && (e.refs.length || e.children.length)) findings.add('info', 'grouping-flattened', `The package groups some sections under the heading "${e.title}"; the sections were kept in order without that extra level.`, e.title); groupings(e.children, false); } };
-  groupings(pub.entries, true);
+  const chapterNames = new Set(chapterTitles.map(norm));
+  const groupings = (es: PmEntrySource[]): void => { for (const e of es) { if (e.title && !isNumber(e.title) && !chapterNames.has(norm(e.title)) && bodyOf2(e)) findings.add('info', 'grouping-flattened', `The package groups some sections under the heading "${e.title}"; the sections were kept in order without that extra level.`, e.title); groupings(e.children); } };
+  const bodyOf2 = (e: PmEntrySource): boolean => { const k: string[] = []; collectRefs(e, k); return k.some((x) => bodyKeys.has(x)); };
+  for (const s of scopes) groupings(s.children);
   // 2. documents the contents list does not name: placed by their number
   const listed = new Set(keysByChapter.flat());
   const placedByNumber = new Set<string>();
   const sorted = [...modules].sort((a, b) => a.key.localeCompare(b.key, 'en', { numeric: true }));
   for (const m of sorted) {
-    if (listed.has(m.key)) continue;
+    if (listed.has(m.key) || headingKeys.has(m.key)) continue;
     let prev: SourceModule | undefined; for (const o of sorted) { if (o === m) break; if (listed.has(o.key) || placedByNumber.has(o.key)) prev = o; }
     let ci = -1; let pos = 0;
     const lookFor = prev ?? sorted.find((o) => o !== m && listed.has(o.key));
@@ -365,5 +576,5 @@ export function mapPackage(pkg: RwiPackage, modules: SourceModule[], pub: Source
   for (const p of pkg.pictures.values()) mediaFiles.push({ media: p.name, from: p, used: usedNames.has(p.name.toLowerCase()) });
   for (const p of pkg.pictures.values()) if (!usedNames.has(p.name.toLowerCase())) findings.add('info', 'picture-unused', `The picture "${p.name}" is in the package but no section uses it; it was kept in the project's pictures.`, p.name);
   const meta: Record<string, string> = { bookName: 'User Handbook' };
-  return { doc: { docType: 'uhb', schemaVersion: '1.0', meta, chapters: docChapters }, modules: outModules, chapters, droppedEntries: dropped, mediaFiles, counts };
+  return { doc: { docType: 'uhb', schemaVersion: '1.0', meta, chapters: docChapters }, modules: outModules, chapters, droppedEntries: dropped, headings: [...headingKeys], headingChapter, mediaFiles, counts };
 }

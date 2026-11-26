@@ -215,7 +215,8 @@ export const DEFAULT_ROOT = '<dmodule xmlns:xsi="http://www.w3.org/2001/XMLSchem
 // ── the contents list (PMC) ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
 export interface PmcModule { identity: ModuleIdentity; pmTitle: string }
-export interface PmcChapter { title: string; modules: PmcModule[] }
+export interface PmcChapter { title: string; modules: PmcModule[]; number?: number; /** the page that introduces the chapter (a package from the older publishing tool has one) */ heading?: PmcModule }
+export interface PmcLayout { /** the publication's own title: the entry that holds everything */ title: string; /** front-matter pages: the entry title and the document */ front: Array<{ title: string; module: PmcModule }> }
 
 const dmRefX = (m: PmcModule, pad: string): string => `${pad}<dmRef>
 ${pad}  <dmRefIdent>
@@ -232,19 +233,35 @@ ${pad}    <issueDate year="${m.identity.issueDate.year}" month="${m.identity.iss
 ${pad}  </dmRefAddressItems>
 ${pad}</dmRef>`;
 
-export function pmcXml(chapters: PmcChapter[], head: { rootStart: string; identAndStatus: string }): string {
-  const entries = chapters.filter((c) => c.modules.length).map((c) => `    <pmEntry>\n      <pmEntryTitle>${esc(c.title)}</pmEntryTitle>\n${c.modules.map((m) => dmRefX(m, '      ')).join('\n')}\n    </pmEntry>`).join('\n');
+/**
+ * The contents list. Without a layout: one entry per chapter, its documents inside.
+ * With one (the older publishing tool's own shape): an entry named by the publication, a "Front matter" entry holding each front-matter page, and a "Chapter" entry holding each chapter
+ * as a folder named by its number - the chapter's heading page in an entry of its own, its documents in an entry without a title. The importer reads both shapes.
+ */
+export function pmcXml(chapters: PmcChapter[], head: { rootStart: string; identAndStatus: string }, layout?: PmcLayout): string {
+  const live = chapters.filter((c) => c.modules.length);
+  const entry = (title: string | null, inner: string, pad: string): string => `${pad}<pmEntry>\n${title === null ? '' : `${pad}  <pmEntryTitle>${esc(title)}</pmEntryTitle>\n`}${inner}\n${pad}</pmEntry>`;
+  const refs = (mods: PmcModule[], pad: string): string => mods.map((m) => dmRefX(m, pad)).join('\n');
+  let entries: string;
+  if (!layout) entries = live.map((c) => entry(c.title, refs(c.modules, '      '), '    ')).join('\n');
+  else {
+    const front = layout.front.length ? entry('Front matter', layout.front.map((f) => entry(f.title, refs([f.module], '          '), '        ')).join('\n'), '      ') : '';
+    const chapterEntries = live.map((c) => (c.heading
+      ? entry(String(c.number ?? ''), `${entry(c.title, refs([c.heading], '            '), '          ')}\n${entry(null, refs(c.modules, '            '), '          ')}`, '        ')
+      : entry(c.title, refs(c.modules, '        '), '      '))).join('\n');
+    entries = entry(layout.title, [front, entry('Chapter', chapterEntries, '      ')].filter(Boolean).join('\n'), '    ');
+  }
   return `<?xml version="1.0" ?>\n${head.rootStart}\n  ${head.identAndStatus.trim()}\n  <content>\n${entries}\n  </content>\n</pm>\n`;
 }
 
-export function generatedPmHead(projectCode: string, title: string, language: Record<string, string>, today: Date): { rootStart: string; identAndStatus: string } {
+export function generatedPmHead(projectCode: string, title: string, language: Record<string, string>, today: Date, pm: { pmIssuer: string; pmNumber: string; pmVolume: string } = { pmIssuer: '00000', pmNumber: '00001', pmVolume: '00' }): { rootStart: string; identAndStatus: string } {
   const d = { y: today.getUTCFullYear(), m: pad2(today.getUTCMonth() + 1), d: pad2(today.getUTCDate()) };
   return {
     rootStart: '<pm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xlink="http://www.w3.org/1999/xlink" xsi:noNamespaceSchemaLocation="http://www.s1000d.org/S1000D_4-2/xml_schema_flat/pm.xsd">',
     identAndStatus: `<identAndStatusSection>
     <pmAddress>
       <pmIdent>
-        <pmCode modelIdentCode="${escA(projectCode)}" pmIssuer="00000" pmNumber="00001" pmVolume="00"/>
+        <pmCode modelIdentCode="${escA(projectCode)}" pmIssuer="${escA(pm.pmIssuer)}" pmNumber="${escA(pm.pmNumber)}" pmVolume="${escA(pm.pmVolume)}"/>
         <language languageIsoCode="${escA(language.languageIsoCode ?? 'en')}" countryIsoCode="${escA(language.countryIsoCode ?? 'US')}"/>
         <issueInfo issueNumber="001" inWork="00"/>
       </pmIdent>

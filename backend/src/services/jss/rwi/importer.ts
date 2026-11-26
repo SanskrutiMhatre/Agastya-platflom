@@ -13,13 +13,45 @@ import { placeholderPng } from '../../importer/png';
 import { authoredMeta, isJssAuthored, jssTypeOfProject, readSource, writeSource, type JssReport } from '../service';
 import { createHash } from 'crypto';
 import { fingerprintSection, isSection, parseJss, serializeJss, type Section } from './canonical';
-import { mapPackage } from './map';
+import { mapPackage, type MapResult } from './map';
 import { writeRecord, type SourceRecord } from './record';
 import { emptyCounts, Findings, type ImportReport } from './report';
-import { parseModule, parsePublication, readPackage, RwiPackageError, type SourceModule } from './source';
+import { classifyFrontMatter } from '../../jssdm/reserved';
+import { reseedIdentity } from '../../xengine/project';
+import { parseModule, parsePublication, readPackage, RwiPackageError, type RwiPackage, type SourceModule, type SourcePublication } from './source';
 import { validateSource } from './validate';
 
 export interface ImportResult { hash: string; report: JssReport; import: ImportReport }
+
+/** The package read, its front matter set aside and the rest mapped to the canonical document: the part of an import that does not depend on where the result goes. */
+export async function loadAndMap(pkg: RwiPackage, chapterTitles: string[], maxDepth: number, findings: Findings): Promise<{ modules: SourceModule[]; pub: SourcePublication; body: SourceModule[]; frontMatter: Array<{ m: SourceModule; page: string }>; mapped: MapResult }> {
+  // parse: a file that cannot be read is reported and left out, not fatal
+  const modules: SourceModule[] = [];
+  for (const f of pkg.modules) {
+    try { modules.push(parseModule(f)); }
+    catch (e) { findings.add('error', 'document-unreadable', `The file ${f.name} could not be read and was left out: ${(e as Error).message.slice(0, 160)}`, f.name); }
+  }
+  if (!modules.length) throw bad('None of the documents in this package could be read.', 'NO_MODULES');
+  let pub;
+  try { pub = parsePublication(pkg.publication!); }
+  catch (e) { throw bad(`The package's contents list could not be read: ${(e as Error).message.slice(0, 200)}`, 'BAD_PUBLICATION'); }
+  for (const o of pkg.other) findings.add('info', 'file-ignored', `The package contains a file that is not part of the document and was ignored: ${o}`, o);
+
+  await validateSource(pkg, modules, pub, findings);
+  // front-matter pages (title page, foreword, lists ... at the zero system code) are not sections: a JSS handbook makes its own cover and front pages from Settings. They are kept in the record.
+  const entryTitle = new Map<string, string>();
+  const titles = (es: typeof pub.entries, trail: string): void => { for (const e of es) { const here = e.title ?? trail; for (const r of e.refs) entryTitle.set(r.key, here); titles(e.children, here); } };
+  titles(pub.entries, '');
+  const frontMatter: Array<{ m: SourceModule; page: string }> = [];
+  const body = modules.filter((m) => {
+    const c = classifyFrontMatter({ infoCode: m.code.infoCode ?? '', disassyCode: m.code.disassyCode, systemCode: m.code.systemCode ?? '', subSystemCode: m.code.subSystemCode ?? '', subSubSystemCode: m.code.subSubSystemCode ?? '', assyCode: m.code.assyCode ?? '', infoName: m.infoName, techName: m.techName, entryTitle: entryTitle.get(m.key) });
+    if (c.kind === 'page') { frontMatter.push({ m, page: c.page }); return false; }
+    return true;
+  });
+  if (frontMatter.length) findings.add('info', 'front-matter-skipped', `${frontMatter.length} front-matter page${frontMatter.length === 1 ? '' : 's'} of the package (${frontMatter.slice(0, 4).map((f) => f.m.infoName || f.m.techName || f.m.file).join(', ')}${frontMatter.length > 4 ? ', ...' : ''}) ${frontMatter.length === 1 ? 'was' : 'were'} not imported as sections: the handbook's cover and front pages are made from its Settings. ${frontMatter.length === 1 ? 'It is' : 'They are'} kept with the project's package record.`);
+  const mapped = mapPackage(pkg, body, pub, chapterTitles, findings, maxDepth);
+  return { modules, pub, body, frontMatter, mapped };
+}
 
 export async function importRwiProject(projectId: string, zipFile: string): Promise<ImportResult> {
   if (!isJssAuthored(projectId)) throw bad('Importing a project is available in a JSS document project.', 'IMPORT_TYPE');
@@ -32,20 +64,7 @@ export async function importRwiProject(projectId: string, zipFile: string): Prom
   catch (e) { if (e instanceof RwiPackageError) throw bad(e.message, e.code); throw e; }
   const findings = new Findings();
   try {
-    // parse: a file that cannot be read is reported and left out, not fatal
-    const modules: SourceModule[] = [];
-    for (const f of pkg.modules) {
-      try { modules.push(parseModule(f)); }
-      catch (e) { findings.add('error', 'document-unreadable', `The file ${f.name} could not be read and was left out: ${(e as Error).message.slice(0, 160)}`, f.name); }
-    }
-    if (!modules.length) throw bad('None of the documents in this package could be read.', 'NO_MODULES');
-    let pub;
-    try { pub = parsePublication(pkg.publication!); }
-    catch (e) { throw bad(`The package's contents list could not be read: ${(e as Error).message.slice(0, 200)}`, 'BAD_PUBLICATION'); }
-    for (const o of pkg.other) findings.add('info', 'file-ignored', `The package contains a file that is not part of the document and was ignored: ${o}`, o);
-
-    await validateSource(pkg, modules, pub, findings);
-    const mapped = mapPackage(pkg, modules, pub, chapterTitles, findings, type.maxDepth);
+    const { modules, pub, body, frontMatter, mapped } = await loadAndMap(pkg, chapterTitles, type.maxDepth, findings);
 
     // the project's own identity is kept; only the body is replaced
     const current = authoredMeta(readSource(projectId).xml);
@@ -98,6 +117,10 @@ export async function importRwiProject(projectId: string, zipFile: string): Prom
         rootStart: o.module.rootStart, identAndStatus: o.module.identAndStatus, doctype: o.module.doctype, schemaLocation: o.module.schemaLocation,
         pictures: o.pictures, attachments: o.attachments, fingerprint: o.fingerprint, tables: o.tables, figures: o.figures, flattened: o.flattened,
       })),
+      others: [
+        ...frontMatter.map(({ m, page }) => ({ file: m.file, rel: relOf.get(m.file) ?? m.file, key: m.key, kind: 'front-matter' as const, page, title: m.infoName || m.techName || m.file, techName: m.techName, infoName: m.infoName, issueDate: m.issueDate, code: m.code, issue: m.issue, language: m.language })),
+        ...mapped.headings.map((k) => body.find((m) => m.key === k)).filter((m): m is SourceModule => !!m).map((m) => ({ file: m.file, rel: relOf.get(m.file) ?? m.file, key: m.key, kind: 'chapter-heading' as const, chapter: mapped.headingChapter[m.key], techName: m.techName, infoName: m.infoName, issueDate: m.issueDate, title: [m.techName, m.infoName].filter(Boolean).join(' - ') || m.file, code: m.code, issue: m.issue, language: m.language })),
+      ],
       pictures: mapped.mediaFiles.map((f) => ({ file: f.from?.name ?? '', media: f.media, placeholder: f.placeholderFor !== undefined, used: f.used })),
       findings: findings.list, counts,
     };
@@ -105,6 +128,7 @@ export async function importRwiProject(projectId: string, zipFile: string): Prom
       { rel: rel(pkg.publication!), text: pkg.publication!.text },
       ...pkg.modules.map((f) => ({ rel: relOf.get(f.name) ?? f.name, text: f.text })),
     ]);
+    reseedIdentity(projectId);                      // the package's own document codes, publication code and picture names become the project's
     return { hash: saved.hash, report: saved.report, import: report };
   } finally { pkg.close(); }
 }

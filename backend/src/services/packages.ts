@@ -167,7 +167,7 @@ export async function exportDeliveryPackage(projectId: string, out: Writable, o:
 
 // ── Import ──────────────────────────────────────────────────────────────────
 
-export interface ImportOptions { overwrite?: boolean; partial?: boolean; skipChecks?: boolean; replacePm?: boolean; validate?: boolean; /** Called with the package's manifest when it can be read (the new-project import takes the project settings from it). */ onManifest?: (m: Manifest) => void }
+export interface ImportOptions { overwrite?: boolean; partial?: boolean; skipChecks?: boolean; replacePm?: boolean; validate?: boolean; /** false: a data module naming an enterprise the Administrator has not registered is kept and reported, not refused (a JSS / JSG project does not author S1000D enterprise data, so the register is not its rule). Default true. */ enterprises?: boolean; /** Called with the package's manifest when it can be read (the new-project import takes the project settings from it). */ onManifest?: (m: Manifest) => void }
 export type ItemStatus = 'accepted' | 'unchanged' | 'skipped' | 'rejected';
 export interface ImportItem { path: string; as: FileKind; status: ItemStatus; message: string; schema?: string; xsdErrors?: number; xsdFirst?: string[]; sha256?: string; action?: 'create' | 'replace' }
 export interface ImportReport { source: string; startedAt: string; finishedAt: string; applied: boolean; counts: Record<ItemStatus, number>; items: ImportItem[]; notes: string[]; manifest: { present: boolean; checked: number; mismatches: string[] } }
@@ -196,7 +196,7 @@ export async function importPackage(projectId: string, zipPath: string, sourceNa
     }
 
     // PLAN 2: judge each file
-    const cfg = getConfig(projectId); const seen = new Map<string, { rel: string; sha: string }>(); const toCheck: Array<{ it: ImportItem; xml: string }> = [];
+    const cfg = getConfig(projectId); const seen = new Map<string, { rel: string; sha: string }>(); const toCheck: Array<{ it: ImportItem; xml: string }> = []; let unregistered = 0;
     const known = new Map(csdb.listDms(projectId).map((m) => [csdb.identityKey(m), m.file]));
     for (const s of staged) {
       const kind = classify(s.rel); const base = path.basename(s.rel); const it: ImportItem = { path: s.rel, as: kind, status: 'accepted', message: '' };
@@ -215,7 +215,7 @@ export async function importPackage(projectId: string, zipPath: string, sourceNa
           if (clash && clash.toLowerCase() !== base.toLowerCase()) throw new Error(`same data module (code, issue, language) as ${clash}, held under another file name`);
           if (exists && sha256File(target) === sha) { it.status = 'unchanged'; it.message = 'Already in the project with identical content.'; continue; }
           if (exists && !o.overwrite) throw new Error('already in the project with different content (overwrite not requested)');
-          if (!o.skipChecks) { for (const p of checkDmEnterprises(xml)) throw new Error(p); if (!exists) { const np = newDmProblems(projectId, xml); if (np.length) throw new Error(np[0]); } }
+          if (!o.skipChecks) { const ep = checkDmEnterprises(xml); if (ep.length) { if (o.enterprises === false) unregistered++; else throw new Error(ep[0]); } if (!exists) { const np = newDmProblems(projectId, xml); if (np.length) throw new Error(np[0]); } }
           it.action = exists ? 'replace' : 'create'; it.message = exists ? 'Replaces the project\'s file (history keeps the old content).' : 'New data module.';
           it.schema = mine.schema || undefined;
           if (o.validate !== false) toCheck.push({ it, xml });                                    // this module against ITS schema only (batched below)
@@ -247,6 +247,7 @@ export async function importPackage(projectId: string, zipPath: string, sourceNa
       } catch (e) { it.status = 'rejected'; it.message = (e as Error).message; }
     }
     void cfg;
+    if (unregistered) notes.push(`${unregistered} data module${unregistered === 1 ? ' names' : 's name'} an enterprise that is not in the Administrator's lists. They were kept as received; this kind of project does not check them.`);
     if (toCheck.length) await xsdBatch(projectId, staging, toCheck.filter((c) => c.it.status === 'accepted'));
     const rejected = items.filter((i) => i.status === 'rejected').length; const integrity = mm.mismatches.length > 0;
     if (integrity) notes.push('The manifest check found differences; the package was not applied.');

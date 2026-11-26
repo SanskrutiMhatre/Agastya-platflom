@@ -42,6 +42,8 @@ export interface EditorOptions {
   tableTemplates?: TableTemplate[];
   /** What a new chapter starts from (its sections and the stencil tables under them), for a type with free chapters. */
   chapterStarter?: OutlineNode | null;
+  /** The text shown beside a section's heading (its document code) - only the sections that are data modules of the package, and only when this returns text. `chapter` is 0 for a section below the top level. */
+  sectionBadge?: (s: Section, chapter: number) => string | null;
 }
 
 type Children = Array<Block | Section>;
@@ -102,6 +104,11 @@ export class JssEditor {
 
   /** Replace the whole document (after a reload from the server). History is cleared. */
   setDocument(doc: JssDoc): void { this.doc = doc; this.undoStack = []; this.redoStack = []; this.dirty = false; this.renderAll(); this.opts.host.onDirty(false); this.updateToolbar(); }
+
+  /** Show (or stop showing) a code beside each section's heading; the document itself is not touched. */
+  setSectionBadge(fn: EditorOptions['sectionBadge'] | undefined): void { this.opts.sectionBadge = fn; this.refreshLabels(); }
+  /** The chapter a top-level section belongs to; 0 for a section lower down. */
+  private chapterNumberOf(s: Section): number { for (const ch of this.doc.chapters) if (ch.children.includes(s)) return ch.number; return 0; }
 
   setFindings(findings: Finding[]): void { this.findings = findings; this.applyFindingMarks(); this.renderProblems(); this.markOutline(); }
 
@@ -390,8 +397,11 @@ export class JssEditor {
     this.plainEditable(title, () => s.title, (v) => { s.title = v; });
     if (this.opts.sectionsFixed) { this.setEditable(title, false); title.title = 'The stencil fixes the sections of this publication, so their titles cannot be changed here'; }
     const bindNo = () => { no.textContent = this.numbers.heading.get(s) ?? ''; }; bindNo(); this.labelFns.push(bindNo);
+    // the section's document code (DMC), kept in the backend and shown here only when the author switches it on; it is never part of the document
+    const code = h('span', { class: 'jss-sec-code', contenteditable: 'false', title: 'Data module code of this section (kept in the backend, not in the document)' });
+    const bindCode = () => { const t = this.opts.sectionBadge?.(s, this.chapterNumberOf(s)) ?? ''; code.textContent = t; code.style.display = t ? '' : 'none'; }; bindCode(); this.labelFns.push(bindCode);
     const bodyEl = h('div', { class: 'jss-sec-body' });
-    sec.append(this.sectionTools(s), h('div', { class: 'jss-sec-head' }, no, title), bodyEl);
+    sec.append(this.sectionTools(s), h('div', { class: 'jss-sec-head' }, no, title, code), bodyEl);
     group.append(sec);
     this.appendChildren(bodyEl, group, s.children, s, depth);
     return group;

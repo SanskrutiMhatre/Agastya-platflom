@@ -21,6 +21,7 @@ export function Projects() {
   const [q, setQ] = useState('');
   const [sort, setSort] = useState<Sort>('recent');
   const [creating, setCreating] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [copying, setCopying] = useState<string | null>(null);
 
   const rows = useMemo(() => {
@@ -45,7 +46,7 @@ export function Projects() {
             <option value="recent">Recently opened</option><option value="name">Name</option><option value="dms">Most data modules</option>
           </select>
           <BackupButton />
-          {role === 'admin' ? null : <><SampleButton onCreated={() => list.reload()} /><SampleButton kind="jsg" onCreated={() => list.reload()} /><SampleButton kind="jsg-ispl" onCreated={() => list.reload()} /><button className="btn btn-primary" onClick={() => setCreating(true)}><Icon name="plus" />New project</button></>}
+          {role === 'admin' ? null : <><button className="btn" onClick={() => setImporting(true)} data-testid="import-as-open" title="Import a package of S1000D documents (or the older publishing tool's export), or a JSS / JSG document, as a new S1000D, JSS or JSG project"><Icon name="upload" />Import package</button><SampleButton onCreated={() => list.reload()} /><SampleButton kind="jsg" onCreated={() => list.reload()} /><SampleButton kind="jsg-ispl" onCreated={() => list.reload()} /><button className="btn btn-primary" onClick={() => setCreating(true)}><Icon name="plus" />New project</button></>}
         </div>
       </div>
 
@@ -74,6 +75,7 @@ export function Projects() {
       </div>
 
       {creating ? <CreateProjectModal folders={folders} onClose={() => setCreating(false)} onCreated={() => list.reload()} /> : null}
+      {importing ? <CreateProjectModal folders={folders} startWith="import" onClose={() => setImporting(false)} onCreated={() => list.reload()} /> : null}
       {copying ? (
         <PromptModal title="Copy project" label="Name of the copy" confirmLabel="Copy" hint="Copies every data module, setting and the publication. You become its owner."
           initial={`${list.data?.find((p) => p.id === copying)?.name} (copy)`} onClose={() => setCopying(null)}

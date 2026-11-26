@@ -18,8 +18,9 @@ import { fingerprintSection, isSection, parseJss, type Block, type Section } fro
 import { readOriginal, readRecord, type RecordModule, type SourceRecord } from './record';
 import type { ExportReport, Finding } from './report';
 import { Findings } from './report';
-import { DEFAULT_ROOT, codeAttrs, contentXml, dmcFileName, doctypeFor, documentXml, generatedIdentity, generatedPmHead, icnNameFor, identAndStatusXml, pmcXml, type ModuleIdentity, type PmcChapter, type SerializeCtx } from './serialize';
+import { DEFAULT_ROOT, codeAttrs, contentXml, dmcFileName, doctypeFor, documentXml, generatedIdentity, generatedPmHead, icnNameFor, identAndStatusXml, pmcXml, type ModuleIdentity, type PmcChapter, type PmcLayout, type PmcModule, type SerializeCtx } from './serialize';
 import { schemaCheck } from './validate';
+import { exportIdentity } from '../../xengine/project';
 
 export interface ExportFile { name: string; data?: Buffer; abs?: string }
 export interface ExportPlan { fileName: string; files: ExportFile[]; report: ExportReport; blocked: boolean }
@@ -34,11 +35,18 @@ export async function planExport(projectId: string): Promise<ExportPlan> {
   const notNative = nativeProblemOfProject(projectId);
   if (notNative) throw bad(`This document cannot be exported: ${notNative}`, 'NOT_NATIVE_JSS');
   let doc;
-  try { doc = parseJss(readSource(projectId).xml); }
+  let sourceXml = '';
+  try { sourceXml = readSource(projectId).xml; doc = parseJss(sourceXml); }
   catch (e) { throw bad(`The document could not be read for export: ${(e as Error).message}`, 'EXPORT_UNREADABLE'); }
   const rec: SourceRecord | null = readRecord(projectId);
   const dir = projectDirFor(projectId); const media = path.join(dir, 'Media');
   const recBySection = new Map<string, RecordModule>(rec?.modules.map((m) => [m.sectionId, m]) ?? []);
+  // the project's own document codes (services/xengine): a section the package never had is numbered by its place in the document's structure, not by a running count
+  const idn = rec ? null : exportIdentity(projectId, sourceXml);
+  // pages of an imported package that are not sections of the handbook (its front matter, each chapter's heading page): written back as received, and listed in the contents list where they stood
+  const keptOthers = (rec?.others ?? []).filter((o) => o.issueDate?.year && o.issueDate.month && o.issueDate.day).flatMap((o) => { const text = readOriginal(projectId, o.rel); return text === null ? [] : [{ o, text }]; });
+  const pageModule = (o: NonNullable<SourceRecord['others']>[number]): PmcModule => ({ identity: { code: o.code, issue: o.issue, language: o.language, issueDate: o.issueDate!, techName: o.techName ?? o.title, infoName: o.infoName ?? '' }, pmTitle: o.techName ?? '' });
+  if (rec?.others?.length && keptOthers.length < rec.others.length) findings.add('info', 'pages-not-restored', `${rec.others.length - keptOthers.length} front-matter or chapter-heading page${rec.others.length - keptOthers.length === 1 ? '' : 's'} of the imported package cannot be put back (the project was imported before they were kept). Import the package again to keep them.`);
 
   // identity of the package
   const projectCode = (rec ? rec.modules[0]?.code.modelIdentCode : '') || (doc.meta.projectCode ?? '').trim();
@@ -63,7 +71,7 @@ export async function planExport(projectId: string): Promise<ExportPlan> {
     const ext = (/\.[A-Za-z0-9]+$/.exec(name)?.[0] ?? '.png').toLowerCase();
     if (known?.placeholder && abs && fs.readFileSync(abs).equals(placeholderPng(known.entity))) { skippedPlaceholders.add(known.entity); pictureEntity.set(key, entity); return entity; }
     if (!abs) { findings.add('warning', 'picture-missing', `A picture used in the document (${name}) is not in the project's pictures; the reference is kept but the picture cannot be included.`, name); pictureEntity.set(key, entity); return entity; }
-    if (!known && !/^ICN-/i.test(name)) { entity = icnNameFor(projectCode || 'PIC', fs.readFileSync(abs)); findings.add('info', 'picture-renamed', `The picture "${name}" was given the standard picture name ${entity}${ext} in the package.`, name); }
+    if (!known && !/^ICN-/i.test(name)) { entity = idn?.icnFor(name, projectCode || idn.modelIdentCode) ?? icnNameFor(projectCode || 'PIC', fs.readFileSync(abs)); findings.add('info', 'picture-renamed', `The picture "${name}" was given the standard picture name ${entity}${ext} in the package.`, name); }
     packagePictures.set(entity, { file: `${entity}${ext}`, abs });
     pictureEntity.set(key, entity);
     return entity;
@@ -90,7 +98,7 @@ export async function planExport(projectId: string): Promise<ExportPlan> {
     const own = chapter.children.filter((c): c is Block => !isSection(c));
     const subs = chapter.children.filter(isSection);
     const parts: Section[] = own.length ? [{ k: 'section', id: `chapter-${chapter.number}-own`, title: chapter.title, children: own }, ...subs] : subs;
-    for (const s of parts) {
+    for (const [pi, s] of parts.entries()) {
       const r = s.id ? recBySection.get(s.id) : undefined;
       let name: string; let text: string; let identity: ModuleIdentity; let generated = true; let pmTitle = '';
       if (r) {
@@ -104,7 +112,10 @@ export async function planExport(projectId: string): Promise<ExportPlan> {
         }
       } else {
         let n = seq; let key: string; let id: ModuleIdentity;
-        do { id = generatedIdentity(projectCode || 'PROJECT', n++, s.title, language, today); key = dmcFileName(id.code); } while (usedCodes.has(key) && n < 100000);
+        const given = idn?.moduleAt(chapter.number, pi);
+        const numbered = (): void => { do { id = generatedIdentity(projectCode || 'PROJECT', n++, s.title, language, today); key = dmcFileName(id.code); } while (usedCodes.has(key) && n < 100000); };
+        id = undefined as unknown as ModuleIdentity; key = '';
+        if (given) { id = { ...generatedIdentity(projectCode || 'PROJECT', 0, s.title, language, today), code: { ...given, modelIdentCode: projectCode || given.modelIdentCode } }; key = dmcFileName(id.code); if (usedCodes.has(key)) numbered(); } else numbered();
         seq = n; usedCodes.add(key); identity = id; name = `XML/${key}.xml`;
         text = rebuild(s, identity, { rootStart: DEFAULT_ROOT, identAndStatus: identAndStatusXml(identity) }, null); created++;
       }
@@ -112,8 +123,9 @@ export async function planExport(projectId: string): Promise<ExportPlan> {
       files.push({ name: `${root}/${name}`, data: Buffer.from(text, 'utf8') });
       modules.push({ identity, pmTitle });
     }
+    const heading = keptOthers.find((k) => k.o.kind === 'chapter-heading' && k.o.chapter === chapter.number);
     const srcTitle = rec?.chapters.find((c) => c.number === chapter.number)?.sourceTitle;
-    pmc.push({ title: srcTitle || chapter.title, modules });
+    pmc.push({ title: srcTitle || chapter.title, modules, number: chapter.number, ...(heading ? { heading: pageModule(heading.o) } : {}) });
     void ci;
   });
   for (const r of rec?.modules ?? []) if (!seen.has(r.sectionId)) findings.add('info', 'section-removed', `"${r.heading || r.techName}" was removed from the document, so it is not in the exported package.`, r.heading || r.techName);
@@ -123,10 +135,13 @@ export async function planExport(projectId: string): Promise<ExportPlan> {
   for (const e of skippedPlaceholders) findings.add('warning', 'picture-missing', `The picture ${e} was missing from the original package and is still missing; a placeholder is not exported.`, e);
 
   // the contents list
-  const head = rec ? { rootStart: rec.publication.rootStart, identAndStatus: rec.publication.identAndStatus } : generatedPmHead(projectCode || 'PROJECT', doc.meta.bookName || root, language, today);
-  const pmcText = pmcXml(pmc, head);
-  const pmcName = rec ? rec.publication.rel : `PMC-${projectCode || 'PROJECT'}-00000-00001-00.xml`;
+  const head = rec ? { rootStart: rec.publication.rootStart, identAndStatus: rec.publication.identAndStatus } : generatedPmHead(projectCode || 'PROJECT', doc.meta.bookName || root, language, today, idn?.pm);
+  const front = keptOthers.filter((k) => k.o.kind === 'front-matter').map((k) => ({ title: k.o.title, module: pageModule(k.o) }));
+  const layout: PmcLayout | undefined = keptOthers.length ? { title: rec?.publication.title || doc.meta.bookName || root, front } : undefined;
+  const pmcText = pmcXml(pmc, head, layout);
+  const pmcName = rec ? rec.publication.rel : `PMC-${projectCode || 'PROJECT'}-${idn?.pm.pmIssuer ?? '00000'}-${idn?.pm.pmNumber ?? '00001'}-${idn?.pm.pmVolume ?? '00'}.xml`;
   files.push({ name: `${root}/${pmcName}`, data: Buffer.from(pmcText, 'utf8') });
+  for (const k of keptOthers) files.push({ name: `${root}/${k.o.rel}`, data: Buffer.from(k.text, 'utf8') });
   for (const { file, abs } of new Map([...packagePictures.values()].map((p) => [p.file, p])).values()) files.push({ name: `${root}/ICN/${file}`, abs });
 
   // checks before anything is written
@@ -141,7 +156,8 @@ export async function planExport(projectId: string): Promise<ExportPlan> {
   }
   const pr = await schemaCheck(pmcText, '4.2', 'pm.xsd');
   for (const e of pr.errors.slice(0, 4)) findings.add(rec ? 'warning' : 'error', 'publication-schema-error', rec ? `The contents list keeps a structure problem the original package had: ${e.message}` : `The contents list does not meet the package's structure rules: ${e.message}`, undefined, `line ${e.line}`);
-  const have = new Set(dmTexts.map((d) => path.posix.basename(d.name).replace(/\.xml$/i, '')));
+  // a file may carry its issue and language in its name (DMC-...-D_001-00_EN-IN.xml, the older publishing tool's way): the contents list names the document by its code alone
+  const have = new Set(dmTexts.map((d) => path.posix.basename(d.name).replace(/\.xml$/i, '').replace(/_[0-9]{3}-[0-9]{2}(_[A-Za-z]{2,3}-[A-Za-z]{2})?$/, '')));
   for (const c of pmc) for (const m of c.modules) if (!have.has(dmcFileName(m.identity.code))) findings.add('error', 'reference-unresolved', `The contents list names a section (${m.identity.techName}) that was not written to the package.`, m.identity.techName);
   if (!dmTexts.length) findings.add('error', 'empty-export', 'The document has no sections to export.');
 

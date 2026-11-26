@@ -12,11 +12,24 @@ interface ReportLike { items?: Array<{ path?: string; status?: string; message?:
 
 const baseName = (p: string) => p.split(/[\\/]/).pop() || p;
 
+/** The package importer's own refusal ("Nothing was imported."): its problems are lines of "<file>: <reason>", grouped here by reason like the per-file report is. */
+function problemReasons(problems: unknown, maxFiles: number): RefusalReason[] {
+  if (!Array.isArray(problems)) return [];
+  const groups = new Map<string, RefusalReason>();
+  for (const raw of problems) {
+    const text = String(raw); const m = /^(.+?\.xml): ([\s\S]+)$/i.exec(text);
+    const message = m ? m[2] : text; const g = groups.get(message) ?? { message, count: 0, files: [] };
+    g.count++; if (m && g.files.length < maxFiles) g.files.push(baseName(m[1]));
+    groups.set(message, g);
+  }
+  return [...groups.values()].sort((a, b) => b.count - a.count);
+}
+
 /** The grouped reasons of a refused import; empty when the error is anything else (a network failure, an expired upload...). Most files first. */
 export function refusalReasons(e: unknown, maxFiles = 3): RefusalReason[] {
   if (!(e instanceof ApiError) || e.code !== 'IMPORT_REFUSED') return [];
   const rep = (e.body?.report ?? null) as ReportLike | null;
-  if (!rep) return [];
+  if (!rep) return problemReasons(e.body?.problems, maxFiles);
   const groups = new Map<string, RefusalReason>();
   for (const it of rep.items ?? []) {
     if (it.status !== 'rejected' || !it.message) continue;

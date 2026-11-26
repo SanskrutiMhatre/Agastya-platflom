@@ -1,8 +1,8 @@
-// A package refused on import says WHY in the new-project dialog.
+// A package whose data modules name an enterprise the Administrator has not registered is IMPORTED, and the dialog says so.
 //
-// Found on a real installation: the Administrator's enterprise lists register only one enterprise, an author imported a package whose data modules
-// name another, the server refused all of them (the check working as designed) and the dialog answered "The report says why." with no report to read.
-// Now the dialog lists the reasons (grouped: 1 line for 1 reason, with how many files and a few names) and says where the author can act.
+// Found on a real installation: the dialog refused such a package ( "the enterprise code is not registered" ) although the platform's own package importer only reports it
+// (services/importer/apply.ts: a foreign package would otherwise be impossible to bring in at all). The dialog now uses that importer: the project is made, and the result lists
+// the reason once, with where an Administrator can register the enterprise.
 //
 // The enterprise lists are shared state of the e2e server, so they are registered for this test only and removed again in afterAll.
 
@@ -46,22 +46,23 @@ test.afterAll(async () => {
   await author.page.context().close(); await admin.dispose();
 });
 
-test('the dialog lists why the package was refused, and what an author can do', async () => {
+test('a package naming an unregistered enterprise is imported, and the result says which enterprise and what an Administrator can do', async () => {
   const page = author.page;
   await page.goto('/workspace');
   await page.getByRole('button', { name: /New project/ }).first().click();
   await page.getByTestId('wiz-start-import').click();
-  await page.getByTestId('wiz-import-file').setInputFiles({ name: 'refusal-package.zip', mimeType: 'application/zip', buffer: pkg });
-  await expect(page.getByText(/This looks like an/)).toBeVisible();
+  await page.getByTestId('wiz-import-file').setInputFiles({ name: 'unregistered-package.zip', mimeType: 'application/zip', buffer: pkg });
+  await expect(page.getByTestId('wiz-detected')).toContainText('An S1000D package');       // the first look is only a guess ...
+  await expect(page.getByTestId('wiz-create')).toBeDisabled();                              // ... so nothing is imported until the person has confirmed it
+  await page.getByTestId('wiz-source-confirm').click();
   await page.getByTestId('wiz-create').click();
 
-  const reasons = page.getByTestId('wiz-import-reasons');
-  await expect(reasons).toBeVisible();
-  await expect(page.getByRole('alert').filter({ hasText: 'The package was not imported' })).toBeVisible();
-  await expect(reasons).toContainText('Why it was not imported');
-  await expect(reasons).toContainText(/enterprise code .00000. is not registered/);
-  await expect(reasons).toContainText('DMC-EXAMPLE-A-00-00-01-00A-040A-D_001-00_EN-US.XML');   // the refused module is named
-  await expect(reasons).toContainText('RPC CAGE codes and Originator CAGE codes');                    // and where to act
-  await expect(page.getByText('The report says why')).toHaveCount(0);
-  await page.screenshot({ path: 'test-results/shots/import-refusal.png' });
+  await expect(page.getByTestId('wiz-done')).toContainText('S1000D');                      // made, not refused
+  const findings = page.getByTestId('import-as-findings');
+  await expect(findings).toContainText(/enterprise code .00000. is not registered/);
+  await expect(findings).toContainText('RPC CAGE codes and Originator CAGE codes');         // and where to act
+  await expect(page.getByTestId('wiz-import-reasons')).toHaveCount(0);
+  await expect(page.getByRole('alert').filter({ hasText: 'The package was not imported' })).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/shots/import-unregistered-enterprise.png' });
+  await page.getByTestId('wiz-done-close').click();
 });

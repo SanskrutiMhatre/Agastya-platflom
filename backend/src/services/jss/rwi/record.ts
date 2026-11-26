@@ -27,6 +27,8 @@ export interface SourceRecord {
   publication: { file: string; rel: string; rootStart: string; identAndStatus: string; code: Record<string, string>; language: Record<string, string>; issue: Record<string, string>; title: string; shortTitle: string };
   chapters: Array<{ number: number; stencilTitle: string; sourceTitle: string | null }>;
   modules: RecordModule[];
+  /** documents of the package that are not sections of the handbook: its front-matter pages, and each chapter's heading page. Kept so the package's codes survive. */
+  others?: Array<{ file: string; rel: string; key: string; kind: 'front-matter' | 'chapter-heading'; page?: string; chapter?: number; techName?: string; infoName?: string; issueDate?: Record<string, string>; title: string; code: Record<string, string>; issue: Record<string, string>; language: Record<string, string> }>;
   pictures: Array<{ file: string; media: string; placeholder: boolean; used: boolean }>;
   findings: Finding[]; counts: ImportCounts;
 }

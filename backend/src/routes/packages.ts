@@ -34,12 +34,24 @@ const uploadOne: RequestHandler = (req, res, next) => upload.single('file')(req,
 });
 const flag = (v: unknown) => v === '1' || v === 'true' || v === true;
 
-/** What a package contains, read from its entry names alone (nothing is extracted). */
-export function detectPackage(zipPath: string): { format: 's1000d' | 'unknown'; dataModules: number; publicationModules: number; graphics: number; other: number; entries: number } {
-  const r = ZipFileReader.open(zipPath, pk.importLimits()); const names = r.entries.map((e) => e.name.replace(/\\/g, '/').split('/').pop() ?? ''); r.close();
+/**
+ * What an upload is, read from its entry names (a .zip: nothing is extracted) or from the root element of its first few KB (one .xml document).
+ * This is only a first guess: the person importing it is asked to confirm it, or to say what it really is.
+ */
+export interface Detection { format: 's1000d' | 'jss' | 'jsg' | 'unknown'; kind: 'package' | 'document'; dataModules: number; publicationModules: number; graphics: number; other: number; entries: number; /** the older publishing tool's own export (.jsspub.zip layout) */ olderTool: boolean; /** a JSG document's type (uhb | ispl) */ docType?: string }
+export function detectPackage(zipPath: string, originalName = ''): Detection {
+  if (/\.xml$/i.test(originalName)) {                          // one authored document: its root element says which
+    const fd = fs.openSync(zipPath, 'r'); const buf = Buffer.alloc(65536); let n = 0; try { n = fs.readSync(fd, buf, 0, buf.length, 0); } finally { fs.closeSync(fd); }
+    const head = buf.subarray(0, n).toString('utf8'); const root = /<(jssbook|jsgdoc)\b([^>]*)>/.exec(head);
+    const format = root ? (root[1] === 'jssbook' ? 'jss' : 'jsg') : 'unknown';
+    return { format, kind: 'document', dataModules: 0, publicationModules: 0, graphics: 0, other: 1, entries: 1, olderTool: false, ...(root && root[1] === 'jsgdoc' ? { docType: /\btype\s*=\s*"([^"]*)"/.exec(root[2])?.[1] ?? 'uhb' } : {}) };
+  }
+  const r = ZipFileReader.open(zipPath, pk.importLimits()); const all = r.entries.map((e) => e.name.replace(/\\/g, '/')); r.close();
+  const names = all.map((n) => n.split('/').pop() ?? '');
   const dm = names.filter((n) => /^DMC-.*\.xml$/i.test(n)).length; const pm = names.filter((n) => pk.classify(n) === 'pm').length;   // a PMC-….xml, or the publication.xml of this platform's own project package
   const gr = names.filter((n) => /\.(png|jpe?g|svg|gif|tiff?|cgm)$/i.test(n)).length;
-  return { format: dm || pm ? 's1000d' : 'unknown', dataModules: dm, publicationModules: pm, graphics: gr, other: names.length - dm - pm - gr, entries: names.length };
+  const olderTool = all.some((n) => /^manifest\.json$/i.test(n)) && all.some((n) => /^project\/(csdb|PM)\//i.test(n));
+  return { format: dm || pm ? 's1000d' : 'unknown', kind: 'package', dataModules: dm, publicationModules: pm, graphics: gr, other: names.length - dm - pm - gr, entries: names.length, olderTool };
 }
 
 // A package that has been looked at but not yet turned into a project waits here, under a random token, until the owner confirms the format.
@@ -54,7 +66,7 @@ export function registerPackageRoutes(app: Express): void {
   app.post('/api/projects/import/detect', requireAuth(), uploadOne, wrap(async (req, res) => {
     const f = (req as any).file as Express.Multer.File | undefined; if (!f) throw bad('No package uploaded.', 'NO_FILE');
     try {
-      const found = detectPackage(f.path);
+      const found = detectPackage(f.path, f.originalname);
       const token = (await import('crypto')).randomBytes(16).toString('hex'); const keep = path.join(uploadTmp(), `${token}.upload`);
       fs.renameSync(f.path, keep);
       for (const [k, v] of pending) if (Date.now() - v.at > 3600_000) { pending.delete(k); try { fs.unlinkSync(v.file); } catch { /* gone */ } }
@@ -70,7 +82,7 @@ export function registerPackageRoutes(app: Express): void {
     const card = await createProject(user, { name: req.body?.name, folder: req.body?.folder, format: req.body?.format, domain: req.body?.domain, manualType: req.body?.manualType });
     const role = 'owner'; let report; let packageSettings: unknown;
     try {
-      report = await pk.importPackage(card.id, held.file, held.name, { overwrite: false, partial: false, skipChecks: false, replacePm: true, validate: true, onManifest: (m) => { packageSettings = m?.project?.settings; } },{ id: user.id, username: user.username, role: user.role }, role);
+      report = await pk.importPackage(card.id, held.file, held.name, { overwrite: false, partial: false, skipChecks: false, replacePm: true, validate: true, enterprises: (card.format ?? 's1000d') === 's1000d', onManifest: (m) => { packageSettings = m?.project?.settings; } },{ id: user.id, username: user.username, role: user.role }, role);
     } catch (e) { try { deleteProject(user, card.id); } catch { /* best effort */ } throw e; }
     if (!report.applied) {                                  // nothing was imported: do not leave an empty project behind
       try { deleteProject(user, card.id); } catch { /* best effort */ }

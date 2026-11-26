@@ -12,7 +12,8 @@ export interface Gates { onboarding: boolean; mustChangePassword: boolean }
 export interface AdminQueues { approvals: number; changes: number; folderRequests: number; resets: number; ownerless: number; releases: number }
 
 export interface FormatInfo { id: 's1000d' | 'jss' | 'jsg'; label: string; description: string; ready: boolean; domains: Array<{ id: string; label: string; manualTypes: Array<{ id: string; label: string; ready: boolean; notReady?: string; note?: string }> }> }
-export interface PackageDetection { token: string; name: string; format: 's1000d' | 'unknown'; dataModules: number; publicationModules: number; graphics: number; other: number; entries: number }
+/** The server's first guess at what an upload is; the person confirms or corrects it (components/importSource.ts). */
+export interface PackageDetection { token: string; name: string; format: 's1000d' | 'jss' | 'jsg' | 'unknown'; kind: 'package' | 'document'; dataModules: number; publicationModules: number; graphics: number; other: number; entries: number; olderTool: boolean; docType?: string }
 export interface ProjectCard {
   id: string; name: string; type: string; pipeline: 's1000dtofo' | 's1000dtojss'; templateRef: string; folder: string; status: string;
   format: 's1000d' | 'jss' | 'jsg'; domain: string | null; manualType: string | null; authoring: 'jss-xml' | null; jssDocType: string | null; autoAddToPublication: boolean; sideText: { enabled: boolean; publisher: string; draftNote: boolean }; headerLogo: boolean;

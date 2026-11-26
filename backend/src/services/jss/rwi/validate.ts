@@ -10,6 +10,7 @@ import fs from 'fs';
 import path from 'path';
 import { config } from '../../../config';
 import { Findings } from './report';
+import { MAPPED_CONTENT } from './map';
 import type { RwiPackage, SourceModule, SourcePublication } from './source';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -41,6 +42,24 @@ export function safeDoctype(xml: string): string {
   return ok ? xml : xml.replace(m[0], '');
 }
 
+/**
+ * A picture the document uses but its DOCTYPE does not declare (the older publishing tool writes an empty one) is declared FOR THE CHECK ONLY: the schema wants every picture reference
+ * to name a declared entity, and a missing declaration is that tool's habit, not a structure problem in the text. A missing picture is reported where it is used (map.ts).
+ */
+export function declareUsedPictures(xml: string): string {
+  const used = new Set<string>(); for (const m of xml.matchAll(/infoEntityIdent="([^"]+)"/g)) used.add(m[1]);
+  if (!used.size) return xml;
+  const dt = /<!DOCTYPE[^>[]*(\[([\s\S]*?)\])?\s*>/i.exec(xml);
+  const declared = new Set<string>(); for (const m of (dt?.[2] ?? '').matchAll(/<!ENTITY\s+(\S+)/g)) declared.add(m[1]);
+  const missing = [...used].filter((n) => !declared.has(n) && /^[A-Za-z_][A-Za-z0-9_.-]*$/.test(n));
+  if (!missing.length) return xml;
+  const decls = missing.map((n) => `<!ENTITY ${n} SYSTEM "${n}.png" NDATA png>`).join('\n');
+  const root = /<([A-Za-z_][A-Za-z0-9_.:-]*)/.exec(xml.replace(/<[?!][^>]*>/g, (s) => ' '.repeat(s.length)));
+  if (!root) return xml;
+  const doctype = `<!DOCTYPE ${root[1]} [\n${dt?.[2] ?? ''}\n${decls}\n]>`;
+  return dt ? xml.replace(dt[0], () => doctype) : xml.slice(0, root.index) + doctype + '\n' + xml.slice(root.index);
+}
+
 /** Validate one XML text against one schema of an installed issue; returns the schema messages (empty = valid) or a note when it cannot be checked. */
 export async function schemaCheck(xml: string, issue: string, schemaFile: string): Promise<{ errors: Array<{ message: string; line: number }>; unchecked?: string }> {
   const set = schemaSet(issue);
@@ -48,7 +67,7 @@ export async function schemaCheck(xml: string, issue: string, schemaFile: string
   const main = set.find((s) => s.fileName === schemaFile);
   if (!main) return { errors: [], unchecked: `schema ${schemaFile} is not part of issue ${issue}` };
   try {
-    const r = await validateXML({ xml: [{ fileName: 'document.xml', contents: safeDoctype(xml) }], schema: [main], preload: set.filter((s) => s.fileName !== schemaFile) });
+    const r = await validateXML({ xml: [{ fileName: 'document.xml', contents: declareUsedPictures(safeDoctype(xml)) }], schema: [main], preload: set.filter((s) => s.fileName !== schemaFile) });
     return { errors: (r.errors ?? []).map((e: { message: string; loc?: { lineNumber?: number } }) => ({ message: String(e.message).replace(/^Schemas validity error\s*:\s*/, '').slice(0, 300), line: e.loc?.lineNumber ?? 0 })) };
   } catch (e) { return { errors: [], unchecked: `the schema check could not run: ${(e as Error).message.slice(0, 120)}` }; }
 }
@@ -95,5 +114,6 @@ export async function validateSource(pkg: RwiPackage, modules: SourceModule[], p
   const seen = new Map<string, string>();
   for (const m of modules) { const k = m.key; if (seen.has(k)) findings.add('warning', 'document-duplicate', `Two documents have the same code (${m.file} and ${seen.get(k)}); both were imported.`, m.file); seen.set(k, m.file); }
   const mic = new Set(modules.map((m) => m.code.modelIdentCode)); if (mic.size > 1) findings.add('info', 'mixed-model-codes', `The documents carry ${mic.size} different model codes.`);
-  if (modules.some((m) => m.contentType && m.contentType !== 'description')) findings.add('warning', 'content-type', 'Some documents are not plain descriptions; only descriptive text is imported from them.');
+  const unmapped = [...new Set(modules.map((m) => m.contentType).filter((t) => t && !MAPPED_CONTENT.has(t)))];
+  if (unmapped.length) findings.add('warning', 'content-type', `Some documents are of a kind this importer does not map (${unmapped.join(', ')}); only their text is imported from them.`);
 }
