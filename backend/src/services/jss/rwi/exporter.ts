@@ -13,6 +13,7 @@ import { projectDirFor } from '../../../context';
 import { bad } from '../../http';
 import { placeholderPng } from '../../importer/png';
 import { isJssAuthored, readSource } from '../service';
+import { nativeProblemOfProject } from '../native';
 import { fingerprintSection, isSection, parseJss, type Block, type Section } from './canonical';
 import { readOriginal, readRecord, type RecordModule, type SourceRecord } from './record';
 import type { ExportReport, Finding } from './report';
@@ -30,6 +31,8 @@ const safeName = (s: string): string => s.replace(/[^\w.\- ]/g, '_').trim() || '
 export async function planExport(projectId: string): Promise<ExportPlan> {
   if (!isJssAuthored(projectId)) throw bad('Export is available in a JSS document project.', 'EXPORT_TYPE');
   const findings = new Findings();
+  const notNative = nativeProblemOfProject(projectId);
+  if (notNative) throw bad(`This document cannot be exported: ${notNative}`, 'NOT_NATIVE_JSS');
   let doc;
   try { doc = parseJss(readSource(projectId).xml); }
   catch (e) { throw bad(`The document could not be read for export: ${(e as Error).message}`, 'EXPORT_UNREADABLE'); }

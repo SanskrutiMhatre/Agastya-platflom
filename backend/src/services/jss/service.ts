@@ -7,6 +7,7 @@
 //
 // Saving is permissive in the same way the S1000D side is: malformed XML is refused; well-formed XML that breaks the schema or the
 // stencil's rules is a draft and is saved. A PDF is only built from a document that has just been checked (assertJssPublishable).
+import { assertNativeJssXml, nativeProblemOf } from './native';
 import fs from 'fs';
 import crypto from 'crypto';
 import path from 'path';
@@ -16,7 +17,7 @@ import { bad, conflict, HttpError } from '../http';
 import { parseTree, walk, norm, type MNode } from '../miniXml';
 import { wellFormedError } from '../wellFormed';
 import { readProjectJson, updateProjectJson, pmRel } from '../projects';
-import { jssTypeById, skeletonOf, type JssDocType, type OutlineNode } from './registry';
+import { jssTypeById, skeletonOf, type JssDocType, type OutlineNode, type StartBlock } from './registry';
 
 const { validateXML } = require('xmllint-wasm');
 const { bookmetaXml } = vendor('engine/frontmatterInject');
@@ -50,13 +51,26 @@ export function sourcePath(projectId: string): string {
 
 export interface NewDocInput { bookName?: string; systemName?: string }
 
+/** The stencil's starting content under a heading: its tables (head and a few empty rows) and fixed sentences. */
+function startXml(blocks: StartBlock[] | undefined, pad: string): string {
+  return (blocks ?? []).map((b) => {
+    if ('para' in b) return `${pad}<para>${esc(b.para)}</para>`;
+    const t = b.table; const cell = (x: string): string => `<cell>${esc(x)}</cell>`;
+    const head = `<row>${t.columns.map(cell).join('')}</row>`;
+    const row = `<row>${t.columns.map(() => '<cell></cell>').join('')}</row>`;
+    return `${pad}<table${t.widths ? ` widths="${t.widths}"` : ''}><title>${esc(t.title)}</title><thead>${head}</thead><tbody>${Array.from({ length: Math.max(1, t.rows ?? 3) }, () => row).join('')}</tbody></table>`;
+  }).join('\n');
+}
+
 function outlineXml(nodes: OutlineNode[], depth: number, ids: { n: number }, chapterNo?: number): string {
   const pad = '  '.repeat(depth + 1);
   return nodes.map((n, i) => {
     const id = `${depth === 0 ? 'c' : 's'}${++ids.n}`;
-    const open = depth === 0 ? `<chapter number="${i + 1}" id="${id}">` : `<section id="${id}">`;
+    const open = depth === 0 ? `<chapter number="${i + 1}" id="${id}">` : `<section id="${id}"${n.orientation ? ` orientation="${n.orientation}"` : ''}>`;
     const close = depth === 0 ? '</chapter>' : '</section>';
-    const inner = n.children?.length ? '\n' + outlineXml(n.children, depth + 1, ids) + '\n' + pad : '';
+    const content = startXml(n.start, pad + '  ');
+    const kids = n.children?.length ? outlineXml(n.children, depth + 1, ids) : '';
+    const inner = content || kids ? '\n' + [content, kids].filter(Boolean).join('\n') + '\n' + pad : '';
     return `${pad}${open}<title>${esc(n.title)}</title>${inner}${close}`;
   }).join('\n');
 }
@@ -97,6 +111,7 @@ export async function writeSource(projectId: string, xml: string, baseHash?: str
   if (Buffer.byteLength(xml) > 50 * 1024 * 1024) throw bad('The document is larger than 50 MB.', 'TOO_LARGE');
   const wf = wellFormedError(xml);
   if (wf) throw new HttpError(400, `The document is not well-formed XML: ${wf}`, 'MALFORMED_XML');
+  assertNativeJssXml(xml);                       // publication.xml stays the JSS document: never a publication module or a package contents list
   const abs = sourcePath(projectId);
   const current = fs.existsSync(abs) ? fs.readFileSync(abs, 'utf8') : null;
   if (baseHash && current !== null && sha(current) !== baseHash) throw conflict('The document was saved by someone else since you opened it. Reload to see their changes.', 'STALE_DOCUMENT');
@@ -110,7 +125,8 @@ export async function writeSource(projectId: string, xml: string, baseHash?: str
 // ── Validation: the schema, then the stencil's rules ────────────────────────────────────────────────────────────────────────────
 
 const apos = (s: string): string => s.replace(/[‘’]/g, "'");
-const sameTitle = (a: string, b: string): boolean => apos(norm(a)).toLowerCase() === apos(norm(b)).toLowerCase();
+const unent = (s: string): string => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');         // the parsed text keeps entities as written
+const sameTitle = (a: string, b: string): boolean => apos(norm(unent(a))).toLowerCase() === apos(norm(unent(b))).toLowerCase();
 const titleOf = (n: MNode): string => { const t = n.children.find((c) => c.name === 'title'); return t ? norm(t.text) : ''; };
 const loc = (n: MNode): string => n.path.replace(/\[1\]/g, '');
 
@@ -153,6 +169,9 @@ export async function validateJss(projectId: string | null, xml: string): Promis
 
   const wf = wellFormedError(xml);
   if (wf) { add('error', 'JSS-WELLFORMED', `Not well-formed XML: ${wf}`, null); return done(null); }
+
+  const notNative = nativeProblemOf(xml);
+  if (notNative) { add('error', 'JSS-NATIVE', notNative, null); return done(null); }
 
   // 1. the schema
   try {

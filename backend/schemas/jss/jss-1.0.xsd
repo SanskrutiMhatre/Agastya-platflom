@@ -25,6 +25,21 @@
       <xs:enumeration value="uhb"/>
       <xs:enumeration value="mm"/>
       <xs:enumeration value="orm"/>
+      <xs:enumeration value="uhb2"/>
+      <xs:enumeration value="tm-pi"/>
+      <xs:enumeration value="tm-pi-vol-2"/>
+      <xs:enumeration value="ds"/>
+      <xs:enumeration value="tote-cs"/>
+      <xs:enumeration value="prs"/>
+      <xs:enumeration value="mrls"/>
+      <xs:enumeration value="rotable"/>
+      <xs:enumeration value="vol-1-pl"/>
+      <xs:enumeration value="vol-2-illustrations"/>
+      <xs:enumeration value="ispl"/>
+      <xs:enumeration value="ispl-wrt-jss"/>
+      <xs:enumeration value="ces"/>
+      <xs:enumeration value="fis"/>
+      <xs:enumeration value="bis"/>
     </xs:restriction>
   </xs:simpleType>
 

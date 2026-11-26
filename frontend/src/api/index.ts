@@ -11,7 +11,7 @@ export interface User { id: string; username: string; fullName: string; role: Gl
 export interface Gates { onboarding: boolean; mustChangePassword: boolean }
 export interface AdminQueues { approvals: number; changes: number; folderRequests: number; resets: number; ownerless: number; releases: number }
 
-export interface FormatInfo { id: 's1000d' | 'jss' | 'jsg'; label: string; description: string; ready: boolean; domains: Array<{ id: string; label: string; manualTypes: Array<{ id: string; label: string; ready: boolean; notReady?: string }> }> }
+export interface FormatInfo { id: 's1000d' | 'jss' | 'jsg'; label: string; description: string; ready: boolean; domains: Array<{ id: string; label: string; manualTypes: Array<{ id: string; label: string; ready: boolean; notReady?: string; note?: string }> }> }
 export interface PackageDetection { token: string; name: string; format: 's1000d' | 'unknown'; dataModules: number; publicationModules: number; graphics: number; other: number; entries: number }
 export interface ProjectCard {
   id: string; name: string; type: string; pipeline: 's1000dtofo' | 's1000dtojss'; templateRef: string; folder: string; status: string;

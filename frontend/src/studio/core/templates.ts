@@ -513,7 +513,7 @@ ${indent(t.body.replace('@@YEAR@@', d.year).replace('@@MONTH@@', d.month).replac
 `;
 }
 
-export function defaultNewDmOptions(schema = 'descript', issue = '5-0'): NewDmOptions {
+export function defaultNewDmOptions(schema = 'descript', issue = '4-2'): NewDmOptions {
   const t = templateFor(schema) ?? TEMPLATES[0];
   return {
     issue,

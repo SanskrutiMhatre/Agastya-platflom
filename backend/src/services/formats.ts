@@ -12,7 +12,7 @@ import { JSS_TYPES } from './jss/registry';
 import { JSG_TYPES } from './jsg/registry';
 
 export type FormatId = 's1000d' | 'jss' | 'jsg';
-export interface ManualType { id: string; label: string; ready: boolean; /** The starting-outline profile (services/profiles) this type uses, when it has one. */ profile?: string; /** The JSS document type (services/jss/registry) a project of this type is authored as. */ jssType?: string; /** The JSG document type (services/jsg/registry) a project of this type is authored as. */ jsgType?: string; /** Why it cannot be created yet. */ notReady?: string }
+export interface ManualType { id: string; label: string; ready: boolean; /** A remark shown with the type (a JSS type the stencil set has no file for). */ note?: string; /** The starting-outline profile (services/profiles) this type uses, when it has one. */ profile?: string; /** The JSS document type (services/jss/registry) a project of this type is authored as. */ jssType?: string; /** The JSG document type (services/jsg/registry) a project of this type is authored as. */ jsgType?: string; /** Why it cannot be created yet. */ notReady?: string }
 export interface Domain { id: string; label: string; manualTypes: ManualType[] }
 export interface FormatInfo { id: FormatId; label: string; description: string; ready: boolean; domains: Domain[] }
 
@@ -36,7 +36,7 @@ export const FORMATS: FormatInfo[] = [
     domains: [
       {
         // one entry per JSS-0251 land stencil: the registry (services/jss/registry) is the only list, so the wizard cannot offer what the engine does not have
-        id: 'land', label: 'Land', manualTypes: JSS_TYPES.map((t) => ({ id: t.id, label: t.label, ready: t.ready, notReady: t.notReady, jssType: t.id })),
+        id: 'land', label: 'Land', manualTypes: JSS_TYPES.map((t) => ({ id: t.id, label: t.label, ready: t.ready, notReady: t.notReady, jssType: t.id, ...(t.derivedFrom ? { note: t.derivedFrom } : {}) })),
       },
       { id: 'naval', label: 'Naval', manualTypes: NAVAL },
     ],

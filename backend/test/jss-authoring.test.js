@@ -86,17 +86,22 @@ const norm = (t) => { let s = t.toLowerCase().replace(/\s*\/\s*/g, '/').replace(
 
 // ── the catalogue ───────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
-test('the catalogue lists all 14 stencil document types; only the three of this slice are ready, and the others say why not', async () => {
+test('the catalogue lists the 14 stencil document types and the four the stencil set has no file for; every one is ready and builds a valid starting document', async () => {
   const t = (await w.get('/api/jss/types')).json.types;
-  assert.deepEqual(t.map((x) => x.id), ['uhb', 'mm', 'orm', 'uhb2', 'tm-pi', 'ds', 'tote-cs', 'prs', 'mrls', 'rotable', 'vol-1-pl', 'vol-2-illustrations', 'ispl', 'ispl-wrt-jss']);
-  assert.deepEqual(t.filter((x) => x.ready).map((x) => x.id), ['uhb', 'mm', 'orm']);
-  for (const x of t.filter((y) => !y.ready)) assert.ok(x.notReady && x.notReady.length > 20, `${x.id} gives a reason`);
+  assert.deepEqual(t.map((x) => x.id), ['uhb', 'mm', 'orm', 'uhb2', 'tm-pi', 'tm-pi-vol-2', 'ds', 'tote-cs', 'prs', 'mrls', 'rotable', 'vol-1-pl', 'vol-2-illustrations', 'ispl', 'ispl-wrt-jss', 'ces', 'fis', 'bis']);
+  assert.deepEqual(t.filter((x) => !x.ready).map((x) => x.id), [], 'every type of the catalogue is ready');
   assert.ok(t.find((x) => x.id === 'uhb2'), 'UHB2 stays its own type');
-  assert.match(t.find((x) => x.id === 'ispl-wrt-jss').notReady, /cross-references/, 'ISPL_wrt_JSS is kept apart from ISPL, with its real difference named');
+  const { JSS_TYPES } = require('../dist/services/jss/registry');
+  assert.deepEqual(JSS_TYPES.filter((x) => x.source === 'derived').map((x) => x.id), ['tm-pi-vol-2', 'ces', 'fis', 'bis'], 'the four without a stencil file say so');
   const land = (await w.get('/api/formats')).json.formats.find((f) => f.id === 'jss').domains.find((d) => d.id === 'land').manualTypes;
   assert.deepEqual(land.map((x) => [x.id, x.ready]), t.map((x) => [x.id, x.ready]), 'the wizard offers exactly what the registry has');
-  const refused = await w.post('/api/projects', { name: 'Not yet', format: 'jss', domain: 'land', manualType: 'ispl' });
-  assert.equal(refused.status, 400); assert.equal(refused.json.code, 'FORMAT_NOT_READY'); assert.match(refused.json.error, /parts-list body is not built yet/);
+  const unknown = await w.post('/api/projects', { name: 'No such', format: 'jss', domain: 'land', manualType: 'no-such-type' });
+  assert.ok(unknown.status >= 400 && unknown.status < 500, `an unknown type is refused (${unknown.status})`);
+  for (const x of t) {
+    const r = await w.post('/api/projects', { name: `Catalogue ${x.id}`, format: 'jss', domain: 'land', manualType: x.id }); assert.equal(r.status, 201, `${x.id}: ${JSON.stringify(r.json).slice(0, 200)}`);
+    const g = (await w.get(`/api/projects/${r.json.project.id}/jss`)).json; assert.equal(g.report.errors, 0, `${x.id}: ${JSON.stringify(g.report.findings.slice(0, 2))}`);
+    assert.deepEqual(g.chapters, x.chapters, `${x.id}: the document has the chapters of its stencil`);
+  }
 });
 
 test('the registry agrees with the stencils: same chapters in the same order, and every stencil section is in the starting document', { skip: !haveStencils && 'the stencils (manual format/JSS0251-stencils) are not in this checkout' }, async () => {
