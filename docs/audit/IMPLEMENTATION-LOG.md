@@ -978,7 +978,8 @@ requests / 730 d audit (archived to a gzip file first); all are settings, 0 = of
   the schedule due/not due); `wp10-storage-contract` 11/11 (new retention case); `wp10-seams` 11/11 (ORDER with 022 appended); `db-snapshot`
   4/4; `s1000d-migration` 2/2 (the generic copy keeps the 016 name); `wp06-lifecycle` 5/5; `project-archive` 5/5; `notifications` 6/6
   (the streamed export); `phase13` 12/12; `wp13-version` 4/4; `api` 17/17; `admin-ops` 8/8; `packages` 10/10; `authz-matrix` 6/6 (after the
-  reviewed snapshot update); `routes-guarded` 1/1. CLI tried by hand on a scratch workspace: backup, verify, restore, restore into a non-empty
+  reviewed snapshot update); `routes-guarded` 1/1; `zipio` 5/5; `settings-hostile-input` 6/6; `wp02-routes` 6/6; `wp03-auth` 11/11; `rbac` 7/7;
+  `phase17-security` 5/5; `project-formats` 4/4; `import-enterprise-refusal` 2/2; `wp13-sqlite-contract` 8/8. CLI tried by hand on a scratch workspace: backup, verify, restore, restore into a non-empty
   folder refused, check; `npm run doctor` with `AGASTYA_WORKSPACE_DIR` = that workspace shows the three new rows ok. Frontend: `tsc --noEmit`
   clean; vitest `src/pages/PlatformBackups.test.tsx` 2/2. `node scripts/ci/lint.mjs` green (no new `any` / `require(`).
 * Limits / not done: (1) DEP-001 installer side - `packaging/host/AgastyaHost.cs` still makes its fixed-wait `pre-upgrade-*` copy; making the
