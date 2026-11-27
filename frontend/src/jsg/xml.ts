@@ -203,7 +203,7 @@ function plateXml(p: Plate, pad: string): string {
     const inner = [...v.graphics.map((g) => GRAPHIC(g, pad + '    ')), ...v.parts.map((r) => `${pad}    <part${PART_KEYS.map((k) => (k === 'item' || k === 'designation' ? ` ${k}="${escA(r[k])}"` : at(k, r[k]))).join('')}/>`), ...(v.notes ?? []).map((n) => `${pad}    <note>${inlineXml(n)}</note>`)].join('\n');
     return `${pad}  <view${at('caption', v.caption)}>${inner ? `\n${inner}\n${pad}  ` : ''}</view>`;
   }).join('\n');
-  return `${pad}<plate${at('id', p.id)} ref="${escA(p.ref)}" title="${escA(p.title)}"${at('caption', p.caption)}${p.divider ? ' divider="true"' : ''}${p.setColumn ? ' setColumn="true"' : ''}>${views ? `\n${views}\n${pad}` : ''}</plate>`;
+  return `${pad}<plate${at('id', p.id)} ref="${escA(p.ref)}" title="${escA(p.title)}"${p.divider ? ' divider="true"' : ''}${p.setColumn ? ' setColumn="true"' : ''}${at('caption', p.caption)}>${views ? `\n${views}\n${pad}` : ''}</plate>`;
 }
 
 const paraXml = (p: Para, tag = 'para'): string => `<${tag}${p.indent !== 2 ? at('indent', p.indent) : ''}${at('align', p.align)}>${inlineXml(p.inline)}</${tag}>`;
@@ -262,7 +262,10 @@ function frontXml(f: Front, pad: string): string {
 }
 
 export function serializeJsg(d: JsgDoc): string {
-  const meta = META_TEXT.filter((k) => d.meta[k] !== undefined).map((k) => `    <${k}>${esc(d.meta[k])}</${k}>`);
+  // GAP-005 (WP-15): the cover fields in the order of the schema and of the server's documents (supplier and issuer after the NSN), so that
+  // saving an unchanged document gives the same bytes (frontend/src/lib/roundtrip-bytes.test.ts)
+  const field = (k: string): string[] => (d.meta[k] !== undefined ? [`    <${k}>${esc(d.meta[k])}</${k}>`] : []);
+  const cut = META_TEXT.indexOf('issueDate');
   const l = (name: string, ls: string[]): string => `    <${name}>${ls.length ? ls.map((x) => `<line>${esc(x)}</line>`).join('') : ''}</${name}>`;
   const chapters = d.chapters.map((c) => `  <chapter${at('id', c.id)} title="${escA(c.title)}">\n${c.sections.map((s) => {
     const inner = s.children.map((x) => (isClause(x) ? clauseXml(x, '      ') : blockXml(x, '      '))).join('\n');
@@ -273,7 +276,7 @@ export function serializeJsg(d: JsgDoc): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <jsgdoc version="${escA(d.version)}" type="${d.type}">
   <meta>
-${[...meta.slice(0, META_TEXT.indexOf('equipmentLife') >= 0 ? meta.length : meta.length), l('supplier', d.supplier), l('issuedBy', d.issuedBy)].join('\n')}
+${[...META_TEXT.slice(0, cut).flatMap(field), l('supplier', d.supplier), l('issuedBy', d.issuedBy), ...META_TEXT.slice(cut).flatMap(field)].join('\n')}
   </meta>
 ${fx || d.front.omit.length ? `  <front${d.front.omit.length ? ` omit="${escA(d.front.omit.join(' '))}"` : ''}>${fx ? `\n${fx}\n  ` : ''}</front>\n` : ''}${chapters ? chapters + '\n' : ''}${d.type === 'ispl' ? `  <plates>${d.plates.length ? '\n' + d.plates.map((p) => plateXml(p, '    ')).join('\n') + '\n  ' : ''}</plates>\n` : ''}${d.appendices.length ? `  <appendices>\n${apps}\n  </appendices>\n` : ''}</jsgdoc>
 `;

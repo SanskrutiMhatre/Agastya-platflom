@@ -30,7 +30,8 @@ test.before(async () => {
 });
 test.after(async () => { await h.close(); });
 
-const refsIn = (xml) => (xml.match(/<dmRef[\s>]/g) || []).length;
+// module references of the publication's content; the header's BREX reference (written since WP-15, PUB-015, when the uploaded PM had none) is not one
+const refsIn = (xml) => (xml.replace(/<brexDmRef>[\s\S]*?<\/brexDmRef>/g, '').match(/<dmRef[\s>]/g) || []).length;
 
 test('the vendored reader still keeps only the first reference of an entry (why the Explorer must not use it for saving)', () => {
   const pmc = require('../vendor/engine/pmc');

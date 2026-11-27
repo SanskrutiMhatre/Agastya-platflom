@@ -20,6 +20,8 @@ import { parseTree, walk, type MNode } from '../miniXml';
 import { wellFormedError } from '../wellFormed';
 import { readProjectJson, updateProjectJson } from '../projectRecord';
 import { registerDocumentCreator } from '../documentCreators';
+import { registerPublishCheck } from '../publishChecks';
+import { registerOwnEngineFormat } from '../ownEngines';
 import { jsgTypeById, ISPL_PREFACE, UHB_FRONT_COUNTS, UHB_PREFACE, type JsgDocType } from './registry';
 import { escText as esc, escAttr } from '../../lib/xml';
 import { sha256 as sha } from '../../lib/hash';
@@ -365,3 +367,37 @@ export async function assertJsgPublishable(projectId: string): Promise<{ validat
     verifyUnchanged: () => { if (sha(fs.readFileSync(sourcePath(projectId), 'utf8')) !== hash) throw conflict('The document changed while it was being built.', 'CHANGED_DURING_VALIDATION'); },
   };
 }
+
+// WP-15 (PUB-011): the publication gate (release submit and approve, publishChecks.ts) asks the JSG check for a JSG project, so a JSG document is
+// released on the same terms as the other two formats: valid right now. (WP-16 left it unregistered because the shared S1000D/JSS publish route
+// would then have built a JSG project with the wrong engine; that route now refuses a JSG project, publisher.ts buildPublication.)
+registerPublishCheck({
+  format: 'jsg',
+  owns: isJsgProject,
+  check: async (projectId, scope) => {
+    if (scope !== 'publication') throw conflict('A single-module preview is an S1000D feature; a JSG document is built as a whole.', 'NOT_S1000D');
+    const g = await assertJsgPublishable(projectId);
+    return { validatedAt: g.validatedAt, files: [SOURCE_NAME], warnings: g.warnings, ruleBreaks: [], verifyUnchanged: g.verifyUnchanged };
+  },
+});
+
+/** WP-15 (PUB-011): what a JSG release covers: the document and every picture of the project (Media/), project-relative and sorted. */
+export function jsgReleaseSources(projectId: string): string[] {
+  const dir = projectDirFor(projectId); const out: string[] = [];
+  if (fs.existsSync(path.join(dir, SOURCE_NAME))) out.push(SOURCE_NAME);
+  const walkDir = (abs: string, rel: string): void => {
+    let list: fs.Dirent[]; try { list = fs.readdirSync(abs, { withFileTypes: true }); } catch { return; }
+    for (const e of list) { if (e.name.startsWith('.')) continue; if (e.isDirectory()) walkDir(path.join(abs, e.name), `${rel}/${e.name}`); else out.push(`${rel}/${e.name}`); }
+  };
+  walkDir(path.join(dir, 'Media'), 'Media');
+  return out.sort();
+}
+
+// WP-15 (PUB-011): the shared release flow and the shared build learn about JSG from here (ownEngines.ts), so their code names no JSG.
+registerOwnEngineFormat({
+  name: 'JSG',
+  owns: isJsgProject,
+  releaseDocument: () => SOURCE_NAME,
+  releaseSources: jsgReleaseSources,
+  refusal: { code: 'JSG_DOCUMENT', message: 'A JSG document is built by the JSG engine: use Generate PDF in the JSG editor (POST /api/projects/:id/jsg/build).' },
+});

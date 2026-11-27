@@ -33,6 +33,7 @@ import { analyzePackage } from './scanner';
 import { repairedEntries } from './repair';
 import { serialisePm } from './identity';
 import { withReconstructedMarker } from './reconstruct';
+import { completePmStatus } from '../pmHeader';
 import { ORIGINALS_DIR, loadState, saveState, type ImportBatch } from './state';
 import type { ChangeEntry, PackageEntry, PackageReport, PoolItem, ReusedDm, RepairOptions, SubPublication } from './types';
 
@@ -185,7 +186,8 @@ export async function applyImport(projectId: string, entries: PackageEntry[], op
   const replace = !!repair.publication && (mode === 'replace' || (mode === 'auto' && existingTotal === 0));
   let publication: ApplyResult['publication'] = { mode: repair.publication ? 'kept' : 'none', reconstructed: null };
   if (repair.publication && replace) {
-    let xml = serialisePm(repair.publication.model);
+    // WP-15 (PUB-015): the writer leaves out header elements the schema requires (applicability, BREX); they come from the package's own PMC, else a neutral default
+    let xml = completePmStatus(serialisePm(repair.publication.model), repair.publication.sourceText ?? null, { enterpriseCode: repair.publication.model.meta?.rpc?.enterpriseCode });
     const counts = pmc().countEntries(repair.publication.model.entries);
     const check = pmc().countEntries(pmc().parsePm(xml).entries);
     if (check.total !== counts.total || check.dms !== counts.dms) throw new Error('Internal check failed: the serialised publication does not read back identically. The modules were written; the publication was not.');

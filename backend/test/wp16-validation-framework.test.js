@@ -117,7 +117,7 @@ test('validation framework: issues are normalised, rule sets run in order and in
 
 test('publish checks: registered per format, the S1000D check is the default, publishGate.ts has no JSS branch', async () => {
   const checks = require('../dist/services/publishChecks');
-  assert.deepEqual(checks.publishCheckFormats(), ['jss', 's1000d']);
+  assert.deepEqual(checks.publishCheckFormats(), ['jsg', 'jss', 's1000d']);   // WP-15 (PUB-011): JSG is released through the same gate
   const gateSrc = fs.readFileSync(path.join(SRC, 'services', 'publishGate.ts'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');   // code, not comments
   assert.doesNotMatch(gateSrc, /isJssAuthored|assertJssPublishable|jss\/service/);
   const s = (await w.post('/api/projects', { name: 'S1000D gate', pipeline: 's1000dtofo' })).json.project.id;

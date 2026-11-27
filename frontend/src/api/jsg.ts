@@ -7,7 +7,7 @@ export interface JsgFinding { severity: 'error' | 'warning'; rule: string; messa
 export interface JsgReport { docType: string | null; valid: boolean; errors: number; warnings: number; findings: JsgFinding[]; validatedAt: string }
 export interface JsgDocument { docType: string | null; label: string | null; stencil: string | null; xml: string; hash: string; report: JsgReport }
 export interface JsgImportReport { chapters: number; sections: number; clauses: number; paragraphs: number; lists: number; tables: number; figures: number; pictures: number; frontPages: string[]; skipped: string[]; warnings: string[] }
-export interface JsgBuild { ok: boolean; totalMs: number; bytes: number; warnings: string[]; pdfUrl: string }
+export interface JsgBuild { ok: boolean; totalMs: number; bytes: number; warnings: string[]; pdfUrl: string; /** WP-15: what the PDF claims */ releaseLabel?: string; released?: boolean; warmFop?: boolean; jobId?: string; report?: { notes: string[]; lines: number } }
 
 const P = (id: string) => `/api/projects/${id}/jsg`;
 
@@ -20,4 +20,6 @@ export const jsgApi = {
   /** Replace the document with a Word file written in the JSG User Handbook styles; its pictures go to the project. */
   importDocx: (id: string, file: File) => { const fd = new FormData(); fd.append('file', file); return request<{ ok: boolean; hash: string; report: JsgReport; import: JsgImportReport; pictures: number }>('POST', `${P(id)}/import-docx`, fd); },
   pdfUrl: (id: string, download = false) => `${P(id)}/pdf${download ? '?download=1' : ''}`,
+  /** WP-15 (PUB-011): the copy to hand out, rebuilt first when it no longer matches the document or its release (as /publish/download for the other formats). */
+  downloadUrl: (id: string) => `${P(id)}/pdf/download`,
 };

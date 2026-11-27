@@ -9,7 +9,9 @@
 //   GET  /api/projects/:id/jsg/pdf         the last PDF built   (viewer)
 //   POST /api/projects/:id/jsg/import-docx  a Word file (multipart `file`) in the JSG User Handbook or ISPL format -> replaces the document, copies its pictures   (editor)
 //
-// These routes are the whole JSG surface: the JSS and S1000D routes and the shared publish route are not involved.
+// These routes are the JSG document surface. WP-15 (PUB-011): a JSG document is released through the shared release routes
+// (POST /api/projects/:id/release, approve, reject), gated by the JSG publish check; GET /jsg/pdf says in X-Release-State and X-Pdf-Stale
+// whether the file still matches the document and its release. The shared S1000D / JSS publish route refuses a JSG project (409 JSG_DOCUMENT).
 
 import fs from 'fs';
 import path from 'path';
@@ -21,7 +23,8 @@ import { JSG_TYPES, jsgTypeById } from '../services/jsg/registry';
 import { JSG_XSD, isJsgProject, jsgTypeOfProject, readSource, writeSource, validateJsg, sourceHistory, sourceRevision, sourceRel } from '../services/jsg/service';
 import { versionGuard } from '../services/versionGuard';
 import { registerOneFileDocumentRoutes, actorOf } from './documentHistory';
-import { PDF_NAME, type JsgBuild } from '../services/jsg/engine';
+import { PDF_NAME, lastJsgBuildState, type JsgBuild } from '../services/jsg/engine';
+import { releaseStateOf } from '../services/release';
 import * as jobs from '../services/jobs';
 import { importDocx } from '../services/jsg/docx';
 import { importIsplDocx } from '../services/jsg/docx-ispl';
@@ -68,19 +71,45 @@ export function registerJsgRoutes(app: Express): void {
   app.post(`${base}/build`, requireProject('reviewer', { from: 'param', cap: 'publish.build' }), wrap(async (req, res) => {
     needJsg(req);
     // WP-14: the JSG build is a job in a worker process, like every other build (the same runner for all three formats, PUB-027)
-    const out = await jobs.run<JsgBuild>({ kind: 'jsg', projectId: req.project.id, params: {}, actor: actorOf(req) });
-    log(req, 'jsg.built', { ms: out.totalMs });
-    res.json({ ok: true, totalMs: out.totalMs, bytes: fs.statSync(out.pdf).size, warnings: out.warnings, pdfUrl: `/api/projects/${req.project.id}/jsg/pdf` });
+    const s = jobs.submit({ kind: 'jsg', projectId: req.project.id, params: {}, actor: actorOf(req) });
+    const out = await s.done as JsgBuild;
+    log(req, 'jsg.built', { ms: out.totalMs, released: out.released });
+    // WP-15 (PUB-011): the answer says what the PDF claims (released or NOT RELEASED) and carries the build report, as the S1000D / JSS build does
+    res.set('X-Job-Id', s.id).json({
+      ok: true, totalMs: out.totalMs, bytes: fs.statSync(out.pdf).size, warnings: out.warnings, releaseLabel: out.releaseLabel, released: out.released, warmFop: out.warmFop,
+      pdfUrl: `/api/projects/${req.project.id}/jsg/pdf`, jobId: s.id, report: jobs.buildReport(req.project.id, s.id),
+    });
   }));
 
   app.get(`${base}/pdf`, requireProject('viewer', { from: 'param', cap: 'project.read' }), wrap((req, res) => {
     needJsg(req);
     const abs = path.join(projectDirFor(req.project.id), PDF_NAME);
     if (!fs.existsSync(abs)) throw notFound('This document has not been built yet.');
-    const name = `${(readProjectJson(req.project.id).name || req.project.id).replace(/[^\w.\- ]/g, '_')}.pdf`;
+    // WP-15 (PUB-011): whether the file still says the right thing: built from this content and for this release state (built before an approval, it says NOT RELEASED)
+    const st = releaseStateOf(req.project.id, { reuse: true }); const built = lastJsgBuildState(req.project.id);
+    const stale = !built || built.fingerprint !== st.fingerprint || built.released !== st.released;
+    const released = !!built?.released && !stale;
+    const name = `${(readProjectJson(req.project.id).name || req.project.id).replace(/[^\w.\- ]/g, '_')}${released ? '' : ' (NOT RELEASED)'}.pdf`;
+    res.set('X-Release-State', released ? 'released' : 'not-released').set('X-Pdf-Stale', stale ? '1' : '0');
     res.type('application/pdf');
     if (req.query.download === '1') res.attachment(name);
     res.sendFile(abs);
+  }));
+
+  // WP-15 (PUB-011): the copy to hand out, as GET /publish/download does for the other formats: rebuilt first (as a job) when the file on disk no
+  // longer says the right thing - built from older content, or before an approval (it then carries NOT RELEASED) - so after approval it is the
+  // clean released copy, and until then it always carries the watermark.
+  app.get(`${base}/pdf/download`, requireProject('reviewer', { from: 'param', cap: 'publish.build' }), wrap(async (req, res) => {
+    needJsg(req);
+    const abs = path.join(projectDirFor(req.project.id), PDF_NAME);
+    const st = releaseStateOf(req.project.id); const built = lastJsgBuildState(req.project.id);
+    if (!fs.existsSync(abs) || !built || built.fingerprint !== st.fingerprint || built.released !== st.released) {
+      await jobs.run<JsgBuild>({ kind: 'jsg', projectId: req.project.id, params: {}, actor: actorOf(req) });
+    }
+    const name = `${(readProjectJson(req.project.id).name || req.project.id).replace(/[^\w.\- ]/g, '_')}${st.released ? '' : ' (NOT RELEASED)'}.pdf`;
+    log(req, 'jsg.downloaded', { released: st.released });
+    res.set('X-Release-State', st.released ? 'released' : 'not-released');
+    res.type('application/pdf').attachment(name).sendFile(abs);
   }));
 
   // Import from Word: the filled handbook's styles are read (docx.ts), its pictures go to the project's Media folder, and the document is replaced (the old one is kept as a .bak beside it).

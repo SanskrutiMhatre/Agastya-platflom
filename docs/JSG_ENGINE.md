@@ -35,6 +35,15 @@ was "not ready".
   unique (error), a plate whose parent plate is missing, an empty plate, a view with parts but no picture, a repeated item number (warnings).
 * **PDF**: `POST .../jsg/build` validates fresh, hashes the file before and after rendering, runs the JSG stylesheets and FOP, writes `jsg-output.pdf`; `GET .../jsg/pdf` serves it.
   Roles: viewer reads, editor saves, reviewer and above build (the same guards as the other formats; `test/routes-guarded.test.js` covers the new routes).
+* **Release (WP-15, PUB-011)**: a JSG document is reviewed and released on the project's Release page, through the same routes as the other formats
+  (`POST /api/projects/:id/release`, approve, reject). The publication gate asks the JSG check (`registerPublishCheck` in `services/jsg/service.ts`): an invalid
+  document cannot be submitted or approved. A release covers `jsg-document.xml` and every file under `Media/`; any change to them takes the release away.
+  Until approval every page but the cover carries the NOT RELEASED watermark (the same `watermark.js` as the other engines, put on the body page masters
+  of the JSG FO); after approval the PDF has no watermark (unlike the S1000D / JSS build, the JSG running head does not name the release number). The build runs as a WP-14 job on the warm FOP renderer (`fopd.js`; FOP via java when it
+  is not available, and the log says so), answers with its job id and build report, and writes `.jsg-publish-state.json` (what it was built from, released or not).
+  `GET .../jsg/pdf` says in `X-Release-State` / `X-Pdf-Stale` whether the file still matches; `GET .../jsg/pdf/download` (the Release page's download) rebuilds first
+  when it does not. The PDF carries Title, Author (the issuing authority's lines), Subject (`JSG User Handbook` ...) and Keywords (document number, NSN).
+  The shared S1000D / JSS publish route refuses a JSG project (409 `JSG_DOCUMENT`). Test: `backend/test/wp15-jsg-release.test.js`.
 
 ## 3. User Handbook - coverage
 
@@ -90,7 +99,9 @@ was "not ready".
 * 436 files of the JSS / S1000D engines, schemas, services, editors and templates were fingerprinted before the JSG work began and compared after: all identical.
 * `backend/test/jsg-engine.test.js` fails if any JSG code appears in the JSS or S1000D stylesheets, engine files, services or `publisher.ts` / `publishGate.ts`, or if a JSG stylesheet
   includes or names another engine.
-* A JSG project has no `publication.xml`, no CSDB, no BREX; the other formats' publish route is never used for it.
+* A JSG project has no `publication.xml`, no CSDB, no BREX; the other formats' publish route is never used for it (since WP-15 it refuses one).
+* WP-15: the shared release flow (`release.ts`) and the shared build (`publisher.ts`) learn about JSG only through two registries the JSG service fills when it
+  loads, `publishChecks.ts` and `ownEngines.ts`; neither file names JSG, so the isolation test above still holds unchanged.
 
 ## 7. ISPL page preview (beside the grid)
 

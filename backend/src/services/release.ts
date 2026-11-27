@@ -20,6 +20,7 @@ import { bad, conflict, notFound } from './http';
 import { readProjectJson, updateProjectJson, pmRel } from './projects';
 import { publicationSources } from './pm';
 import { FileMemo } from './fileMemo';
+import { ownEngineFormatOf } from './ownEngines';
 import type { DmSummary } from './csdb';
 
 const watermarkEngine = vendor('engine/watermark');
@@ -44,7 +45,7 @@ export function publicationFingerprint(projectId: string, opts: { reuse?: boolea
   const project = readProjectJson(projectId);
   const h = crypto.createHash('sha256');
   const digest = (abs: string): Buffer => crypto.createHash('sha256').update(fs.readFileSync(abs)).digest();
-  for (const rel of publicationSources(projectId, opts.known)) {
+  for (const rel of releaseSources(projectId, opts.known)) {
     h.update(rel, 'utf8');
     h.update('\0');
     const abs = path.join(dir, rel);
@@ -97,8 +98,22 @@ export function printableBoxMm(effective: any, pipeline: string): { w: number; h
   return { w: width > 40 ? width : fw, h: height > 40 ? height : fh };
 }
 
+// WP-15 (PUB-011): a format with an engine of its own (ownEngines.ts) is released like the other two: it says which file the release is
+// recorded against and which files its fingerprint covers. Every other project: the publication module and what it contains, as before.
+
+/** The project file a release is recorded against. */
+export function releaseDocumentRel(projectId: string): string {
+  return ownEngineFormatOf(projectId)?.releaseDocument(projectId) ?? pmRel(readProjectJson(projectId));
+}
+
+/** The files a release fingerprint covers (project-relative, sorted). */
+export function releaseSources(projectId: string, known?: DmSummary[]): string[] {
+  const own = ownEngineFormatOf(projectId);
+  return own ? own.releaseSources(projectId) : publicationSources(projectId, known);
+}
+
 function pmDocument(projectId: string): any {
-  return docIndex.resolve(projectId, pmRel(readProjectJson(projectId)));
+  return docIndex.resolve(projectId, releaseDocumentRel(projectId));
 }
 
 export function releaseStateOf(projectId: string, opts: { reuse?: boolean; known?: DmSummary[] } = {}) {
@@ -127,8 +142,8 @@ export function releaseOverview(projectId: string, canSubmit: boolean) {
     staleRelease: st.staleRelease ? view(st.approved) : null,
     scheduled: st.scheduled ? view(st.scheduled) : null,
     pending: st.pending ? releaseView(st.pending) : null,
-    sources: publicationSources(projectId).length,
-    publicationRel: pmRel(readProjectJson(projectId)),
+    sources: releaseSources(projectId).length,
+    publicationRel: releaseDocumentRel(projectId),
     history: store.listReleasesForProject(projectId).map(releaseView),
     watermark: readWatermark(projectId),
     watermarkStyles: WATERMARK_STYLES,
@@ -138,7 +153,7 @@ export function releaseOverview(projectId: string, canSubmit: boolean) {
 
 export function requestRelease(projectId: string, userId: string, body: { scheduledAt?: string; note?: string }) {
   const pmDoc = pmDocument(projectId);
-  if (!pmDoc) throw bad('This project has no publication module to release.', 'NO_PUBLICATION');
+  if (!pmDoc) { const own = ownEngineFormatOf(projectId); throw bad(own ? `This project has no ${own.name} document to release.` : 'This project has no publication module to release.', 'NO_PUBLICATION'); }
   // Submitting for review takes effect on approval; a later date is optional.
   const when = body.scheduledAt ? new Date(String(body.scheduledAt)) : new Date();
   if (Number.isNaN(when.getTime())) throw bad('A valid release date and time is required.');

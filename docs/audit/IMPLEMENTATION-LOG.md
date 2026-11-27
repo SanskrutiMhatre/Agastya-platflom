@@ -2208,3 +2208,70 @@ was removed: `check:parity` PASS with nothing removed and no explanation row (th
   suites, the backend suite (no backend file changed).
 * Left: backend dead-export sweep (after WP-15/WP-17); the kept API-only routes stay until the owner decides otherwise (D8/D19);
   `frontend-hygiene.json` in the baseline folder is the audit's snapshot and is not regenerated (the gate's report is the live count).
+## Phase 4 (WP-15)
+
+### WP-15 JSG parity and conversion fidelity (PUB-011, PUB-008, PUB-009, PUB-015, ARC-024, PUB-016, PUB-017, PUB-018, GAP-005) - done, with the limits listed
+
+Branch `worktree-agent-a721009b2b8bc5c9d`, from 4994249. No migration.
+
+* **JSG release, watermark, warm FOP (PUB-011).**
+  - `services/jsg/engine.ts`: the build reads the release state (`release.ts` `releaseStateOf`). Until a release is approved, every page master but the
+    cover carries the NOT RELEASED watermark (`watermark.js`, the same one the other engines use; the project's own watermark settings apply as there).
+    The build renders on the warm FOP JVM (`fopd.js`) and falls back to java with a log line. It writes `.jsg-publish-state.json` (fingerprint, released).
+  - Routes: `POST /jsg/build` runs as a job (`jobs.submit`) and answers with `jobId`, `report` (`jobs.buildReport`), `released`, `releaseLabel`, `warmFop`.
+    `GET /jsg/pdf` sets `X-Release-State` and `X-Pdf-Stale`. New `GET /jsg/pdf/download` (reviewer, `publish.build`) rebuilds first when the file is
+    stale. The authz snapshot was regenerated for this one reviewed addition.
+  - Release through the shared routes: the JSG check is registered in `publishChecks.ts` (`jsg/service.ts`), so an invalid document is refused at
+    submit (422 `VALIDATION_FAILED`). A new registry, `services/ownEngines.ts`, tells `release.ts` which file the release is recorded against and what the
+    fingerprint covers (`jsg-document.xml` + `Media/**`). It also tells `publisher.ts` to refuse a JSG project (409 `JSG_DOCUMENT`, on publish, configured
+    builds and front-matter sync). Neither shared file names JSG, so the jsg-engine ISOLATION test is unchanged and passes.
+  - Frontend: the Release page downloads the JSG PDF from `/jsg/pdf/download` and says what a JSG release covers (`ReleasePage.tsx`, `api/jsg.ts`).
+  - `wp16-validation-framework`: the expected formats list now includes `jsg` (an intended change; the test still checks that the gate has no
+    format branch).
+* **Conversion fidelity (PUB-008, PUB-009, PUB-015, ARC-024).** Recorded in `docs/CROSS_ENGINE_ARCHITECTURE.md` section 4, "WP-15":
+  - Untitled continuation `levelledPara`s let a warning or caution appear anywhere in a section without blocking the export (reproduced before the
+    fix: EXPORT_BLOCKED, "Element 'warning': This element is not expected").
+  - Figure legends are kept: as an S1000D `definitionList`, and as paragraphs in JSG.
+  - One `pmEntry` per module removes the "chapter-unknown (untitled)" drift on the return trip.
+  - `pmHeader.ts` `completePmStatus` makes the publication module schema-valid on import and on every Explorer save.
+  - Every picture of `csdb/` and `Media/` is packed under `ICN/`.
+  - Losses the reader sees are `warning`, not `info`.
+  - `pm-multi-ref.test.js` `refsIn` now leaves out the header's new `brexDmRef`. The test still counts the four module references it is about.
+* **PDF document properties (PUB-017, decision D9).** Title, Author, Subject and Keywords for S1000D, JSS and JSG, written as an XMP `fo:declarations`
+  packet. For S1000D and JSS this goes through a new optional `onFo` hook in `vendor/engine/build.js` (exception "FO hook",
+  `docs/JSS_VENDOR_EXCEPTIONS.md`; `docs/S1000D_COMPLETE_IMPLEMENTATION.md` section 10 item 10); JSG writes the packet in its own engine.
+  Decision D9 follows the audit's recommendation: Arial stays, and there is no tagged PDF and no PDF/A, since neither standard requires them.
+  `test/pdftools.js` gains `info` (pdf.js `getMetadata`), because poppler's `pdfinfo` is not available.
+* **PUB-016.**
+  - (a) Ghostscript, following the audit's recommendation to delete the path: the platform passes `pdfCompressLevel: 0`. Ghostscript is not shipped and
+    no screen offered the setting; `build.js` keeps its unused code.
+  - (b) The image optimiser runs inside the WP-14 publish worker process, not in the API process. This holds by construction. The 100 ms acceptance
+    figure was not measured.
+* **PUB-018 (decision D11).** HTML publication stays API-only and S1000D-only (recorded in `docs/API-ONLY-ROUTES.md`).
+* **GAP-005.** `frontend/src/lib/roundtrip-bytes.test.ts` covers all 28 JSS starting documents (`__fixtures__/jss-skeletons.json`, generated from the
+  backend `skeletonXml`) and the two JSG reference documents. A save of an unchanged document:
+  - keeps the model and every text and attribute value;
+  - is idempotent;
+  - differs from the original only in layout. For JSS that is the indentation and `<cell/>` written as `<cell></cell>`. For JSG it is the indentation and
+    the order of the front pages (`xs:all`).
+  - Two JSG differences were fixed in `jsg/xml.ts` rather than accepted: the supplier and issuer lines in `<meta>`, and plate `divider=`/`caption=` order.
+* **Tests run** (backend one file at a time after a clean build; NAVAL_STENCILS and VEKTRA_SAMPLE set):
+  - All files passed except the three listed under Limits:
+    - new: wp15-conversion-fidelity 4/4, wp15-jsg-release 4/4;
+    - JSG: jsg-engine 7/7, jsg-ispl 5/5, jsg-word 3/3;
+    - xengine: content-types 2/2, convert 7/7, identity 11/11, import-wizard 4/4, legacy-import 5/5, pictures 2/2;
+    - JSS: jss-rwi 7/7, jss-authoring 13/13, jssdm 24/24, jssdm-http 10/10;
+    - PM: pm-multi-ref 5/5 (after the `refsIn` change), pm-multiref 3/3;
+    - importer and packages: importer-http 12/12, importer-repairs 20/20, importer-scan 19/19, importer-structure 18/18, import 5/5, packages 10/10,
+      project-archive 5/5;
+    - platform: wp14-jobs 9/9, wp11-integrity 16/16, wp10-seams 11/11, wp10-storage-contract 15/15, authz-matrix 6/6, wp29-audit-coverage 2/2,
+      wp16-validation-framework 6/6, api 17/17, release-issue 1/1, publish-gate 24/24.
+  - Frontend: tsc clean; vitest roundtrip-bytes + src/jsg + src/jss + docPublication 182/182; parity check PASS. `scripts/ci/lint.mjs` green.
+  - New tests registered in `scripts/ci/test-plan.json`: wp15-jsg-release under pdfSmoke, wp15-conversion-fidelity under heavy.
+* **Limits.**
+  - Two failures that look older than this branch, not re-run on the base commit:
+    - `jss-rwi-verify` 2/3: "saving over a newer save is refused" got 200, not 409. The test re-sends the identical text with the old hash, and the
+      WP-11 merge accepts it. No WP-15 change touches the JSS save path.
+    - `phase13` 11/12: the admin roles list has 4 roles where the test expects 3, which looks like WP-27's role addition.
+  - Not run: the main Playwright suite, the gate, golden/pdf21 suites. No Playwright spec was added for the Release page change.
+  - JSG's running head does not name the release number, unlike S1000D and JSS.

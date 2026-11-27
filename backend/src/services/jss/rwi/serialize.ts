@@ -29,7 +29,7 @@ function inlineX(inl: Inline[], ctx: SerializeCtx): string {
   return inl.map((i) => {
     if (i.t === 'text') return esc(i.text);
     if (i.t === 'br') return ' ';
-    if (i.t === 'xref') return inlineX(i.children, ctx);
+    if (i.t === 'xref') { ctx.notes.push('xref'); return inlineX(i.children, ctx); }   // WP-15 (PUB-015): the words stay, the link does not: reported
     const inner = inlineX(i.children, ctx);
     switch (i.mark) {
       case 'b': return `<emphasis emphasisType="em01">${inner}</emphasis>`;
@@ -124,8 +124,12 @@ function blockX(b: Block, ctx: SerializeCtx, pad: string): string {
         const w = g.width && /^\d+(\.\d+)?(mm|cm|in|pt|px)$/.test(g.width) ? ` reproductionWidth="${g.width}"` : ''; const h = g.height && /^\d+(\.\d+)?(mm|cm|in|pt|px)$/.test(g.height) ? ` reproductionHeight="${g.height}"` : '';
         return `${pad}  <graphic infoEntityIdent="${escA(entityFromSrc(g.src, ctx))}"${w}${h}/>`;
       });
-      if (b.legend.length) ctx.notes.push('figure-legend');
-      return `${pad}<figure${id ? ` id="${escA(id)}"` : ''}>${b.title ? `\n${pad}  <title>${esc(b.title)}</title>` : ''}\n${gs.join('\n')}\n${pad}</figure>`;
+      // WP-15 (PUB-015): the numbered key is the figure's legend (a definition list: the number, then its text); the standard requires a title, so a
+      // figure without one gets an empty title (the importer reads an empty title back as none)
+      const legend = b.legend.length
+        ? `\n${pad}  <legend>\n${pad}    <definitionList>\n${b.legend.map((k) => `${pad}      <definitionListItem><listItemTerm>${esc(k.num)}</listItemTerm><listItemDefinition><para>${esc(k.text)}</para></listItemDefinition></definitionListItem>`).join('\n')}\n${pad}    </definitionList>\n${pad}  </legend>`
+        : '';
+      return `${pad}<figure${id ? ` id="${escA(id)}"` : ''}>\n${pad}  <title>${esc(b.title ?? '')}</title>\n${gs.join('\n')}${legend}\n${pad}</figure>`;
     }
     default: {
       const inner = b.blocks.flatMap((x) => (x.k === 'para' ? [x.inline] : x.items.map((it) => it.parts.flatMap((p) => (p.k === 'list' ? [] : p.inline)))));
@@ -136,13 +140,38 @@ function blockX(b: Block, ctx: SerializeCtx, pad: string): string {
   }
 }
 
-function sectionX(s: Section, ctx: SerializeCtx, pad: string): string {
-  const items: string[] = [];
-  for (const c of s.children) {
-    if (isSection(c)) items.push(sectionX(c, ctx, pad + '  '));
-    else if (c.k === 'list') attachList(items, listX(c, ctx, pad + '    '));
-    else { const x = blockX(c, ctx, pad + '  '); if (x) items.push(x); }
+/**
+ * WP-15 (PUB-009): a JSS section may hold a warning or a caution anywhere among its blocks; an S1000D levelled paragraph takes its warnings, then its
+ * cautions, FIRST (after the title) and only then notes, paragraphs, lists, tables and figures. The section's blocks are therefore cut where a notice could
+ * not stand: the first run stays in the titled paragraph, each later run (starting with its warning or caution) becomes an UNTITLED levelled paragraph
+ * after it - the standard's own numbered paragraph, which the importer (map.ts mapBody) reads back as the parent's content, in the same order.
+ */
+function noticeRuns(blocks: Block[]): Block[][] {
+  const runs: Block[][] = [[]];
+  for (const b of blocks) {
+    const run = runs[runs.length - 1];
+    const fits = b.k === 'warning' ? run.every((x) => x.k === 'warning') : b.k === 'caution' ? run.every((x) => x.k === 'warning' || x.k === 'caution') : true;
+    if (fits) run.push(b); else runs.push([b]);
   }
+  return runs;
+}
+
+function blocksX(blocks: Block[], ctx: SerializeCtx, pad: string): string[] {
+  const items: string[] = [];
+  for (const c of blocks) {
+    if (c.k === 'list') attachList(items, listX(c, ctx, pad + '  '));
+    else { const x = blockX(c, ctx, pad); if (x) items.push(x); }
+  }
+  return items;
+}
+
+function sectionX(s: Section, ctx: SerializeCtx, pad: string): string {
+  const own = s.children.filter((c): c is Block => !isSection(c));
+  const subs = s.children.filter(isSection);
+  const [first, ...later] = noticeRuns(own);
+  const items: string[] = blocksX(first, ctx, pad + '  ');
+  for (const run of later) items.push(`${pad}  <levelledPara>\n${blocksX(run, ctx, pad + '    ').join('\n')}\n${pad}  </levelledPara>`);
+  for (const c of subs) items.push(sectionX(c, ctx, pad + '  '));
   const body = items.join('\n');
   return `${pad}<levelledPara>\n${pad}  <title>${esc(s.title)}</title>${body ? '\n' + body : ''}\n${pad}</levelledPara>`;
 }
@@ -243,7 +272,10 @@ export function pmcXml(chapters: PmcChapter[], head: { rootStart: string; identA
   const entry = (title: string | null, inner: string, pad: string): string => `${pad}<pmEntry>\n${title === null ? '' : `${pad}  <pmEntryTitle>${esc(title)}</pmEntryTitle>\n`}${inner}\n${pad}</pmEntry>`;
   const refs = (mods: PmcModule[], pad: string): string => mods.map((m) => dmRefX(m, pad)).join('\n');
   let entries: string;
-  if (!layout) entries = live.map((c) => entry(c.title, refs(c.modules, '      '), '    ')).join('\n');
+  // WP-15 (PUB-008): one data module per entry inside the chapter's entry. A chapter entry listing several dmRef side by side is legal, but the
+  // platform's S1000D publication model keeps one reference per entry and splits the rest into untitled entries beside the chapter, which a later
+  // S1000D -> JSS conversion then cannot place ("chapter-unknown").
+  if (!layout) entries = live.map((c) => entry(c.title, c.modules.map((m) => entry(null, refs([m], '        '), '      ')).join('\n'), '    ')).join('\n');
   else {
     const front = layout.front.length ? entry('Front matter', layout.front.map((f) => entry(f.title, refs([f.module], '          '), '        ')).join('\n'), '      ') : '';
     const chapterEntries = live.map((c) => (c.heading

@@ -20,6 +20,7 @@ import { assertS1000dPublication } from './projectRecord';
 import { listDms, type DmSummary } from './csdb';
 import { parsePmComplete } from './importer/pmComplete';
 import { RECONSTRUCTED_MARKER } from './importer/package';
+import { completePmStatus } from './pmHeader';
 
 const pmc = vendor('engine/pmc');
 const { dmCodeString, pmCodeString } = vendor('engine/resolveDmRefs');
@@ -156,6 +157,8 @@ export function writePm(projectId: string, model: { meta?: unknown; entries: PmE
   const existing = fs.existsSync(abs) ? fs.readFileSync(abs, 'utf8') : null;
   if (existing !== null && baseHash !== undefined && sha(existing) !== baseHash) throw conflict('The publication was changed by someone else since you opened it. Reload it to see their changes.', 'EDIT_CONFLICT', { currentHash: sha(existing) });
   if (existing !== null) xml = carryReconstructedMarker(existing, xml);
+  // WP-15 (PUB-015): the writer does not write the header's applicability and BREX reference (pm.xsd requires both): the saved file keeps the ones it had
+  xml = completePmStatus(xml, existing, { enterpriseCode: (model.meta as { rpc?: { enterpriseCode?: string } } | undefined)?.rpc?.enterpriseCode });
   if (fs.existsSync(abs)) fs.copyFileSync(abs, abs + '.bak');
   content.writeText(projectId, abs, xml);
   return { counts, backup: path.basename(abs) + '.bak', hash: sha(xml) };

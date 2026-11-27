@@ -9,6 +9,7 @@
 
 import { useEffect, useState } from 'react';
 import { contentApi, type ReviewComment, type ReviewState } from '../../api';
+import { jsgApi } from '../../api/jsg';
 import { Alert, Badge, ConfirmModal, Empty, Field, Loading, errText, fmtDate, ago, useAsync } from '../../components/ui';
 import { Icon } from '../../components/Icon';
 import { PageHeader } from '../../components/PageHeader';
@@ -26,7 +27,8 @@ const STATE: Record<ReviewState, { label: string; tone?: 'ok' | 'warn' | 'bad' |
 };
 
 export function ReleasePage() {
-  const { id, role, can, reload } = useProject();
+  const { id, role, can, reload, summary } = useProject();
+  const jsg = summary.project.format === 'jsg';                   // WP-15 (PUB-011): a JSG document is released here too; its PDF comes from the JSG engine
   const toast = useUi((s) => s.toast);
   const rel = useAsync(() => contentApi.release(id), [id]);
   const dms = useAsync(() => contentApi.dms(id), [id]);
@@ -109,10 +111,10 @@ export function ReleasePage() {
                       : <>Every PDF is stamped <strong>NOT RELEASED</strong>. Submit the manual for review when it is finished.</>}
             </p>
             <div className="v2-row" style={{ marginTop: 12, flexWrap: 'wrap' }}>
-              <a className="btn btn-primary" href={contentApi.downloadUrl(id)} download data-testid="download-pdf"><Icon name="download" />{rv.state === 'approved' ? 'Download released PDF' : 'Download PDF (NOT RELEASED)'}</a>
+              <a className="btn btn-primary" href={jsg ? jsgApi.downloadUrl(id) : contentApi.downloadUrl(id)} download data-testid="download-pdf"><Icon name="download" />{rv.state === 'approved' ? 'Download released PDF' : 'Download PDF (NOT RELEASED)'}</a>
               <span className="v2-hint">{rv.state === 'approved' ? 'No watermark.' : 'Carries the NOT RELEASED watermark until approval.'} Built fresh from the current content.</span>
             </div>
-            <p className="v2-hint" style={{ marginBottom: 0 }}>Covers {r.sources} source file{r.sources === 1 ? '' : 's'}: the publication module, the data modules placed in it, and its front matter.</p>
+            <p className="v2-hint" style={{ marginBottom: 0 }}>Covers {r.sources} source file{r.sources === 1 ? '' : 's'}{jsg ? ': the JSG document and its pictures.' : ': the publication module, the data modules placed in it, and its front matter.'}</p>
           </div>
 
           {rv.state === 'in_review' && r.pending ? (

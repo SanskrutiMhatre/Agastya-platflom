@@ -119,6 +119,7 @@
   "GET /api/projects/:id/jsg/history": "requireProject(viewer,param) :: 401 403 403 404 404 ok ok | ok ok ok ok ok",
   "GET /api/projects/:id/jsg/history/:rev": "requireProject(viewer,param) :: 401 403 403 404 404 ok ok | ok ok ok ok ok",
   "GET /api/projects/:id/jsg/pdf": "requireProject(viewer,param) :: 401 403 403 404 404 ok ok | ok ok ok ok ok",
+  "GET /api/projects/:id/jsg/pdf/download": "requireProject(reviewer,param) :: 401 403 403 404 404 ok 403 | 403 ok ok ok ok",
   "GET /api/projects/:id/jss": "requireProject(viewer,param) :: 401 403 403 404 404 ok ok | ok ok ok ok ok",
   "GET /api/projects/:id/jss/checkouts": "requireProject(viewer,param) :: 401 403 403 404 404 ok ok | ok ok ok ok ok",
   "GET /api/projects/:id/jss/export": "requireProject(viewer,param) :: 401 403 403 404 404 ok ok | ok ok ok ok ok",

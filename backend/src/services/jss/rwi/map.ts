@@ -226,7 +226,15 @@ function mapFigure(e: Element, ctx: Ctx): Figure {
     for (const [from, to] of [['reproductionWidth', 'width'], ['reproductionHeight', 'height']] as const) { const v = (g.getAttribute(from) ?? '').trim(); if (/^\d+(\.\d+)?(mm|cm|in|pt|px)$/.test(v)) gr[to] = v; }
     graphics.push(gr);
   }
-  return { k: 'figure', id, ...(title ? { title } : {}), graphics, legend: [] };
+  // WP-15 (PUB-015): the legend (a definition list: the key number, then its text) is the JSS figure's numbered key
+  const legend: Figure['legend'] = [];
+  const lg = kids(e).find((c) => c.tagName === 'legend');
+  for (const item of lg ? Array.from(lg.getElementsByTagName('definitionListItem')) : []) {
+    const num = squash(kids(item).find((c) => c.tagName === 'listItemTerm')?.textContent ?? '').trim();
+    const text = squash(kids(item).find((c) => c.tagName === 'listItemDefinition')?.textContent ?? '').trim();
+    if (num || text) legend.push({ num: num || String(legend.length + 1), text });
+  }
+  return { k: 'figure', id, ...(title ? { title } : {}), graphics, legend };
 }
 
 function mapNotice(e: Element, ctx: Ctx): Notice {
