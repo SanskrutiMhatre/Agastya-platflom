@@ -81,8 +81,8 @@ export function clientStatic(dir: string, opts: { maxCacheBytes?: number; maxFil
   const cache = new Map<string, Packed>();
   const pending = new Map<string, Promise<Packed>>();
   let cached = 0;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const mime: { lookup(p: string): string; charsets: { lookup(t: string): string | false } } = (express.static as any).mime;
+  type Mime = { lookup(p: string): string; charsets: { lookup(t: string): string | false } };
+  const mime: Mime = (express.static as unknown as { mime: Mime }).mime;
 
   const cacheControl = (res: Response, urlPath: string, file: string): void => {
     if (file.endsWith('index.html')) res.setHeader('Cache-Control', 'no-cache');

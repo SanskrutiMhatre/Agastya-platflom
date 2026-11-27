@@ -88,8 +88,8 @@ export function registerWorkspaceRoutes(app: Express): void {
   // WP-18 (PERF-016): `?limit=&offset=` (and `q`, matched against name, id and folder) return one window and the total; without them, the whole list as before.
   app.get('/api/projects', requireAuth(), wrap((req, res) => {
     const want = pageRequest(req); const q = searchText(req);
-    let projects: any[] = P.listProjectsFor(req.auth.user);
-    if (q) projects = projects.filter((p) => [p.name, p.id, p.folder, p.group].some((v) => typeof v === 'string' && v.toLowerCase().includes(q)));
+    let projects = P.listProjectsFor(req.auth.user);
+    if (q) projects = projects.filter((p) => [p.name, p.id, (p as { folder?: unknown }).folder, (p as { group?: unknown }).group].some((v) => typeof v === 'string' && v.toLowerCase().includes(q)));
     if (!want) return void res.json({ projects });
     const w = windowOf(projects, want);
     res.json({ projects: w.items, ...w.page });
