@@ -28,6 +28,9 @@ const ORDER = [
   // WP-12: from here on every step is appended with the next number (storage/schema.ts checkOrder refuses anything else).
   '022-audit-project-index',
   '023-document-leases',
+  '024-reserved-drop-at-merge',   // TEMPORARY (WP-14 branch only): replace with WP-27's 024 at merge
+  '025-reserved-drop-at-merge',   // TEMPORARY (WP-14 branch only): replace with WP-29's 025 at merge
+  '026-jobs',
 ];
 
 const MIGRATIONS = ORDER.map((name) => require(`./${name}`));

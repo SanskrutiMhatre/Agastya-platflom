@@ -11,7 +11,7 @@
 
 import { rewriteCodes } from '../services/modelCode';
 import { placeNewDm } from '../services/pm';
-import type { Express, RequestHandler } from 'express';
+import type { Express, Request, RequestHandler } from 'express';
 import fs from 'fs';
 import path from 'path';
 import { cappedDiskUpload, discardWhenDone, uploadedBytes } from '../services/uploads';
@@ -34,7 +34,7 @@ import { assertS1000dPublication } from '../services/projectRecord';
 import { checkDmEnterprises } from '../services/enterprises';
 import * as validation from '../services/validation';
 import * as publisher from '../services/publisher';
-import { assertPublishable } from '../services/publishGate';
+import * as jobs from '../services/jobs';
 import { readProjectJson, updateProjectJson, csdbRel, mediaRel, isCirProject, assertNotCir, PROTECTED_PROJECT_KEYS, unsafeInputFields, sameSetting, unsafeArtwork } from '../services/projects';
 import * as cir from '../services/cir';
 import * as leases from '../services/leases';
@@ -73,12 +73,17 @@ const importUpload: RequestHandler = (req, res, next) => {
 };
 
 const view = (min: string, cap = 'project.read'): RequestHandler => requireProject(min, { from: 'param', cap });
+/** What a publish job answers (services/jobs/kinds.ts "publish"). */
+interface Built { pdf: string; totalMs?: number; releaseLabel: string; ruleBreaks?: string[] }
 
 export function registerProjectContentRoutes(app: Express): void {
   const base = '/api/projects/:id';
   const pname = (id: string) => `“${readProjectJson(id).name || 'the project'}”`;
   const actor = (req: any) => ({ id: req.auth.user.id, username: req.auth.user.username, role: req.auth.user.role });
   const log = (req: any, action: string, meta?: unknown) => audit({ actorId: req.auth.user.id, actorUsername: req.auth.user.username, action, projectId: req.project.id, targetType: 'project', targetId: req.project.id, meta });
+  // WP-14: the publish gate as a job (a worker process), with the same refusal (422 VALIDATION_FAILED and its findings) as before
+  const gate = (req: Request): Promise<unknown> => jobs.run({ kind: 'gate', projectId: req.project.id, params: { scope: 'publication', opts: {} }, actor: actor(req) });
+  const isAsync = (req: Request): boolean => req.query?.async === '1' || req.body?.async === true;
 
   // ── Data modules (the Editor) ───────────────────────────────────────────
   // WP-18 (PERF-016, FE-030): `?limit=&offset=` return one window plus the total, `q` narrows by file name, code or title on the server, and
@@ -318,10 +323,16 @@ export function registerProjectContentRoutes(app: Express): void {
     log(req, 'validation.issue', { issue });
     res.json({ issue });
   }));
+  // WP-14 (PERF-001): validation runs as a job in a worker process; the request waits for it (same answer as before), or with ?async=1 gets 202
+  // and the job, whose progress and result GET /jobs/:jobId replays.
   app.post(`${base}/validation`, view('reviewer', 'validate.run'), wrap(async (req, res) => {
-    const run = await validation.runValidation(req.project.id, { issue: req.body?.issue === undefined ? undefined : String(req.body.issue), brex: req.body?.brex === undefined ? true : !!req.body.brex });
-    log(req, 'validation.run', run.summary);
-    res.json({ run });
+    const params = { issue: req.body?.issue === undefined ? undefined : String(req.body.issue), brex: req.body?.brex === undefined ? true : !!req.body.brex, fresh: req.body?.fresh === true };
+    const s = jobs.submit({ kind: 'validate', projectId: req.project.id, params, actor: actor(req) });
+    const record = (out: unknown): void => { const run = (out as { run: validation.ValidationRun }).run; log(req, 'validation.run', { ...run.summary, ...(run.cached ? { cached: true } : {}) }); };
+    if (isAsync(req)) { void s.done.then(record, () => undefined); res.status(202).json({ job: { id: s.id }, jobUrl: `/api/projects/${req.project.id}/jobs/${s.id}` }); return; }
+    const out = await s.done as { run: validation.ValidationRun };
+    record(out);
+    res.set('X-Job-Id', s.id).json({ run: out.run });
   }));
 
   // ── Release + watermark ─────────────────────────────────────────────────
@@ -344,7 +355,7 @@ export function registerProjectContentRoutes(app: Express): void {
   }));
   app.post(`${base}/release`, view('editor', 'release.submit'), wrap(async (req, res) => {
     assertNotCir(req.project.id, 'release');
-    await assertPublishable(req.project.id, 'publication');          // a release is a publication: its modules must be valid right now
+    await gate(req);                                                 // a release is a publication: its modules must be valid right now
     const again = review.reviewState(req.project.id).state === 'changes_requested';
     publisher.syncFrontMatter(req.project.id);                       // the fingerprint that is approved must be the one every build reproduces
     const out = release.requestRelease(req.project.id, req.auth.user.id, req.body ?? {});
@@ -366,7 +377,7 @@ export function registerProjectContentRoutes(app: Express): void {
     if (!canApprove(req.auth.user, req.project.role)) throw forbidden('Only the Project Manager of this project, or an administrator, can decide a release.', 'APPROVER_ONLY');
     const requester = store.getRelease(param(req, 'relId'))?.requested_by;
     if (approve) { const sod = securityPolicy.approverConflict(requester, req.auth.user.id); if (sod) throw forbidden(sod, 'SEPARATION_OF_DUTIES'); }   // before any side effect (D7)
-    if (approve) await assertPublishable(req.project.id, 'publication');   // never approve a release whose content is not valid now
+    if (approve) await gate(req);                                    // never approve a release whose content is not valid now
     // Approval turns every in-work revision of the publication into the next ISSUE (in-work 00, issueType "changed"); the release then covers that content.
     // The issuing happens BEFORE the decision is recorded (and only for a request that is still pending), so a failure leaves the release undecided and the
     // approval can simply be repeated - already-issued modules are not issued twice.
@@ -429,9 +440,14 @@ export function registerProjectContentRoutes(app: Express): void {
     }
     assertNotCir(req.project.id, 'publish');
     const allowRuleBreaks = req.body?.allowRuleBreaks === true;
-    const out: any = await publisher.buildPublication(req.project.id, { compression, allowRuleBreaks });
-    log(req, out.ruleBreaks?.length ? 'publish.built.with-rule-breaks' : 'publish.built', { ms: out.totalMs, ruleBreaks: out.ruleBreaks ?? [] });
-    res.json({ ok: true, ruleBreaks: out.ruleBreaks ?? [], totalMs: out.totalMs, bytes: fs.statSync(out.pdf).size, releaseLabel: out.releaseLabel, pdfUrl: `/api/projects/${req.project.id}/publish/pdf` });
+    // WP-14: the build is a job in a worker process (deadline, cancel, one build per project, a bounded number server-wide)
+    const s = jobs.submit({ kind: 'publish', projectId: req.project.id, params: { compression, allowRuleBreaks }, actor: actor(req) });
+    const record = (out: Built): void => log(req, out.ruleBreaks?.length ? 'publish.built.with-rule-breaks' : 'publish.built', { ms: out.totalMs, ruleBreaks: out.ruleBreaks ?? [] });
+    if (isAsync(req)) { void s.done.then((o) => record(o as Built), () => undefined); res.status(202).json({ job: { id: s.id }, jobUrl: `/api/projects/${req.project.id}/jobs/${s.id}` }); return; }
+    const out = await s.done as Built;
+    record(out);
+    // PUB-005: what the build said about the document (notes, image references, security confinements) comes back with the answer
+    res.set('X-Job-Id', s.id).json({ ok: true, ruleBreaks: out.ruleBreaks ?? [], totalMs: out.totalMs, bytes: fs.statSync(out.pdf).size, releaseLabel: out.releaseLabel, pdfUrl: `/api/projects/${req.project.id}/publish/pdf`, jobId: s.id, report: jobs.buildReport(req.project.id, s.id) });
   }));
 
   /*
@@ -444,7 +460,9 @@ export function registerProjectContentRoutes(app: Express): void {
     const abs = path.join(projectDirFor(req.project.id), publisher.PDF_NAME);
     const built = publisher.lastBuildState(req.project.id);
     if (!fs.existsSync(abs) || !built || built.fingerprint !== st.fingerprint || built.released !== st.released) {
-      await publisher.buildPublication(req.project.id);
+      // WP-14 (PERF-015): still rebuilt here, because the page links to this address for the released copy; but as a job (deadline,
+      // one per project, joined with an identical queued build), never on the server's thread
+      await jobs.run({ kind: 'publish', projectId: req.project.id, params: {}, actor: actor(req) });
     }
     const name = `${(readProjectJson(req.project.id).name || req.project.id).replace(/[^\w.\- ]/g, '_')}${st.released ? '' : ' (NOT RELEASED)'}.pdf`;
     log(req, 'publish.downloaded', { released: st.released });
@@ -454,8 +472,8 @@ export function registerProjectContentRoutes(app: Express): void {
 
   app.post(`${base}/publish/preview/:file`, view('reviewer', 'publish.preview'), wrap(async (req, res) => {
     csdb.resolveDmFile(req.project.id, param(req, 'file'));
-    const out = await publisher.buildPreview(req.project.id, param(req, 'file'));
-    res.set('X-Build-Ms', String(out.totalMs ?? ''));
+    const out = await jobs.run<{ pdf: string; totalMs?: number }>({ kind: 'preview', projectId: req.project.id, params: { file: param(req, 'file') }, actor: actor(req) });
+    res.set('X-Build-Ms', String(out.totalMs ?? '')).set('X-Job-Id', String(out.jobId ?? ''));
     res.type('application/pdf').sendFile(out.pdf);
   }));
 

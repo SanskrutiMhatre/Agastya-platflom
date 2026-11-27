@@ -116,11 +116,15 @@ async function boot({ ws: withWs = false } = {}) {
 
   // close(): stop the renderer and the server, close the database, and remove the throwaway workspace (QA-010). On Windows a file still held by
   // a child process cannot be removed at once; the exit handler tries again. AGASTYA_KEEP_TEMP=1 keeps the workspace.
+  let jobsDown = Promise.resolve();
   const close = () => new Promise((r) => {
     try { require('../dist/services/publisher').stopRenderer(); } catch { /* none */ }
+    // WP-14: the job workers (and their JVMs) hold the throwaway workspace's database and files: end them before it is removed
+    try { const j = require('../dist/services/jobs'); jobsDown = j.shutdownJobs(); } catch { /* none */ }
     if (withWs) { for (const w of sockets) { try { w.terminate(); } catch { /* gone */ } } try { require('../dist/services/broadcast').close(); } catch { /* none */ } }
     server.close(r);
   })
+    .then(() => jobsDown.catch(() => undefined))
     .then(() => {
       try { require('../dist/context').registryDb.close(); } catch { /* already closed */ }
       temps.add(ws); if (!process.env.AGASTYA_KEEP_TEMP && rmQuiet(ws)) temps.delete(ws);

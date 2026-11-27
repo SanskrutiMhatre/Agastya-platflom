@@ -18,8 +18,10 @@ import { adoptFromContents } from '../services/projectConfig';
 import { readManifestOf } from '../services/projectArchive';
 import { restoreSettings, type RestoreReport } from '../services/packageSettings';
 import { projectDirFor } from '../context';
-import { buildHtmlPublication } from '../services/htmlPublish';
+import type { HtmlResult } from '../services/htmlPublish';
 import { allFindings } from '../services/findings';
+import { lastRun } from '../services/validation';
+import * as jobs from '../services/jobs';
 import { buildObject } from '../services/objectTemplates';
 import { createItem } from '../services/adminConfig';
 import { objectHtml, objectPdf } from '../services/objectRender';
@@ -183,7 +185,8 @@ export function registerPackageRoutes(app: Express): void {
   app.post(`${base}/publish/html`, view('reviewer', 'publish.build'), wrap(async (req, res) => {
     if (isCirProject(req.project.id)) throw new HttpError(403, 'The shared repository is not published.', 'CIR_PUBLISH');
     const input = req.body?.productId || Array.isArray(req.body?.values) ? { productId: req.body?.productId || undefined, values: Array.isArray(req.body?.values) ? req.body.values : undefined } : undefined;
-    const out = await buildHtmlPublication(req.project.id, input, { allowRuleBreaks: req.body?.allowRuleBreaks === true });
+    // WP-14: the HTML publication (with its gate) is a build job in a worker process
+    const out = await jobs.run<HtmlResult>({ kind: 'html', projectId: req.project.id, params: { input: input ?? null, allowRuleBreaks: req.body?.allowRuleBreaks === true }, actor: actor(req) });
     log(req, out.ruleBreaks.length ? 'publish.html.with-rule-breaks' : 'publish.html', { name: out.name, pages: out.pages, configured: out.configured, ruleBreaks: out.ruleBreaks });
     res.status(201).json({ name: out.name, pages: out.pages, assets: out.assets, missing: out.missing, configured: out.configured, ruleBreaks: out.ruleBreaks, warnings: out.warnings, zip: `/api/projects/${req.project.id}/publish/html/${out.name}.zip`, index: `/api/projects/${req.project.id}/publish/html/${out.name}/index.html` });
   }));
@@ -206,7 +209,11 @@ export function registerPackageRoutes(app: Express): void {
   }));
 
   // ── Findings (module, rule, XML location, suggested fix) and the standards coverage matrix ──
-  app.get(`${base}/findings`, view('viewer'), wrap(async (req, res) => { res.json(await allFindings(req.project.id, req.query.run === '1')); }));
+  app.get(`${base}/findings`, view('viewer'), wrap(async (req, res) => {
+    // WP-14: a fresh run is a validation job in a worker process; the findings are then read from the run it stored
+    if (req.query.run === '1' || !lastRun(req.project.id)) await jobs.run({ kind: 'validate', projectId: req.project.id, params: { brex: false, fresh: true }, actor: { id: req.auth.user.id, username: req.auth.user.username } });
+    res.json(await allFindings(req.project.id, false));
+  }));
   app.get('/api/s1000d/coverage', requireAuth(), wrap((_req, res) => { res.json({ rows: coverage() }); }));
 
   // ── New objects from templates, and rendering (HTML / PDF) ──

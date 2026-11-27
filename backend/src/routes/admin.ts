@@ -16,7 +16,7 @@ import { audit, requireAdmin, requireAuth, store } from '../context';
 import { wrap, param } from '../services/http';
 import { COLLECTIONS, createItem, deleteItem, listItems, specOf, updateItem } from '../services/adminConfig';
 import * as platform from '../services/platform';
-import * as publisher from '../services/publisher';
+import * as jobs from '../services/jobs';
 import { readProjectJson, pmRel } from '../services/projects';
 import { projectDirFor } from '../context';
 import fs from 'fs';
@@ -121,9 +121,8 @@ export function registerAdminRoutes(app: Express): void {
     log(req, 'maintenance.rebuild-pdfs.started', { projects: ids.length });
     void (async () => {
       let ok = 0; const failed: string[] = [];
-      for (const id of ids) {
-        try { await publisher.buildPublication(id); ok++; } catch { failed.push(id); }
-      }
+      // WP-14: each rebuild is a build job (the build slots bound how many run at once; authors' own builds queue beside them)
+      await Promise.all(ids.map((id) => jobs.run({ kind: 'publish', projectId: id, params: {}, actor: { id: req.auth.user.id, username: req.auth.user.username } }).then(() => { ok++; }, () => { failed.push(id); })));
       audit({ actorId: req.auth.user.id, actorUsername: req.auth.user.username, action: 'maintenance.rebuild-pdfs.finished', targetType: 'admin', meta: { rebuilt: ok, failed } });
     })();
     res.status(202).json({ queued: ids.length });

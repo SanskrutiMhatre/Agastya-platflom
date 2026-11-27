@@ -38,6 +38,12 @@ let rl = null;
 let ready = null;         // Promise that resolves once the JVM prints READY
 let queue = Promise.resolve();
 let disabled = false;     // set true after a failed start, so we stop retrying
+// Vendor exception "fopd bounds" (2026-11-27, audit WP-14: PERF-008, PUB-003): JVM options (the heap limit) set by the server's job
+// worker before the first render, and the per-render exit listener is removed when the render answers (it leaked one per render).
+let jvmArgs = [];
+function configure(o) {
+  if (o && Array.isArray(o.jvmArgs)) jvmArgs = o.jvmArgs.map(String);
+}
 
 function start() {
   if (proc) return ready;
@@ -46,7 +52,7 @@ function start() {
       // The font configuration is passed as an argument rather than left to a
       // default inside FopServer, so this path and build.js's `fop -c` are
       // demonstrably reading the same file.
-      proc = spawn(JAVA, ['-cp', CLASSPATH, 'FopServer', fontConf.fopConf() || toolPaths.FOP_XCONF], {
+      proc = spawn(JAVA, [...jvmArgs, '-cp', CLASSPATH, 'FopServer', fontConf.fopConf() || toolPaths.FOP_XCONF], {
         cwd: CLASS_DIR,
         stdio: ['pipe', 'pipe', 'pipe'],
         // Without this the JVM inherits an AppImage's LD_LIBRARY_PATH, which
@@ -95,14 +101,16 @@ function render({ baseDir, foPath, pdfPath }) {
   const job = queue.then(async () => {
     await start();
     return new Promise((resolve, reject) => {
+      const p = proc;
       const onLine = (line) => {
         rl.removeListener('line', onLine);
+        p.removeListener('exit', onExit);          // vendor exception "fopd bounds": no leaked listener per render
         if (line.startsWith('OK')) resolve({ pdf: pdfPath });
         else reject(new Error(line.replace(/^ERR:\s*/, '') || 'FOP render failed'));
       };
       const onExit = () => reject(new Error('FopServer died mid-render'));
       rl.on('line', onLine);
-      proc.once('exit', onExit);
+      p.once('exit', onExit);
       proc.stdin.write([baseDir, foPath, pdfPath].join('\t') + '\n');
     });
   });
@@ -130,4 +138,7 @@ function stop() {
 
 function isAvailable() { return !disabled; }
 
-module.exports = { render, start, warmup, stop, isAvailable };
+/** The JVM's process id while it runs (the job worker reports it), else null. Vendor exception "fopd bounds". */
+function pid() { return proc ? proc.pid : null; }
+
+module.exports = { render, start, warmup, stop, isAvailable, configure, pid };

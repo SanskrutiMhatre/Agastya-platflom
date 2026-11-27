@@ -19,6 +19,7 @@ import { listItems } from '../services/adminConfig';
 import * as APP from '../services/applicability';
 import * as EVAL from '../services/applicEval';
 import * as publisher from '../services/publisher';
+import * as jobs from '../services/jobs';
 import { gateTargets } from '../services/publishGate';
 import { projectDirFor } from '../context';
 import { readProjectJson, pmRel } from '../services/projects';
@@ -288,7 +289,8 @@ export function registerS1000dRoutes(app: Express): void {
     });
   }));
   app.post(`${base}/publish/configured`, projView('reviewer', 'publish.build'), wrap(async (req, res) => {
-    const out = await publisher.buildConfiguredPublication(req.project.id, { productId: req.body?.productId || undefined, values: Array.isArray(req.body?.values) ? req.body.values : undefined });
+    // WP-14: a configuration PDF is a build job in a worker process
+    const out = await jobs.run<publisher.ConfiguredBuildResult>({ kind: 'configured', projectId: req.project.id, params: { productId: req.body?.productId || undefined, values: Array.isArray(req.body?.values) ? req.body.values : undefined }, actor: { id: req.auth.user.id, username: req.auth.user.username } });
     pLog(req, 'publish.configured', { name: out.name, label: out.plan.label });
     res.status(201).json({ name: out.name, file: out.file, plan: out.plan, releaseLabel: out.releaseLabel, totalMs: out.totalMs });
   }));

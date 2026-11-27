@@ -14,6 +14,7 @@
 // =============================================================================
 
 import path from 'path';
+import os from 'os';
 
 const ROOT = path.resolve(__dirname, '..');
 
@@ -95,6 +96,86 @@ export interface Config {
    * decided password-reset requests; audit rows older than `auditDays` are written to a compressed archive file first, then removed.
    */
   retention: { sessionsDays: number; notificationsDays: number; resetRequestsDays: number; auditDays: number };
+  /** WP-14 (PERF-001, PUB-027, PRD-001): the job service that runs validation, the publish gate and publication in worker processes. */
+  jobs: JobsConfig;
+}
+
+/**
+ * WP-14: the job service. Every variable is optional; the defaults follow the audit (03 section 5, addendum 17 PRD-001).
+ *   AGASTYA_JOBS                  "worker" (default) or "inline" (run in the server process: a diagnostic fallback, no isolation)
+ *   AGASTYA_JOB_WORKERS           worker processes at most (default: cores - 1, at most validation + build slots, at least 1)
+ *   AGASTYA_VALIDATION_SLOTS      validation / gate jobs at once, server-wide (default 2)
+ *   AGASTYA_BUILD_SLOTS           publication builds at once, server-wide (default 2: two FOP slots)
+ *   AGASTYA_JOB_TIMEOUT_MINUTES   deadline of one job (default 30); a job past it is killed with its process tree
+ *   AGASTYA_WORKER_HEAP_MB        V8 heap of a worker (default 4096; WebAssembly memory of the schema validator is outside it)
+ *   AGASTYA_FOP_HEAP_MB           -Xmx of the FOP JVM a worker starts (default 1536; 0 = the JVM's own default)
+ *   AGASTYA_JOBS_PER_WORKER       a worker (and its JVM) is replaced after this many jobs (default 50)
+ *   AGASTYA_WORKER_IDLE_MINUTES   an idle worker exits after this long (default 10)
+ *   AGASTYA_JOB_OBJECT            "0" = do not put workers into a Windows job object (default on, Windows only)
+ *   AGASTYA_JOB_PROCESS_MB        job object: memory limit of each process (default half the RAM, 1-8 GB)
+ *   AGASTYA_JOB_MEMORY_MB         job object: memory limit of all workers and their tools together (default 75 % of the RAM)
+ *   AGASTYA_JOB_CPU_PERCENT       job object: CPU rate cap of all workers together (default (cores - 1) / cores; 0 = no cap)
+ *   AGASTYA_JOB_ACTIVE_PROCESSES  job object: processes at once (default 8 per worker)
+ *   AGASTYA_VALIDATION_CACHE      "0" = never answer the Validation page from the stored run of unchanged content (default on)
+ *   AGASTYA_JOB_KEEP_DAYS         finished job records are kept this long (default 30)
+ *   AGASTYA_JOB_TEST_KINDS        "1" = the diagnostic job kinds the tests use (sleep, crash, allocate, spawn); never in production
+ *   AGASTYA_JOB_WORKER            set by the pool for its own children: this process is a worker (no migrations, no listener)
+ */
+export interface JobsConfig {
+  mode: 'worker' | 'inline';
+  workers: number;
+  validationSlots: number;
+  buildSlots: number;
+  timeoutMs: number;
+  workerHeapMb: number;
+  fopHeapMb: number;
+  jobsPerWorker: number;
+  idleMs: number;
+  limits: { enabled: boolean; processMb: number; jobMb: number; cpuPercent: number; activeProcesses: number };
+  validationCache: boolean;
+  keepDays: number;
+  testKinds: boolean;
+  /** This process is a job worker. */
+  worker: boolean;
+  /** The environment a worker starts with: this one without secrets and without the variables that load code (the audit's "reduced environment"). */
+  workerEnv: Record<string, string>;
+}
+
+/** Names a worker never inherits: secrets, and the variables that load code into Node or the JVM. */
+const WORKER_ENV_DROP = /PASSWORD|PASSPHRASE|SECRET|TOKEN|COOKIE|CREDENTIAL|^NODE_OPTIONS$|^JAVA_TOOL_OPTIONS$|^_JAVA_OPTIONS$|^JDK_JAVA_OPTIONS$/i;
+
+function parseJobs(env: Env): JobsConfig {
+  const cores = Math.max(1, os.cpus().length);
+  const ramMb = Math.floor(os.totalmem() / 1024 ** 2);
+  const mode = (env.AGASTYA_JOBS ?? '').trim().toLowerCase();
+  if (mode !== '' && mode !== 'worker' && mode !== 'inline') throw new ConfigError('AGASTYA_JOBS', `"${env.AGASTYA_JOBS}" is not a job mode: use "worker" (default) or "inline".`);
+  const validationSlots = envPositive('AGASTYA_VALIDATION_SLOTS', 2, env);
+  const buildSlots = envPositive('AGASTYA_BUILD_SLOTS', 2, env);
+  const workers = envPositive('AGASTYA_JOB_WORKERS', Math.max(1, Math.min(cores - 1, validationSlots + buildSlots)), env);
+  const workerEnv: Record<string, string> = {};
+  for (const [k, v] of Object.entries(env)) if (v !== undefined && !WORKER_ENV_DROP.test(k)) workerEnv[k] = v;
+  workerEnv.AGASTYA_JOB_WORKER = '1';
+  return {
+    mode: mode === 'inline' ? 'inline' : 'worker',
+    workers, validationSlots, buildSlots,
+    timeoutMs: envPositive('AGASTYA_JOB_TIMEOUT_MINUTES', 30, env) * 60_000,
+    workerHeapMb: envPositive('AGASTYA_WORKER_HEAP_MB', 4096, env),
+    fopHeapMb: envCount('AGASTYA_FOP_HEAP_MB', 1536, env),
+    jobsPerWorker: envPositive('AGASTYA_JOBS_PER_WORKER', 50, env),
+    idleMs: envPositive('AGASTYA_WORKER_IDLE_MINUTES', 10, env) * 60_000,
+    limits: {
+      enabled: env.AGASTYA_JOB_OBJECT !== '0' && process.platform === 'win32',
+      processMb: envPositive('AGASTYA_JOB_PROCESS_MB', Math.min(8192, Math.max(1024, Math.floor(ramMb / 2))), env),
+      jobMb: envPositive('AGASTYA_JOB_MEMORY_MB', Math.max(1536, Math.floor(ramMb * 0.75)), env),
+      cpuPercent: Math.min(100, envCount('AGASTYA_JOB_CPU_PERCENT', cores > 1 ? Math.floor(((cores - 1) / cores) * 100) : 0, env)),
+      activeProcesses: envPositive('AGASTYA_JOB_ACTIVE_PROCESSES', workers * 8, env),
+    },
+    validationCache: env.AGASTYA_VALIDATION_CACHE !== '0',
+    keepDays: envCount('AGASTYA_JOB_KEEP_DAYS', 30, env),
+    testKinds: env.AGASTYA_JOB_TEST_KINDS === '1',
+    worker: env.AGASTYA_JOB_WORKER === '1',
+    workerEnv,
+  };
 }
 
 export type DeploymentMode = 'local' | 'server';
@@ -259,13 +340,15 @@ export function buildConfig(env: Env = process.env): Config {
       resetRequestsDays: envCount('AGASTYA_RETENTION_RESET_REQUESTS_DAYS', 90, env),
       auditDays: envCount('AGASTYA_AUDIT_RETENTION_DAYS', 730, env),
     },
+    jobs: parseJobs(env),
   };
 }
 
 /** The effective configuration without secrets, for the start-up log and diagnostics. */
 export function describeConfig(c: Config): Record<string, unknown> {
-  const { initialAdmin, ...rest } = c;
-  return { ...rest, initialAdmin: initialAdmin.INITIAL_ADMIN_USERNAME ? { username: initialAdmin.INITIAL_ADMIN_USERNAME, password: '[set]' } : null };
+  const { initialAdmin, jobs, ...rest } = c;
+  const { workerEnv, ...jobsRest } = jobs;
+  return { ...rest, jobs: { ...jobsRest, workerEnv: `[${Object.keys(workerEnv).length} variables]` }, initialAdmin: initialAdmin.INITIAL_ADMIN_USERNAME ? { username: initialAdmin.INITIAL_ADMIN_USERNAME, password: '[set]' } : null };
 }
 
 /** This process's configuration, built once. */

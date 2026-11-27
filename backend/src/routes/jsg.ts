@@ -21,7 +21,8 @@ import { JSG_TYPES, jsgTypeById } from '../services/jsg/registry';
 import { JSG_XSD, isJsgProject, jsgTypeOfProject, readSource, writeSource, validateJsg, sourceHistory, sourceRevision, sourceRel } from '../services/jsg/service';
 import { versionGuard } from '../services/versionGuard';
 import { registerOneFileDocumentRoutes, actorOf } from './documentHistory';
-import { buildJsgPdf, PDF_NAME } from '../services/jsg/engine';
+import { PDF_NAME, type JsgBuild } from '../services/jsg/engine';
+import * as jobs from '../services/jobs';
 import { importDocx } from '../services/jsg/docx';
 import { importIsplDocx } from '../services/jsg/docx-ispl';
 import { diskUpload, discard, tooLarge } from '../services/uploads';
@@ -66,7 +67,8 @@ export function registerJsgRoutes(app: Express): void {
 
   app.post(`${base}/build`, requireProject('reviewer', { from: 'param', cap: 'publish.build' }), wrap(async (req, res) => {
     needJsg(req);
-    const out = await buildJsgPdf(req.project.id);
+    // WP-14: the JSG build is a job in a worker process, like every other build (the same runner for all three formats, PUB-027)
+    const out = await jobs.run<JsgBuild>({ kind: 'jsg', projectId: req.project.id, params: {}, actor: actorOf(req) });
     log(req, 'jsg.built', { ms: out.totalMs });
     res.json({ ok: true, totalMs: out.totalMs, bytes: fs.statSync(out.pdf).size, warnings: out.warnings, pdfUrl: `/api/projects/${req.project.id}/jsg/pdf` });
   }));
