@@ -14,7 +14,7 @@ import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import { configApi, platformApi, workspaceApi, type AppSettings, type ConfigItem, type ConfigSpec, type SecurityPolicy } from '../api';
 import { Icon } from '../components/Icon';
 import { PageHeader } from '../components/PageHeader';
-import { Alert, Badge, ConfirmModal, Empty, Field, Loading, Modal, errText, useAsync } from '../components/ui';
+import { Alert, Badge, ConfirmModal, Empty, Field, Loading, Modal, errText, fmtDate, useAsync } from '../components/ui';
 import { useApp } from '../store/appSettings';
 import { DEFAULT_ACCENT, deriveAccent } from '../lib/accent';
 import { useUi } from '../store/ui';
@@ -195,8 +195,8 @@ function AuditSection() {
   return (
     <div className="v2-stack">
       <div className="v2-row v2-spread">
-        <div><h3 style={{ margin: 0 }}>Audit logs</h3><p className="v2-sub" style={{ margin: '2px 0 0' }}>Who did what, newest first.</p></div>
-        <a className="btn" href={platformApi.AUDIT_CSV} download data-testid="audit-export"><Icon name="download" />Export CSV</a>
+        <div><h3 style={{ margin: 0 }}>Audit logs</h3><p className="v2-sub" style={{ margin: '2px 0 0' }}>Who did what, newest first. Every row is chained and signed; Verify chain shows whether any was changed, removed or inserted.</p></div>
+        <a className="btn" href={platformApi.AUDIT_CSV} download data-testid="audit-export"><Icon name="download" />Export all (CSV)</a>
       </div>
       <Audit />
     </div>
@@ -226,6 +226,7 @@ function SecuritySection() {
     <div className="v2-stack" style={{ maxWidth: 560 }} data-testid="security-policy">
       <div><h3 style={{ margin: 0 }}>Security</h3><p className="v2-sub" style={{ margin: '2px 0 0' }}>How long people stay signed in, and who may approve a release.</p></div>
       {audit && audit.failures > 0 ? <Alert tone="bad">The audit log could not record {audit.failures} action{audit.failures === 1 ? '' : 's'} since the server started (last: {audit.last?.action} at {audit.last?.at}: {audit.last?.error}). The details are in workspace\logs\audit-failures.log.</Alert> : null}
+      {audit?.lastVerification ? <Alert tone={audit.lastVerification.ok ? 'ok' : 'bad'}><span data-testid="sec-audit-verify">Audit chain, last checked {fmtDate(audit.lastVerification.at)}: {audit.lastVerification.summary}.</span>{audit.lastVerification.ok ? null : ' See Audit logs > Verify chain, and docs/OPERATIONS.md section 13.'}</Alert> : null}
       <Field label="Sign out after this many minutes without activity" hint="0 means no idle limit. Typing in an editor counts as activity."><input className="v2-input" type="number" min={0} max={1440} value={form.idleMinutes} onChange={num('idleMinutes')} data-testid="sec-idle" /></Field>
       <Field label="Sign out this many hours after signing in" hint="Whatever happens; one working day is usual."><input className="v2-input" type="number" min={1} max={720} value={form.absoluteHours} onChange={num('absoluteHours')} data-testid="sec-absolute" /></Field>
       <Field label="Shortest password a person may choose" hint="15 or more when there is no second sign-in factor. Existing passwords keep working."><input className="v2-input" type="number" min={8} max={64} value={form.passwordMinLength} onChange={num('passwordMinLength')} data-testid="sec-pwmin" /></Field>

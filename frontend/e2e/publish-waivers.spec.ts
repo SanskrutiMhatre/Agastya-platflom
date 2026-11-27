@@ -129,6 +129,10 @@ test('the Publication page lists the waiver (subject, reason, who, when); removi
   await shot(page, '57-waivers-list');
 
   await row.getByTestId('waiver-remove').click();
+  // WP-29 (ENT-017): the removal asks for a reason, kept in the waiver history
+  const removing = page.getByRole('dialog', { name: `Remove the waiver for ${subject}` });
+  await removing.getByRole('textbox').fill('The BREX is in the project now.');
+  await removing.getByRole('button', { name: 'Remove', exact: true }).click();
   await expect(card.getByTestId('waiver-row')).toHaveCount(0);
   await expect(card).toContainText('No waivers');
   expect(await waivers()).toHaveLength(0);
