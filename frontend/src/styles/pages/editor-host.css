@@ -47,10 +47,8 @@ html[data-editor-focus] .v2-pshell > .v2-rail { visibility: hidden; overflow: hi
 .v2-edcomments-head { display: flex; align-items: center; gap: 8px; padding: 8px 8px 6px 12px; }
 .v2-edcomments-list { flex: 1; min-height: 0; overflow: auto; padding: 0 10px 10px; display: flex; flex-direction: column; gap: 8px; }
 .v2-rv.is-current { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
-/* WP-35 second pass: the editor chrome without inline styles; a thin rule separates the page's own actions from the host's (palette, keys, focus, layout) */
+/* WP-35 second pass: the editor chrome without inline styles */
 .v2-edhead > h1.v2-edtitle { font-size: 14px; }
-.v2-edsep { width: 1px; height: 20px; background: var(--border); flex: none; margin: 0 2px; }
-.v2-edhead.is-focus .v2-edsep { display: none; }
 .v2-row.v2-edautosave { gap: 4px; font-size: 12px; }
 .v2-row.v2-edcomments-done { gap: 6px; padding: 0 12px 6px; }
 .v2-edcomments-empty { padding: 0 12px; }
