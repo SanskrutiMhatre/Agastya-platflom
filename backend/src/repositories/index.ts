@@ -19,8 +19,9 @@ import {
 } from './s1000dRecords';
 import { SqliteRetentionRepository, type RetentionRepository } from './retentionRepository';
 import { SqliteLeaseRepository, type LeaseRepository, type LeaseRow } from './leaseRepository';
+import { SqliteAccessRepository, type AccessRepository } from './accessRepository';
 
-export type { ProjectRegistry, SnsRepository, ProjectConfigRepository, ReferenceRepository, ActivityRepository, CirLinkRepository, ExtensionRepository, LifecycleRepository, RetentionRepository, UnitOfWork, LeaseRepository, LeaseRow };
+export type { ProjectRegistry, SnsRepository, ProjectConfigRepository, ReferenceRepository, ActivityRepository, CirLinkRepository, ExtensionRepository, LifecycleRepository, RetentionRepository, AccessRepository, UnitOfWork, LeaseRepository, LeaseRow };
 
 export interface Repositories extends UnitOfWork {
   /** The engine behind these repositories ('sqlite'); a contract test and the migration runner use it to pick a dialect. */
@@ -41,6 +42,8 @@ export interface Repositories extends UnitOfWork {
   leases: LeaseRepository;
   /** WP-12 (PLT-007, ENT-015): housekeeping rows past their retention. */
   retention: RetentionRepository;
+  /** WP-27 (PLT-016, ENT-005): groups, group grants, capability rules, the directory group map. */
+  access: AccessRepository;
 }
 
 export function createSqliteRepositories(db: SqlDatabase): Repositories {
@@ -61,5 +64,6 @@ export function createSqliteRepositories(db: SqlDatabase): Repositories {
     activity: new SqliteActivityRepository(db),
     leases: new SqliteLeaseRepository(db),
     retention: new SqliteRetentionRepository(db),
+    access: new SqliteAccessRepository(db),
   };
 }

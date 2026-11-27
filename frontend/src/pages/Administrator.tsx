@@ -21,6 +21,7 @@ import { useUi } from '../store/ui';
 import { Audit, Users } from './Settings';
 import { CatalogueSection, SnsPresetsSection, ExtensionsSection, CoverageSection } from './AdminS1000d';
 import { PlatformBackups } from './PlatformBackups';
+import { DirectorySection, GroupsSection } from './AccessAdmin';
 
 const REFERENCE: Array<[string, string]> = [
   ['country-codes', 'Country codes'], ['language-codes', 'Language codes'], ['dm-types', 'DM types'],
@@ -34,7 +35,7 @@ const SHARED: Array<[string, string]> = [['language-codes', 'Language codes'], [
 const S1000D_ITEMS: Array<[string, string]> = [['s1000d-catalogue', 'Information codes'], ['sns-presets', 'Numbering (SNS)'], ['dm-types', 'Data module types'], ['pm-templates', 'Publication templates'], ['rpc-cages', 'Responsible partner companies'], ['originator-cages', 'Originator companies'], ['ddn', 'Data dispatch notes'], ['ddn-metadata', 'DDN metadata']];
 const S1000D_ADVANCED: Array<[string, string]> = [['extensions', 'Extension profiles'], ['coverage', 'Standards coverage']];
 const GROUPS: Array<{ title: string; items: Array<[string, string]>; advanced?: Array<[string, string]> }> = [
-  { title: 'People and access', items: [['roles', 'Roles'], ['users', 'Users']] },
+  { title: 'People and access', items: [['roles', 'Roles'], ['users', 'Users'], ['groups', 'Groups'], ['directory', 'Directory sign-on']] },
   { title: 'All manual types', items: SHARED },
   { title: 'S1000D', items: S1000D_ITEMS, advanced: S1000D_ADVANCED },
   { title: 'JSS', items: [['format-jss', 'Manual types and stencils']] },
@@ -87,6 +88,8 @@ export function AdministratorPage() {
             <Route path="format-jsg" element={<FormatSection format="jsg" />} />
             <Route path="coverage" element={<CoverageSection />} />
             <Route path="users" element={<Users />} />
+            <Route path="groups" element={<GroupsSection />} />
+            <Route path="directory" element={<DirectorySection />} />
             {REFERENCE.map(([id]) => <Route key={id} path={id} element={<ConfigTable key={id} collection={id} />} />)}
             <Route path="sns-defaults" element={<Navigate to="../sns-presets" replace />} />   {/* the second SNS screen was removed (2026-11-26): Numbering (SNS) is the one */}
             <Route path="audit-logs" element={<AuditSection />} />
@@ -187,6 +190,11 @@ function RolesSection() {
       <div><h3 style={{ margin: 0 }}>Roles</h3><p className="v2-sub" style={{ margin: '2px 0 0' }}>The platform's roles are fixed by the code that enforces them, so they are shown here, not edited.</p></div>
       <h4 style={{ margin: 0 }}>Platform roles</h4>{table(r.data.roles)}
       <h4 style={{ margin: 0 }}>Roles inside a project</h4>{table(r.data.projectRoles)}
+      {r.data.capabilities?.length ? <>
+        <h4 style={{ margin: 0 }}>Actions inside a project</h4>
+        <p className="v2-sub" style={{ margin: 0 }}>The lowest project role that may do each action. A project's managers can allow one action to a person or group below that role, or deny it (Project settings &gt; Access).</p>
+        <div className="v2-card" data-testid="capabilities"><table className="v2-table"><thead><tr><th>Action</th><th>From role</th></tr></thead><tbody>{r.data.capabilities.map((c) => <tr key={c.capability}><td className="v2-mono">{c.capability}</td><td>{c.minRole}</td></tr>)}</tbody></table></div>
+      </> : null}
     </div>
   );
 }

@@ -28,6 +28,7 @@ import { LocalFolderStore, type ContentStore } from './storage/contentStore';
 import type { LimiterStore, SessionStore } from './storage/authStores';
 import { createSqliteRepositories, type Repositories } from './repositories';
 import { currentRequest } from './services/requestContext';
+import { createDirectory, createDirectoryAuthProvider } from './core/auth/directory';
 
 /* eslint-disable @typescript-eslint/no-var-requires, @typescript-eslint/no-explicit-any */
 const { AuthStore } = require('./core/auth/store');
@@ -47,7 +48,8 @@ const MIGRATION_STEPS: MigrationStep[] = forDialect('sqlite');
 /** Who a person is (core/auth/provider.js). Roles, memberships and sessions stay in the platform. */
 export interface AuthProvider {
   readonly kind: string;
-  authenticate(c: { username: string; password: string }): Promise<{ ok: boolean; user?: AuthAccount; viaMaster?: boolean; reason?: 'unknown-user' | 'bad-password' | 'disabled' }>;
+  /** WP-27 adds two reasons a directory provider gives: the directory could not be reached, or no mapped group gives the person a role. */
+  authenticate(c: { username: string; password: string }): Promise<{ ok: boolean; user?: AuthAccount; viaMaster?: boolean; reason?: 'unknown-user' | 'bad-password' | 'disabled' | 'directory-unavailable' | 'not-authorised'; detail?: string }>;
   /** The signed-in session for a Cookie header, or null; its shape is the session service's (core/auth/sessions.js). */
   resolveSession(cookieHeader: string): unknown;
   /** Creates or finds the local account for an external identity (a directory provider); the local provider throws. */
@@ -193,8 +195,15 @@ export function createAppContext(config: Config, o: AppContextOverrides = {}): A
   const securityPolicy = createSecurityPolicy(store, nowIso);
   const sessionsSvc = new SessionService(sessionStore, { secureCookies: config.secureCookies, policy: securityPolicy });
   const limiter = new RateLimiter({ store: limiterStore });
-  const authz = createAuthz({ store, sessions: sessionsSvc, workspaceDir, projectDirFor });
-  const authProvider: AuthProvider = o.authProvider ?? createLocalAuthProvider({ store, sessions: sessionsSvc });
+  // WP-27: group grants and capability rules are read by every project decision.
+  const authz = createAuthz({ store, sessions: sessionsSvc, workspaceDir, projectDirFor, access: repos.access });
+  const auditWriter = createAudit(store, workspaceDir);
+  const localProvider: AuthProvider = createLocalAuthProvider({ store, sessions: sessionsSvc });
+  // WP-27 (ENT-005): Mode B with AGASTYA_DIRECTORY_URL signs directory users in over LDAPS; local accounts (and the break-glass
+  // administrator) keep signing in locally. Without a directory the local provider is the only one, exactly as before.
+  const authProvider: AuthProvider = o.authProvider ?? (config.directory
+    ? createDirectoryAuthProvider({ store, access: repos.access, sessions: sessionsSvc, local: localProvider, directory: createDirectory(config.directory), audit: auditWriter.audit })
+    : localProvider);
   let started = false;
   let snapshot: string | null = null;
 
@@ -204,7 +213,7 @@ export function createAppContext(config: Config, o: AppContextOverrides = {}): A
     sessionStore, limiterStore, authProvider, securityPolicy, sessionsSvc, limiter, authz,
     docIndex: new DocIndex(store),
     revisions: new Revisions(store),
-    ...createAudit(store, workspaceDir),
+    ...auditWriter,
     start() {
       if (started) return { snapshot };
       /**

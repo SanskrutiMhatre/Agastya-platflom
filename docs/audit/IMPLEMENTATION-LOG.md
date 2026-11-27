@@ -1537,3 +1537,71 @@ Behaviour-preserving unless stated; decisions taken from the audit's recommendat
     `zipio.ts`. PNG encoders: the vendor copy stays (ARC-007 says so).
   - `serial` (2 job chains) and `runTool` (process runner): WP-14's job service, as 03 section 3 recommends. `paths.ts` / `atomic.ts`: WP-11.
   - Frontend escapers (`studio/core/xml.ts` and the JSS/JSG editors' own) were not part of the PUB-028 count and were not touched.
+
+## Phase 8 (continued)
+
+### WP-27 Directory sign-on, central administration and fine-grained permissions (ENT-005, DEP-015, PLT-016, ENT-023; ENT-022 and RES-003 not done) - done in part (see limits)
+
+Branch `worktree-agent-ae6519e7918fa58ba` (from 54874d8). Owner approval: implement without asking; decisions below take the audit's
+recommendation.
+
+* **Directory sign-on (ENT-005, DEP-015).** A second provider behind the WP-03 `AuthProvider` seam (`core/auth/directory.js`), chosen when
+  `config.directory` is set; otherwise the local provider exactly as before (Mode A unchanged, proved by `wp27-permissions` test 1 and the
+  unchanged auth suites). LDAPv3 over **LDAPS only** (`core/auth/ldap.js`: BER encoder/decoder, simple bind, search, unbind; TLS 1.2+,
+  certificate verified against `AGASTYA_DIRECTORY_CA_FILE` or the system store). Service bind, then a typed filter search for the person
+  (user-supplied text is never pasted into a filter string; RFC 4515 escaping is not needed because filters are encoded as BER structures),
+  then a bind as the person's DN (an empty password is refused before any bind: no unauthenticated-bind bypass). Groups from `memberOf`,
+  or Active Directory's in-chain rule (`1.2.840.113556.1.4.1941`) when `AGASTYA_DIRECTORY_NESTED_GROUPS=1`. Several URLs are tried in order.
+* **Group-to-role mapping and JIT provisioning.** `directory_group_map` (Administrator > Directory sign-on): a directory group DN gives a
+  global role (admin / project_manager / author / auditor) and/or feeds a local group. Strongest role wins; auditor only when it is the only
+  role. First sign-in creates the account through `provisionUser` (no local password: hash `!directory`); later sign-ins update name, role
+  (never demoting the last active administrator) and the directory-fed group memberships (local memberships are kept).
+* **Offboarding.** At sign-in (unknown, disabled in AD via `userAccountControl`, or in no mapped group) and in a periodic sync
+  (`services/directorySync.ts`, every `AGASTYA_DIRECTORY_SYNC_HOURS`, first run 15 min after start; *Sync now*). Sessions end. An account the
+  directory disabled (`disabled_reason='directory'`) is reinstated when the directory lets it in again; one an administrator disabled is not.
+  A sync that would disable every directory account (2 or more) changes nothing (`directory.sync.failed`).
+* **Break-glass.** A local account name never consults the directory; directory down -> `503 DIRECTORY_UNAVAILABLE` for domain sign-ins
+  only; the last local administrator cannot be switched to the directory (`BREAK_GLASS_REQUIRED`). Password change / reset / forgot refuse
+  directory accounts (`409 DIRECTORY_ACCOUNT`).
+* **Central administration and fine-grained permissions (PLT-016, ENT-023)** through the existing guard/capability system, so the authz
+  matrix and the `can` map remain the single source of truth:
+  - Groups (`access_groups`, `access_group_members`) and project group grants (`project_group_grants`): a person's project role is the
+    strongest of membership, folder and group (`authz.evaluate`).
+  - Capability rules (`project_capability_rules`, per project, subject user or group, `allow` / `deny`): evaluated in `requireProject` for the
+    route's declared `cap`. Deny wins (`403 CAPABILITY_DENIED`); allow lifts the role-ladder refusal for that one capability. Owners and
+    software administrators are never affected; `project.access` itself is never subject to rules. The project card's `can` map applies the
+    same rules (`permissions.canFor`).
+  - Auditor (read-only) role: a flag on the account (`users.auditor`), not a fourth global role (keeps every `role` check unchanged). Viewer on
+    every active project, the user list and the audit log (`requireGlobal('access.read' | 'audit.read')`, a new guard class in the matrix);
+    every non-GET refused (`403 READ_ONLY_ACCOUNT`) except its own sign-in gates.
+  - No escalation: nobody grants a project role above their own (`ROLE_ABOVE_YOURS`).
+  - Administrator > Roles lists every capability with its minimum role (`/api/admin/roles` `capabilities`).
+  - Routes: `routes/access.ts`; SQL in `repositories/accessRepository.ts` (wp10 seam; contract case added); migration
+    `024-directory-groups-permissions` (additive).
+* **UI.** Administrator > Groups, Administrator > Directory sign-on (`pages/AccessAdmin.tsx`), Project settings > Access (group grants and
+  single-action rules), Users list shows *Directory* / *Auditor* / *Offboarded by the directory*, *Make auditor*, no *Reset password* for
+  directory accounts. Docs: OPERATIONS.md section 5 "Mode B: directory sign-on" and "Auditors and fine-grained permissions".
+* **Decisions recorded.**
+  - No LDAP library is in `node_modules` and none can be installed offline: a small own LDAPv3 client (bind/search/unbind only), tested
+    against an in-process fake LDAPS server (`test/helpers-ldap.js`).
+  - LDAPS only (no plain LDAP, no StartTLS): meets AD channel binding / signing requirements without SASL.
+  - A directory URL in Mode A is a start-up error (desktop keeps local accounts).
+  - Configuration by environment variables (`AGASTYA_DIRECTORY_*`, typed in `config.ts`); an `agastya.ini [directory]` section is left
+    to the launcher owner (WP-25 was changing the launcher in parallel).
+  - Migration 023 (`023-document-leases`) is WP-11's file copied verbatim (commit 0011621) because `checkOrder` refuses a gap; if WP-29 or
+    another package also took 024, the lead renumbers at merge (the file content is independent).
+* **Tests run** (each file alone, `node --test --test-concurrency=1`): `wp27-directory` 15/15, `wp27-permissions` 7/7, `authz-matrix` 6/6
+  (snapshot regenerated with `AGASTYA_UPDATE_AUTHZ_SNAPSHOT=1` and reviewed: 17 new routes, `GET /api/admin/users`, `/audit`,
+  `/maintenance/audit.csv` moved from `requireAdmin` to `requireGlobal(...)` with the same answers for every existing role plus the auditor
+  column; the auditor gets 403 on every write except the 7 `/api/auth/*` gate routes), `auth-core` 11/11, `auth-http` 10/10, `wp03-auth`
+  11/11, `rbac` 7/7, `routes-guarded` 1/1, `wp13-permissions` 3/3, `wp10-seams` 11/11, `wp10-storage-contract` 12/12, `admin-ops` 8/8,
+  `ws-broadcast` 5/5, `settings-hostile-input` 6/6, `wp06-lifecycle` 5/5, `wp26-network` 9/9 (one earlier run failed test 7, the
+  Mode B TLS test, under the parallel agents' load; a re-run alone passed 9/9, and the file was not changed). Backend `tsc` clean; lint ratchet unchanged
+  (any.backend 279, require 46). Frontend: `tsc --noEmit` clean, `vitest` `pages/AccessAdmin.test.tsx` 4/4, `PlatformBackups.test.tsx` 2/2;
+  `check:parity` PASS. Not run (per the brief): Playwright, the full backend suite, the gate, full vitest.
+* **Not done, and why.**
+  - A test against a real Active Directory: external (steps in OPERATIONS.md).
+  - Kerberos / NTLM integrated sign-on, TOTP second factor, OIDC/SAML (RES-003, optional): not in this package; LDAPS bind covers Mode B on a
+    domain network. OIDC would be a third provider behind the same seam.
+  - ENT-022 classification-based export control (P3, optional): not started.
+  - A Playwright journey for the new screens: not written or run (the brief excludes Playwright here).

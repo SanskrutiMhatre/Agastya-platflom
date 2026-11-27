@@ -19,7 +19,8 @@ export type Capability =
   | 'publish.build' | 'publish.preview' | 'validate.run' | 'watermark.read' | 'watermark.write'
   | 'release.read' | 'release.submit' | 'release.decide' | 'review.comment'
   | 'members.read' | 'members.invite' | 'members.manage' | 'activity.read'
-  | 'problems.review';
+  | 'problems.review'
+  | 'access.manage';   // WP-27: a project's group grants and capability rules
 export type Can = Partial<Record<Capability, boolean>>;
 export const may = (can: Can | null | undefined, cap: Capability): boolean => !!can?.[cap];
 

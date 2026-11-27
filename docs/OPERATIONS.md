@@ -281,6 +281,67 @@ The exit code is the standard Inno Setup one (0 = success; anything else is a fa
 *Settings → Apps → Agastya Platform → Uninstall.* It stops and removes the service and the firewall rule and deletes the program. **The data folder and
 `agastya.ini` stay.** Delete them yourself to remove everything.
 
+### Mode B: directory sign-on (Active Directory / LDAP)
+
+On a network server (Mode B) people can sign in with their domain account (WP-27). The server checks the password against the directory over
+**LDAPS only** (TLS 1.2 or later, the certificate verified, no plain LDAP, no StartTLS), and the directory groups the person is in decide their
+role. On this computer only (Mode A) the setting is refused at start: a desktop installation keeps local accounts.
+
+Set these as **system environment variables** for the service (there is no `agastya.ini` section yet), then restart:
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `AGASTYA_DIRECTORY_URL` | (none = off) | `ldaps://dc1.corp.local:636`, several comma-separated (tried in order). |
+| `AGASTYA_DIRECTORY_BASE_DN` | required | Where people are searched, e.g. `DC=corp,DC=local`. |
+| `AGASTYA_DIRECTORY_BIND_DN` | required | A read-only service account, e.g. `CN=svc-agastya,OU=Service,DC=corp,DC=local`. |
+| `AGASTYA_DIRECTORY_BIND_PASSWORD_FILE` | required | A file holding its password (open only to the service identity). The password is never in an environment variable. |
+| `AGASTYA_DIRECTORY_CA_FILE` | (system trust) | PEM of the CA that signed the domain controllers' certificates. |
+| `AGASTYA_DIRECTORY_GROUP_BASE_DN` | the base DN | Where nested groups are searched. |
+| `AGASTYA_DIRECTORY_LOGIN_ATTRIBUTE` | `sAMAccountName` | The attribute people's user name is matched against (`uid` on OpenLDAP). |
+| `AGASTYA_DIRECTORY_USER_CLASS` | `user` | Object class of a person (`inetOrgPerson` on OpenLDAP). |
+| `AGASTYA_DIRECTORY_NESTED_GROUPS` | `0` | `1` = follow nested groups (Active Directory's in-chain rule). |
+| `AGASTYA_DIRECTORY_TIMEOUT_MS` | `10000` | Per-operation time limit. |
+| `AGASTYA_DIRECTORY_SYNC_HOURS` | `24` | How often every directory account is re-checked (offboarding); `0` = only *Sync now*. |
+
+Then, in **Administrator > Directory sign-on**:
+
+1. *Test connection* (optionally with a user name: it shows the DN and the groups found; no password is sent).
+2. Map directory groups (full DN) to a role: Software administrator, Project Manager, Author, or Auditor (read-only). A person in several
+   mapped groups gets the strongest role. A mapping can also feed a local **group** (Administrator > Groups), which projects can give a role to
+   (Project settings > Access). Nobody can sign in with a domain account until at least one group is mapped.
+
+What happens:
+
+* **First sign-in** creates the account (just in time); later sign-ins update the name, the role and the directory-fed group memberships.
+  Directory accounts have no local password: *Reset password*, *Change password* and *Forgot password* do not apply to them.
+* **Offboarding.** A person disabled in the directory, deleted, or removed from every mapped group is disabled here at their next sign-in or
+  at the next periodic check (*Sync now* runs it at once); their sessions end. They come back by themselves if the directory lets them in
+  again. An account an administrator disabled stays disabled. A check that would disable *every* directory account at once (a wrong base
+  DN, an empty group) changes nothing and is logged as `directory.sync.failed`.
+* **Break-glass.** Local accounts keep signing in with their local password, and the directory is never asked about a local account name.
+  Keep at least one local software administrator (the server refuses to switch the last one to the directory). When no directory server
+  answers, domain sign-ins get *503 directory unavailable*; local sign-ins work.
+* **Audit.** `auth.login` (with `source: directory`), `auth.login.failed` (with the reason), `directory.user.provisioned`, `.role-changed`,
+  `.groups-changed`, `.offboarded`, `.reinstated`, `directory.sync`, and every mapping and group change.
+
+Notes for the domain administrator: the service account needs read access to the people and groups only. Active Directory's *LDAP channel
+binding* and *signing* requirements are met by LDAPS. Kerberos / Windows integrated sign-on (no password prompt) is not provided: people type
+their domain password into the sign-in page, which goes to the server over HTTPS and to the domain controller over LDAPS.
+
+**Verify against your real directory** (the product's tests use a simulated LDAPS server): set the variables on a test server, *Test
+connection* with a known user name, map one test group, sign in as a member, check the role, remove the member from the group in AD, run
+*Sync now* and check the account shows *Offboarded by the directory*.
+
+### Auditors and fine-grained permissions
+
+* **Auditor (read-only).** Administrator > Users > *Make auditor* (or a directory group mapped to Auditor): reads every project, the user list
+  and the audit log, and is refused every change (`403 READ_ONLY_ACCOUNT`).
+* **Groups.** Administrator > Groups. A project's owner or Project Manager gives a group a role in Project settings > **Access**; a member's role
+  is the strongest of their own, their folder's and their groups'.
+* **Single-action exceptions.** In the same tab, allow one action (for example `release.submit`) to a person or group below the role that
+  normally has it, or deny it to someone whose role has it. A denial wins over every grant except an owner's and a software administrator's.
+  Administrator > Roles lists every action and the role it normally needs. Nobody can give more than their own role.
+
 ## 11. Security notes
 
 * The server listens on `127.0.0.1` unless `Bind` says otherwise. The product sends nothing to the internet and has no telemetry or update check.

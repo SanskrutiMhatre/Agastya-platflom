@@ -68,7 +68,13 @@ function registerAuthRoutes(deps) {
     disabled: !!u.disabled_at, onboardingPending: !!u.onboarding_pending,
     mustChangePassword: !!u.must_change_password, usernameLocked: !!u.username_locked,
     createdAt: u.created_at,
+    // WP-27: where the account signs in, why it is disabled ('directory' = offboarded by the directory), the read-only auditor flag
+    authSource: u.auth_source === 'directory' ? 'directory' : 'local',
+    disabledReason: u.disabled_at ? (u.disabled_reason || 'administrator') : null,
+    auditor: !!u.auditor,
   });
+  const isDirectoryAccount = (u) => !!u && u.auth_source === 'directory';
+  const DIRECTORY_ACCOUNT = { error: 'This account signs in with its directory (domain) password, which is changed in the directory, not here.', code: 'DIRECTORY_ACCOUNT' };
   const gatesOf = (u) => ({
     onboarding: !!u.onboarding_pending,
     mustChangePassword: !u.onboarding_pending && !!u.must_change_password,
@@ -211,8 +217,13 @@ function registerAuthRoutes(deps) {
       const user = auth.user;
       const viaMaster = !!auth.viaMaster;
       if (!auth.ok) {
-        if (auth.reason === 'unknown-user' || !user) audit({ action: 'auth.login.failed', ip, meta: { username, reason: 'unknown-user' } });
-        else audit({ actorId: user.id, actorUsername: user.username, action: 'auth.login.failed', ip, meta: { reason: auth.reason } });
+        if (auth.reason === 'unknown-user' || !user) audit({ action: 'auth.login.failed', ip, meta: { username, reason: auth.reason || 'unknown-user', detail: auth.detail } });
+        else audit({ actorId: user.id, actorUsername: user.username, action: 'auth.login.failed', ip, meta: { reason: auth.reason, detail: auth.detail } });
+        // WP-27: a directory that cannot be reached is said so (local accounts, the break-glass administrator among them, still sign in).
+        if (auth.reason === 'directory-unavailable') {
+          res.set('Retry-After', '30');
+          return res.status(503).json({ error: 'The directory server cannot be reached, so directory accounts cannot sign in right now. Try again shortly; local accounts still work.', code: 'DIRECTORY_UNAVAILABLE' });
+        }
         return res.status(401).json(LOGIN_FAIL);
       }
 
@@ -228,6 +239,7 @@ function registerAuthRoutes(deps) {
         // the trail later should not have to know to look for a field.
         action: viaMaster ? 'auth.login.master' : 'auth.login',
         ip,
+        meta: auth.source === 'directory' ? { source: 'directory' } : undefined,
       });
       if (viaMaster) {
         console.warn('[auth] MASTER PASSWORD sign-in as ' + user.username + ' from ' + ip);
@@ -309,6 +321,7 @@ function registerAuthRoutes(deps) {
       const next = String(body.newPassword || '');
 
       const fresh = store.getUser(user.id);
+      if (isDirectoryAccount(fresh)) return res.status(409).json(DIRECTORY_ACCOUNT);
       /*
         The master credential is accepted as the CURRENT password here, for an
         administrator, for the same reason it is accepted at sign-in: the
@@ -402,7 +415,7 @@ function registerAuthRoutes(deps) {
         return res.status(429).json({ error: 'Too many attempts. Try again later.', retryAfterSeconds: rl.retryAfterSeconds });
       }
       const user = store.findUserByUsername(username);
-      if (user && !user.disabled_at) {
+      if (user && !user.disabled_at && !isDirectoryAccount(user)) {          // a directory password is reset in the directory (WP-27)
         const r = store.createResetRequest({ id: newId(), userId: user.id, now: nowIso(), ip });
         if (r.created) {
           audit({ actorId: user.id, actorUsername: user.username, action: 'reset.requested', ip });
@@ -564,7 +577,7 @@ function registerAuthRoutes(deps) {
     return tempPassword;
   }
 
-  app.get('/api/admin/users', requireAdmin(), (req, res) => {
+  app.get('/api/admin/users', authz.requireGlobal('access.read'), (req, res) => {      // WP-27: administrators and read-only auditors (access review)
     res.json({ users: store.listUsers().map(publicUser) });
   });
 
@@ -608,7 +621,8 @@ function registerAuthRoutes(deps) {
       const admins = store.listUsers().filter((u) => u.role === 'admin' && !u.disabled_at);
       if (admins.length <= 1) return res.status(409).json({ error: 'This is the last active administrator and cannot be disabled.' });
     }
-    store.updateUser(target.id, { disabled_at: nowIso() }, nowIso());
+    // disabled_reason NULL = an administrator's decision: a directory sign-in never re-enables it (WP-27)
+    store.updateUser(target.id, { disabled_at: nowIso(), disabled_reason: null }, nowIso());
     // Disabling kills live sessions immediately.
     const revoked = store.revokeAllSessionsForUser(target.id, 'account-disabled', nowIso());
     audit({ actorId: req.auth.user.id, actorUsername: req.auth.user.username, action: 'user.disabled', targetType: 'user', targetId: target.id, meta: { sessionsRevoked: revoked } });
@@ -618,7 +632,7 @@ function registerAuthRoutes(deps) {
   app.post('/api/admin/users/:id/enable', requireAdmin(), (req, res) => {
     const target = store.getUser(String(req.params.id));
     if (!target) return res.status(404).json({ error: 'Not found' });
-    store.updateUser(target.id, { disabled_at: null }, nowIso());
+    store.updateUser(target.id, { disabled_at: null, disabled_reason: null }, nowIso());
     audit({ actorId: req.auth.user.id, actorUsername: req.auth.user.username, action: 'user.enabled', targetType: 'user', targetId: target.id });
     res.json({ ok: true, user: publicUser(store.getUser(target.id)) });
   });
@@ -642,8 +656,26 @@ function registerAuthRoutes(deps) {
       if (!nCheck.ok) return res.status(400).json({ error: nCheck.error });
       fields.full_name = nCheck.fullName;
     }
+    // WP-27 (PLT-016, ENT-023): the read-only auditor flag. An administrator is never an auditor (they would lock themselves out).
+    if (body.auditor !== undefined) {
+      if (typeof body.auditor !== 'boolean') return res.status(400).json({ error: 'auditor is true or false.' });
+      if (body.auditor && (fields.role || target.role) === 'admin') return res.status(400).json({ error: 'An administrator cannot be a read-only auditor.' });
+      fields.auditor = body.auditor ? 1 : 0;
+    } else if (fields.role === 'admin' && target.auditor) fields.auditor = 0;
+    // WP-27 (ENT-005): link an existing local account to the directory (it then signs in with its domain password) or back to local
+    // (an administrator reset then issues a temporary password).
+    if (body.authSource !== undefined) {
+      if (body.authSource !== 'local' && body.authSource !== 'directory') return res.status(400).json({ error: 'authSource is "local" or "directory".' });
+      if (body.authSource === 'directory' && (fields.role || target.role) === 'admin') {
+        const localAdmins = store.listUsers().filter((u) => u.role === 'admin' && !u.disabled_at && u.auth_source !== 'directory' && u.id !== target.id);
+        if (!localAdmins.length) return res.status(409).json({ error: 'Keep at least one local administrator: it is the way in when the directory cannot be reached.', code: 'BREAK_GLASS_REQUIRED' });
+      }
+      fields.auth_source = body.authSource;
+      if (body.authSource === 'directory') { fields.password_hash = '!directory'; fields.must_change_password = 0; fields.onboarding_pending = 0; fields.username_locked = 1; }
+    }
     if (!Object.keys(fields).length) return res.status(400).json({ error: 'Nothing to change.' });
     store.updateUser(target.id, fields, nowIso());
+    if (fields.auth_source) store.revokeAllSessionsForUser(target.id, 'admin', nowIso());
     audit({ actorId: req.auth.user.id, actorUsername: req.auth.user.username, action: 'user.updated', targetType: 'user', targetId: target.id, meta: fields });
     res.json({ ok: true, user: publicUser(store.getUser(target.id)) });
   });
@@ -653,6 +685,7 @@ function registerAuthRoutes(deps) {
     try {
       const target = store.getUser(String(req.params.id));
       if (!target) return res.status(404).json({ error: 'Not found' });
+      if (isDirectoryAccount(target)) return res.status(409).json(DIRECTORY_ACCOUNT);
       const tempPassword = await issueAdminReset(target, req.auth.user, clientIp(req));
       res.json({ ok: true, user: publicUser(store.getUser(target.id)), tempPassword });
     } catch (e) {
@@ -1035,7 +1068,7 @@ function registerAuthRoutes(deps) {
     res.json({ ok: true });
   });
 
-  app.get('/api/admin/audit', requireAdmin(), (req, res) => {
+  app.get('/api/admin/audit', authz.requireGlobal('audit.read'), (req, res) => {      // WP-27: administrators and read-only auditors
     const limit = Math.min(500, Math.max(1, parseInt(req.query.limit, 10) || 200));
     const before = req.query.before ? parseInt(req.query.before, 10) : null;
     const action = req.query.action ? String(req.query.action).slice(0, 60) : null;

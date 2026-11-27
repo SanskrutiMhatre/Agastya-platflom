@@ -112,9 +112,11 @@ export function Users() {
                     <option value="author">Author</option><option value="project_manager">Project Manager</option><option value="admin">Software administrator</option>
                   </select>
                 </td>
-                <td>{u.disabled ? <Badge tone="bad">Disabled</Badge> : u.onboardingPending ? <Badge tone="warn">Awaiting first sign-in</Badge> : u.mustChangePassword ? <Badge tone="warn">Must change password</Badge> : <Badge tone="ok">Active</Badge>}</td>
+                <td>{u.disabled ? <Badge tone="bad" title={u.disabledReason === 'directory' ? 'Disabled by the directory (removed from its groups or disabled there)' : undefined}>{u.disabledReason === 'directory' ? 'Offboarded by the directory' : 'Disabled'}</Badge> : u.onboardingPending ? <Badge tone="warn">Awaiting first sign-in</Badge> : u.mustChangePassword ? <Badge tone="warn">Must change password</Badge> : <Badge tone="ok">Active</Badge>}
+                  {u.authSource === 'directory' ? <> <Badge title="Signs in with the domain password">Directory</Badge></> : null}{u.auditor ? <> <Badge tone="accent" title="Reads every project and the audit log, changes nothing">Auditor</Badge></> : null}</td>
                 <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                  <button className="btn btn-sm" onClick={() => setConfirm({ user: u, action: 'reset' })}><Icon name="key" size={13} />Reset password</button>{' '}
+                  {u.role !== 'admin' ? <><button className="btn btn-sm" data-testid={`auditor-${u.username}`} onClick={() => act(() => adminApi.updateUser(u.id, { auditor: !u.auditor }), u.auditor ? 'No longer read-only' : 'Now a read-only auditor')}>{u.auditor ? 'End auditor' : 'Make auditor'}</button>{' '}</> : null}
+                  {u.authSource !== 'directory' ? <><button className="btn btn-sm" onClick={() => setConfirm({ user: u, action: 'reset' })}><Icon name="key" size={13} />Reset password</button>{' '}</> : null}
                   {u.disabled
                     ? <button className="btn btn-sm" onClick={() => act(() => adminApi.enable(u.id), 'Account enabled')}>Enable</button>
                     : <button className="btn btn-sm" disabled={u.id === me?.id} onClick={() => setConfirm({ user: u, action: 'disable' })}>Disable</button>}

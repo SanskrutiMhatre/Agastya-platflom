@@ -7,7 +7,8 @@
   "security": [
     "rbac.test.js", "routes-guarded.test.js", "phase17-security.test.js", "wp02-routes.test.js", "wp03-auth.test.js",
     "wp04-reset-admin.test.js", "xml-guard.test.js", "settings-hostile-input.test.js", "import-enterprise-refusal.test.js",
-    "authz-matrix.test.js", "auth-core.test.js", "auth-http.test.js", "ws-broadcast.test.js", "admin-ops.test.js", "wp26-network.test.js"
+    "authz-matrix.test.js", "auth-core.test.js", "auth-http.test.js", "ws-broadcast.test.js", "admin-ops.test.js", "wp26-network.test.js",
+    "wp27-directory.test.js", "wp27-permissions.test.js"
   ],
   "pdfSmoke": [
     "pdf-furniture.test.js", "jss-change-notice.test.js", "jss-cover-foot.test.js", "jss-cover-isolation.test.js", "jsg-engine.test.js",
