@@ -18,6 +18,7 @@
     "deep-workspace.test.js":         { "max": 1, "why": "Windows-only path limit; skips on Linux/macOS runners" },
     "project-delete-after-build.test.js": { "max": 1, "why": "Windows-only file locks; skips on Linux/macOS runners" },
     "wp30-pdf-regression.test.js":    { "max": 7, "why": "the JSS-0251 RWI package (SAMPLE PROJECTS/JSS-0251/RWI.zip or RWI_ZIP; 2 tests) and the licensed Arial files the baselines are set in (backend/vendor/tools/fonts/arial*.ttf; the 3 other raster tests whose baseline is set in Arial + sensitivity + specificity; the JSG book uses no Arial and is compared anyway)" },
-    "wp30-chaos.test.js":             { "max": 4, "why": "Windows only (taskkill /T and the job object); skips on Linux/macOS runners" }
+    "wp30-chaos.test.js":             { "max": 4, "why": "Windows only (taskkill /T and the job object); skips on Linux/macOS runners" },
+    "wp30-airgap.test.js":            { "max": 2, "why": "Windows only (Get-NetTCPConnection; 1 test) and frontend/dist not built (the static G-OFF-2 scan; the gate builds it first)" }
   }
 }

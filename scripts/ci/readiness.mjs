@@ -132,7 +132,14 @@ gate('G-SEC-6', 'the installed copy grants write access to its data folder only 
   const broad = r.stdout.split(/\r?\n/).filter((l) => /(Everyone|BUILTIN\\Users|Authenticated Users):.*\((?:[^)]*[FMW][^)]*)\)/.test(l));
   return { status: broad.length ? 'FAIL' : 'PASS', detail: broad.join(' | ') || 'no write grant to Everyone, Users or Authenticated Users' };
 });
-gate('G-OFF-2', 'no Content-Security-Policy violation in the e2e run', () => ({ status: 'NOT RUN', detail: 'not automated yet: the e2e suite does not collect CSP reports (WP-09)' }));
+gate('G-OFF-2', 'the built client loads nothing from another host (static scan of frontend/dist)', () => {
+  // WP-30: the static half of G-OFF-2 (no src/href/url()/@import/import()/Worker/WebSocket to an http(s) host in the built client). The CSP half
+  // (default-src 'self' served with every page) is wp03-auth's security-headers test; CSP violation reports from the e2e run are not collected.
+  if (!fs.existsSync(path.join(ROOT, 'frontend', 'dist', 'index.html'))) return { status: 'NOT RUN', detail: 'frontend/dist is not built (npx vite build in frontend/)' };
+  const r = spawnSync(process.execPath, ['--test', '--test-concurrency=1', '--test-name-pattern', 'G-OFF-2', 'test/wp30-airgap.test.js'], { cwd: path.join(ROOT, 'backend'), encoding: 'utf8' });
+  const files = /# (\d+) files of frontend\/dist scanned/.exec(r.stdout)?.[1];
+  return { status: r.status === 0 ? 'PASS' : 'FAIL', detail: `wp30-airgap.test.js (G-OFF-2): ${files ?? '?'} files scanned${r.status === 0 ? ', no foreign host' : `: ${(r.stdout.match(/a resource the browser would fetch[^\n]*/) || [''])[0]}`}` };
+});
 gate('G-DEP-6', 'doctor passes on a clean install', () => {
   if (!INSTALL) return { status: 'NOT RUN', detail: 'pass --install <folder of an installed copy>' };
   const ctl = path.join(INSTALL, 'AgastyaCtl.exe');
