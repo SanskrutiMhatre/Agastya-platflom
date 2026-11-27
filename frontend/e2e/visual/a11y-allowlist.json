@@ -1,0 +1,4 @@
+{
+  "_comment": "WP-20: reviewed waivers for e2e/visual/a11y.spec.ts. Each entry: rule (the a11y-audit.ts rule id), route (a SCREENS name or *), target (a substring of the reported target), reason, wp (the package that fixes it), expires (YYYY-MM-DD; an expired entry fails the suite). Add an entry only when the fix belongs to a later package (for example the screen redesign WP-35); fix everything else.",
+  "waivers": []
+}

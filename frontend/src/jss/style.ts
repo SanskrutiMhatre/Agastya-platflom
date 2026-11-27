@@ -37,7 +37,7 @@ export const JSS_CSS = `
 .jss-main { display: flex; flex: 1; min-height: 0; }
 .jss-outline { width: 250px; flex: none; border-right: 1px solid var(--border); background: var(--bg-elev); overflow: auto; padding: 8px 0; }
 .jss-outline h3 { margin: 4px 12px 6px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); font-weight: 600; }
-.jss-ol { display: flex; gap: 6px; align-items: baseline; padding: 3px 12px; cursor: pointer; color: var(--text-muted); border-left: 3px solid transparent; line-height: 1.3; }
+.jss-ol { display: flex; gap: 6px; align-items: baseline; min-height: 24px; padding: 3px 12px; cursor: pointer; color: var(--text-muted); border-left: 3px solid transparent; line-height: 1.3; }
 .jss-ol:hover { background: var(--bg-hover); color: var(--text); }
 .jss-ol.cur { background: var(--accent-soft); color: var(--accent); border-left-color: var(--accent); }
 .jss-ol .n { flex: none; font-variant-numeric: tabular-nums; color: var(--text-faint); min-width: 30px; }

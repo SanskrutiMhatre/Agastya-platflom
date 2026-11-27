@@ -1,0 +1,22 @@
+{
+  "_comment": "WP-20: reviewed exceptions of scripts/tokens/check-coverage.mjs. `backgrounds`: colour tokens used as a background on which no text is drawn (bars, dots, handles, overlays, image mats), so they need no text pair. `themeMechanism`: file:reason for code that still reads or sets the theme outside the store, with the package that removes it. Add an entry only with a reason a reviewer can check.",
+  "backgrounds": {
+    "scrim": "the dimmed layer behind a dialog; the dialog's own surface carries the text",
+    "image-backdrop": "white mat behind pictures and thumbnails (fixed token, the picture is the content)",
+    "border-default": "disabled-control edge colour; states.css uses it as a border, the regex sees the shorthand",
+    "border-strong": "the neutral status dot (.v2-dot without a state, always beside its text label) and the split handle: decorative marks",
+    "ctx-line": "the 2px underline of the active contextual ribbon tab",
+    "doc-change-modify": "3px change bar in the document margin",
+    "doc-change-add": "3px change bar in the document margin",
+    "doc-change-delete": "3px change bar in the document margin",
+    "doc-selection": "the picture resize handle (--sel), a 10px square",
+    "export-canvas": "the area behind the printed pages in the export view; the pages are paper",
+    "viewer-highlight": "pdf.js search highlight over the canvas-drawn page: the visible text is pixels, the text layer is transparent",
+    "viewer-text-select": "pdf.js selection over the canvas-drawn page (same as viewer-highlight)",
+    "info": "the severity dot of an info finding (.v2-sev.info), a non-text mark; info/surface-panel is paired as text"
+  },
+  "themeMechanism": {
+    "main.tsx": "the store's wiring: applies the stored choice at start and follows the OS while the choice is 'system' (part of the theme owner)",
+    "studio/ui/app.ts": "the Studio's standalone mode sets the attribute only when no platform host is present (`if (!this.host)`); inside the shell the host decides. Removed with the editor host contract (WP-21)"
+  }
+}

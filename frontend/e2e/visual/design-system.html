@@ -1,0 +1,140 @@
+<!doctype html>
+<!-- WP-20 (DS-010, 08 section 7.5): the living style guide fixture. Every shared shell component in its states, rendered by the REAL entry stylesheet of
+     the build (the spec serves this page on the app's origin and links the built CSS in place of the marker below). No styles of its own except
+     layout, so a component that loses a state style shows up here, in both themes. The markup follows components/ui.tsx, lists.tsx and
+     PageHeader.tsx; keep it in step when a component's classes change. data-c = component, data-s = state (the spec forces :hover/:focus on them). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Design system</title>
+<!--STYLES-->
+<style>
+  body { overflow: auto !important; }
+  .ds { padding: 16px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; width: 1320px; }
+  .ds section { padding: 12px; }
+  .ds h3 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+  .ds .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .ds .static-modal { position: static; display: block; padding: 12px; }
+  .ds .static-modal .modal { width: 100%; max-width: none; }
+  .ds .static-toasts { position: static; }
+</style>
+</head>
+<body>
+<main class="ds">
+  <h1 class="v2-sr">Design system</h1>
+
+  <section class="v2-card" data-c="buttons">
+    <h3>Buttons</h3>
+    <div class="row">
+      <button class="btn" data-c="btn" data-s="default">Secondary</button>
+      <button class="btn" data-c="btn" data-s="hover">Hover</button>
+      <button class="btn" data-c="btn" data-s="focus">Focus</button>
+      <button class="btn" data-c="btn" data-s="disabled" disabled>Disabled</button>
+      <button class="btn" data-c="btn" data-s="busy" aria-busy="true">Busy</button>
+      <button class="btn btn-sm" data-c="btn-sm" data-s="default">Small</button>
+    </div>
+    <div class="row">
+      <button class="btn btn-primary" data-c="btn-primary" data-s="default">Primary</button>
+      <button class="btn btn-primary" data-c="btn-primary" data-s="hover">Hover</button>
+      <button class="btn btn-primary" data-c="btn-primary" data-s="focus">Focus</button>
+      <button class="btn btn-primary" data-c="btn-primary" data-s="disabled" disabled>Disabled</button>
+      <button class="btn btn-primary" data-c="btn-primary" data-s="busy" aria-busy="true">Busy</button>
+    </div>
+    <div class="row">
+      <button class="btn btn-danger" data-c="btn-danger" data-s="default">Danger</button>
+      <button class="btn btn-danger" data-c="btn-danger" data-s="hover">Hover</button>
+      <button class="btn btn-primary btn-danger-solid" data-c="btn-danger-solid" data-s="default">Delete</button>
+      <button class="btn btn-primary btn-danger-solid" data-c="btn-danger-solid" data-s="disabled" disabled>Delete</button>
+      <button class="icon-btn" data-c="icon-btn" data-s="default" aria-label="Icon button">&#9881;</button>
+      <button class="icon-btn" data-c="icon-btn" data-s="hover" aria-label="Icon button hovered">&#9881;</button>
+      <button class="icon-btn pressed" data-c="icon-btn" data-s="selected" aria-label="Icon button pressed">&#9881;</button>
+      <button class="icon-btn" data-c="icon-btn" data-s="disabled" aria-label="Icon button disabled" disabled>&#9881;</button>
+    </div>
+    <div class="row">
+      <div class="v2-seg" role="radiogroup" aria-label="Segmented">
+        <button role="radio" aria-checked="false" data-c="seg" data-s="default">Follow the system</button>
+        <button role="radio" aria-checked="true" class="on" data-c="seg" data-s="selected">Light</button>
+        <button role="radio" aria-checked="false" data-c="seg" data-s="hover">Dark</button>
+        <button role="radio" aria-checked="false" data-c="seg" data-s="disabled" disabled>Off</button>
+      </div>
+    </div>
+    <div class="v2-tabs row" role="tablist">
+      <button class="v2-tab active" role="tab" aria-selected="true" data-c="tab" data-s="selected">Selected tab</button>
+      <button class="v2-tab" role="tab" aria-selected="false" data-c="tab" data-s="default">Tab</button>
+      <button class="v2-tab" role="tab" aria-selected="false" data-c="tab" data-s="hover">Hovered tab</button>
+    </div>
+  </section>
+
+  <section class="v2-card" data-c="forms">
+    <h3>Form fields</h3>
+    <div class="v2-field" data-c="field" data-s="default"><label for="f1">Name</label><input id="f1" class="v2-input" value="Pump manual" aria-describedby="f1-n"><span id="f1-n" class="v2-hint">A hint under the field.</span></div>
+    <div class="v2-field" data-c="field" data-s="focus"><label for="f2">Focused</label><input id="f2" class="v2-input" value="Has focus"></div>
+    <div class="v2-field" data-c="field" data-s="error"><label for="f3">With an error</label><input id="f3" class="v2-input" value="bad value" aria-invalid="true" aria-describedby="f3-n"><span id="f3-n" class="v2-error" role="alert">This value is not allowed.</span></div>
+    <div class="v2-field" data-c="field" data-s="disabled"><label for="f4">Disabled</label><input id="f4" class="v2-input" value="Read only" disabled></div>
+    <div class="v2-field" data-c="select" data-s="default"><label for="f5">Select</label><select id="f5" class="v2-select"><option>One</option><option>Two</option></select></div>
+    <div class="v2-field" data-c="textarea" data-s="default"><label for="f6">Text</label><textarea id="f6" class="v2-textarea" rows="2">Two lines
+of text</textarea></div>
+  </section>
+
+  <section class="v2-card" data-c="feedback">
+    <h3>Badges and alerts</h3>
+    <div class="row">
+      <span class="v2-badge" data-c="badge" data-s="default">Draft</span>
+      <span class="v2-badge ok" data-c="badge" data-s="success">Valid</span>
+      <span class="v2-badge warn" data-c="badge" data-s="warning">3 warnings</span>
+      <span class="v2-badge bad" data-c="badge" data-s="error">2 errors</span>
+      <span class="v2-badge accent" data-c="badge" data-s="accent">New</span>
+    </div>
+    <div class="v2-alert" role="status" data-c="alert" data-s="default">A neutral note for the reader.</div>
+    <div class="v2-alert ok" role="status" data-c="alert" data-s="success" style="margin-top:8px">The publication was built.</div>
+    <div class="v2-alert warn" role="status" data-c="alert" data-s="warning" style="margin-top:8px">Two modules are not placed in the publication.</div>
+    <div class="v2-alert bad" role="alert" data-c="alert" data-s="error" style="margin-top:8px">The schema check failed on one module.</div>
+    <div class="v2-empty" data-c="empty" data-s="default" style="margin-top:8px"><strong class="v2-empty-title">Nothing here yet</strong>Create the first item to start.</div>
+  </section>
+
+  <section class="v2-card" data-c="overlays">
+    <h3>Dialog and toasts</h3>
+    <div class="modal-backdrop static-modal" data-c="modal" data-s="default">
+      <div class="modal" role="dialog" aria-modal="true" aria-label="Delete the project?">
+        <div class="modal-head"><h2 class="modal-title">Delete the project?</h2><button class="icon-btn" aria-label="Close">&#10005;</button></div>
+        <div class="modal-body">The project and its history go to the recycle bin.</div>
+        <div class="modal-buttons"><button class="btn">Cancel</button><button class="btn btn-primary btn-danger-solid">Delete</button></div>
+      </div>
+    </div>
+    <div class="v2-toasts static-toasts" aria-live="polite">
+      <div class="v2-toast info" role="status" data-c="toast" data-s="default"><span class="v2-toast-text">Saved.</span><button type="button" class="v2-toast-x" aria-label="Dismiss">&#215;</button></div>
+      <div class="v2-toast success" role="status" data-c="toast" data-s="success"><span class="v2-toast-text">Publication built.</span><button type="button" class="v2-toast-x" aria-label="Dismiss">&#215;</button></div>
+      <div class="v2-toast error" role="alert" data-c="toast" data-s="error"><span class="v2-toast-text">The server could not be reached.</span><button type="button" class="v2-toast-x" aria-label="Dismiss">&#215;</button></div>
+    </div>
+  </section>
+
+  <section class="v2-card" data-c="structure" style="grid-column: 1 / -1">
+    <h3>Page header, section, table</h3>
+    <header class="v2-ph" data-c="page-header" data-s="default">
+      <div class="v2-ph-main">
+        <span class="v2-ph-icon">&#9636;</span>
+        <div class="v2-ph-text"><h2>Publication</h2><p>Chapters, modules and the build of the manual.</p></div>
+        <div class="v2-ph-actions"><button class="btn btn-primary">Generate PDF</button></div>
+      </div>
+      <dl class="v2-ph-stats">
+        <div class="v2-stat"><dd>12</dd><dt>Modules</dt></div>
+        <div class="v2-stat ok"><dd>10</dd><dt>Valid</dt></div>
+        <div class="v2-stat warn"><dd>1</dd><dt>Warnings</dt></div>
+        <div class="v2-stat bad"><dd>1</dd><dt>Errors</dt></div>
+      </dl>
+    </header>
+    <section class="v2-sec" data-open="1" data-c="section" data-s="default">
+      <button type="button" class="v2-sec-head" aria-expanded="true"><span style="flex:1;min-width:0">Unplaced modules</span><span class="v2-badge warn">2</span></button>
+      <div class="v2-sec-body">Two modules are in the project but not in the publication.</div>
+    </section>
+    <table class="v2-table" data-c="table" data-s="default">
+      <thead><tr><th>Code</th><th>Title</th><th>State</th></tr></thead>
+      <tbody>
+        <tr><td class="v2-mono">S1KSTUDIO-A-29-10-00-00A-040A-D</td><td>Description</td><td><span class="v2-badge ok">Valid</span></td></tr>
+        <tr data-s="hover"><td class="v2-mono">S1KSTUDIO-A-29-10-00-00A-520A-A</td><td>Procedures</td><td><span class="v2-badge bad">2 errors</span></td></tr>
+      </tbody>
+    </table>
+  </section>
+</main>
+</body>
+</html>

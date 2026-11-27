@@ -1,0 +1,6 @@
+/* WP-20: applied only while a baseline picture is taken (toHaveScreenshot stylePath). Baselines test colour and layout, not the machine's font build:
+   the UI font is pinned to Arial (installed on every Windows image; the product's paper font as well), the monospace face to Consolas. */
+:root { --font-ui: Arial, 'Liberation Sans', sans-serif !important; --font-mono: Consolas, 'Liberation Mono', monospace !important; }
+*, *::before, *::after { transition: none !important; animation: none !important; caret-color: transparent !important; }
+/* the keyboard tooltip and the spinner follow timing, not design */
+[data-testid='focus-tooltip'] { display: none !important; }

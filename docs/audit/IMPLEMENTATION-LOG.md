@@ -751,3 +751,92 @@ waits for a D21 trigger (WP-37); migrations stay additive and keep their names a
   `pm-multi-ref` 5/5, `extensions` 5/5, `release-issue` 1/1; earlier builds of this package: `sns` 16/16, `sns-polish` 4/4,
   `sns-separation` 6/6, `lifecycle-reinstate` 2/2, `db-snapshot` 4/4, `s1000d-migration` 2/2, `uploads-config` 4/4, `wp04-reset-admin` 1/1.
   Not run: the full backend suite, the PDF-heavy files, vitest, Playwright (left to the lead's merged run).
+## Phase 5 (taken early)
+
+### WP-20 Automated theme and visual validation (TH-009, QA-012, RES-007, QA-013, DS-010) - done, with the limits listed
+
+What WP-19 already had is not repeated (colour-literal lint, static contrast pairs, undefined-variable coverage, static state matrix). Added, in the
+order of 08 section 7:
+
+* 7.2 token coverage (`frontend/scripts/tokens/check-coverage.mjs`, now part of `npm run lint:theme`): (1) pair completeness (7.6 #17): every
+  colour token the code uses as a text colour must be the foreground of a contrast pair, every one used as a background the background of one;
+  (2) one theme mechanism (7.6 #10): `prefers-color-scheme` and setting `data-theme` only in the theme owners; (3) no bare `var(--p-*)` primitive
+  outside the tokens (except the accent preview cards, which render the other theme on purpose); (4) unused colour tokens listed (warning:
+  `--surface-raised`). Reviewed exceptions in `scripts/tokens/coverage-exempt.json`, a reason each (13 decorative backgrounds: scrim, change
+  bars, handles, pdf.js highlight over canvas-drawn text ...; `main.tsx` = the store's wiring; `studio/ui/app.ts` standalone mode, to go with the
+  host contract of WP-21). A stale exemption fails (ratchet). First run: **31 colour tokens were in use with no contrast pair**, i.e. never
+  checked; 18 pairs added to `tokens.json` (paper tints under paper ink, the PDF page label, the ISPL empty text, the JSS cross-reference ink; the
+  JSG placeholder and the watermark preview as floors, like WP-19's `paper-placeholder`), the rest exempted as decorative. `check-contrast.mjs`
+  now composites a translucent `paper-*` tint over the paper (over the panel it made the JSS focus tint read 1.37:1 in dark; on the real white
+  paper it is 19:1). Pairs 103 -> 121 (242 checks), 0 failing. `src/styles/tokens/coverage.test.ts` 3/3 (tree passes; five planted violations
+  and a stale exemption fail).
+* 7.5 component theme tests (`src/components/theme.test.ts`, vitest/jsdom): the shared components (Badge, Alert, Field hint/error, ConfirmModal
+  danger and busy, PromptModal, Toasts, Spinner, Empty, PageHeader with stats, Section, ThemeChoiceControl, buttons) are rendered with React in
+  both themes and styled by the real entry sheets through a small cascade (Element.matches on the real selectors, specificity, custom-property
+  inheritance, var() fallbacks, alpha compositing; jsdom applies no custom properties). Per component and theme: no inline colour, every var()
+  resolves, every text 4.5:1 (3:1 large) on the background it sits on, dark differs from light. Plus the live switch of ThemeToggle and
+  ThemeChoiceControl, and a non-vacuity test (planted inline colour, faded text, undefined variable). 15/15.
+* 7.3 runtime sweep and G-UX-1 (`frontend/e2e/visual/a11y-audit.ts`, `a11y.spec.ts`). axe-core is **not** available offline here (no
+  `axe-core` entry in `%LOCALAPPDATA%\npm-cache\_cacache\index-v5`, none in node_modules), so an in-repository subset of axe's WCAG A/AA rules,
+  with axe's rule ids and impact levels, runs in the page: html-has-lang, document-title, button-name, link-name, label, select-name, image-alt,
+  frame-title, aria-roles, aria-valid-attr-value (dangling idrefs), duplicate-id-aria, aria-hidden-focus, nested-interactive, target-size (WCAG
+  2.2 2.5.8 with the spacing and inline exceptions), color-contrast (the 7.3 sweep: every visible text node, opacity chain, backgrounds
+  composited through the ancestors, large-text rule; paper sheets, canvas and pdf.js pages skipped because the paper pairs cover them; text over
+  images listed as incomplete), and landmark-one-main / page-has-heading-one as moderate (reported, not budgeted). Budget: 0 serious/critical on
+  the ten named routes (sign-in, workspace, project, Studio, JSS editor, JSG editor, Publish = publication, Release, Admin, Settings) in both
+  themes; waivers only through `a11y-allowlist.json` (reason, package, expiry; an expired one fails): **empty**. A planted-defects test proves
+  every rule fires and a clean page passes. Note: "project" redirects to the Studio today (no project home until WP-22). Moving to axe is a
+  one-line change in the spec once `@axe-core/playwright` is in the offline cache.
+* 7.4 visual regression (`frontend/playwright.visual.config.ts`, `e2e/visual/screens.spec.ts`): its own config, port (`E2E_PORT`, default 4060),
+  server, workspace, output folder (`test-results-visual-<port>`) and lock; the main config now ignores `e2e/visual/`. Projects `light` and
+  `dark`; each picture first asserts `html[data-theme]`. 13 key screens (sign-in, overview, workspace, projects, project, Studio, JSS editor,
+  JSG editor, publication, validation, release, administrator, settings) + the design-system fixture, 1366x768, both themes = **28 baselines**
+  (`e2e/visual/__screenshots__/<theme>/`, 1.8 MB; reviewed once). Flake control: channel msedge pinned (version written to
+  `__screenshots__/BROWSER.txt`: msedge 158.0.4370.33; a major change is reported), `stable.css` pins the UI font to Arial and mono to Consolas
+  and stops animations, caret and the focus tooltip; device scale 1, reduced motion, UTC, en-GB; fixed seed names (`seed.ts`, idempotent);
+  dates, times, ids and versions found by their text are masked; `maxDiffPixelRatio` 0.002. Guard against a vacuous baseline: the dark
+  workspace must have a mean luminance below 0.35 and the light one above 0.6 (decoded in the browser), and the toggle repaints without reload.
+* DS-010 (`e2e/visual/design-system.html`): the living style guide as a fixture: every shared shell component in its states (buttons in five
+  variants x default/hover/focus/disabled/busy, icon buttons, segmented control, tabs, fields default/focus/error/disabled, select, textarea,
+  badges and alerts in every tone, empty state, dialog, toasts, page header with stats, section, table), served on the app's origin with the
+  BUILT entry stylesheet. A picture per theme, and a computed-style test with real :hover, keyboard :focus-visible and :disabled (state differs
+  from default, hover text 4.5:1, 2px focus ring 3:1 against the card, every status colour 4.5:1). A fixture, not a dev route: a route would
+  either ship in the bundle or be missing from the built app the suite tests.
+* QA-013 performance probes (`scripts/ci/perf.mjs`, `perf-compare.mjs`, `perf-compare.test.mjs`): runs `backend/scripts/perf-phase17.js`
+  (import, export, validation, findings, assets, HTML, delivery, optional PDF, peak RSS) `--repeat` times, takes the per-metric median, appends
+  it to a history (`AGASTYA_PERF_HISTORY`, default `verification-results/perf-history/perf.jsonl`) and compares it with the median of the last
+  five comparable runs (same size, host, CPU count, Node major): +25 % ALERT, +40 % FAIL, steps under 50 ms not judged, no verdict before three
+  runs (no budget number is invented). A probe whose HTTP steps failed is not recorded. Decision (audit 10.5: "alert at +25 %, fail a release
+  at +40 %"): the nightly (100 modules, 200 pictures, 1 run) reports and exits 0; the release (500/1 000, PDF, 3 repeats) exits 1 on FAIL.
+  Reason, measured here: identical 10-module runs on this shared host gave the delivery step 1 420 to 2 423 ms, so one run a night would fail
+  on noise.
+* Gate (`scripts/ci/gate.mjs`): new stages `theme` (pr, nightly, release: the four token checks, each recorded), `visual` (nightly, release:
+  the visual config on `E2E_VISUAL_PORT`, default 4060, junit into the evidence) and `perf` (nightly, release: the rule's unit test, then the
+  probe). `.github/workflows/gate.yml` sets `E2E_VISUAL_PORT` and a history folder outside the checkout (a clean checkout deletes ignored
+  folders). Scripts: root `npm run perf`, frontend `npm run test:visual`. `.gitignore`: `test-results-*/` (the per-port folders of WP-08 were not
+  ignored).
+* Defects found by the new checks, fixed:
+  - JSS outline rows: 23 px tall adjacent `role=button` targets (target-size, WCAG 2.5.8, 34 per page in both themes): `min-height: 24px`
+    (`jss/style.ts`);
+  - toast dismiss button: opacity 0.85 put the "x" at 4.25:1 (light) / 4.03:1 (dark) on the success toast, and it was a 15 px target: full
+    ink, a 24 px target with negative margins so the toast keeps its height, hover = a currentColor tint (`styles/states.css`);
+  - PDF viewer page-number label: #aaaaaa on the white page, 2.32:1 -> #5d6475 (6:1) (`tokens.json` primitive `viewer-page-label`);
+  - 31 colour tokens in use without a contrast pair (above).
+  Found, not fixed (moderate, not budgeted; landmarks and the skip link are WP-23, UX-005): no `main` landmark on any of the ten routes; no
+  level-one heading on publication and release.
+* Verified (this worktree; Playwright only with my own config on port 4061, `--output=test-results-wp20`, Edge 158; port 4050 and the main suite
+  not touched): `npm run -s lint:theme` ok; vitest `src/styles/tokens/coverage.test.ts` 3/3, `tokens.test.ts` 7/7, `src/components/theme.test.ts`
+  15/15, `src/styles/states.test.ts` 131/131; `node --test scripts/ci/perf-compare.test.mjs` 9/9; `perf.mjs --size 10,10,0` five times into a
+  scratch history (BASELINE three times, then verdicts; report-only and strict exits as designed); frontend `tsc --noEmit` clean, the
+  e2e/visual files type-checked strict on their own; `check:bundle` PASS; `scripts/ci/lint.mjs` ok; `node --check scripts/ci/gate.mjs`.
+  Visual suite: run 1 took the baselines (56/58; the planted-defects test showed that names were only checked on elements with a size, so an
+  empty 0x0 link escaped: fixed); run 2 without updating, after the toast fix: 57/58, the dark design-system picture failed with 4 302 px
+  changed because the toasts had grown 1 px - the regression check doing its job; the toast margin was corrected and the design-system tests
+  then passed against the original baselines. Final full run on the final build (run 3, no update): **58/58 passed in 2.6 min**; only the
+  moderate landmark/heading notes printed.
+* Not done / limits: axe-core itself (the in-repo subset is narrower, and no automated tool judges the contenteditable editors; the manual
+  checklist and screen-reader pass of RES-007 stay manual); widths other than 1366 and the `forced-colors` / `contrast-more` projects of 7.4;
+  overlay-state pictures (command palette, context menu, file menu, form with errors) beyond the fixture's dialog and toasts; the fixture
+  pictures show hover/focus samples in their resting look (the computed test drives the real states); the gate itself was not run here (lead's
+  instruction); the perf history needs three runner runs before it judges; the main e2e suite (`zz-theme-states.spec.ts` touches the toast) and
+  the full vitest are for the lead's run.

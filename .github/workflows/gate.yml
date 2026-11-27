@@ -21,6 +21,8 @@ jobs:
     env:
       E2E_CHANNEL: msedge        # decision D18: Edge is the reference browser
       E2E_PORT: '4050'
+      E2E_VISUAL_PORT: '4060'    # WP-20: the theme and accessibility suite has its own server
+      AGASTYA_PERF_HISTORY: C:\agastya-ci\perf-history   # WP-20: outside the checkout, so the performance history survives a clean checkout
     steps:
       - uses: actions/checkout@v4
         with: { lfs: false }
