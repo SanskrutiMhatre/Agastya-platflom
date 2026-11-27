@@ -508,7 +508,7 @@ A wrong value (`IntervalHours=often`, a relative `CopyTo`) stops the server at s
   releases it, and the others get a notice. The owner, a project manager or an administrator can **break** a check-out (audited
   `lease.broken`); the holder is told.
 * **Without a check-out**, two people saving the same file are protected by the version check: the second save is refused (`409`) and shows
-  the other version; nothing is overwritten silently (verified in the load test: 0 silent overwrites in 2,326 accepted saves).
+  the other version; nothing is overwritten silently (verified in the load test: 0 silent overwrites in 3,863 accepted saves over five runs).
 
 ### 13.4 Backup, standby and recovery (availability position)
 
@@ -552,7 +552,7 @@ triggers**: write p95 above 200 ms, event-loop p99 above 100 ms. `POST /api/admi
 A trigger that stays on at normal load is the signal of section 8, *Why SQLite, and when that changes*.
 
 **Measured (WP-28, 2026-11-27)** with `backend\scripts\load-test.js`: 50 scripted authors (2x the assumption) over WebSockets with presence,
-10 projects, check-out / edit / save / check-in, contended saves on a shared module, lists and the dashboard; own server on loopback HTTP, on
+10 projects (100 in the last row), check-out / edit / save / check-in, contended saves on a shared module, lists and the dashboard; own server on loopback HTTP, on
 a **shared 8-core laptop CPU (i7-6820HQ) with other work running**, runs of 1-2 minutes:
 
 | Run | Requests/s | p50 / p95 (client) | Errors | Check-out notice p95 | Server event loop p99 | D21 |
@@ -560,6 +560,7 @@ a **shared 8-core laptop CPU (i7-6820HQ) with other work running**, runs of 1-2 
 | Normal pace (1-3 s think), no project validation | 52 | 20 / 79 ms | 0 | 75 ms | 69 ms | none |
 | Normal pace, with project validation | 27 | 639 / 1,957 ms | 0 | 1,710 ms | 1,874 ms | event loop |
 | Stress (0.1-0.5 s think, ~4x the pace) | 86 | 363 / 653 ms | 0 | 636 ms | 826 ms | event loop |
+| Normal pace, **100 projects**, no project validation | 52 | 17 / 46 ms | 0 | 43 ms | 40 ms | none |
 
 * At the assumed load and 2x the people the server meets the targets with room to spare, **except while someone runs a whole-project
   validation**: that work runs on the server's main thread (18 s median at 50 authors) and every other request waits behind it. Until the job

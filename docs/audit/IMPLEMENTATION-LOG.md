@@ -1713,3 +1713,115 @@ recommendation.
     a Server SKU was not tried.
   - No full `npm run package:win` with the update package; it needs `frontend/dist` and the bundled runtimes.
   - G-REL-3 was not run against a real previous release; only the synthetic 1.0.0/1.1.0 stages.
+
+## Phase 8 (Mode B team server)
+
+### WP-28 Mode B team server: install path, multi-user operation, load acceptance, availability position (PRD-003, PRD-007, G-REL-4 under load, G-PERF-4 at the addendum's assumed scale; gates measured on a shared machine, see conditions) - done, with the limits listed
+
+Branch `worktree-agent-a32d4a700783ef242` (from ea34c5b). Owner approval: implement without asking; decisions take the audit's recommendation.
+Scale assumption (addendum 17, Q1): 25 concurrent authors (100 named users), 100 projects; acceptance at 2x = 50 scripted authors.
+
+* **Presence (PRD-003).** `services/presence.ts`: who has which project and document open, **in memory only** (never written; the test scans
+  every file of the data folder for the marker), keyed by WebSocket connection, 75 s TTL with a 25 s heartbeat, swept every 15 s; dropped at
+  once on close, sign-out / session end, and when the person loses read access (`broadcast.recheck`). The socket now accepts exactly one
+  inbound message type (`{type:'presence'}`, readers of the project only), max 4 KB (larger closes 1009), more than 20 per 10 s dropped and more
+  than 100 closes 1008. An unchanged heartbeat sends nothing to others. `GET /api/projects/:id/presence` (viewer) gives people and leases.
+* **Check-out notices.** `leases.ts` broadcasts `{type:'leases', path, part, holder, released, broken}` on a new check-out, check-in, expiry
+  release and break (renewal is silent); `projectLeases` carries the file path.
+* **Session and connection limits.** `AGASTYA_WS_MAX_CLIENTS` (default 1000; beyond: 503) and 8 sockets per session (beyond: 429).
+* **Metrics.** `services/metrics.ts`: request ring buffers (all / writes, p50/p95/p99, in-flight, 5xx), event-loop delay
+  (`monitorEventLoopDelay`), every SQLite statement timed through a proxy on the handle (slow >= 50 ms as the lock-wait proxy, `database is
+  locked` counted), gauges (sockets, presence entries), memory, and the **D21 triggers** (write p95 > 200 ms, event-loop p99 > 100 ms).
+  `GET /api/admin/metrics`, `POST /api/admin/metrics/reset` (admin, audited `metrics.reset`). Authz snapshot regenerated for these three routes
+  (reviewed).
+* **Warm standby (PRD-007).** `[backup] CopyTo` / `AGASTYA_BACKUP_COPY_DIR` (absolute, else a start-up `ConfigError`): after each scheduled
+  backup the archive is copied there (`copyBackupTo`, verified), `lastCopy` recorded, `backup.copied` / `backup.copy_failed` audited,
+  administrators notified on failure, copies pruned like the originals.
+* **UI (small, on design-system tokens, WP-35 runs in parallel).** `editors/host/TeamChip.tsx` in the S1000D editor and in `DocEditorShell`
+  (JSS / JSG): the faces of the others in the project, what they have open, the lease state of the open document with Check out / Check in /
+  Break (owner, manager, admin; confirmed), a toast when a document held by someone else is released. Project Home: *Working now* card
+  (`components/WorkingNow.tsx`). `lib/presence.ts` announces the open document and re-sends it after a reconnect.
+* **Host and installer (Mode B install path).** `packaging/host/TeamServer.cs`:
+  - `agastya.ini` `[directory]` (the WP-27 deferral), `[backup]` (`Dir`, `IntervalHours`, `Keep`, `CopyTo`, `RestoreTestDays`), `[server]
+    MaxConnections`, `LeaseMinutes` -> `AGASTYA_*` (paths relative to agastya.ini); `[client] Server` / `Thumbprint`.
+  - `AgastyaCtl.exe --configure-server --name ... [--bind] [--port] (--make-cert | --pfx [--passphrase-file] | --cert --key) [--firewall]`:
+    material into `<state>\tls` (earlier files kept as `.old-<time>`), `[server]`/`[tls]` written, `tls\` limited to SYSTEM, Administrators,
+    LOCAL SERVICE (read); the private CA key in `tls\ca\`, which LOCAL SERVICE cannot read. `--firewall` only elevated.
+  - `--check-server [url]`: the client/server handshake from a client (certificate trusted or pinned SHA-256, `/api/version`,
+    `minClientVersion` both ways, schema compatible); `--doctor` runs it on a client installation; `--console` / the tray on a client open the
+    server and run nothing.
+  - Installer (`agastya.iss`): with LAN, `ConfigureTeamServer` runs `--configure-server` before the service is registered (`/SERVERNAMES`,
+    `/TLSPFX` + `/TLSPASSFILE`, `/TLSCERT` + `/TLSKEY`, otherwise a private CA for the computer name; an upgrade with TLS already configured
+    is left alone); `/CLIENTOF=<url>` writes `[client] Server` and installs no service. Template: commented `[directory]`, `[backup]`,
+    `[client]` sections.
+* **Load harness.** `backend/scripts/load-test.js`: N scripted authors, each with its own account, a WebSocket with presence, and a mix of
+  check-out / read / save / check-in on its own module, **contended saves on a shared module without a lease** (the version guard decides),
+  project / module lists, dashboard, presence, optional whole-project validation; check-out notice latency measured from the action to the
+  other authors' sockets; server metrics read (reset after warm-up); the harness's own event-loop delay reported. **No-lost-update proof**:
+  per module, the accepted saves must form one chain of base hash -> new hash and the server's final hash must equal the chain end.
+  `--drill`: backup, restore into a new folder, start a server on it, first read, all timed. `--base <url>` runs against an existing server
+  (external multi-machine runs); `--profile <dir>` writes a V8 CPU profile of its own server. Exit 0 PASS, 1 FAIL, 2 could not run.
+* **Measured results.** All on **this shared 8-core machine (Intel i7-6820HQ, 2.7 GHz) while other agents were building and testing**, the
+  harness and the server on the same computer, loopback HTTP (no TLS on the wire), own temporary workspace, short runs (45-126 s measured
+  after a 10-15 s warm-up). 50 authors throughout. Client-side times include the harness's own queueing (its event-loop p99 stayed 24-25 ms).
+
+  | Run | Projects | Think | Measured | Requests (/s) | p50 / p95 / p99 / max (ms) | Errors | Write p95 | Notice p95 / max, >5 s | Server loop p99 / max | Statements: max, slow, locked | Server-side p95 / write p95 | Saves accepted, silent overwrites | Result |
+  | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+  | A normal, validation on, drill | 10 | 1-3 s | 126 s | 3,387 (26.8) | 639 / 1,957 / 3,394 / 27,702 | 0 | 1,743 | 1,710 / 3,393, 0 | 1,874 / 3,295 | 399 ms, 10, 0 | 44 / 80 | 525, 0 | PASS (D21 event loop) |
+  | B normal, no validation | 10 | 1-3 s | 123 s | 6,419 (52.2) | 20 / 79 / 151 / 380 | 0 | 88 | 75 / 376, 0 | 69 / 354 | 206 ms, 12, 0 | 26 / 37 | 985, 0 | PASS, no D21 trigger |
+  | C stress | 10 | 0.1-0.5 s | 61 s | 5,270 (86.3) | 363 / 653 / 828 / 975 | 0 | 673 | 636 / 886, 0 | 826 / 909 | 83 ms, 2, 0 | 35 / 49 | 816, 0 | PASS (D21 event loop) |
+  | D stress, CPU-profiled | 10 | 0.1-0.5 s | 45 s | 4,907 (106.4) | 275 / 419 / 473 / 571 | 0 | 427 | 414 / 548, 0 | 459 / 550 | 66 ms, 2, 0 | 25 / 28 | 767, 0 | PASS (D21 event loop) |
+  | E normal, 100 projects | 100 | 1-3 s | 93 s | 4,863 (52.3) | 17 / 46 / 76 / 194 | 0 | 57 | 43 / 73, 0 | 40 / 123 | 21 ms, 0, 0 | 20 / 22 | 770, 0 | PASS, no D21 trigger |
+
+  Drill (run A, 1,009,065-byte archive): backup 3,710 ms, restore 2,609 ms, start to ready 1,830 ms, first read 2,192 ms, **8.5 s total**.
+  Contended saves on the shared module: 122 / 254 / 195 accepted with 11 / 30 / 63 refused `409` in A / B / C; every refusal is the guard
+  working, not an error. In E (100 projects, 101 modules, 107 s to seed) the 50 authors are spread over 100 projects, so each project has
+  fewer watchers (455 notices) and the shared module saw no conflict (199 accepted, 0 refused): it proves the 100-project size, not contention.
+
+  **Reading.** At 2x the assumed concurrency, at a normal working pace, the server meets the targets (B: p95 79 ms, no D21 trigger, 0 errors,
+  every check-out notice within 0.4 s, no lock waits) - **except while a whole-project validation runs**: it executes on the main thread
+  (p50 18.4 s at this size) and everything else queues behind it (A). That is PERF-001; it is fixed by moving validation into the job
+  service (WP-14, in progress in parallel; nothing was built here). **Measured ceiling** on this machine: one CPU core, about 86-106 requests/s
+  (C, D), reached at roughly 4x the normal pace of 50 people; past it, server-side handling stays at p95 25-35 ms and the waiting grows (the
+  event-loop delay is the queue). The CPU profile at the ceiling: ~25% of busy time in SQLite statement execution (statements are prepared
+  per call: ~5% in `prepare` alone - a statement cache is the cheap next step), ~10% in file reads / `fsync`. No `database is locked` in any
+  run; the slowest statement was 399 ms (A, behind validation).
+* **Decisions recorded.**
+  - Clients are browsers or a client installation of the same host (`[client] Server`, `/CLIENTOF`), not a separate slim Client-Setup.exe:
+    one package, one signing and update path (audit recommendation for the smallest surface).
+  - Presence in memory only, per connection, no new table; check-out stays the WP-11 lease (no new locking model). No migration was needed
+    (027 unused).
+  - The private CA is the default on a LAN install with no certificate given (the server must not start without TLS, WP-26); the CA key is
+    kept out of the service's reach and the runbook says to move it offline.
+  - The firewall rule stays the WP-25 port rule; `--configure-server --firewall` exists for a hand configuration and was **not executed**.
+  - Availability position as the addendum: no automatic failover; daily backup default, hourly selectable; RPO = interval; RTO measured at
+    the first drill (8.5 s machine time measured here on 1 MB; the runbook asks for the customer's own number).
+* **Docs.** OPERATIONS.md section 13 *Team server runbook (Mode B)*: install, `--configure-server`, ini keys, clients and CA distribution,
+  presence and check-out, backup + warm standby + manual failover + drill, upgrade order and client/server version matrix, capacity with the
+  measured table, metrics and D21 triggers, running the harness against a real server. Section 5 (firewall now port-bound) and the
+  directory section (ini keys) updated.
+* **Tests run** (each alone): backend `wp28-team-server` 6/6 (new: presence for readers only, silent heartbeat, notices within 5 s, renewal
+  silent, break notice, sign-out removes presence, nothing on disk, 9th socket 429, oversize 1009, flood 1008, metrics shape/reset/403,
+  standby copy ok / failure audited / relative path refused), `ws-broadcast` 5/5, `routes-guarded` 1/1, `wp10-seams` 11/11, `wp11-integrity`
+  16/16, `authz-matrix` 6/6; `scripts/release/teamserver.test.mjs` 4/4 (new: AgastyaCtl compiled from `packaging/host/*.cs` without warnings
+  into a temp product tree; `--configure-server` refusals change nothing; `--make-cert` writes ini + tls, ACLs checked with `icacls`, CA key
+  not readable by LOCAL SERVICE; `--console` serves HTTPS with it; `[backup]`/`[server]` keys reach the server (read back from
+  `/api/admin/metrics`); `--check-server` fails on an untrusted certificate, passes with the pinned thumbprint, fails on a wrong pin and for a
+  0.0.0 client; a client refuses `--console`; a bad ini value stops the server with the variable named), `host.test.mjs` 6/6,
+  `installer.test.mjs` 1/1 (ISCC compiles the changed script; per-user silent install/upgrade/uninstall in temp). Frontend: `tsc --noEmit`
+  clean, `TeamChip.test.tsx` 4/4, theme lint 0 literals, `check:parity` PASS. `scripts/ci/lint.mjs` exit 0 (any.backend unchanged at 279).
+  Backend `tsc` clean. New tests registered in `scripts/ci/test-plan.json` (`security`, `release-tools`). Load runs A-E above.
+  Not run (per the brief): the main Playwright suite, full suites, the gate.
+* **External (needs real machines; built and documented, not run here).**
+  - Real separate client computers and network, TLS on the wire under load, a domain / Active Directory: `load-test.js --base` and
+    OPERATIONS.md 13.6.
+  - A clean-VM install as a real Windows service with the firewall rule and a listener scan (WP-26 left it here): no service, firewall rule
+    or certificate-store change was made on this machine; the installer's LAN path (`ConfigureTeamServer`) was compiled but not executed in
+    admin mode (the installer test is per-user, where LAN is unavailable). `/CLIENTOF` was compiled, not executed.
+  - The first restore drill on the customer's data (RTO).
+* **Not done, and why.**
+  - Whole-project validation still blocks the event loop under load: WP-14's job service (not duplicated here).
+  - No metrics screen (API only), to keep UI additions small while WP-35 redesigns screens.
+  - No two-browser Playwright spec (presence is covered by the backend test over real sockets and the TeamChip component test).
+  - DPAPI protection of the PFX passphrase file (ACL-protected file only).
+  - Statement caching in the storage layer (found by the profile; not a WP-28 change).
