@@ -20,10 +20,10 @@ let server: http.Server | null = null;
 export async function start(port: number = config.port): Promise<number> {
   // WP-06 (DEP-017): one server per data folder; a second one stops here naming the owner's process. Test harnesses that start several
   // in-process apps on one workspace on purpose opt out with AGASTYA_NO_WORKSPACE_LOCK=1.
-  if (process.env.AGASTYA_NO_WORKSPACE_LOCK !== '1') acquireWorkspaceLock(workspaceDir);
+  if (config.workspaceLock) acquireWorkspaceLock(workspaceDir);
   try { sweepPendingImports(); } catch (e) { console.warn('[start] unfinished imports:', (e as Error).message); }    // REL-004: an import cut off by a crash
   await reconcileRegistry();
-  await ensureBootstrapAdmin({ store, audit, now: () => new Date() });
+  await ensureBootstrapAdmin({ store, audit, env: config.initialAdmin, now: () => new Date() });
 
   const app = createApp();
   startRenderer();
@@ -92,7 +92,7 @@ if (require.main === module) {
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   // Windows cannot deliver SIGTERM to a child process, so the packaged launcher (and the Windows service) asks for a clean stop by closing this
   // process's standard input. The server then closes its connections and the warm renderer, and the database is not cut off mid-write.
-  if (process.env.AGASTYA_SHUTDOWN_ON_STDIN_CLOSE === '1') {
+  if (config.shutdownOnStdinClose) {
     process.stdin.on('end', () => shutdown('stdin closed'));
     process.stdin.on('error', () => undefined);
     process.stdin.resume();

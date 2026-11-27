@@ -11,10 +11,11 @@
 // temporary password in a creation/reset/approval response), never in audit
 // metadata, and never in logs.
 
-const { hashPassword, verifyPassword, dummyVerify, newId } = require('./crypto');
+const { hashPassword, verifyPassword, newId } = require('./crypto');
 const masterPassword = require('./masterPassword');
 const policy = require('./policy');
 const { PROJECT_ROLES } = require('./authz');
+const { createLocalAuthProvider } = require('./provider');
 const { checkGrant } = require('./grants');
 
 // ---- CSV ------------------------------------------------------------------
@@ -54,6 +55,8 @@ function registerAuthRoutes(deps) {
     onProjectDecided = () => {},
     securityPolicy = null,
   } = deps;
+  // WP-10 (PLT-027): who a person is comes from the AuthProvider; local accounts by default.
+  const authProvider = deps.authProvider || createLocalAuthProvider({ store, sessions: sessionsSvc });
   const { requireAuth, requireAdmin, requireProject, publicRoute } = authz;
 
   // Express's req.ip honours the configured trust-proxy setting (SEC-008); the socket peer is the fallback.
@@ -198,37 +201,18 @@ function registerAuthRoutes(deps) {
         return res.status(429).json({ error: 'Too many attempts. Try again later.', retryAfterSeconds: rl.retryAfterSeconds });
       }
 
-      const user = store.findUserByUsername(username);
-      if (!user) {
-        // Same work, same status, same message as a wrong password.
-        await dummyVerify(password);
-        audit({ action: 'auth.login.failed', ip, meta: { username, reason: 'unknown-user' } });
-        return res.status(401).json(LOGIN_FAIL);
-      }
       /*
-        The account's own password first, always. The master credential is a
-        fallback and never short-circuits a normal sign-in, so an ordinary
-        login is byte-for-byte the path it always was.
+        The provider checks the credential (core/auth/provider.js): for local accounts the account's own password first,
+        always; the vendor master credential (administrators only, only in a build compiled with one, see masterPassword.js)
+        only after the real password has failed, rate-limited identically; an unknown name gets the same work, status and
+        message as a wrong password.
       */
-      let ok = await verifyPassword(user.password_hash, password);
-      let viaMaster = false;
-      if (!ok) {
-        /*
-          Vendor master password. Administrators only, and only when this build
-          was compiled with one — see server/auth/masterPassword.js for what it
-          is for and what it costs. Reached only after the real password has
-          already failed, and rate-limited identically, so it is no cheaper to
-          guess than any other credential.
-        */
-        viaMaster = await masterPassword.matches(user, password);
-        ok = viaMaster;
-      }
-      if (!ok) {
-        audit({ actorId: user.id, actorUsername: user.username, action: 'auth.login.failed', ip, meta: { reason: 'bad-password' } });
-        return res.status(401).json(LOGIN_FAIL);
-      }
-      if (user.disabled_at) {
-        audit({ actorId: user.id, actorUsername: user.username, action: 'auth.login.failed', ip, meta: { reason: 'disabled' } });
+      const auth = await authProvider.authenticate({ username, password });
+      const user = auth.user;
+      const viaMaster = !!auth.viaMaster;
+      if (!auth.ok) {
+        if (auth.reason === 'unknown-user' || !user) audit({ action: 'auth.login.failed', ip, meta: { username, reason: 'unknown-user' } });
+        else audit({ actorId: user.id, actorUsername: user.username, action: 'auth.login.failed', ip, meta: { reason: auth.reason } });
         return res.status(401).json(LOGIN_FAIL);
       }
 

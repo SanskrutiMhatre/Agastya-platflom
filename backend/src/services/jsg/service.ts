@@ -10,13 +10,14 @@ import fs from 'fs';
 import crypto from 'crypto';
 import path from 'path';
 import { config } from '../../config';
-import { projectDirFor } from '../../context';
+import { projectDirFor, content } from '../../context';
 import { bad, conflict, HttpError } from '../http';
 import { checkXmlSafetyOf } from '../csdbGuard';
 import { syncIdentity } from '../xengine/project';
 import { parseTree, walk, type MNode } from '../miniXml';
 import { wellFormedError } from '../wellFormed';
-import { readProjectJson, updateProjectJson } from '../projects';
+import { readProjectJson, updateProjectJson } from '../projectRecord';
+import { registerDocumentCreator } from '../documentCreators';
 import { jsgTypeById, ISPL_PREFACE, UHB_FRONT_COUNTS, UHB_PREFACE, type JsgDocType } from './registry';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -38,6 +39,8 @@ export const sha = (text: string): string => crypto.createHash('sha256').update(
 export const isJsgProject = (projectId: string): boolean => readProjectJson(projectId).format === 'jsg';
 export const jsgTypeOfProject = (projectId: string): JsgDocType | undefined => jsgTypeById(readProjectJson(projectId).jsgDocType);
 export const sourcePath = (projectId: string): string => path.join(projectDirFor(projectId), SOURCE_NAME);
+/** The document's place inside the project, for the ContentStore (WP-10). */
+const sourceInProject = (projectId: string): string => path.relative(content.projectDir(projectId), sourcePath(projectId));
 
 // ── A new document ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -168,6 +171,9 @@ export function skeletonXml(type: JsgDocType, input: NewDocInput = {}): string {
   throw bad(`${type.label}: not available yet`, 'JSG_TYPE_NOT_READY');
 }
 
+// WP-10 (ARC-006): projects.ts creates a JSG project's first document through this registration, not through a require() of this file.
+registerDocumentCreator('jsg', (projectId, typeId, o) => createInitialDocument(projectId, jsgTypeById(typeId)!, { projectName: o.projectName }));
+
 /** Create the project's first document. Called by project creation. */
 export function createInitialDocument(projectId: string, type: JsgDocType, input: NewDocInput): void {
   fs.writeFileSync(sourcePath(projectId), skeletonXml(type, input), 'utf8');
@@ -177,9 +183,9 @@ export function createInitialDocument(projectId: string, type: JsgDocType, input
 // ── Reading and writing ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 export function readSource(projectId: string): { xml: string; hash: string } {
-  const abs = sourcePath(projectId);
-  if (!fs.existsSync(abs)) throw bad('This project has no JSG document yet.', 'NO_JSG_DOCUMENT');
-  const xml = fs.readFileSync(abs, 'utf8');
+  const at = sourceInProject(projectId);
+  if (!content.exists(projectId, at)) throw bad('This project has no JSG document yet.', 'NO_JSG_DOCUMENT');
+  const xml = content.readText(projectId, at);
   return { xml, hash: sha(xml) };
 }
 
@@ -191,13 +197,13 @@ export async function writeSource(projectId: string, xml: string, baseHash?: str
   if (/<!DOCTYPE/i.test(xml.replace(/<!--[\s\S]*?-->/g, '').replace(/<!\[CDATA\[[\s\S]*?\]\]>/g, ''))) throw bad('A JSG document may not declare a DOCTYPE: the engine needs none, and entities are not supported in it.', 'DOCTYPE_REFUSED');   // PUB-014
   const wf = wellFormedError(xml);
   if (wf) throw new HttpError(400, `The document is not well-formed XML: ${wf}`, 'MALFORMED_XML');
-  const abs = sourcePath(projectId);
-  const current = fs.existsSync(abs) ? fs.readFileSync(abs, 'utf8') : null;
+  const at = sourceInProject(projectId);
+  const current = content.exists(projectId, at) ? content.readText(projectId, at) : null;
   if (baseHash && current !== null && sha(current) !== baseHash) throw conflict('The document was saved by someone else since you opened it. Reload to see their changes.', 'STALE_DOCUMENT');
   const declared = /<jsgdoc\b[^>]*\btype="([^"]+)"/.exec(xml)?.[1];
   const type = jsgTypeOfProject(projectId);
   if (type && declared && declared !== type.id) throw bad(`This project is a ${type.label}; the document says it is "${declared}".`, 'DOCTYPE_MISMATCH');
-  fs.writeFileSync(abs, xml, 'utf8');
+  content.writeText(projectId, at, xml);
   syncIdentity(projectId, 'jsg', xml);                 // the document codes kept in the backend (services/xengine) follow the document; never refuses a save
   return { hash: sha(xml), report: await validateJsg(xml) };
 }

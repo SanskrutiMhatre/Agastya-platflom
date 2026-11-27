@@ -9,7 +9,7 @@
 // on which project; this reads it, never changes it.
 // =============================================================================
 
-import { store } from '../context';
+import { store, repos } from '../context';
 import { readProjectJson } from './projects';
 
 type Row = Record<string, any>;
@@ -27,7 +27,6 @@ const EDIT = new Set(['dm.saved', 'dm.created', 'dm.imported', 'dm.deleted', 'pm
 const BUILD = new Set(['publish.built']);
 const CHECK = new Set(['validation.run']);
 
-const marks = (n: number): string => Array.from({ length: n }, () => '?').join(',');
 
 export interface ActivityReport {
   since: string; days: number;
@@ -46,14 +45,10 @@ export function activityFor(projectIds: string[], days = 7): ActivityReport {
   const empty: ActivityReport = { since, days, totals: { projects: 0, people: 0, edits: 0, builds: 0, pendingApprovals: 0 }, projects: [], people: [], feed: [] };
   if (!projectIds.length) return empty;
 
-  const q = marks(projectIds.length);
-  const stats: Row[] = store.db.prepare(
-    `SELECT project_id, actor_id, action, COUNT(*) AS n, MAX(at) AS last FROM audit_log
-     WHERE project_id IN (${q}) AND at >= ? GROUP BY project_id, actor_id, action`).all(...projectIds, since);
-  const lastEver: Row[] = store.db.prepare(
-    `SELECT project_id, actor_id, MAX(at) AS last FROM audit_log WHERE project_id IN (${q}) AND actor_id IS NOT NULL GROUP BY project_id, actor_id`).all(...projectIds);
-  const feedRows: Row[] = store.db.prepare(
-    `SELECT id, at, actor_username, action, project_id, meta FROM audit_log WHERE project_id IN (${q}) ORDER BY id DESC LIMIT 60`).all(...projectIds);
+  // WP-10 (PRD-002): the three audit-log reads are in repositories/s1000dRecords.ts (ActivityRepository).
+  const stats: Row[] = repos.activity.actionStats(projectIds, since);
+  const lastEver: Row[] = repos.activity.lastActive(projectIds);
+  const feedRows: Row[] = repos.activity.feed(projectIds);
   const pending = new Set<string>(store.listPendingReleases().map((r: Row) => r.project_id));
 
   const names = new Map<string, { name: string; folder: string }>();

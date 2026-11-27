@@ -24,7 +24,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { nowIso } from '../config';
-import { store } from '../context';
+import { repos } from '../context';
 import { bad, conflict, notFound } from './http';
 import { parseBrexModel } from './brex';
 
@@ -64,7 +64,8 @@ export const UNRESOLVED_DEFAULTS: Record<string, string> = Object.fromEntries(
   Object.entries(SPEC_EVIDENCE).filter(([, e]) => e.status === 'multiple' || e.status === 'unresolved').map(([k, e]) => [k, e.note]),
 );
 
-const dbh = () => store.db;
+// WP-10 (PRD-002): every statement is in repositories/referenceRepository.ts; this file holds the rules.
+const R = () => repos.reference;
 const brexDir = () => path.join(__dirname, '..', '..', 'brex');
 const refDir = () => path.join(__dirname, '..', '..', 'reference');
 const brexFile = (issue: IssueKey) => path.join(brexDir(), `DMC-S1000D-${LETTER[issue]}-04-10-0301-00A-022A-D_001-00_EN-US.XML`);
@@ -96,24 +97,22 @@ let seeded = false;
  */
 export function seedReference(): { codes: number; issues: number } {
   const now = nowIso();
-  const db = dbh();
   let codes = 0;
-  db.exec('BEGIN');
-  try {
+  repos.transaction(() => {
     for (const issue of ISSUE_KEYS) {
       const file = brexFile(issue);
       const raw = fs.readFileSync(file);
       const sha = crypto.createHash('sha256').update(raw).digest('hex');
       const sid = `brex:${issue}`;
       // unchanged file already read in: nothing to parse (start-up cost)
-      const known: any = db.prepare('SELECT sha256 FROM ref_sources WHERE id = ?').get(sid);
-      if (known?.sha256 === sha && Number((db.prepare("SELECT COUNT(*) AS n FROM ref_codes WHERE issue = ? AND origin = 'brex'").get(issue) as any).n) > 0) continue;
+      if (R().sourceSha(sid) === sha && R().brexCodeCount(issue) > 0) continue;
       const xml = raw.toString('utf8');
-      db.prepare(`INSERT INTO ref_sources (id, kind, label, file, sha256, issue, limitation, loaded_at) VALUES (?,?,?,?,?,?,?,?)
-                  ON CONFLICT(id) DO UPDATE SET sha256 = excluded.sha256, file = excluded.file, loaded_at = excluded.loaded_at`)
-        .run(sid, 'brex', `S1000D Issue ${ISSUE_LABEL[issue]} default BREX`, path.basename(file), sha, issue,
-          issue === '4-2' ? 'The Issue 4.2 specification text is also available to this project.'
-            : 'Only this default BREX is available for this issue: the Issue 4.2 specification text is the only specification text on hand, so titles and code lists for this issue are as the BREX states them.', now);
+      R().upsertBrexSource({
+        id: sid, label: `S1000D Issue ${ISSUE_LABEL[issue]} default BREX`, file: path.basename(file), sha256: sha, issue,
+        limitation: issue === '4-2' ? 'The Issue 4.2 specification text is also available to this project.'
+          : 'Only this default BREX is available for this issue: the Issue 4.2 specification text is the only specification text on hand, so titles and code lists for this issue are as the BREX states them.',
+        now,
+      });
       const model = parseBrexModel(xml, `default ${ISSUE_LABEL[issue]}`, false);
       for (const kind of CODE_KINDS) {
         const rule = model.rules.find((r) => r.id === KIND_RULE[kind].rule && r.objectPath === KIND_RULE[kind].path);
@@ -121,17 +120,12 @@ export function seedReference(): { codes: number; issues: number } {
         for (const v of rule.values) {
           if (v.form === 'pattern') {
             // "project available" ranges: BREX accepts ANY code matching the pattern, and leaves its meaning to the project
-            db.prepare(`INSERT INTO ref_code_ranges (kind, issue, pattern, title, source_id, rule_id) VALUES (?,?,?,?,?,?)
-                        ON CONFLICT(kind, issue, pattern) DO UPDATE SET title = excluded.title, source_id = excluded.source_id, rule_id = excluded.rule_id`)
-              .run(kind, issue, v.allowed.trim(), v.label.trim().replace(/\s+/g, ' '), sid, rule.id);
+            R().upsertRange({ kind, issue, pattern: v.allowed.trim(), title: v.label.trim().replace(/\s+/g, ' '), sourceId: sid, ruleId: rule.id });
             continue;
           }
           if (v.form !== 'single') continue;
           const code = v.allowed.trim().toUpperCase();
-          db.prepare(`INSERT INTO ref_codes (kind, issue, code, title, origin, source_id, rule_id, created_at, updated_at) VALUES (?,?,?,?, 'brex', ?,?,?,?)
-                      ON CONFLICT(kind, issue, code) DO UPDATE SET title = excluded.title, source_id = excluded.source_id, rule_id = excluded.rule_id, updated_at = excluded.updated_at
-                      WHERE ref_codes.origin = 'brex'`)
-            .run(kind, issue, code, v.label.trim().replace(/\s+/g, ' '), sid, rule.id, now, now);
+          R().upsertBrexCode({ kind, issue, code, title: v.label.trim().replace(/\s+/g, ' '), sourceId: sid, ruleId: rule.id, now });
           codes++;
         }
       }
@@ -139,14 +133,11 @@ export function seedReference(): { codes: number; issues: number } {
     // DM-type advice
     const recFile = path.join(refDir(), 'dmtype-recommendations.json');
     const rec = JSON.parse(fs.readFileSync(recFile, 'utf8'));
-    db.prepare(`INSERT INTO ref_sources (id, kind, label, file, sha256, issue, limitation, loaded_at) VALUES (?,?,?,?,?,?,?,?)
-                ON CONFLICT(id) DO UPDATE SET sha256 = excluded.sha256, loaded_at = excluded.loaded_at`)
-      .run('s1kd-dmtypes', 'advice', rec.provenance.source, path.basename(recFile), crypto.createHash('sha256').update(fs.readFileSync(recFile)).digest('hex'), null, rec.provenance.limitation, now);
+    R().upsertAdviceSource({ id: 's1kd-dmtypes', label: rec.provenance.source, file: path.basename(recFile), sha256: crypto.createHash('sha256').update(fs.readFileSync(recFile)).digest('hex'), limitation: rec.provenance.limitation, now });
     for (const [schema, list] of Object.entries<string[]>(rec.bySchema)) {
-      for (const code of list) db.prepare('INSERT OR IGNORE INTO ref_dmtype_codes (schema, code, source_id) VALUES (?,?,?)').run(schema, code, 's1kd-dmtypes');
+      for (const code of list) R().addDmTypeAdvice(schema, code, 's1kd-dmtypes');
     }
-    db.exec('COMMIT');
-  } catch (e) { db.exec('ROLLBACK'); throw e; }
+  });
   seeded = true;
   return { codes, issues: ISSUE_KEYS.length };
 }
@@ -159,7 +150,7 @@ export interface CodeRange { kind: CodeKind; issue: IssueKey; pattern: string; t
 
 export function listRanges(kind: CodeKind, issue: IssueKey): CodeRange[] {
   ensureSeeded();
-  return (dbh().prepare('SELECT * FROM ref_code_ranges WHERE kind = ? AND issue = ? ORDER BY pattern').all(kind, issue) as any[])
+  return (R().listRanges(kind, issue) as any[])
     .map((r) => ({ kind: r.kind, issue: r.issue, pattern: r.pattern, title: r.title, sourceId: r.source_id ?? null, ruleId: r.rule_id ?? null }));
 }
 
@@ -175,20 +166,18 @@ const rowOf = (r: any): CodeRow => ({
 
 export function listCodes(kind: CodeKind, issue: IssueKey): CodeRow[] {
   ensureSeeded();
-  return dbh().prepare(`SELECT c.*, s.label AS source_label FROM ref_codes c LEFT JOIN ref_sources s ON s.id = c.source_id
-                        WHERE c.kind = ? AND c.issue = ? ORDER BY c.code`).all(kind, issue).map(rowOf);
+  return R().listCodes(kind, issue).map(rowOf);
 }
 
 export function getCode(kind: CodeKind, issue: IssueKey, code: string): CodeRow | null {
   ensureSeeded();
-  const r = dbh().prepare(`SELECT c.*, s.label AS source_label FROM ref_codes c LEFT JOIN ref_sources s ON s.id = c.source_id WHERE c.kind = ? AND c.issue = ? AND c.code = ?`)
-    .get(kind, issue, String(code).toUpperCase());
+  const r = R().getCode(kind, issue, String(code).toUpperCase());
   return r ? rowOf(r) : null;
 }
 
 export function listSources(): Array<{ id: string; kind: string; label: string; file: string | null; sha256: string | null; issue: string | null; limitation: string | null; loadedAt: string }> {
   ensureSeeded();
-  return dbh().prepare('SELECT * FROM ref_sources ORDER BY id').all().map((r: any) => ({
+  return R().listSources().map((r: any) => ({
     id: r.id, kind: r.kind, label: r.label, file: r.file, sha256: r.sha256, issue: r.issue, limitation: r.limitation, loadedAt: r.loaded_at,
   }));
 }
@@ -199,8 +188,8 @@ export function catalogueSummary() {
   return ISSUE_KEYS.map((issue) => ({
     issue, label: ISSUE_LABEL[issue],
     kinds: Object.fromEntries(CODE_KINDS.map((k) => {
-      const r: any = dbh().prepare(`SELECT COUNT(*) AS n, SUM(origin = 'custom') AS custom FROM ref_codes WHERE kind = ? AND issue = ?`).get(k, issue);
-      return [k, { count: Number(r.n), custom: Number(r.custom ?? 0), ranges: listRanges(k, issue).length }];
+      const r = R().countCodes(k, issue);
+      return [k, { count: r.n, custom: r.custom, ranges: listRanges(k, issue).length }];
     })),
   }));
 }
@@ -224,7 +213,7 @@ export function typeAdvice(issue: IssueKey, dmTypes: Array<{ schema: string; nam
   ensureSeeded();
   const allowed = new Set(listCodes('infoCode', issue).map((c) => c.code));
   const recs = new Map<string, string[]>();
-  for (const r of dbh().prepare('SELECT schema, code FROM ref_dmtype_codes ORDER BY schema, code').all() as any[]) {
+  for (const r of R().dmTypeAdvice()) {
     if (!allowed.has(r.code)) continue;
     (recs.get(r.schema) ?? recs.set(r.schema, []).get(r.schema)!).push(r.code);
   }
@@ -263,22 +252,20 @@ export function addCustomCode(kind: CodeKind, issue: IssueKey, rawCode: unknown,
   const code = cleanCode(kind, rawCode); const title = cleanTitle(rawTitle);
   if (getCode(kind, issue, code)) throw conflict(`${code} is already in the Issue ${ISSUE_LABEL[issue]} catalogue.`, 'DUPLICATE');
   const now = nowIso();
-  dbh().prepare(`INSERT INTO ref_codes (kind, issue, code, title, origin, source_id, rule_id, created_at, updated_at) VALUES (?,?,?,?, 'custom', NULL, NULL, ?, ?)`).run(kind, issue, code, title, now, now);
+  R().insertCustomCode({ kind, issue, code, title, now });
   return getCode(kind, issue, code)!;
 }
 
 /** Add one custom code to several issues in one transaction. */
 export function addCustomCodes(kind: CodeKind, issues: IssueKey[], rawCode: unknown, rawTitle: unknown): CodeRow[] {
-  const db = dbh();
-  db.exec('BEGIN');
-  try { const rows = issues.map((i) => addCustomCode(kind, i, rawCode, rawTitle)); db.exec('COMMIT'); return rows; } catch (e) { db.exec('ROLLBACK'); throw e; }
+  return repos.transaction(() => issues.map((i) => addCustomCode(kind, i, rawCode, rawTitle)));
 }
 
 export function updateCustomCode(kind: CodeKind, issue: IssueKey, code: string, rawTitle: unknown): CodeRow {
   const row = getCode(kind, issue, code);
   if (!row) throw notFound('No such code.');
   if (row.origin === 'brex') throw conflict('A code from the default BREX is read-only: the BREX is its source. Add a custom code instead.', 'READ_ONLY');
-  dbh().prepare('UPDATE ref_codes SET title = ?, updated_at = ? WHERE kind = ? AND issue = ? AND code = ?').run(cleanTitle(rawTitle), nowIso(), kind, issue, row.code);
+  R().setCodeTitle(kind, issue, row.code, cleanTitle(rawTitle), nowIso());
   return getCode(kind, issue, code)!;
 }
 
@@ -286,7 +273,6 @@ export function deleteCustomCode(kind: CodeKind, issue: IssueKey, code: string):
   const row = getCode(kind, issue, code);
   if (!row) throw notFound('No such code.');
   if (row.origin === 'brex') throw conflict('A code from the default BREX is read-only: the BREX is its source.', 'READ_ONLY');
-  dbh().prepare('DELETE FROM ref_codes WHERE kind = ? AND issue = ? AND code = ?').run(kind, issue, row.code);
   // A project that had selected it no longer lists it; its data modules are untouched.
-  dbh().prepare('DELETE FROM project_codes WHERE kind = ? AND code = ? AND project_id IN (SELECT project_id FROM project_config WHERE json_extract(data, \'$.issue\') = ?)').run(kind, row.code, issue);
+  R().deleteCode(kind, issue, row.code);
 }

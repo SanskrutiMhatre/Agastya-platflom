@@ -10,7 +10,7 @@ import fs from 'fs';
 import path from 'path';
 import { projectDirFor } from '../../context';
 import { bad, notFound } from '../http';
-import { readProjectJson } from '../projects';
+import { readProjectJson } from '../projectRecord';
 import { getConfigRow } from '../projectConfig';
 import { projectRepo } from '../sns/store';
 import { readRecord as readRwiRecord } from '../jss/rwi/record';

@@ -1,6 +1,6 @@
 // Extension profiles: Administrators register (namespace + XSD); projects explicitly enable.
 import type { Express } from 'express';
-import { audit, requireAdmin, requireProject, store } from '../context';
+import { audit, requireAdmin, requireProject } from '../context';
 import { wrap, param, forbidden } from '../services/http';
 import * as ext from '../services/extensions';
 import { isCirProject } from '../services/projects';
@@ -8,7 +8,7 @@ import { isCirProject } from '../services/projects';
 export function registerExtensionRoutes(app: Express): void {
   const alog = (req: any, action: string, meta?: unknown) => audit({ actorId: req.auth.user.id, actorUsername: req.auth.user.username, action, targetType: 'admin', meta });
   app.get('/api/admin/extensions', requireAdmin(), wrap((_req, res) => {
-    res.json({ profiles: ext.listProfiles().map((p) => ({ ...p, projects: store.stmt('SELECT COUNT(*) AS n FROM project_ext WHERE profile_id = ?').get(p.id).n })) });
+    res.json({ profiles: ext.listProfiles().map((p) => ({ ...p, projects: ext.profileUse(p.id) })) });
   }));
   app.post('/api/admin/extensions', requireAdmin(), wrap(async (req, res) => {
     const p = await ext.registerProfile(req.auth.user.id, { name: req.body?.name, namespace: req.body?.namespace, description: req.body?.description, xsd: req.body?.xsd, xsdName: req.body?.xsdName });

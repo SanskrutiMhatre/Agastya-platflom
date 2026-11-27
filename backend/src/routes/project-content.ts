@@ -330,7 +330,7 @@ export function registerProjectContentRoutes(app: Express): void {
     let issued: Array<{ from: string; file: string }> = [];
     if (approve && store.getRelease(param(req, 'relId'))?.status === 'pending') issued = await lifecycle.issueForRelease(req.project.id, publicationSources(req.project.id), actor(req));
     release.decideRelease(req.project.id, param(req, 'relId'), approve, req.auth.user.id);
-    if (issued.length) { store.stmt('UPDATE releases SET content_hash = ? WHERE id = ?').run(release.publicationFingerprint(req.project.id), param(req, 'relId')); log(req, 'release.issued', { issued }); }
+    if (issued.length) { store.setReleaseContentHash(param(req, 'relId'), release.publicationFingerprint(req.project.id)); log(req, 'release.issued', { issued }); }
     notify([requester], { kind: approve ? 'approval.approved' : 'approval.rejected', title: approve ? 'Release approved' : 'Release rejected', body: `${pname(req.project.id)}: ${approve ? 'approved' : 'rejected'} by ${req.auth.user.fullName ?? req.auth.user.full_name}.`, projectId: req.project.id, actorId: req.auth.user.id });
     log(req, approve ? 'release.approved' : 'release.rejected', { id: param(req, 'relId') });
     res.json({ ok: true });

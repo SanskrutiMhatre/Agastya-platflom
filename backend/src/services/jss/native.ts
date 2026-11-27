@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import { projectDirFor } from '../../context';
 import { bad } from '../http';
-import { pmRel, readProjectJson } from '../projects';
+import { pmRel, readProjectJson } from '../projectRecord';
 
 /** The root element of an XML text, skipping the declaration, comments, a DOCTYPE and processing instructions. */
 export function rootElementOf(xml: string): string | null {

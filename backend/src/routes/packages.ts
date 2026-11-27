@@ -24,6 +24,7 @@ import { buildObject } from '../services/objectTemplates';
 import { createItem } from '../services/adminConfig';
 import { objectHtml, objectPdf } from '../services/objectRender';
 import { coverage } from '../services/registry';
+import { FilePendingImportStore, type PendingImportStore } from '../storage/pendingImports';
 
 const view = (min: string, cap = 'project.read'): RequestHandler => requireProject(min, { from: 'param', cap });
 const tmpRoot = uploadTmp;
@@ -55,9 +56,9 @@ export function detectPackage(zipPath: string, originalName = ''): Detection {
   return { format: dm || pm ? 's1000d' : 'unknown', kind: 'package', dataModules: dm, publicationModules: pm, graphics: gr, other: names.length - dm - pm - gr, entries: names.length, olderTool };
 }
 
-// A package that has been looked at but not yet turned into a project waits here, under a random token, until the owner confirms the format.
-const pending = new Map<string, { userId: string; file: string; name: string; at: number }>();
-const TOKEN_RE = /^[a-f0-9]{32}$/;
+// A package that has been looked at but not yet turned into a project waits under a random token until the owner confirms the format. The record is kept
+// beside the upload (storage/pendingImports.ts, WP-10 PLT-031), so it survives a restart within its hour.
+const pending: PendingImportStore = new FilePendingImportStore(uploadTmp);
 
 export function registerPackageRoutes(app: Express): void {
   const base = '/api/projects/:id';
@@ -71,15 +72,15 @@ export function registerPackageRoutes(app: Express): void {
       const man = /\.zip$/i.test(f.originalname) ? await readManifestOf(f.path) : null;      // an archive made by this platform (a project's Export) says so in its manifest
       const token = (await import('crypto')).randomBytes(16).toString('hex'); const keep = path.join(uploadTmp(), `${token}.upload`);
       fs.renameSync(f.path, keep);
-      for (const [k, v] of pending) if (Date.now() - v.at > 3600_000) { pending.delete(k); try { fs.unlinkSync(v.file); } catch { /* gone */ } }
-      pending.set(token, { userId: (req as any).auth.user.id, file: keep, name: f.originalname, at: Date.now() });
+      pending.sweep();
+      pending.put(token, { userId: (req as any).auth.user.id, file: keep, name: f.originalname, at: Date.now() });
       res.json({ token, name: f.originalname, ...found, ...(man ? { archive: { format: man.format, domain: man.domain ?? null, manualType: man.manualType ?? null, name: man.name ?? '' } } : {}) });
     } catch (e) { try { fs.unlinkSync(f.path); } catch { /* moved or gone */ } throw e; }
   }));
 
   app.post('/api/projects/import', requireAuth(), wrap(async (req, res) => {
     const user = (req as any).auth.user; const token = String(req.body?.token ?? '');
-    const held = TOKEN_RE.test(token) ? pending.get(token) : undefined;
+    const held = pending.get(token);
     if (!held || held.userId !== user.id || !fs.existsSync(held.file)) throw bad('That upload has expired. Choose the package again.', 'UPLOAD_EXPIRED');
     const card = await createProject(user, { name: req.body?.name, folder: req.body?.folder, format: req.body?.format, domain: req.body?.domain, manualType: req.body?.manualType });
     markImportPending(card.id, 'package import');          // WP-06 (REL-004): a server stop before the end leaves no half-made project

@@ -16,7 +16,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { config, nowIso } from '../config';
-import { store } from '../context';
+import { repos } from '../context';
 import { bad, conflict, notFound } from './http';
 import { parseTree, walk, type MNode } from './miniXml';
 
@@ -34,9 +34,12 @@ const row = (r: any): Profile => ({ id: r.id, name: r.name, namespace: r.namespa
 const dirOf = () => { const d = path.join(config.workspaceDir, 'extensions'); fs.mkdirSync(d, { recursive: true }); return d; };
 const xsdFile = (id: string) => path.join(dirOf(), `${id}.xsd`);
 
-export const listProfiles = (): Profile[] => store.stmt('SELECT * FROM ext_profiles ORDER BY name').all().map(row);
-const byNamespace = (ns: string): Profile | undefined => { const r = store.stmt('SELECT * FROM ext_profiles WHERE namespace = ?').get(ns); return r ? row(r) : undefined; };
-export const enabledFor = (projectId: string): Set<string> => new Set(store.stmt('SELECT profile_id FROM project_ext WHERE project_id = ?').all(projectId).map((r: any) => r.profile_id));
+// WP-10 (PRD-002): every statement is in repositories/s1000dRecords.ts (ExtensionRepository); this file holds the rules.
+export const listProfiles = (): Profile[] => repos.extensions.listProfiles().map(row);
+const byNamespace = (ns: string): Profile | undefined => { const r = repos.extensions.byNamespace(ns); return r ? row(r) : undefined; };
+export const enabledFor = (projectId: string): Set<string> => new Set(repos.extensions.enabledFor(projectId));
+/** How many projects have a profile enabled. */
+export const profileUse = (profileId: string): number => repos.extensions.projectCount(profileId);
 
 export async function registerProfile(by: string, input: { name: string; namespace: string; description?: string; xsd: string; xsdName?: string }): Promise<Profile> {
   const name = String(input.name ?? '').trim(); const ns = String(input.namespace ?? '').trim();
@@ -53,23 +56,22 @@ export async function registerProfile(by: string, input: { name: string; namespa
   try { const probe = await validateXML({ xml: [{ fileName: 'p.xml', contents: `<p xmlns="${ns}"/>` }], schema: [{ fileName: 'p.xsd', contents: xsd }] }); const fatal = (probe.errors || []).find((e: any) => /parsing|compil|not a schema|failed to load/i.test(String(e.message))); if (fatal) throw bad(`The XSD is not a usable schema: ${String(fatal.message).slice(0, 200)}`, 'XSD_INVALID'); }
   catch (e) { if ((e as any).status) throw e; throw bad(`The XSD is not a usable schema: ${(e as Error).message.slice(0, 200)}`, 'XSD_INVALID'); }
   if (byNamespace(ns)) throw conflict('That namespace already has a profile.', 'DUPLICATE');
-  if (store.stmt('SELECT 1 FROM ext_profiles WHERE name = ?').get(name)) throw conflict('A profile with that name exists.', 'DUPLICATE');
+  if (repos.extensions.nameTaken(name)) throw conflict('A profile with that name exists.', 'DUPLICATE');
   const id = newId(); fs.writeFileSync(xsdFile(id), xsd, 'utf8');
-  store.stmt('INSERT INTO ext_profiles (id, name, namespace, xsd_name, xsd_sha256, description, created_by, created_at) VALUES (?,?,?,?,?,?,?,?)')
-    .run(id, name, ns, path.basename(input.xsdName || `${name}.xsd`).slice(0, 120), crypto.createHash('sha256').update(xsd).digest('hex'), String(input.description ?? '').slice(0, 500), by, nowIso());
-  return row(store.stmt('SELECT * FROM ext_profiles WHERE id = ?').get(id));
+  repos.extensions.insertProfile({ id, name, namespace: ns, xsd_name: path.basename(input.xsdName || `${name}.xsd`).slice(0, 120), xsd_sha256: crypto.createHash('sha256').update(xsd).digest('hex'), description: String(input.description ?? '').slice(0, 500), created_by: by, created_at: nowIso() });
+  return row(repos.extensions.getProfile(id));
 }
 
 export function deleteProfile(id: string): void {
-  if (!store.stmt('SELECT 1 FROM ext_profiles WHERE id = ?').get(id)) throw notFound('No such profile.');
-  const n = store.stmt('SELECT COUNT(*) AS n FROM project_ext WHERE profile_id = ?').get(id).n;
+  if (!repos.extensions.getProfile(id)) throw notFound('No such profile.');
+  const n = repos.extensions.projectCount(id);
   if (n) throw conflict(`${n} project${n === 1 ? ' has' : 's have'} this profile enabled; disable it there first.`, 'IN_USE');
-  store.stmt('DELETE FROM ext_profiles WHERE id = ?').run(id); try { fs.unlinkSync(xsdFile(id)); } catch { /* gone */ }
+  repos.extensions.deleteProfile(id); try { fs.unlinkSync(xsdFile(id)); } catch { /* gone */ }
 }
 export function setEnabled(projectId: string, profileId: string, enabled: boolean, by: string): void {
-  if (!store.stmt('SELECT 1 FROM ext_profiles WHERE id = ?').get(profileId)) throw notFound('No such profile.');
-  if (enabled) store.stmt('INSERT OR IGNORE INTO project_ext (project_id, profile_id, enabled_by, enabled_at) VALUES (?,?,?,?)').run(projectId, profileId, by, nowIso());
-  else store.stmt('DELETE FROM project_ext WHERE project_id = ? AND profile_id = ?').run(projectId, profileId);
+  if (!repos.extensions.getProfile(profileId)) throw notFound('No such profile.');
+  if (enabled) repos.extensions.enable(projectId, profileId, by, nowIso());
+  else repos.extensions.disable(projectId, profileId);
 }
 
 // ── scanning ────────────────────────────────────────────────────────────────

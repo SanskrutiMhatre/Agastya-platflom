@@ -680,3 +680,74 @@ Limits / open:
 * Owner blessing wanted: the 7 viewer-level writes and the 21 sign-in-only writes in `authz-allow.json` are recorded as intended, each with a
   reason (open, copy, convert, the publish plan, the delivery package, JSS and JSG validate; sign-out, activity, password change, onboarding, invitations, folders, creating and importing projects,
   notifications, CIR, S1000D config validation; folder and CIR handlers check ownership themselves). The audit's recommendation was taken; the owner can strike any of them, and the test will then demand the guard.
+## Phase 2
+
+### WP-10 Explicit application context and storage/auth seams (PLT-028, PLT-030, PLT-031, PLT-032, ARC-006, PLT-027, PRD-002; ARC-017 not done) - done in part (see limits)
+
+Decisions taken from the audit (no owner question): `context.ts` stays as a compatibility facade so the importing modules do not change;
+the 109-method `AuthStore` is not put behind an interface (03 section 6); the storage seam is dialect-clean now and the PostgreSQL adapter
+waits for a D21 trigger (WP-37); migrations stay additive and keep their names and order; behaviour is unchanged unless stated below.
+
+* **Config (PLT-032).** `config.ts` builds one typed, validated `Config` with `buildConfig(env)` (pure; `config` = the process's, built once
+  at first load, as the test harness expects). It is the only module under `src/` that reads `process.env`: `index.ts` (workspace lock,
+  stdin shutdown, first-run administrator), `services/origin.ts` (dev origins), `services/uploads.ts` and `services/packages.ts` (upload,
+  timeout and expanded-size limits), `services/importer/recover/pdfjs.ts` and `core/auth/bootstrap.js` (its `env` now comes from the
+  caller) read the configuration. An invalid `PORT` stops with `PORT: ...` (`ConfigError`); `describeConfig` prints it without secrets.
+  `envPositive` moved to `config.ts` and is re-exported by `uploads.ts`. `AGASTYA_MAX_EXPANDED_BYTES` is now read once at start, like the
+  other limits (it was read per import). Outside `src/`: the vendored engine (`vendor/engine/paths.js` `JSS_JAVA`, `JSS_GS`, the allow-listed
+  child environment; `catalog.js` `XML_CATALOG_FILES`) and the operator scripts keep their own reads (vendored code / separate tools).
+* **AppContext (PLT-028).** `appContext.ts` `createAppContext(config, overrides)` builds what `context.ts` built at import (workspace
+  skeleton and templates, database handle, `AuthStore`, sessions, throttle, security policy, authz, document index, revisions, the audit
+  writer with its own failure counter) plus the seams below; `start()` takes the pre-migration snapshot and runs the migrations, so a
+  migration error is an error of `start()` (tested); `close()` checkpoints and closes. `context.ts` builds the default context, starts it
+  at import exactly as before and re-exports the same names plus `defaultContext()`, `repos`, `content`, `authProvider`.
+  `storage/sqlite.ts` `openSqlite` returns a new handle per call (same file, pragmas and registry tables as `vendor/engine/db.js`, whose
+  module-wide handle made a second context impossible); the registry methods moved to `repositories/projectRegistry.ts` bound to that
+  handle. `vendor/engine/db.js` stays for `scripts/reset-admin.js`. Two contexts on two workspaces run in one test process without seeing
+  each other's users, registry rows, content or audit rows.
+* **Seams.** `ContentStore` (`storage/contentStore.ts`, default `LocalFolderStore`, paths confined to the project folder): project.json
+  (`services/projectRecord.ts`), data-module read/save/create/delete (`csdb.ts`), the JSS and JSG document read/save (`jss/service.ts`,
+  `jsg/service.ts`). Writes are plain writes as before; WP-11 makes them atomic and revisioned in this one place. `SessionStore` and
+  `LimiterStore` (`storage/authStores.ts`) name what `sessions.js` and `rateLimit.js` use; defaults are the `AuthStore` tables;
+  `MemoryLimiterStore` is the in-process alternative. `AuthProvider` (`core/auth/provider.js`, local accounts by default): the login route
+  authenticates through it with the same steps (own password, master credential only after it failed, disabled refused, dummy work for an
+  unknown name; same audit rows). `provisionUser` refuses for local accounts (directory sign-on is WP-27, D5).
+* **Import cycle (ARC-006).** The 8-module cycle (`csdb`, `projectConfig`, `projects`, `sns`, `jss/native`, `jss/service`, `jsg/service`,
+  `xengine/project`) is gone: the project record functions moved to the leaf `services/projectRecord.ts`, the read-only CSDB index to
+  `services/csdbIndex.ts` (`projects.ts` and `csdb.ts` re-export them), and `createProject` asks `services/documentCreators.ts` for the JSS or
+  JSG creator, which each engine registers when it loads (`app.ts` loads both explicitly), instead of `require()`-ing them; the lazy
+  `require('../context')` in `createProject` is an import. Runtime cycle count over the compiled tree: 0 (tested; requires inside functions
+  are counted). Lazy requires that are not cycles remain in `activity.ts`, `assets.ts`, `cir.ts`, `sample.ts`.
+* **Dialect-clean storage (PRD-002, PLT-030).** Every statement that sat in services and routes moved into `src/repositories/` behind
+  interfaces (`Repositories`: `registry`, `sns`, `projectConfig`, `reference`, `cirLinks`, `lifecycle`, `extensions`, `activity`, a
+  `transaction()` unit of work and `ping()`), SQL text unchanged: `sns.ts` (37 sites), `s1000dRef.ts` (21), `projectConfig.ts` (15),
+  `extensions.ts` (12) and its route, `cir.ts` (6), `lifecycle.ts` (3), `activity.ts` (3), `bootReference.ts` (1),
+  `routes/project-content.ts` (the release fingerprint, now `AuthStore.setReleaseContentHash`), `dbSnapshot.ts` (moved to `storage/`, old
+  path re-exports). The migrations are one file per step in `storage/migrations/` with a body per engine (`sqlite` today; `forDialect`
+  refuses an engine that lacks a step), the order and SQL byte-identical to the former array (checked by comparing the evaluated objects).
+  Grep test: SQL (statement shapes, `.prepare(`, `.stmt(`, `store.db`, `BEGIN/COMMIT/ROLLBACK`) is allowed only in `repositories/`,
+  `storage/`, `core/auth/store.js` (the AuthStore, deliberately not interfaced) and `core/collab/` (document index and revisions, written on
+  the AuthStore's statement cache); the allow-list for anything else is empty. Contract suite `test/wp10-storage-contract.test.js` runs every
+  repository and both limiter stores through one `contract(engine, make)` function, today with `sqlite`.
+* **Process-local state (PLT-031).** Pending package-import tokens are kept as a record beside the upload (`storage/pendingImports.ts`),
+  so a pending import survives a restart within its hour (and expires after it, also on read); `GET /api/ready` (public, listed in
+  `routes-guarded`) answers 503 naming the failing check when the database does not answer, the data folder is not writable or free disk is
+  under `AGASTYA_READY_MIN_FREE_BYTES` (256 MB); the `AuthStore` statement cache is capped (500). Clean shutdown with checkpoint was WP-06.
+  WebSocket clients and the warm renderer stay process-local (multi-node work, not Mode A/B single host).
+* Tests changed: `settings-hostile-input` architecture test now exempts `services/projectRecord.ts` (the code moved there from
+  `projects.ts`); `routes-guarded` lists `GET /api/ready` in the intended public set.
+* Not done: ARC-017 (split `registerAuthRoutes` and the other god functions under 300 lines) was left out to keep this diff mechanical;
+  the AuthStore and `core/collab` keep their SQL (see above); routes and services still import the facade rather than receiving `ctx`
+  (new code can take an `AppContext`; migrating the 74 importers is opportunistic, as the audit recommends).
+* Verified (backend `tsc` 0 errors; each file alone, `--test-concurrency=1`, against the final build unless noted; `AGASTYA_CLIENT_DIST`
+  pointed at the main checkout's `frontend/dist` because the worktree has no client build, which `wp03-auth` "security headers" needs):
+  new `wp10-seams` 11/11 (no `process.env` outside config, cycle count 0, SQL grep with empty allow-list and a non-vacuity check, typed
+  config errors, two isolated contexts, AuthProvider answers, migration failure in `start()`, migration files, pending import across a
+  restart, readiness) and `wp10-storage-contract` 9/9 (sqlite); `routes-guarded` 1/1, `project-formats` 4/4, `settings-hostile-input` 6/6.
+  On the build before the last cosmetic edit (an unused require removed from `projects.ts`): `api` 17/17, `csdb-objects` 4/4, `packages`
+  10/10, `project-archive` 5/5, `importer-http` 12/12, `import` 5/5, `jss-authoring` 12/12, `jsg-engine` 7/7, `xengine-convert` 7/7,
+  `xengine-import-wizard` 4/4, `phase17-security` 5/5, `phase13` 12/12, `notifications` 6/6, `wp07-small-fixes` 4/4, `wp06-lifecycle` 5/5,
+  `cir-links` 4/4, `lifecycle` 5/5, `sns-http` 10/10, `s1000d-reference` 18/18, `rbac` 7/7, `wp03-auth` 11/11, `jssdm-http` 9/9,
+  `pm-multi-ref` 5/5, `extensions` 5/5, `release-issue` 1/1; earlier builds of this package: `sns` 16/16, `sns-polish` 4/4,
+  `sns-separation` 6/6, `lifecycle-reinstate` 2/2, `db-snapshot` 4/4, `s1000d-migration` 2/2, `uploads-config` 4/4, `wp04-reset-admin` 1/1.
+  Not run: the full backend suite, the PDF-heavy files, vitest, Playwright (left to the lead's merged run).

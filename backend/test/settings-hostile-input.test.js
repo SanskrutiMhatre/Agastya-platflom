@@ -108,10 +108,10 @@ test('a forged project archive cannot point the new project at another project, 
   assert.ok(!JSON.stringify((await bob.get(`/api/projects/${id}/dms`)).json).includes('VICTIM'));
 });
 
-test('architecture: no code outside services/projects.ts reads input.csdbDir / mediaDir / pm directly (they go through csdbRel / mediaRel / pmRel)', () => {
+test('architecture: no code outside services/projectRecord.ts (formerly projects.ts; WP-10) reads input.csdbDir / mediaDir / pm directly (they go through csdbRel / mediaRel / pmRel)', () => {
   const root = path.resolve(__dirname, '..', 'src'); const hits = [];
   const walk = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else if (/\.(ts|js)$/.test(e.name)) {
-    const rel = path.relative(root, p).split(path.sep).join('/'); if (rel === 'services/projects.ts') continue;
+    const rel = path.relative(root, p).split(path.sep).join('/'); if (rel === 'services/projectRecord.ts') continue;
     fs.readFileSync(p, 'utf8').split(/\r?\n/).forEach((l, i) => { if (/\binput\s*(\?\.|\.|&&\s*\w+\.input\.)\s*(csdbDir|mediaDir|pm)\b/.test(l) && !/safeRelPath\(/.test(l)) hits.push(`${rel}:${i + 1}`); });
   } } };
   walk(root);
