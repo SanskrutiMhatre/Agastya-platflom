@@ -107,7 +107,11 @@ test('the real RWI package: Import -> Edit -> Save -> Validate -> Generate PDF -
   const edited = doc0.xml.replace(EDIT_FROM, 'Refer Table 1.1 for the performance specifications of TEER (verified edit).'); assert.notEqual(edited, doc0.xml);
   const saved = await w.put(`${p.U}/jss`, { xml: edited, baseHash: doc0.hash }); assert.equal(saved.status, 200, JSON.stringify(saved.json).slice(0, 300));
   native(p, 'the save');
-  const stale = await w.put(`${p.U}/jss`, { xml: edited, baseHash: doc0.hash }); assert.equal(stale.status, 409, 'saving over a newer save is refused');
+  // WP-11 / D22: a save from an older copy is merged chapter by chapter. Re-sending the very change the server already has merges
+  // cleanly (nothing is overwritten); a DIFFERENT change to the same paragraph from that older copy must still be refused.
+  const again = await w.put(`${p.U}/jss`, { xml: edited, baseHash: doc0.hash }); assert.equal(again.status, 200, 'the identical change from the older copy is accepted (nothing to overwrite)');
+  const rival = doc0.xml.replace(EDIT_FROM, 'Refer Table 1.1 for a conflicting edit of TEER.'); assert.notEqual(rival, doc0.xml);
+  const stale = await w.put(`${p.U}/jss`, { xml: rival, baseHash: doc0.hash }); assert.equal(stale.status, 409, 'saving over a newer save is refused');
 
   // ── Validate ──
   const val = await w.post(`${p.U}/jss/validate`, {}); assert.equal(val.status, 200); assert.equal(val.json.errors, 0, JSON.stringify(val.json.findings.filter((f) => f.severity === 'error').slice(0, 3)));

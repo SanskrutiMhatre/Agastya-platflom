@@ -83,7 +83,8 @@ test('administrator reference data: the V1 sections, seeded once, edited by admi
     assert.equal((await c.get('/api/admin/roles')).status, 403);
     assert.equal((await c.post('/api/admin/maintenance/reindex')).status, 403);
   }
-  assert.equal((await admin.get('/api/admin/roles')).json.roles.length, 3);
+  // WP-27 added the read-only auditor (a flag on an account, listed with the three global roles)
+  assert.deepEqual((await admin.get('/api/admin/roles')).json.roles.map((r) => r.name), ['Administrator', 'Project Manager', 'Author', 'Auditor (read-only)']);
 });
 
 test('platform settings: administrators write them, everyone reads them, bad values are refused', async () => {
