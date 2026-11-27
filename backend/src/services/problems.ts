@@ -18,8 +18,8 @@
 
 import fs from 'fs';
 import path from 'path';
-import crypto from 'crypto';
 import { projectDirFor } from '../context';
+import { writeFileAtomic } from '../storage/atomicWrite';
 import { bad } from './http';
 import { lastRun, type Issue } from './validation';
 import { listWaivers } from './publishWaivers';
@@ -46,11 +46,9 @@ export function listMarks(projectId: string): ReviewMark[] {
   } catch { return []; }
 }
 
+// WP-11: the one atomic writer (flush, rename with retries on Windows; leftovers swept at start).
 function save(projectId: string, list: ReviewMark[]): void {
-  const file = fileOf(projectId);
-  const tmp = `${file}.${process.pid}.${crypto.randomBytes(4).toString('hex')}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(list, null, 1) + '\n', 'utf8');
-  fs.renameSync(tmp, file);
+  writeFileAtomic(fileOf(projectId), JSON.stringify(list, null, 1) + '\n');
 }
 
 const cleanKey = (k: unknown): string => {
