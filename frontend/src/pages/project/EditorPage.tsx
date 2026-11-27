@@ -24,6 +24,8 @@ import { PdfPane } from './editor/PdfPane';
 import { rememberDoc } from '../../lib/continueDoc';
 import { confirmDialog } from '../../lib/dialogs';
 import { CommentsButton, CommentsPanel, useEditorComments } from '../../editors/host/EditorComments';
+import { TeamChip } from '../../editors/host/TeamChip';
+import { useSession } from '../../store/session';
 
 export function EditorPage() {
   const ctx = useProject();
@@ -132,6 +134,11 @@ export function EditorPage() {
 
   const openAt = useCallback((file: string, line?: number) => { studio.openDm(file, line).catch((e) => toast(errText(e), 'error')); }, [toast]);
   const writable = canWrite(ctx.can);
+  // WP-28 (PRD-003): who else is here, and the open data module's check-out
+  const me = useSession((s) => s.user);
+  const dmFile = activeDoc?.file && /^DMC-.*\.xml$/i.test(activeDoc.file) ? activeDoc.file : null;
+  const teamDoc = dmFile ? { kind: 'dm' as const, path: dmFile, title: activeDoc?.title || undefined, leases: `/api/projects/${ctx.id}/dms/${encodeURIComponent(dmFile)}/checkout`, checkout: `/api/projects/${ctx.id}/dms/${encodeURIComponent(dmFile)}/checkout` } : null;
+  const canBreak = ctx.role === 'owner' || ctx.role === 'manager' || me?.role === 'admin';
 
   return (
     <>
@@ -145,7 +152,7 @@ export function EditorPage() {
             : null}
           <span className="v2-edactions" ref={setSlot} data-testid="chrome-preview-slot" />
         </span>}
-        extra={<CommentsButton state={comments} />}
+        extra={<><TeamChip projectId={ctx.id} doc={teamDoc} writable={ready && writable} canBreak={canBreak} editing={!!activeDoc?.dirty} /><CommentsButton state={comments} /></>}
         onPalette={() => studio.run('tools.palette')} onShortcuts={() => studio.run('tools.shortcuts')} />
       <CommentsPanel projectId={ctx.id} state={comments} activeFile={activeDoc?.file} onOpen={(c) => { if (c.dmFile) openAt(c.dmFile); }} />
       {!writable ? <Alert tone="warn">You have {ctx.role} access to this project: you can read and proof data modules, but changes cannot be saved.</Alert> : null}

@@ -6,6 +6,10 @@
 ;   Agastya-Platform-<ver>-win-x64-Setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART [/DIR="D:\Agastya"] [/DATADIR="D:\AgastyaData"]
 ;        [/STATEDIR="D:\AgastyaConfig"] [/PORT=4040] [/LAN] [/SVCNAME=AgastyaPlatform] [/NOSERVICE] [/TASKS="service,lan,autostart,desktopicon"]
 ;   /CURRENTUSER installs for the signed-in user only (no administrator rights; the service and LAN options are then unavailable).
+;   WP-28 team server (with /LAN): [/SERVERNAMES=docs.example.local,docs] and one of /TLSPFX=<file> [/TLSPASSFILE=<file>],
+;        /TLSCERT=<pem> /TLSKEY=<pem>, or nothing - then a private CA and a server certificate for SERVERNAMES (default: this computer's
+;        name) are made in <state>\tls (AgastyaCtl.exe --configure-server). Clients trust <state>\tls\ca.pem once.
+;   WP-28 client of a team server: /CLIENTOF=https://docs.example.local:4040/ writes [client] Server= and installs no service.
 ;   /ADMINUSER=<name> /ADMINPASSWORDFILE=<file>   create the first administrator unattended (the file's first line is a TEMPORARY password,
 ;        changed at the first sign-in; it is read by AgastyaCtl.exe, never put on a command line; delete the file afterwards).
 ; Uninstall:  unins000.exe /VERYSILENT [/PURGEDATA]   - the data folder is KEPT unless /PURGEDATA is given (interactive: a question, default No).
@@ -235,7 +239,8 @@ end;
 
 function ServiceWanted: Boolean;
 begin
-  Result := IsAdminInstallMode and WizardIsTaskSelected('service') and (not SwitchGiven('NOSERVICE'));
+  // WP-28: a client of a team server (/CLIENTOF) runs no server of its own
+  Result := IsAdminInstallMode and WizardIsTaskSelected('service') and (not SwitchGiven('NOSERVICE')) and (ExpandConstant('{param:CLIENTOF|}') = '');
 end;
 
 function ValidPort(const S: String): Boolean;
@@ -403,6 +408,45 @@ begin
   end;
 end;
 
+// WP-28: a LAN choice is a team server (Mode B), which serves HTTPS only: the certificate is put in place with AgastyaCtl.exe
+// --configure-server before the service starts. An upgrade that already has a certificate keeps it unless a TLS switch is given.
+procedure ConfigureTeamServer;
+var
+  Args, Names, Rest: String;
+  P: Integer;
+  HasTls: Boolean;
+begin
+  if ExpandConstant('{param:CLIENTOF|}') <> '' then
+  begin
+    SetIniString('client', 'Server', ExpandConstant('{param:CLIENTOF|}'), IniPath);
+    Exit;
+  end;
+  if not LanWanted then Exit;
+  HasTls := (ExistingValue('tls', 'Certificate', '') <> '') or (ExistingValue('tls', 'Pfx', '') <> '');
+  Args := '--configure-server --bind lan --port ' + WantedPort;
+  Names := ExpandConstant('{param:SERVERNAMES|}');
+  if Names = '' then Names := GetComputerNameString;
+  Rest := Names;
+  repeat
+    P := Pos(',', Rest);
+    if P = 0 then begin Args := Args + ' --name "' + Trim(Rest) + '"'; Rest := ''; end
+    else begin Args := Args + ' --name "' + Trim(Copy(Rest, 1, P - 1)) + '"'; Delete(Rest, 1, P); end;
+  until Rest = '';
+  if ExpandConstant('{param:TLSPFX|}') <> '' then
+  begin
+    Args := Args + ' --pfx "' + ExpandConstant('{param:TLSPFX|}') + '"';
+    if ExpandConstant('{param:TLSPASSFILE|}') <> '' then Args := Args + ' --passphrase-file "' + ExpandConstant('{param:TLSPASSFILE|}') + '"';
+  end
+  else if ExpandConstant('{param:TLSCERT|}') <> '' then
+    Args := Args + ' --cert "' + ExpandConstant('{param:TLSCERT|}') + '" --key "' + ExpandConstant('{param:TLSKEY|}') + '"'
+  else if not HasTls then
+    Args := Args + ' --make-cert'
+  else Exit;   // an upgrade of a configured team server: nothing to change
+  if RunHidden(ExpandConstant('{app}\AgastyaCtl.exe'), Args) <> 0 then
+    if not WizardSilent then
+      MsgBox('The team-server certificate could not be set up, so the server will not start on the network. Run "AgastyaCtl.exe --configure-server" (OPERATIONS.md, "Team server").', mbError, MB_OK);
+end;
+
 procedure ConfigureFirewall;
 var
   Rule: String;
@@ -410,7 +454,8 @@ begin
   Rule := '{#FirewallRule}';
   RunHidden(ExpandConstant('{sys}\netsh.exe'), 'advfirewall firewall delete rule name="' + Rule + '"');
   // WP-25 (DEP-023): node.exe now lives in versions\<version>\runtime and moves with every update, so the rule is bound to the port, not
-  // to a program path (Mode B's own firewall handling belongs to WP-28)
+  // to a program path. WP-28: Mode B uses this same rule (the port, private and domain networks); AgastyaCtl.exe --configure-server --firewall
+  // makes it by hand on an installation that did not choose LAN here.
   if LanWanted then
     RunHidden(ExpandConstant('{sys}\netsh.exe'),
       'advfirewall firewall add rule name="' + Rule + '" dir=in action=allow protocol=TCP localport=' + WantedPort +
@@ -470,6 +515,7 @@ begin
     // [update] KeepVersions are removed
     if RunHidden(ExpandConstant('{app}\AgastyaCtl.exe'), '--activate "{#AppVersion}"') <> 0 then
       MsgBox('The new version could not be made current. Run "AgastyaCtl.exe --doctor" for details.', mbError, MB_OK);
+    ConfigureTeamServer;
     ConfigureFirewall;
     ProvisionWebView2;
     CreateFirstAdministrator;
