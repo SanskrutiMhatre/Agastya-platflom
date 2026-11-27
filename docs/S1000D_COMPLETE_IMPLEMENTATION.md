@@ -201,6 +201,11 @@ cross-module `dmRef`, ICN references, asset integrity).
   `generate-id()` values, which libxslt changes from run to run anyway (`test/wp33-fo-equivalence.test.js`; 104 product builds of the PDF suites re-run with the old
   stylesheets, all equivalent). FO stage, 200 figure-bearing modules: 535 s before, 2.8 s after; 500 modules 9.3 s (`test/wp33-fo-scaling.test.js`). The pre-change files are
   in `backend/test/fixtures/wp33-old/`.
+  (8) `catalog.js` (third vendor exception, amended 2026-11-27 after WP-16 found HTTP 500s): the generated libxml2 catalogue is named
+  after a hash of its content (`jsspub-s1000d-catalog-<16 hex>.xml` in the temp folder) instead of one shared name. Every checkout and install
+  writes its own absolute schema paths, so a build could read a catalogue that pointed at another checkout's schemas, and a rename over a file
+  another process held open failed on Windows (EPERM). Identical content still shares one file; the atomic write is unchanged
+  (`test/catalog-race.test.js`).
 
 ## 11. Migration
 
