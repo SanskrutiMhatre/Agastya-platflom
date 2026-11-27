@@ -278,3 +278,29 @@ and, written to disk directly, is never requested by a build (the listener recor
 test fails with `GET /pixel.png Java/21.0.13.1` on the listener.
 
 **To undo.** Delete `foGuard.js` and the `foGuard` lines in `build.js`, `jsg/engine.ts` and `objectRender.ts`.
+
+## Exception: "FO-stage scaling" (2026-11-27, audit work package WP-33, finding PERF-003 (P0); made under the owner's approval of the audit roadmap)
+
+**Reason.** The FO stage of the direct S1000D engine (one `xsltproc` run of `s1000dtofo/s1000dtofo.xsl` over the whole publication) grew super-quadratically
+with figure-bearing data modules: 9.9 s for 50 and an extrapolated hour for 500 modules on the shipped libxslt 1.1.28. The causes were whole-book XPath scans
+evaluated once per figure, per repeated id, per reference or per abbreviation, and one expression (`//dmodule//figure[title]`) that libxml2 evaluates with a
+quadratic merge even when it runs once.
+
+**Affected files.** `backend/vendor/pipeline/s1000dtofo/frontmatter-s1000d.xsl` (list of illustrations: the first titled figure is computed once, on the descendant axis;
+list of abbreviations: a new key `acronym-by-term`), `s1000dtofo.xsl` (`unique-id` and `dm-occurrence-suffix` read a position in an existing key instead of counting
+`preceding::`), `refs.xsl` (`internalRef` fallback evaluated only when there is no enclosing module; `footnoteRef` by key), `warnings.xsl` (`@warningRefs` / `@cautionRefs`
+by key). The JSS stylesheets were measured and are already linear; nothing there changed.
+
+**Behaviour.** None: the same FO. Each replacement selects the same node-set (in document order) or the same number by construction, and where a key might not hold a node
+the old expression stays as the fallback. libxslt makes `generate-id()` from memory addresses, so two runs of even the unchanged stylesheet differ in those ids; the
+FO is therefore compared after renaming generated ids in order of first appearance, which accepts a one-to-one renaming and nothing else.
+
+**Isolation measures.** No parameter, no new output; every other profile and pipeline is untouched. The pre-change stylesheets are kept in
+`backend/test/fixtures/wp33-old/` (test data only, never loaded by a build).
+
+**Regression tests.** `backend/test/wp33-fo-equivalence.test.js` (old against new FO under the default and Xignal profiles: cloned publications with a reprint, warning and
+caution references, footnotes, an id nested in an element with the same id, repeated abbreviations, no figures, 200 figures in one module, the 21-type fixtures in four
+issues and the rich set; it fails on a one-step change of the duplicate-id count), `backend/test/wp33-fo-scaling.test.js` (benchmark B6, 50 to 500 modules, limits on time
+and growth). Results and timings: `docs/audit/IMPLEMENTATION-LOG.md`, WP-33.
+
+**To undo.** Copy the four files from `backend/test/fixtures/wp33-old/` back over `backend/vendor/pipeline/s1000dtofo/`.

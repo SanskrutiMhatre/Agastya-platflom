@@ -90,13 +90,24 @@ function dataModule(i, { figs = 1, uniqueIds = false } = {}) {
  */
 function writePublication(dir, n, opts = {}) {
   fs.mkdirSync(path.join(dir, 'csdb'), { recursive: true });
-  let entries = '';
+  const files = [];
   for (let i = 1; i <= n; i++) {
     const file = `DMC-EXAMPLE-A-00-0-0-${pad(Math.floor(i / 100), 2)}-${pad(i % 100, 2)}A-040A-D_001-00_EN-US.XML`;
     fs.writeFileSync(path.join(dir, 'csdb', file), dataModule(i, opts));
-    entries += `\n      <pmEntry><pmEntryTitle>Chapter ${i}</pmEntryTitle><xi:include href="csdb/${file}"/></pmEntry>`;
-    if (opts.reprint && i === 1) entries += `\n      <pmEntry><pmEntryTitle>Reprint</pmEntryTitle><xi:include href="csdb/${file}"/></pmEntry>`;
+    files.push(file);
+    if (opts.reprint && i === 1) files.push(file);
   }
+  return writePm(dir, files, `FO scaling ${n}`);
+}
+
+/**
+ * Write pm.xml into `dir`, one pmEntry per file (already in dir/csdb; a name listed twice is a reprint), copy the picture and
+ * write the image-size index. Returns the path of pm.xml.
+ */
+function writePm(dir, files, title) {
+  fs.mkdirSync(path.join(dir, 'csdb'), { recursive: true });
+  const entries = files.map((f, i) => `\n      <pmEntry><pmEntryTitle>Chapter ${i + 1}</pmEntryTitle><xi:include href="csdb/${f}"/></pmEntry>`).join('');
+  const n = title;
   const pm = `<?xml version="1.0" encoding="UTF-8"?>
 <pm xmlns:xi="http://www.w3.org/2001/XInclude">
   <identAndStatusSection>
@@ -108,7 +119,7 @@ function writePublication(dir, n, opts = {}) {
       </pmIdent>
       <pmAddressItems>
         <issueDate year="2026" month="11" day="17"/>
-        <pmTitle>FO scaling ${n}</pmTitle>
+        <pmTitle>${n}</pmTitle>
       </pmAddressItems>
     </pmAddress>
     <pmStatus issueType="new">
@@ -123,9 +134,21 @@ function writePublication(dir, n, opts = {}) {
   const out = path.join(dir, 'pm.xml');
   fs.writeFileSync(out, pm);
   // The picture and the side-car size index, as a real build has them (engine/build.js writes _image-dims.xml before the FO stage).
-  fs.copyFileSync(ICN, path.join(dir, 'csdb', path.basename(ICN)));
+  if (!fs.existsSync(path.join(dir, 'csdb', path.basename(ICN)))) fs.copyFileSync(ICN, path.join(dir, 'csdb', path.basename(ICN)));
   writeImageDimIndex(dir, 'csdb', 'csdb');
   return out;
+}
+
+/**
+ * Build a pipeline folder holding the stylesheets as they were BEFORE WP-33: a copy of vendor/pipeline with the files kept in
+ * test/fixtures/wp33-old laid over s1000dtofo/. Returns the path of its s1000dtofo.xsl.
+ */
+function oldPipeline(dir) {
+  const root = path.join(dir, 'pipeline-before-wp33');
+  fs.cpSync(path.join(BACKEND, 'vendor', 'pipeline'), root, { recursive: true });
+  const old = path.join(BACKEND, 'test', 'fixtures', 'wp33-old');
+  for (const f of fs.readdirSync(old)) fs.copyFileSync(path.join(old, f), path.join(root, 's1000dtofo', f));
+  return path.join(root, 's1000dtofo', 's1000dtofo.xsl');
 }
 
 /**
@@ -161,4 +184,4 @@ function runFo({ input, foOut, stylesheet = STYLESHEET, params, cwd, timeoutMs =
   });
 }
 
-module.exports = { writePublication, runFo, driver, dataModule, STYLESHEET, BACKEND };
+module.exports = { writePublication, writePm, runFo, driver, dataModule, oldPipeline, STYLESHEET, BACKEND, ICN };
