@@ -9,16 +9,15 @@ const { performance } = require('node:perf_hooks');
 const { boot, DM21 } = require('./helpers');
 
 process.env.AGASTYA_JOB_TEST_KINDS = '1';
-process.env.AGASTYA_JOB_TIMEOUT_MINUTES = '0.25';          // 15 s: the deadline test waits for it; the real projects here validate in a few seconds
 const PW = 'Correct-Horse-9!';
 const FIX = path.join(DM21, '5-0');
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
 const until = async (pred, ms = 30000, what = 'condition') => { const end = Date.now() + ms; while (Date.now() < end) { const v = await pred(); if (v) return v; await new Promise((r) => setTimeout(r, 100)); } throw new Error(`timed out waiting for ${what}`); };
 
-let h; let w; let pid; let jobs; let sock;
+let h; let w; let pid; let jobs; let sock; let admin;
 test.before(async () => {
   h = await boot({ ws: true });
-  const admin = new h.Client('admin');
+  admin = new h.Client('admin');
   await admin.post('/api/auth/setup', { username: 'admin', password: PW, fullName: 'A' });
   const made = await admin.post('/api/team/users', { username: 'jobrunner', fullName: 'Jo B', role: 'author' });
   w = new h.Client('jobrunner');
@@ -47,7 +46,9 @@ test('a validation is a job in a worker: ?async=1 answers 202, the record and it
   assert.ok(sock.messages.some((m) => m.type === 'job' && m.job.id === id && m.job.state === 'running'), 'and one for the start');
   const list = await w.get(`/api/projects/${pid}/jobs`);
   assert.ok(list.json.jobs.some((j) => j.id === id && j.kind === 'validate'));
-  const st = jobs.jobsStatus();
+  const adm = await admin.get('/api/admin/jobs');
+  assert.equal(adm.status, 200); assert.equal((await w.get('/api/admin/jobs')).status, 403, 'the service view is for administrators');
+  const st = adm.json;
   assert.equal(st.mode, 'worker', 'the compiled server runs jobs in worker processes');
   assert.ok(st.pool.workers.length >= 1 && st.pool.workers.every((x) => x.pid !== process.pid), 'not in the server process');
   assert.equal(st.pool.jobObject.state, process.platform === 'win32' ? 'active' : 'off', JSON.stringify(st.pool.jobObject));
@@ -97,7 +98,7 @@ test('cancel: a running job ends with its process tree, its waiter gets JOB_CANC
 
 test('deadline (hang simulation, DEP-028): a worker that never answers is killed at the limit, only its job fails, and the next job succeeds', { timeout: 120000 }, async () => {
   const t0 = Date.now();
-  const s = jobs.submit({ kind: 'test.busy', projectId: pid, params: { ms: 600000 } });
+  const s = jobs.submit({ kind: 'test.busy', projectId: pid, params: { ms: 600000 }, timeoutMs: 15000 });   // a 15 s deadline for this job
   const other = jobs.run({ kind: 'test.sleep', projectId: 'another-project', params: { ms: 200 } });
   assert.equal((await other).slept, 200, 'another project is served while the hung job runs');
   const health = await w.get('/api/health'); assert.equal(health.status, 200, 'the server answers');

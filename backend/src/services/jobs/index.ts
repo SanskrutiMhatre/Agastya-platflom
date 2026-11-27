@@ -29,7 +29,11 @@ import { LANE_OF, deserializeError, serializeError, type JobKind, type Lane, typ
 export { isJobKind, type JobKind } from './protocol';
 
 export interface Actor { id?: string | null; username?: string | null }
-export interface SubmitInput { kind: JobKind; projectId: string | null; params?: Record<string, unknown>; actor?: Actor | null }
+export interface SubmitInput {
+  kind: JobKind; projectId: string | null; params?: Record<string, unknown>; actor?: Actor | null;
+  /** A shorter deadline than the configured one (never longer); for callers inside the server and the tests, not the HTTP API. */
+  timeoutMs?: number;
+}
 
 /** What a client sees of a job (GET /jobs/:id, the WebSocket "job" message). */
 export interface JobView {
@@ -41,7 +45,7 @@ interface Job {
   id: string; kind: JobKind; lane: Lane; projectId: string | null; params: Record<string, unknown>; key: string;
   state: JobState; createdAt: string; startedAt: string | null; actor: Actor | null;
   done: Promise<unknown>; resolve(v: unknown): void; reject(e: Error): void;
-  seq: number; running: RunningJob | null; inlineAbort: boolean; timer: NodeJS.Timeout | null; cancelledBy: string | null;
+  seq: number; running: RunningJob | null; inlineAbort: boolean; timer: NodeJS.Timeout | null; cancelledBy: string | null; timeoutMs: number;
 }
 
 const MAX_LOG_LINES = 2000;
@@ -125,6 +129,7 @@ export function submit(input: SubmitInput): { id: string; done: Promise<unknown>
     id: crypto.randomUUID(), kind: input.kind, lane: LANE_OF[input.kind], projectId: input.projectId, params, key,
     state: 'queued', createdAt: nowIso(), startedAt: null, actor: input.actor ?? null, done, resolve, reject,
     seq: 0, running: null, inlineAbort: false, timer: null, cancelledBy: null,
+    timeoutMs: Math.min(config.jobs.timeoutMs, input.timeoutMs && input.timeoutMs > 0 ? input.timeoutMs : Infinity),
   };
   repos.jobs.insert({ id: job.id, kind: job.kind, projectId: job.projectId, params: JSON.stringify(params), actorId: job.actor?.id ?? null, actorName: job.actor?.username ?? null, createdAt: job.createdAt });
   counters.submitted++;
@@ -160,7 +165,7 @@ function start(j: Job, viaWorkers: boolean): void {
   laneActive[j.lane]++;
   repos.jobs.markRunning(j.id, j.startedAt, null);
   announce(j);
-  j.timer = setTimeout(() => abort(j, 'timeout'), config.jobs.timeoutMs);
+  j.timer = setTimeout(() => abort(j, 'timeout'), j.timeoutMs);
   j.timer.unref();
   const work: Promise<{ ok: true; result: unknown; inputHash?: string | null } | { ok: false; error: WireError }> = viaWorkers
     ? (j.running = getPool().run(j.id, j.kind, j.lane, j.projectId, j.params, {
@@ -177,9 +182,9 @@ function start(j: Job, viaWorkers: boolean): void {
     (e: Error) => {
       if (j.inlineAbort) return;
       const a = e instanceof WorkerAbort ? e : null;
-      const minutes = Math.round(config.jobs.timeoutMs / 60_000);
+      const limit = j.timeoutMs >= 60_000 ? `${Math.round(j.timeoutMs / 60_000)} minute${Math.round(j.timeoutMs / 60_000) === 1 ? "" : "s"}` : `${Math.round(j.timeoutMs / 1000)} seconds`;
       if (a?.reason === 'cancel') finish(j, 'cancelled', null, { name: 'HttpError', status: 409, code: 'JOB_CANCELLED', message: `The job was cancelled${j.cancelledBy ? ` by ${j.cancelledBy}` : ''}. Nothing was published by it.` });
-      else if (a?.reason === 'timeout') { counters.timedOut++; finish(j, 'failed', null, { name: 'HttpError', status: 504, code: 'JOB_TIMEOUT', message: `The job ran longer than its limit (${minutes} minute${minutes === 1 ? '' : 's'}) and was stopped, with every program it had started. Other work was not affected; try again, and if it happens again the document may make the PDF tool loop.` }); }
+      else if (a?.reason === 'timeout') { counters.timedOut++; finish(j, 'failed', null, { name: 'HttpError', status: 504, code: 'JOB_TIMEOUT', message: `The job ran longer than its limit (${limit}) and was stopped, with every program it had started. Other work was not affected; try again, and if it happens again the document may make the PDF tool loop.` }); }
       else if (a?.reason === 'shutdown') finish(j, 'interrupted', null, { name: 'HttpError', status: 503, code: 'JOB_INTERRUPTED', message: 'The server is stopping; the job was ended. Run it again when the server is back.' });
       else { counters.crashed++; void crashMessage(e.message).then((m) => finish(j, 'failed', null, { name: 'HttpError', status: 500, code: 'JOB_WORKER_CRASHED', message: m })); }
     },
