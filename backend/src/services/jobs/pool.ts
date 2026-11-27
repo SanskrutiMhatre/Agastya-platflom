@@ -13,7 +13,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { fork, spawn, type ChildProcess } from 'child_process';
+import { fork, spawn, spawnSync, type ChildProcess } from 'child_process';
 import { JobObjectHolder, type JobObjectLimits, type JobObjectStatus } from './jobObject';
 import type { FromWorker, JobKind, Lane, ToWorker, WireError } from './protocol';
 
@@ -199,6 +199,22 @@ export class WorkerPool {
       await killTree(w.pid);
     }));
     this.holder.close();
+  }
+
+  /**
+   * Ends every idle worker with its process tree, synchronously (services/renderer.ts: a warm JVM keeps the pictures it embedded open, and
+   * Windows will not delete a file that is open). A worker running a job is left alone. Returns how many ended.
+   */
+  releaseIdleSync(): number {
+    let n = 0;
+    for (const w of [...this.workers]) {
+      if (w.current || w.ending) continue;
+      w.ending = true; n++;
+      if (w.idle) { clearTimeout(w.idle); w.idle = null; }
+      if (process.platform === 'win32') spawnSync('taskkill.exe', ['/PID', String(w.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true, timeout: 10_000 });
+      else { try { w.child.kill('SIGKILL'); } catch { /* gone */ } }
+    }
+    return n;
   }
 
   /** Synchronous last resort when the server process exits: kill the workers (the job object takes their tools). */

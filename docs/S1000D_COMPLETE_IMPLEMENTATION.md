@@ -206,6 +206,11 @@ cross-module `dmRef`, ICN references, asset integrity).
   writes its own absolute schema paths, so a build could read a catalogue that pointed at another checkout's schemas, and a rename over a file
   another process held open failed on Windows (EPERM). Identical content still shares one file; the atomic write is unchanged
   (`test/catalog-race.test.js`).
+  (9) `vendor/engine/fopd.js` (WP-14, exception "fopd bounds", audit PERF-008 / PUB-003): `configure({ jvmArgs })` lets the job worker start
+  the warm FOP JVM with a heap limit (`-Xmx`, `AGASTYA_FOP_HEAP_MB`, default 1536); `pid()` reports the JVM's process id; and the per-render
+  `exit` listener is removed when the render answers (one listener leaked per render, Node warned after ten). Rendering itself is unchanged:
+  same class, same arguments otherwise, same request line. The fallback launch (`paths.FOP_ARGS`) gets the same `-Xmx` from the worker
+  (`services/jobs/worker.ts`) without a vendor change.
 
 ## 11. Migration
 

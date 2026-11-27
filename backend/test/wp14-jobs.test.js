@@ -148,3 +148,27 @@ test('a gate refusal travels back unchanged: the worker\'s error is the error th
   const s = fields(await jobs.run({ kind: 'gate', projectId: pid, params: { scope: { file: f }, opts: {} } }).catch((e) => e));
   assert.equal(s.status, 422); assert.equal(s.code, 'VALIDATION_FAILED'); assert.equal(s.findings[0].kind, 'schema');
 });
+
+test('a publication builds in a worker (same answer, plus the build report), and the built project can be deleted: the workers let its pictures go', { timeout: 300000 }, async () => {
+  const { placeholderPng } = require('../dist/services/importer/png');
+  const r = await w.post('/api/projects', { name: 'Built in a worker', pipeline: 's1000dtofo', s1000d: { mic: 'EXAMPLE', issue: '5.0', responsiblePartner: { code: '00000', name: 'Example Company' } } });
+  assert.equal(r.status, 201, JSON.stringify(r.json)); const id = r.json.project.id; const dir = path.join(h.ws, 'projects', id);
+  const descFile = fs.readdirSync(FIX).find((f) => /-040A-D_/.test(f));
+  const icn = 'ICN-EXAMPLE-A-000000-A-00000-00001-A-001-01';
+  fs.mkdirSync(path.join(dir, 'csdb'), { recursive: true }); fs.writeFileSync(path.join(dir, 'csdb', `${icn}.png`), placeholderPng(1));
+  const xml = fs.readFileSync(path.join(FIX, descFile), 'utf8').replace('<!DOCTYPE dmodule [', `<!DOCTYPE dmodule [\n  <!NOTATION png SYSTEM "png">\n  <!ENTITY ${icn} SYSTEM "${icn}.png" NDATA png>`).replace('</description>', `<levelledPara><title>Picture</title><figure><title>A picture</title><graphic infoEntityIdent="${icn}"/></figure></levelledPara></description>`);
+  const made = await w.post(`/api/projects/${id}/dms`, { file: descFile, xml });
+  assert.equal(made.status, 201, JSON.stringify(made.json).slice(0, 300));
+  const code = /<dmCode\s+([^>]*?)\s*\/?>/.exec(xml)[1];
+  const pm = fs.readFileSync(path.join(dir, 'publication.xml'), 'utf8');
+  const content = `<content><pmEntry><pmEntryTitle>One</pmEntryTitle><dmRef><dmRefIdent><dmCode ${code}/></dmRefIdent></dmRef></pmEntry></content>`;
+  fs.writeFileSync(path.join(dir, 'publication.xml'), /<content[\s\S]*<\/content>|<content\s*\/>/.test(pm) ? pm.replace(/<content[\s\S]*<\/content>|<content\s*\/>/, content) : pm.replace('</pm>', `${content}</pm>`));
+  const b = await w.post(`/api/projects/${id}/publish`, {});
+  assert.equal(b.status, 200, JSON.stringify(b.json).slice(0, 500));
+  assert.ok(b.json.ok && b.json.bytes > 1000 && b.json.pdfUrl && Array.isArray(b.json.ruleBreaks), 'the answer the page reads, as before');
+  assert.ok(b.json.jobId && b.json.report && Array.isArray(b.json.report.notes) && b.json.report.lines > 0, 'plus the job and its report');
+  assert.equal((await w.get(`/api/projects/${id}/publish/pdf`)).status, 200);
+  const del = await w.req('DELETE', `/api/projects/${id}?confirm=${encodeURIComponent('Built in a worker')}`);
+  assert.equal(del.status, 200, JSON.stringify(del.json).slice(0, 300));
+  assert.equal(fs.existsSync(dir), false, 'the folder is gone');
+});

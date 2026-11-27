@@ -24,6 +24,7 @@ import { deliver, setBroadcastSink, type BroadcastMessage } from '../broadcast';
 import type { JobRow, JobState } from '../../repositories';
 import { runKind } from './kinds';
 import { WorkerPool, WorkerAbort, type RunningJob } from './pool';
+import { onReleaseRenderer } from '../renderer';
 import { LANE_OF, deserializeError, serializeError, type JobKind, type Lane, type WireError } from './protocol';
 
 export { isJobKind, type JobKind } from './protocol';
@@ -55,6 +56,7 @@ const busyProjects = new Map<string, Job>();           // project id -> its runn
 const laneActive: Record<Lane, number> = { validation: 0, build: 0 };
 let pool: WorkerPool | null = null;
 let initialised = false;
+let releaseHooked = false;
 let counters = { submitted: 0, coalesced: 0, succeeded: 0, failed: 0, cancelled: 0, timedOut: 0, crashed: 0 };
 
 const laneCap = (l: Lane): number => (l === 'validation' ? config.jobs.validationSlots : config.jobs.buildSlots);
@@ -74,6 +76,7 @@ function getPool(): WorkerPool {
       limits: l.enabled ? { processMb: l.processMb, jobMb: l.jobMb, cpuPercent: l.cpuPercent, activeProcesses: l.activeProcesses } : null,
     });
     process.once('exit', () => { try { pool?.killAllNow(); } catch { /* best effort */ } });
+    if (!releaseHooked) { releaseHooked = true; onReleaseRenderer(() => { pool?.releaseIdleSync(); }); }   // deleting a built project: let the workers' JVMs go
   }
   return pool;
 }
