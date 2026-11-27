@@ -32,9 +32,9 @@ export function capabilityTableFrom(app: RouterView): Record<string, string> {
   return out;
 }
 
-/** WP-27: the capabilities every route of which only reads (GET/HEAD): what a read-only auditor's map may show as allowed. */
-export function readOnlyCapabilitiesFrom(app: RouterView & { _router?: { stack?: Array<{ route?: { methods?: Record<string, boolean> } }> } }): Set<string> {
-  const writes = new Set<string>(); const all = new Set<string>();
+/** WP-27: the capabilities at least one reading route (GET/HEAD) declares: what a read-only auditor's map may show as allowed (its writes are refused by the guards). */
+export function readableCapabilitiesFrom(app: RouterView & { _router?: { stack?: Array<{ route?: { methods?: Record<string, boolean> } }> } }): Set<string> {
+  const reads = new Set<string>(); const all = new Set<string>();
   for (const layer of app?._router?.stack ?? []) {
     const route = layer.route as undefined | { methods?: Record<string, boolean>; stack: Array<{ handle?: { cap?: unknown } }> };
     if (!route) continue;
@@ -42,16 +42,16 @@ export function readOnlyCapabilitiesFrom(app: RouterView & { _router?: { stack?:
     for (const s of route.stack) {
       const cap = s.handle?.cap;
       if (typeof cap !== 'string') continue;
-      all.add(cap); if (write) writes.add(cap);
+      all.add(cap); if (!write) reads.add(cap);
     }
   }
-  return new Set([...all].filter((c) => !writes.has(c)));
+  return new Set([...all].filter((c) => reads.has(c)));
 }
 
-let readOnlyCaps = new Set<string>();
-export function setCapabilityTable(t: Record<string, string>, readOnly?: Set<string>): void { table = { ...t }; if (readOnly) readOnlyCaps = new Set(readOnly); }
+let readableCaps = new Set<string>();
+export function setCapabilityTable(t: Record<string, string>, readOnly?: Set<string>): void { table = { ...t }; if (readOnly) readableCaps = new Set(readOnly); }
 export function capabilityTable(): Record<string, string> { return { ...table }; }
-export function readOnlyCapabilities(): Set<string> { return new Set(readOnlyCaps); }
+export function readableCapabilities(): Set<string> { return new Set(readableCaps); }
 
 /** WP-27: what changes the plain role answer for one person on one project. */
 export interface CanOptions {
@@ -76,7 +76,7 @@ export function canFor(role: string | null | undefined, status: string = 'active
     const mine = cap === 'project.access' ? [] : rules.filter((r) => r.capability === cap);
     if (mine.some((r) => r.effect === 'deny')) ok = false;
     else if (!ok && mine.some((r) => r.effect === 'allow')) ok = true;
-    if (opts.readOnly && !readOnlyCaps.has(cap)) ok = false;
+    if (opts.readOnly && !readableCaps.has(cap)) ok = false;
     out[cap] = ok;
   }
   return out;

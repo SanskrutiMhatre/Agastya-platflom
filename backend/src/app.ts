@@ -41,7 +41,7 @@ import { registerBackupRoutes } from './routes/backups';
 import { notifyAccess } from './services/access-notify';
 import { API_VERSION, MIN_CLIENT_VERSION, CLIENT_VERSION_HEADER, buildInfo, clientAccepted, schemaLevel } from './services/version';
 import { hostAllowed, MISDIRECTED } from './services/network';
-import { capabilityTableFrom, readOnlyCapabilitiesFrom, setCapabilityTable } from './services/permissions';
+import { capabilityTableFrom, readableCapabilitiesFrom, setCapabilityTable } from './services/permissions';
 import { registerAccessRoutes } from './routes/access';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -134,7 +134,7 @@ export function createApp(): express.Express {
   registerBackupRoutes(app);             // WP-12: platform backup, verify, copy, restore into a new folder (administrators)
   registerAccessRoutes(app);             // WP-27: directory sign-on administration, groups, project group grants and capability rules
   // The client's `can` map is read from the guards just registered (WP-13, FE-019): one rule, stated once, on the server.
-  setCapabilityTable(capabilityTableFrom(app), readOnlyCapabilitiesFrom(app));
+  setCapabilityTable(capabilityTableFrom(app), readableCapabilitiesFrom(app));
 
   // Unknown API paths are JSON 404s, never the SPA shell.
   app.use('/api', (_req, res) => { res.status(404).json({ error: 'Not found' }); });

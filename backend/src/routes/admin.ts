@@ -13,7 +13,7 @@
 
 import type { Express } from 'express';
 import { audit, requireAdmin, requireAuth, requireGlobal, store } from '../context';
-import { capabilityTable, readOnlyCapabilities } from '../services/permissions';
+import { capabilityTable, readableCapabilities } from '../services/permissions';
 import { wrap, param } from '../services/http';
 import { COLLECTIONS, createItem, deleteItem, listItems, specOf, updateItem } from '../services/adminConfig';
 import * as platform from '../services/platform';
@@ -80,7 +80,7 @@ export function registerAdminRoutes(app: Express): void {
       // WP-27: the permission catalogue - every capability a project route declares and the lowest project role that holds it. A project's
       // managers can allow one capability to a person or group below that role, or deny it to anyone below owner (project > Access).
       capabilities: Object.entries(capabilityTable()).sort(([a], [b]) => a.localeCompare(b))
-        .map(([capability, minRole]) => ({ capability, minRole, readOnly: readOnlyCapabilities().has(capability) })),
+        .map(([capability, minRole]) => ({ capability, minRole, readable: readableCapabilities().has(capability) })),
     });
   }));
 
