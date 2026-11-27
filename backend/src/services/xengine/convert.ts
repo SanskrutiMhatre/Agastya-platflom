@@ -91,7 +91,9 @@ async function zipOfS1000dProject(projectId: string): Promise<string> {
     if (!fs.existsSync(d)) return;
     for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) await walk(p, `${prefix}/${e.name}`, only); else if (!only || only.test(e.name)) await z.addFile(`${prefix}/${e.name}`, p); }
   };
-  await walk(csdb, 'csdb', /\.xml$/i); await walk(media, 'Media');
+  // WP-09 (QA-021, PUB-008): ICN artwork uploaded through the product lives beside the data modules (csdb/); it goes into the package too,
+  // or the converted project has no pictures. The package reader recognises a picture by its ICN- name wherever it is.
+  await walk(csdb, 'csdb', /\.xml$|^ICN-/i); await walk(media, 'Media');
   if (fs.existsSync(pm)) await z.addFile(`PM/${path.basename(pm)}`, pm);
   await z.finish();
   return file;
