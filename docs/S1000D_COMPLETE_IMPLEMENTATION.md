@@ -211,6 +211,10 @@ cross-module `dmRef`, ICN references, asset integrity).
   `exit` listener is removed when the render answers (one listener leaked per render, Node warned after ten). Rendering itself is unchanged:
   same class, same arguments otherwise, same request line. The fallback launch (`paths.FOP_ARGS`) gets the same `-Xmx` from the worker
   (`services/jobs/worker.ts`) without a vendor change.
+  (10) `vendor/engine/build.js` (WP-15, PUB-017, exception "FO hook" in `docs/JSS_VENDOR_EXCEPTIONS.md`): an optional `onFo(foAbsPath)` option, called in
+  `buildJss` and `buildS1000dToFo` right after the WP-02 `foGuard.confineFo` step and before FOP. The platform uses it to write the PDF document
+  properties into the FO (`services/pdfInfo.ts`: an `fo:declarations` XMP packet with dc:title, dc:creator, dc:description, pdf:Keywords and
+  xmp:CreatorTool, which FOP copies into the PDF's Info dictionary). Without the option the build is byte-for-byte what it was. No stylesheet changed.
 
 ## 11. Migration
 

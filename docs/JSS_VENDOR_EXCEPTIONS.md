@@ -304,3 +304,23 @@ issues and the rich set; it fails on a one-step change of the duplicate-id count
 and growth). Results and timings: `docs/audit/IMPLEMENTATION-LOG.md`, WP-33.
 
 **To undo.** Copy the four files from `backend/test/fixtures/wp33-old/` back over `backend/vendor/pipeline/s1000dtofo/`.
+
+## Exception: "FO hook" (2026-11-27, audit work package WP-15, finding PUB-017; made under the owner's approval of the audit roadmap)
+
+**Reason.** PDFs had no document properties (Title, Author, Subject, Keywords). FOP fills them from an `fo:declarations` XMP packet. Writing one from the
+stylesheets of each engine would have meant new parameters in each; one hook in the build driver lets the platform write the packet into the FO that the
+stylesheets already produced.
+
+**Affected file.** `backend/vendor/engine/build.js`: an optional `onFo(foAbsPath)` option, called in `buildJss` and `buildS1000dToFo` after the
+WP-02 `foGuard.confineFo` step and before FOP. Nothing else in the vendored tree changed; no stylesheet changed.
+
+**Behaviour.** Without the option: none. With it (the platform always passes it: `services/publisher.ts` `pdfInfoFor`, `services/pdfInfo.ts`), the FO gains one
+`fo:declarations` block after `fo:layout-master-set`; layout, pages and text are the same. The JSG engine writes the same packet itself (`services/jsg/engine.ts`),
+since it does not go through `build.js`.
+
+**Not done, on purpose (decision D9, the audit's recommendation).** No tagged PDF (FOP accessibility) and no PDF/A: neither JSS-0251 nor S1000D asks for them.
+Arial stays (owner decision); the licence basis is in `backend/vendor/tools/fonts/README.md`.
+
+**Regression tests.** `backend/test/wp15-jsg-release.test.js` reads Title, Author, Subject, Keywords and Creator of a JSG, a JSS and an S1000D PDF with pdf.js.
+
+**To undo.** Remove the two `if (typeof o.onFo === 'function')` lines (and the option comment) from `build.js`.

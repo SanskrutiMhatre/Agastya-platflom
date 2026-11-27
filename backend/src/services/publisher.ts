@@ -320,7 +320,8 @@ function resolveMarks(projectId: string, effective: any, pipeline: string, log: 
  * title), else the project's name. Author: the publishers of the title page, else the publication's responsible partner company. Subject: the
  * format and the kind of manual. Keywords: the publication code / number.
  */
-export function pdfInfoFor(projectId: string, project: any, effective: any, dir: string): PdfInfo {
+type EffectiveConfig = ReturnType<typeof effectiveConfig>;
+export function pdfInfoFor(projectId: string, project: EffectiveConfig['project'], effective: EffectiveConfig['effective'], dir: string): PdfInfo {
   const pub = effective?.publication ?? {};
   const publishers = ((effective?.branding?.publishers ?? []) as Array<{ name?: string }>).map((p) => String(p?.name ?? '').trim()).filter(Boolean).join(', ');
   let text = ''; try { text = fs.readFileSync(path.join(dir, pmRel(project)), 'utf8'); } catch { /* no publication file */ }
@@ -410,7 +411,9 @@ async function renderFull(projectId: string, gate: GatePass, log: (m: string) =>
       layoutParams: useDirect
         ? furnitureFor(projectId, project, effective, !!releaseLabel, dir, engineConfig.stage2Params(effective).filter(([n]: [string, string]) => !/^cover\.(codeNo|revNo)$/.test(n)), log)
         : engineConfig.stage2Params(effective), compression,
-      pdfCompressLevel: Number(project.output?.pdfCompressLevel ?? 0),
+      // WP-15 (PUB-016, the audit's recommendation): the Ghostscript recompression pass is not used. Ghostscript is not shipped and no screen
+      // offered the setting, so `output.pdfCompressLevel` only ever logged "skipped"; the platform no longer asks for it (build.js keeps the code, unused).
+      pdfCompressLevel: 0,
       watermarkUri: wm ? wm.uri : undefined, watermarkRepeat: wm ? wm.repeat : undefined, releaseLabel,
       onMessage: log,
       onFo: (fo: string) => { try { injectPdfInfo(fo, pdfInfoFor(projectId, project, effective, dir)); } catch (e) { log(`PDF document properties not written: ${(e as Error).message}`); } },   // WP-15 (PUB-017)

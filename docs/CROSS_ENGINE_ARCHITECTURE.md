@@ -72,7 +72,28 @@ Routes: `GET /api/projects/:id/identity`, `PUT …/identity`, `PUT …/identity/
 
 Import with a choice of source and target: `POST /api/xengine/import` (`file`, `source` = `auto|s1000d|jss|jsg`, `target`, `name`). A `.zip` is an S1000D package (or the older tool's export); an `.xml` is one JSS or JSG document. A mismatch between the chosen source and the file is refused in words (`WRONG_SOURCE`). `GET /api/xengine/formats` lists the conversions.
 
-What cannot be carried (reported each time): JSG front pages (made by the target from its settings), JSG ISPL plates and parts (an ISPL is refused: no counterpart), pictures inside JSG table cells, JSS figure legends, JSS links to outside addresses, lists inside notices, headings deeper than the target allows (written as a bold line).
+What cannot be carried (reported each time): JSG front pages (made by the target from its settings), JSG ISPL plates and parts (an ISPL is refused: no counterpart), pictures inside JSG table cells, JSS links to outside addresses, lists inside notices, headings deeper than the target allows (written as a bold line).
+
+### WP-15 (audit PUB-008, PUB-009, PUB-015, ARC-024): fidelity of the conversions, 2026-11-27
+
+* **Severity.** A finding that loses something the reader sees is a `warning`, not `info`: JSS → S1000D page breaks, lists inside notices and cross-references
+  (written as their words; the target is not linked); a chapter's own text that becomes a first data module (`chapter-text-moved`); JSS → JSG dropped links, figure
+  legends (now kept as text, see below) and lists inside notices. Labels and wording: `jss/rwi/exporter.ts`, `xengine/jsg-model.ts`.
+* **Warnings and cautions anywhere in a section (PUB-009).** S1000D allows notices only at the head of a `levelledPara`; a JSS warning after a paragraph made the
+  exported module schema-invalid and blocked the conversion (`EXPORT_BLOCKED`). The exporter now splits a section's blocks into runs that each start with their
+  notices: the first run stays in the titled `levelledPara`, every later run is an untitled `levelledPara` that the importer merges back into the same section
+  (`jss/rwi/serialize.ts` `noticeRuns`, `map.ts`). The round trip gives the same blocks in the same order.
+* **Figure legends.** JSS → S1000D: a `legend` (`definitionList` of key and text, figure title always written since S1000D requires it), read back on import.
+  JSS → JSG: each key item becomes a paragraph after the figure (`<b>1</b> Bolt`), with a warning.
+* **Publication module (PUB-015).** The publication module the importer writes is complete in the order of `pm.xsd` (responsible partner company, applicability,
+  BREX reference, quality assurance were missing): `services/pmHeader.ts` `completePmStatus`, applied on import (`importer/apply.ts`) and on every save of the
+  publication structure (`pm.ts` `writePm`), keeping what the source or the previous file had. Each chapter entry holds one `pmEntry` per module, so the
+  return trip no longer finds an untitled chapter.
+* **Pictures (PUB-008, ARC-024).** An S1000D project is packed for conversion with every picture of `csdb/` and `Media/` under `ICN/`, whatever its name
+  (`xengine/convert.ts` `zipOfS1000dProject`, by `mediaFormats.formatOf`), not only `.xml` files: a picture that was renamed or added outside the CSDB arrives.
+* **Tests.** `backend/test/wp15-conversion-fidelity.test.js`: JSS → S1000D → JSS with notices, list, table, figure with picture and legend, links, note and page break
+  (same blocks, same picture bytes, the findings above); every exported data module against 4.2 `descript.xsd` and the publication module against `pm.xsd`, after the
+  conversion and after a save of the publication structure; a renamed CSDB picture and a `Media/` picture converted to JSS and JSG; JSS → JSG legends and warnings.
 
 ## 5. User interface
 
