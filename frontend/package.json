@@ -12,7 +12,7 @@
     "test": "vitest run",
     "e2e": "playwright test",
     "test:verify": "node scripts/run-verify.mjs",
-    "lint:theme": "node scripts/tokens/build-tokens.mjs --check && node scripts/tokens/check-contrast.mjs && node scripts/tokens/lint-colors.mjs",
+    "lint:theme": "node scripts/tokens/build-tokens.mjs --check && node scripts/tokens/check-contrast.mjs && node scripts/tokens/check-coverage.mjs && node scripts/tokens/lint-colors.mjs",
     "tokens": "node scripts/tokens/build-tokens.mjs"
   },
   "dependencies": {

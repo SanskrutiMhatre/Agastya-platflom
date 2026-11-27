@@ -19,7 +19,8 @@ for (const theme of ['light', 'dark']) {
   const panel = parseColour(resolve(s, 'surface-panel', theme));
   for (const [fgName, bgName, kind] of s.pairs) {
     const bgRaw = parseColour(resolve(s, bgName, theme));
-    const bg = bgRaw.a < 1 ? over(bgRaw, panel) : bgRaw;
+    // a translucent paper tint lies on the paper sheet (white in both themes), every other translucent background on the panel (WP-20)
+    const bg = bgRaw.a < 1 ? over(bgRaw, bgName.startsWith('paper-') ? parseColour(resolve(s, 'paper', theme)) : panel) : bgRaw;
     const fgRaw = parseColour(resolve(s, fgName, theme));
     const fg = fgRaw.a < 1 ? over(fgRaw, bg) : fgRaw;
     const need = kind.startsWith('floor:') ? Number(kind.slice(6)) : NEED[kind];
