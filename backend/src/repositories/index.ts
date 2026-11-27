@@ -17,8 +17,9 @@ import {
   SqliteActivityRepository, SqliteCirLinkRepository, SqliteExtensionRepository, SqliteLifecycleRepository,
   type ActivityRepository, type CirLinkRepository, type ExtensionRepository, type LifecycleRepository,
 } from './s1000dRecords';
+import { SqliteLeaseRepository, type LeaseRepository, type LeaseRow } from './leaseRepository';
 
-export type { ProjectRegistry, SnsRepository, ProjectConfigRepository, ReferenceRepository, ActivityRepository, CirLinkRepository, ExtensionRepository, LifecycleRepository, UnitOfWork };
+export type { ProjectRegistry, SnsRepository, ProjectConfigRepository, ReferenceRepository, ActivityRepository, CirLinkRepository, ExtensionRepository, LifecycleRepository, UnitOfWork, LeaseRepository, LeaseRow };
 
 export interface Repositories extends UnitOfWork {
   /** The engine behind these repositories ('sqlite'); a contract test and the migration runner use it to pick a dialect. */
@@ -35,6 +36,8 @@ export interface Repositories extends UnitOfWork {
   lifecycle: LifecycleRepository;
   extensions: ExtensionRepository;
   activity: ActivityRepository;
+  /** Check-out leases of documents and document parts (WP-11). */
+  leases: LeaseRepository;
 }
 
 export function createSqliteRepositories(db: SqlDatabase): Repositories {
@@ -53,5 +56,6 @@ export function createSqliteRepositories(db: SqlDatabase): Repositories {
     lifecycle: new SqliteLifecycleRepository(db),
     extensions: new SqliteExtensionRepository(db),
     activity: new SqliteActivityRepository(db),
+    leases: new SqliteLeaseRepository(db),
   };
 }

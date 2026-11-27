@@ -18,6 +18,8 @@ import { FileMemo } from './fileMemo';
 import { wellFormedError } from './wellFormed';
 import { readProjectJson, csdbRel, mediaRel } from './projectRecord';
 import { assertNewDmAllowed } from './projectConfig';
+import { saveRevisioned, withDocumentLock } from './projectFiles';
+import { assertNotLeasedByOther } from './leases';
 
 const { checkXmlSafety } = require('../core/auth/xmlGuard');
 const { isDoubledXml, DOUBLED_MESSAGE } = vendor('engine/doubled');
@@ -99,18 +101,21 @@ export async function writeDm(projectId: string, file: string, xml: string, base
   validateContent(rel, xml, lenient);
   assertUnique(projectId, file, xml);
 
-  // Optimistic concurrency: refuse to overwrite a version the author never saw.
-  const current = content.readText(projectId, at);
-  const currentHash = sha(current);
-  if (baseHash && baseHash !== currentHash) {
-    throw conflict('This data module was changed by someone else since you opened it.', 'EDIT_CONFLICT',
-      { currentHash, modified: modifiedOf(projectId, at) });
-  }
-  if (current !== xml) {
-    content.writeText(projectId, at, xml);
-    await cut(projectId, rel, xml, actor, 'save');
-  }
-  return { file, hash: sha(xml), modified: modifiedOf(projectId, at), changed: current !== xml };
+  // WP-11: the check and the write run under the document's write lock, the revision is recorded before the atomic write (projectFiles.ts).
+  return withDocumentLock(`${projectId}:${rel}`, async () => {
+    // A check-out lease held by someone else refuses the save, naming the holder (RES-001).
+    await assertNotLeasedByOther(projectId, rel, actor);
+    // Optimistic concurrency: refuse to overwrite a version the author never saw. The routes make the hash mandatory (versionGuard.ts);
+    // `undefined` is left for the server's own callers that state an explicit overwrite (the import with overwrite=1).
+    const current = content.readText(projectId, at);
+    const currentHash = sha(current);
+    if (baseHash !== undefined && baseHash !== currentHash) {
+      throw conflict('This data module was changed by someone else since you opened it.', 'EDIT_CONFLICT',
+        { currentHash, modified: modifiedOf(projectId, at) });
+    }
+    if (current !== xml) await saveRevisioned(projectId, at, xml, actor, 'save');
+    return { file, hash: sha(xml), modified: modifiedOf(projectId, at), changed: current !== xml };
+  });
 }
 
 /**
@@ -126,10 +131,7 @@ export async function createDm(projectId: string, file: string, xml: string, act
   // A NEW module must fit the project's S1000D configuration (MIC, issue, offered types and codes, SNS). The server decides this, not the form.
   // Imports (lenient) are brought in as they are: validation and the publication gate report what does not fit.
   if (!lenient && !opts.fromRepository && !opts.revisionOf) assertNewDmAllowed(projectId, xml);   // a revision of a module the project already holds is not a NEW module
-  content.mkdir(projectId, path.dirname(at));
-  content.writeText(projectId, at, xml);
-  await docIndex.syncProject(projectId, projectDirFor(projectId), nowIso());
-  await cut(projectId, rel, xml, actor, 'create');
+  await saveRevisioned(projectId, at, xml, actor, 'create');            // WP-11: atomic, and refused when its revision cannot be recorded
   return { file, hash: sha(xml), modified: modifiedOf(projectId, at) };
 }
 
@@ -138,6 +140,7 @@ export async function deleteDm(projectId: string, file: string, actor: Actor, pr
   const rel = `${csdbRel(readProjectJson(projectId))}/${file}`;
   if (!content.exists(projectId, at)) throw notFound('No such data module.');
   if (lockedFor(projectId, rel, actor, projectRole)) throw forbidden('This data module is locked. Only a project owner can delete it.', 'DOCUMENT_LOCKED');
+  await assertNotLeasedByOther(projectId, rel, actor);                  // WP-11: a module checked out by someone else is not deleted under them
   // Keep the last content in history so a deletion can be undone by hand.
   await cut(projectId, rel, content.readText(projectId, at), actor, 'before-delete');
   content.remove(projectId, at);

@@ -12,7 +12,7 @@ import { csdbDir, listDms, type DmSummary } from '../csdb';
 import { pmPath, parseModel } from '../pm';
 import { parseBrexModel } from '../brex';
 import { readSidecar } from '../jssdm/sidecar';
-import { projectDirFor } from '../../context';
+import { projectDirFor, content } from '../../context';
 import { INFO_CODE_GROUPS, DEFAULT_ORDER_KEYS, type OrderConfig } from './codes';
 import { NON_CONTENT_INFO_CODES, deriveStructure, structureDms, type DeriveOptions, type Structure } from './derive';
 import { learnSnsFromDms, snsRowsFromBrexModel } from './learn';
@@ -162,7 +162,7 @@ export function applyDerived(projectId: string, out: ReturnType<typeof deriveFor
   const abs = out.absPm;
   let backup: string | null = null;
   if (fs.existsSync(abs)) backup = keepBackup(abs);
-  fs.writeFileSync(abs, out.pm.xml, 'utf8');
+  content.writeText(projectId, abs, out.pm.xml);
   return { counts: pmc.countEntries(pmc.parsePm(out.pm.xml).entries), backup };
 }
 

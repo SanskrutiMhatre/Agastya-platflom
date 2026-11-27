@@ -9,8 +9,8 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { vendor } from '../../config';
-import { projectDirFor } from '../../context';
-import { bad, notFound } from '../http';
+import { projectDirFor, content } from '../../context';
+import { bad, conflict, notFound } from '../http';
 import { checkXmlSafetyOf } from '../csdbGuard';
 import { readProjectJson, updateProjectJson } from '../projects';
 import { wellFormedError } from '../wellFormed';
@@ -20,6 +20,8 @@ const pagesEngine = (): { resolvePages(fm: unknown): any[] } => vendor('engine/f
 
 const STAMP_FILE = '_frontmatter-generated.json';
 const MAX_BYTES = 1024 * 1024;
+/** The version of a page as the editor sends it back (WP-11). */
+export const fullHash = (s: string): string => crypto.createHash('sha256').update(String(s), 'utf8').digest('hex');
 const hash = (s: string): string => crypto.createHash('sha256').update(String(s), 'utf8').digest('hex').slice(0, 32);
 
 export interface AncillaryPage {
@@ -75,15 +77,16 @@ function pageOf(projectId: string, effective: any, pageId: string): { page: Anci
   return { page, abs: path.join(dirOf(projectId), page.file) };
 }
 
-export function readAncillary(projectId: string, effective: any, pageId: string): { page: AncillaryPage; xml: string } {
+export function readAncillary(projectId: string, effective: any, pageId: string): { page: AncillaryPage; xml: string; hash: string } {
   const { page, abs } = pageOf(projectId, effective, pageId);
-  return { page, xml: fs.readFileSync(abs, 'utf8') };
+  const xml = fs.readFileSync(abs, 'utf8');
+  return { page, xml, hash: fullHash(xml) };
 }
 
 const rootName = (xml: string): string | null => /<([A-Za-z_][\w.-]*)[\s/>]/.exec(xml.replace(/<\?[\s\S]*?\?>|<!--[\s\S]*?-->/g, ''))?.[1] ?? null;
 
 /** Save a page's XML. It must be well formed, keep the page's root element, and carry no DOCTYPE (no entities, no external files). */
-export function writeAncillary(projectId: string, effective: any, pageId: string, xml: string): AncillaryPage {
+export function writeAncillary(projectId: string, effective: any, pageId: string, xml: string, baseHash?: string): AncillaryPage {
   const { page, abs } = pageOf(projectId, effective, pageId);
   if (typeof xml !== 'string' || !xml.trim()) throw bad('Send the page as { "xml": "..." }.', 'BAD_BODY');
   if (Buffer.byteLength(xml) > MAX_BYTES) throw bad('A page may be at most 1 MB.', 'TOO_BIG');
@@ -91,9 +94,12 @@ export function writeAncillary(projectId: string, effective: any, pageId: string
   checkXmlSafetyOf(xml);                         // WP-02 (PUB-002): an xi:include of a local file needs no DOCTYPE
   const problem = wellFormedError(xml);
   if (problem) throw bad(`The page is not well-formed XML: ${problem}`, 'MALFORMED_XML');
-  const was = rootName(fs.readFileSync(abs, 'utf8')); const now = rootName(xml);
+  const current = fs.readFileSync(abs, 'utf8');
+  // WP-11 (FE-008): the page is saved only over the version the author opened (the route makes the hash mandatory)
+  if (baseHash !== undefined && baseHash !== fullHash(current)) throw conflict('This page was changed by someone else since you opened it. Reload it to see their changes.', 'EDIT_CONFLICT', { currentHash: fullHash(current) });
+  const was = rootName(current); const now = rootName(xml);
   if (was && now !== was) throw bad(`The page's outer element must stay <${was}> (it is <${now ?? 'missing'}>).`, 'BAD_ROOT');
-  fs.writeFileSync(abs, /^\s*<\?xml/.test(xml) ? xml : `<?xml version="1.0" encoding="UTF-8"?>\n${xml}`, 'utf8');
+  content.writeText(projectId, abs, /^\s*<\?xml/.test(xml) ? xml : `<?xml version="1.0" encoding="UTF-8"?>\n${xml}`);
   return { ...page, edited: true };
 }
 
@@ -103,7 +109,7 @@ export function resetAncillary(projectId: string, effective: any, pageId: string
   const dir = dirOf(projectId);
   fs.rmSync(abs, { force: true });
   const stamp = readStamp(dir); delete stamp[page.file as string];
-  fs.writeFileSync(path.join(dir, STAMP_FILE), JSON.stringify(stamp, null, 2) + '\n', 'utf8');
+  content.writeText(projectId, path.join(dir, STAMP_FILE), JSON.stringify(stamp, null, 2) + '\n');
   prepareFrontMatterFiles(projectId, effective);
   return listAncillary(projectId, effective).find((p) => p.id === pageId) as AncillaryPage;
 }

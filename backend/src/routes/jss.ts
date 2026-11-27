@@ -3,7 +3,7 @@
 //
 //   GET  /api/jss/types                    the document types of the JSS stencils, and which are built
 //   GET  /api/projects/:id/jss             the project's JSS document (XML), its type, and a fresh validation report   (viewer)
-//   PUT  /api/projects/:id/jss             save the XML { xml, baseHash? } - malformed refused, schema-invalid kept as a draft   (editor)
+//   PUT  /api/projects/:id/jss             save the XML { xml, baseHash } (baseHash mandatory, WP-11) - malformed refused, schema-invalid kept as a draft   (editor)
 //   POST /api/projects/:id/jss/validate    check { xml? } (default: the saved document) against the schema and the stencil's rules   (viewer)
 //   GET  /api/projects/:id/ancillary            the ancillary pages (title pages, foreword, record of changes ...): which are printed, their headings, which were edited   (viewer)
 //   PUT  /api/projects/:id/ancillary            { pages: [{ id, enabled?, title? }] } choose the pages that are printed and their headings   (editor)
@@ -22,7 +22,9 @@ import { wrap, bad, notFound } from '../services/http';
 import { JSS_TYPES, jssTypeById, tableTemplatesOf } from '../services/jss/registry';
 import { effectiveConfig, applyJssFrontMatter } from '../services/publisher';
 import { listAncillary, readAncillary, resetAncillary, saveAncillaryChoices, writeAncillary } from '../services/jss/ancillary';
-import { JSS_XSD, isJssAuthored, jssTypeOfProject, readSource, writeSource, validateJss } from '../services/jss/service';
+import { JSS_XSD, isJssAuthored, jssTypeOfProject, readSource, writeSource, validateJss, sourceHistory, sourceRevision, sourceRel } from '../services/jss/service';
+import { versionGuard } from '../services/versionGuard';
+import { registerOneFileDocumentRoutes, actorOf } from './documentHistory';
 
 export function registerJssRoutes(app: Express): void {
   app.get('/api/jss/types', requireAuth(), wrap((_req, res) => {
@@ -47,14 +49,20 @@ export function registerJssRoutes(app: Express): void {
     });
   }));
 
-  app.put(base, requireProject('editor', { from: 'param', cap: 'dm.write' }), wrap(async (req, res) => {
+  app.put(base, requireProject('editor', { from: 'param', cap: 'dm.write' }), versionGuard('JSS document'), wrap(async (req, res) => {
     needJss(req);
     const xml = req.body?.xml;
     if (typeof xml !== 'string') throw bad('Send the document as { "xml": "..." }.', 'BAD_BODY');
-    const out = await writeSource(req.project.id, xml, typeof req.body?.baseHash === 'string' ? req.body.baseHash : undefined);
-    log(req, 'jss.saved', { bytes: Buffer.byteLength(xml), errors: out.report.errors, warnings: out.report.warnings });
+    const out = await writeSource(req.project.id, xml, res.locals.baseHash, actorOf(req));
+    log(req, 'jss.saved', { bytes: Buffer.byteLength(xml), errors: out.report.errors, warnings: out.report.warnings, ...(out.merged ? { merged: true } : {}) });
     res.json(out);
   }));
+
+  // WP-11: the document's history (restore a previous save) and its check-outs by chapter (decision D22)
+  registerOneFileDocumentRoutes(app, {
+    base, what: 'JSS document', auditPrefix: 'jss', need: needJss, rel: sourceRel, history: sourceHistory, revision: sourceRevision,
+    save: async (req, projectId, xml, baseHash, reason) => { const o = await writeSource(projectId, xml, baseHash, actorOf(req), reason); return { hash: o.hash, ...(o.merged ? { merged: true, xml: o.xml } : {}) }; },
+  });
 
   app.post(`${base}/validate`, requireProject('viewer', { from: 'param', cap: 'project.read' }), wrap(async (req, res) => {
     needJss(req);
@@ -94,10 +102,10 @@ export function registerJssRoutes(app: Express): void {
     res.json(readAncillary(req.project.id, effective(req), req.params.page));
   }));
 
-  app.put(`${anc}/:page`, requireProject('editor', { from: 'param', cap: 'settings.write' }), wrap((req, res) => {
-    const page = writeAncillary(req.project.id, effective(req), req.params.page, req.body?.xml);
+  app.put(`${anc}/:page`, requireProject('editor', { from: 'param', cap: 'settings.write' }), versionGuard('page'), wrap((req, res) => {
+    const page = writeAncillary(req.project.id, effective(req), req.params.page, req.body?.xml, res.locals.baseHash);
     log(req, 'jss.ancillary.saved', { page: page.id, bytes: Buffer.byteLength(req.body.xml) });
-    res.json({ page });
+    res.json({ page, hash: readAncillary(req.project.id, effective(req), req.params.page).hash });
   }));
 
   app.post(`${anc}/:page/reset`, requireProject('editor', { from: 'param', cap: 'settings.write' }), wrap((req, res) => {

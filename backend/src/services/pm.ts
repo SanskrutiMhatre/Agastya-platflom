@@ -12,8 +12,9 @@ import fs from 'fs';
 import path from 'path';
 import { DOMParser } from '@xmldom/xmldom';
 import { vendor } from '../config';
-import { projectDirFor } from '../context';
-import { bad } from './http';
+import { projectDirFor, content } from '../context';
+import { bad, conflict } from './http';
+import { sha } from './csdbIndex';
 import { readProjectJson, csdbRel, pmRel } from './projects';
 import { listDms, type DmSummary } from './csdb';
 import { parsePmComplete } from './importer/pmComplete';
@@ -135,7 +136,8 @@ export function carryReconstructedMarker(prior: string, next: string): string {
   return next.replace(/^(<\?xml[^>]*\?>\r?\n)/, `$1${m[0]}\n`);
 }
 
-export function writePm(projectId: string, model: { meta?: unknown; entries: PmEntry[] }, allowEmpty = false) {
+/** `baseHash` (mandatory on the route, WP-11 FE-008): the version of the publication module the editor loaded; a newer file refuses the save (409 EDIT_CONFLICT). */
+export function writePm(projectId: string, model: { meta?: unknown; entries: PmEntry[] }, allowEmpty = false, baseHash?: string) {
   if (!Array.isArray(model?.entries)) throw bad('entries[] is required.');
   const counts = pmc.countEntries(model.entries);
   if (counts.total === 0 && !allowEmpty) throw bad('Refusing to save an empty publication. Pass allowEmpty=1 if that is intended.', 'EMPTY_PM');
@@ -149,10 +151,12 @@ export function writePm(projectId: string, model: { meta?: unknown; entries: PmE
   // The importer marks a publication it built itself with an XML comment, which the serialiser (it writes the model, not the file) does not carry.
   // The mark is what tells a later import of this project's export that the publication is Agastya's own and not a foreign template to rebuild,
   // so a save from the Explorer must not silently take it away.
-  if (fs.existsSync(abs)) xml = carryReconstructedMarker(fs.readFileSync(abs, 'utf8'), xml);
+  const existing = fs.existsSync(abs) ? fs.readFileSync(abs, 'utf8') : null;
+  if (existing !== null && baseHash !== undefined && sha(existing) !== baseHash) throw conflict('The publication was changed by someone else since you opened it. Reload it to see their changes.', 'EDIT_CONFLICT', { currentHash: sha(existing) });
+  if (existing !== null) xml = carryReconstructedMarker(existing, xml);
   if (fs.existsSync(abs)) fs.copyFileSync(abs, abs + '.bak');
-  fs.writeFileSync(abs, xml, 'utf8');
-  return { counts, backup: path.basename(abs) + '.bak' };
+  content.writeText(projectId, abs, xml);
+  return { counts, backup: path.basename(abs) + '.bak', hash: sha(xml) };
 }
 
 // ── Explore ───────────────────────────────────────────────────────────────
