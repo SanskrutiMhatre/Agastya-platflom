@@ -1,0 +1,38 @@
+{
+ "_about": "WP-09: the owner-blessed intended differences of the authorisation matrix (backend/test/authz-matrix.test.js). Every entry carries its reason. Taken from the audit's recommendation under the execution directive of 2026-11-27; an entry is changed only with a reviewed diff.",
+ "onboardingGateExits": ["POST /api/auth/logout", "POST /api/auth/activity", "GET /api/auth/me", "POST /api/auth/onboarding"],
+ "passwordChangeGateExits": ["POST /api/auth/logout", "POST /api/auth/activity", "GET /api/auth/me", "POST /api/auth/change-password"],
+ "viewerWrites": {
+  "POST /api/projects/:id/open": "Records the caller's own active project and the opened time; changes no project content.",
+  "POST /api/projects/:id/copy": "Creates a NEW project owned by the caller from content the caller can already read; the source is not changed.",
+  "POST /api/projects/:id/convert": "Creates a NEW project owned by the caller in another format; the source is only read.",
+  "POST /api/projects/:id/publish/configured/plan": "Computes which modules a configured build would include; read-only (POST because the selection is a body).",
+  "POST /api/projects/:id/packages/delivery": "Builds a delivery ZIP for download from content the caller can read; the only record written is the administrator's dispatch log entry.",
+  "POST /api/projects/:id/jss/validate": "Validates the posted or saved JSS document; writes nothing.",
+  "POST /api/projects/:id/jsg/validate": "Validates the posted or saved JSG document; writes nothing."
+ },
+ "authOnlyWrites": {
+  "POST /api/auth/logout": "Ends the caller's own session.",
+  "POST /api/auth/activity": "Refreshes the caller's own session (idle limit).",
+  "POST /api/auth/change-password": "Changes the caller's own password; the current password is required.",
+  "POST /api/auth/onboarding": "Completes the caller's own first sign-in.",
+  "POST /api/invitations/:id/accept": "The handler only accepts an invitation addressed to the caller (404 otherwise).",
+  "POST /api/invitations/:id/decline": "The handler only declines an invitation addressed to the caller (404 otherwise).",
+  "POST /api/folders": "Folders are per person; the service decides with the caller's identity.",
+  "PATCH /api/folders/:key": "The service checks the caller's rights on the folder.",
+  "DELETE /api/folders/:key": "The service checks the caller's rights on the folder (and on its projects with withProjects=1).",
+  "PUT /api/folders/:key/access": "The service checks that the caller may grant access on the folder.",
+  "POST /api/projects": "Any signed-in person may create a project and becomes its owner.",
+  "POST /api/projects/sample": "Creates a sample project owned by the caller.",
+  "POST /api/projects/sample-jsg": "Creates a sample JSG project owned by the caller.",
+  "POST /api/notifications/read": "Marks the caller's own notifications read.",
+  "POST /api/cir": "The Common Information Repository is shared: every signed-in person may add modules (by design, see authz.js evaluate).",
+  "DELETE /api/cir/:id": "The service refuses Authors (403 CIR_DELETE_ROLE); Project Managers and administrators may delete.",
+  "POST /api/cir/:id/copy": "The handler evaluates editor rights on the target project (404 otherwise).",
+  "POST /api/s1000d/validate-config": "Validates a posted configuration against the defaults; writes nothing.",
+  "POST /api/projects/import/detect": "Inspects an uploaded file; writes nothing but a temporary upload.",
+  "POST /api/projects/import": "Creates a NEW project owned by the caller from an uploaded archive.",
+  "POST /api/xengine/import": "Creates a NEW project owned by the caller from an uploaded package or document."
+ },
+ "unreferenced": {}
+}

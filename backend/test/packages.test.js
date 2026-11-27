@@ -97,6 +97,11 @@ test('project package round trip into a second project; report; repeated import 
   const again = await upload(w, `/api/projects/${p2}/packages/import`, exp.buf);
   assert.equal(again.json.counts.accepted, 0); assert.ok(again.json.counts.unchanged >= 4);
   const reps = await w.get(`/api/projects/${p2}/packages/import-reports`); assert.ok(reps.json.reports.length >= 2);
+  // WP-09: one report by its id. The route was registered as .../import-reports/:id, so the report id overwrote the project id in req.params
+  // and the guard looked up a project called "<time>.json": the route answered 404 for everyone.
+  const one = await w.get(`/api/projects/${p2}/packages/import-reports/${encodeURIComponent(reps.json.reports[0].id)}`);
+  assert.equal(one.status, 200, JSON.stringify(one.json)); assert.ok(Array.isArray(one.json.items) && one.json.items.length > 0, 'the full report, with its items');
+  assert.equal((await other.get(`/api/projects/${p2}/packages/import-reports/${encodeURIComponent(reps.json.reports[0].id)}`)).status, 404, 'a non-member still gets nothing');
 });
 
 test('import safety: ZIP Slip, path traversal, XXE, tampered manifest, unsafe svg, risky types, non-zip', async () => {

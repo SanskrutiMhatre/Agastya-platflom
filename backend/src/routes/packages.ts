@@ -170,8 +170,9 @@ export function registerPackageRoutes(app: Express): void {
     const d = path.join(projectDirFor(req.project.id), '.import-reports');
     res.json({ reports: fs.existsSync(d) ? fs.readdirSync(d).filter((f) => f.endsWith('.json')).sort().reverse().slice(0, 50).map((f) => ({ id: f, ...JSON.parse(fs.readFileSync(path.join(d, f), 'utf8')) })).map(({ items, ...r }: any) => ({ ...r, items: undefined, itemCount: items?.length ?? 0 })) : [] });
   }));
-  app.get(`${base}/packages/import-reports/:id`, view('viewer'), wrap((req, res) => {
-    const id = param(req, 'id'); if (!/^[\w.-]+\.json$/.test(id)) throw bad('Bad report id.');
+  // WP-09: the report parameter must not be called :id - that is the project id the guard reads (the matrix rule "no repeated parameter").
+  app.get(`${base}/packages/import-reports/:reportId`, view('viewer'), wrap((req, res) => {
+    const id = param(req, 'reportId'); if (!/^[\w.-]+\.json$/.test(id)) throw bad('Bad report id.');
     const f = path.join(projectDirFor(req.project.id), '.import-reports', id); if (!fs.existsSync(f)) throw new HttpError(404, 'No such report.');
     res.json(JSON.parse(fs.readFileSync(f, 'utf8')));
   }));
