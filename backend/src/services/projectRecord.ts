@@ -7,6 +7,7 @@
 // =============================================================================
 
 import { content } from '../context';
+import { HttpError } from './http';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { safeRelPath, safeArtworkRef } = require('../core/auth/xmlGuard');
@@ -87,6 +88,16 @@ export function isS1000dProject(projectId: string): boolean {
   const pj = readProjectJson(projectId);
   const format = pj.format ?? (pj.type === 'JSS' || pj.templateRef === 'uhb' ? 'jss' : 's1000d');
   return format === 's1000d';
+}
+/** WP-16 (PUB-022 / ARC-018): the message every S1000D writer gives for a JSS document project (routes/jss-guard.ts answers the same). */
+export const JSS_PROTECTED_MESSAGE = 'This is a JSS document project: its publication.xml is the JSS document and is not replaced by an S1000D import. Use "Import project" in the JSS document to bring in an RWI package.';
+/**
+ * WP-16 (PUB-022 / ARC-018): a JSS document project's publication.xml IS the JSS document. Every S1000D writer of the publication module calls
+ * this before it writes, so a new route that reaches one of them is refused (409) even when routes/jss-guard.ts (now defence in depth) does
+ * not list it. The project's kind cannot be changed through settings (PROTECTED_PROJECT_KEYS, WP-01).
+ */
+export function assertS1000dPublication(projectId: string): void {
+  if (readProjectJson(projectId).authoring === 'jss-xml') throw new HttpError(409, JSS_PROTECTED_MESSAGE, 'JSS_PROJECT_PROTECTED');
 }
 export const mediaRel = (pj: any): string => inputField(pj, 'mediaDir', 'Media');
 export const pmRel = (pj: any): string => inputField(pj, 'pm', 'publication.xml');

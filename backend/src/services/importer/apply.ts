@@ -26,6 +26,7 @@ import * as csdb from '../csdb';
 import * as pm from '../pm';
 import { checkDmEnterprises } from '../enterprises';
 import { csdbRel, readProjectJson } from '../projects';
+import { assertS1000dPublication } from '../projectRecord';
 import { isPlaceholderPng } from './png';
 import { externalTargets } from './repairs/icn';
 import { analyzePackage } from './scanner';
@@ -69,6 +70,7 @@ const pmc = (): { parsePm(x: string): { entries: unknown[] }; countEntries(e: un
 const batchId = (): string => new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
 
 export async function applyImport(projectId: string, entries: PackageEntry[], options: ApplyOptions, actor: Actor, projectRole: string): Promise<ApplyResult> {
+  assertS1000dPublication(projectId);                                  // WP-16 (PUB-022): the S1000D importer never writes into a JSS document project
   const pj = readProjectJson(projectId);
   const analysis = analyzePackage(entries, { ...options, projectName: options.projectName ?? pj.name });
   const { pkg, repair, report } = analysis;
