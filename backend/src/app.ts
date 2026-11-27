@@ -38,7 +38,8 @@ import { registerXengineRoutes } from './routes/xengine';
 import { registerWaiverRoutes } from './routes/waivers';
 import { registerBrandRoutes } from './routes/brand';
 import { notifyAccess } from './services/access-notify';
-import { API_VERSION, MIN_CLIENT_VERSION, buildInfo, schemaLevel } from './services/version';
+import { API_VERSION, MIN_CLIENT_VERSION, CLIENT_VERSION_HEADER, buildInfo, clientAccepted, schemaLevel } from './services/version';
+import { hostAllowed, MISDIRECTED } from './services/network';
 import { capabilityTableFrom, setCapabilityTable } from './services/permissions';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -55,7 +56,19 @@ export function createApp(): express.Express {
   app.set('trust proxy', config.trustProxy);
   app.disable('x-powered-by');
   app.use(requestContextMiddleware(clientIp));   // every audit row gets the client address; a 500 answers with this request's id (WP-03)
-  app.use(securityHeaders);                      // CSP, nosniff, framing, referrer (ENT-012, FE-017)
+  app.use(securityHeaders);                      // CSP, nosniff, framing, referrer (ENT-012, FE-017); HSTS on TLS in Mode B (WP-26)
+  // WP-26: the Host must name this server (DNS rebinding); the same rule guards the WebSocket upgrade (services/broadcast.ts).
+  app.use((req, res, next) => {
+    if (hostAllowed(req.headers.host)) return next();
+    res.status(421).json({ error: MISDIRECTED, code: 'MISDIRECTED_REQUEST' });
+  });
+  // WP-26: the version handshake, enforced on the server as well: a client older than MIN_CLIENT_VERSION (a page cached from before an upgrade)
+  // gets 426 and reloads; the version routes themselves always answer, so it can learn what to do.
+  app.use('/api', (req, res, next) => {
+    const v = req.headers[CLIENT_VERSION_HEADER];
+    if (clientAccepted(typeof v === 'string' ? v : undefined) || /^\/(version|health|ready)$/.test(req.path)) return next();
+    res.status(426).json({ error: 'This page is older than the server. Reload it to continue.', code: 'CLIENT_TOO_OLD', minClientVersion: MIN_CLIENT_VERSION, version: buildInfo().version });
+  });
   app.use(compressResponses);                    // gzip for JSON / text answers of 1 KB or more (WP-18: PERF-016)
   app.use(express.json({ limit: '25mb' }));
 

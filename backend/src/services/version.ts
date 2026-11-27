@@ -19,6 +19,32 @@ export const API_VERSION = 1;
 /** The oldest client version that works against this server. */
 export const MIN_CLIENT_VERSION = '2.0.0';
 
+/**
+ * WP-26: the header the client sends its own version in (frontend/src/api/client.ts), and the same value as the `client` query parameter of the
+ * WebSocket (a browser cannot set headers there). A request without it (a script, curl, an older tool) is not refused.
+ */
+export const CLIENT_VERSION_HEADER = 'x-agastya-client';
+
+/** "2.10.1" -> [2, 10, 1]; a pre-release ("2.1.0-rc.1") ranks below its release. null when it is not a version. */
+function parseVersion(v: string): { nums: number[]; pre: boolean } | null {
+  const m = /^v?(\d+)\.(\d+)\.(\d+)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$/.exec(v.trim());
+  return m ? { nums: [Number(m[1]), Number(m[2]), Number(m[3])], pre: !!m[4] } : null;
+}
+
+/** Compare two versions: <0, 0, >0. A malformed version ranks below every real one. */
+export function compareVersions(a: string, b: string): number {
+  const x = parseVersion(a); const y = parseVersion(b);
+  if (!x || !y) return (x ? 1 : 0) - (y ? 1 : 0);
+  for (let i = 0; i < 3; i++) if (x.nums[i] !== y.nums[i]) return x.nums[i] - y.nums[i];
+  return (x.pre ? 0 : 1) - (y.pre ? 0 : 1);
+}
+
+/** Whether a client that says it is `clientVersion` may talk to this server (undefined = it did not say). */
+export function clientAccepted(clientVersion: string | undefined, min: string = MIN_CLIENT_VERSION): boolean {
+  if (clientVersion === undefined || clientVersion === '') return true;
+  return compareVersions(clientVersion, min) >= 0;
+}
+
 export interface BuildInfo { version: string; commit: string | null; builtAt: string | null; dirty: boolean | null; packaged: boolean }
 
 /** The fields read from version.json (written by the packager) or package.json; each is checked before use. */
