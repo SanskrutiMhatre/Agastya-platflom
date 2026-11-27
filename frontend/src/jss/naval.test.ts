@@ -46,9 +46,11 @@ function startingDocuments(): Record<string, string> | null {
   if (!have) return null;
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jss-start-'));
   const script = "const s=require('./dist/services/jss/service');const r=require('./dist/services/jss/registry');const out={};"
-    + "for(const t of r.JSS_TYPES.filter((x)=>x.ready)) out[t.id]=s.skeletonXml(t,{bookName:'Round trip',systemName:'System'});process.stdout.write(JSON.stringify(out));process.exit(0);";
+    + "for(const t of r.JSS_TYPES.filter((x)=>x.ready)) out[t.id]=s.skeletonXml(t,{bookName:'Round trip',systemName:'System'});process.stdout.write('@@STARTING-DOCUMENTS@@'+JSON.stringify(out));process.exit(0);";
   const r = spawnSync(process.execPath, ['-e', script], { cwd: backend, env: { ...process.env, AGASTYA_WORKSPACE_DIR: dir }, encoding: 'utf8', maxBuffer: 1 << 27 });
-  return r.status === 0 ? (JSON.parse(r.stdout) as Record<string, string>) : null;
+  // the server's own start-up lines (e.g. "[db] quick_check: ok") share stdout; the result follows its marker
+  const at = r.stdout.lastIndexOf('@@STARTING-DOCUMENTS@@');
+  return r.status === 0 && at >= 0 ? (JSON.parse(r.stdout.slice(at + '@@STARTING-DOCUMENTS@@'.length)) as Record<string, string>) : null;
 }
 
 describe.skipIf(!have)('the starting document of every type opens in the editor and is saved back without losing anything', () => {

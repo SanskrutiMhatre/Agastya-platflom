@@ -127,7 +127,8 @@ test('a new data module joins the publication automatically (BREX and applicabil
   const pr = await w.post('/api/projects', { name: 'Auto add', format: 's1000d', s1000d: { mic: 'EXAMPLE', issue: '5.0', responsiblePartner: { code: '00000', name: 'Example Company' } } });
   const id = pr.json.project.id; const U = `/api/projects/${id}`; assert.equal(pr.json.project.autoAddToPublication, true);
   const pick = (c) => fs.readdirSync(FIX).find((x) => new RegExp(`-${c}A-D_`).test(x));
-  const refs = () => (fs.readFileSync(path.join(h.ws, 'projects', id, 'publication.xml'), 'utf8').match(/<dmRef\b/g) ?? []).length;
+  // module references of the publication's content; the header's <brexDmRef> (which pm.xsd requires, written since WP-15 PUB-015) is not a page
+  const refs = () => (fs.readFileSync(path.join(h.ws, 'projects', id, 'publication.xml'), 'utf8').replace(/<brexDmRef>[\s\S]*?<\/brexDmRef>/g, '').match(/<dmRef\b/g) ?? []).length;
   assert.equal(refs(), 0);
   assert.equal((await w.post(`${U}/dms`, { file: pick('040'), xml: fs.readFileSync(path.join(FIX, pick('040')), 'utf8') })).status, 201);
   assert.equal(refs(), 1, 'the new module is in the publication');

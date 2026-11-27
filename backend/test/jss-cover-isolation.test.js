@@ -34,7 +34,9 @@ const norm = (s) => s.replace(new RegExp(todayForms().join('|'), 'g'), BASELINE_
 // (3) WHICH picture the Larsen & Toubro fallback logo is: on 2026-11-26 the owner replaced vendor/pipeline/jss/artwork/lt-logo.png by assets/default-publisher-logo.png (the L&T Precision
 // Engineering logo) for every JSS book, this path included. The one changed file name is mapped back, so the fingerprint still proves that nothing of the LAYOUT moved.
 // (4) Since WP-07 (PUB-020) the default artwork is an absolute file: URL instead of ../ steps; both forms name the same file and map to the same token.
-const canon = (s) => s.replace(/url\('(?:(?:\.\.\/)+|file:\/\/\/)[^']*?\/backend\/assets\/default-publisher-logo\.png'/g, "url('VENDOR/pipeline/jss/artwork/lt-logo.png'").replace(/url\('(?:(?:\.\.\/)+|file:\/\/\/)[^']*?\/backend\/vendor\//g, "url('VENDOR/")
+// (5) Since WP-15 (PUB-017) the platform writes the PDF's document properties (title, author, subject, keywords) into the FO as ONE <fo:declarations>
+// block (an XMP packet FOP copies into the PDF Info dictionary). It is metadata, not layout, and it is removed whole - nothing else is ignored.
+const canon = (s) => s.replace(/<fo:declarations>[\s\S]*?<\/fo:declarations>/g, '').replace(/url\('(?:(?:\.\.\/)+|file:\/\/\/)[^']*?\/backend\/assets\/default-publisher-logo\.png'/g, "url('VENDOR/pipeline/jss/artwork/lt-logo.png'").replace(/url\('(?:(?:\.\.\/)+|file:\/\/\/)[^']*?\/backend\/vendor\//g, "url('VENDOR/")
   .replace(/<([\w:.-]+)((?:\s+[\w:.-]+="[^"]*")+)\s*(\/?)>/g, (m, tag, attrs, close) => `<${tag} ${[...attrs.matchAll(/([\w:.-]+)="([^"]*)"/g)].map((x) => `${x[1]}="${x[2]}"`).sort().join(' ')}${close}>`);
 const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
 const fingerprint = (fo) => sha(canon(norm(fo)));
