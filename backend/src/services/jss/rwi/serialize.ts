@@ -5,8 +5,8 @@
 import { createHash } from 'crypto';
 import type { Block, Cell, Inline, List, Part, Section, Table } from './canonical';
 import { esc, isSection } from './canonical';
+import { escAttr as escA } from '../../../lib/xml';
 
-const escA = (s: string): string => esc(s).replace(/"/g, '&quot;');
 
 export interface ModuleIdentity {
   code: Record<string, string>; issue: Record<string, string>; language: Record<string, string>; issueDate: Record<string, string>; techName: string; infoName: string;

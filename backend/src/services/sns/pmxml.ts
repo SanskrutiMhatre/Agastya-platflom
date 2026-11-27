@@ -10,6 +10,7 @@
 
 import { vendor } from '../../config';
 import type { StructDm, StructModule, Structure } from './derive';
+import { escAttr as esc } from '../../lib/xml';
 
 export interface PmEntryOut {
   type: 'folder' | 'dm';
@@ -44,7 +45,6 @@ export function structureToPmEntries(s: Structure, o: TitleOptions = {}): PmEntr
   return s.roots.map(walk);
 }
 
-const esc = (v: unknown): string => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const attrs = (o: Record<string, string>, keys: string[]): string => keys.filter((k) => o[k] !== undefined && o[k] !== '').map((k) => ` ${k}="${esc(o[k])}"`).join('');
 
 /** <content>'s inner XML, written by the vendored pmc module. */

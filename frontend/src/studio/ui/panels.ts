@@ -9,7 +9,7 @@ import { elementChildren, textOf } from '../core/xml';
 import { friendlyName, elementDescription } from '../core/elementInfo';
 import { ATOMIC } from '../core/display';
 import { idPrefixFor } from '../core/ids';
-import { xsdRegex } from '../core/xsdRegex';
+import { xsdRegex } from '../../../../backend/src/shared/xsdRegex';
 import { uniqueId } from '../core/ops';
 import { buildLabels } from '../view/labels';
 import type { AttrInfo } from '../core/grammar';

@@ -38,7 +38,10 @@ interface StudioState { docs: OpenDoc[]; ready: boolean; projectId: string | nul
 export const useStudio = create<StudioState>(() => ({ docs: [], ready: false, projectId: null }));
 
 /** `object` = a CSDB object (comment, update file, ICN metadata, SCORM package) rather than a data module: saved through the objects API. */
-interface Ref { file: string; hash: string; object?: boolean }
+interface Ref { file: string; hash: string; object?: boolean; /** WP-21 (PRD-004): the text the hash stands for, the base of a compare-and-merge */ base?: string }
+
+/** WP-21 (PRD-004): a refused save the author chose to compare: their text, the text both started from, and the module. */
+export interface StudioConflict { file: string; base: string; mine: string }
 const DM_FILE = /^DMC-[A-Za-z0-9._-]+\.xml$/i;
 
 class StudioSession {
@@ -54,6 +57,9 @@ class StudioSession {
   notify: (msg: string, kind?: 'info' | 'error' | 'success') => void = () => undefined;
   /** `created`: the save made a new data module (it may have joined the publication), not a new version of an open one. */
   onSaved: (created: boolean) => void = () => undefined;
+  /** WP-21: the page's focus mode (the editor page sets these while it is shown) and the compare-and-merge dialog of a refused save. */
+  focus: { toggle: () => void; isOn: () => boolean } | null = null;
+  onConflict: ((c: StudioConflict) => void) | null = null;
 
   constructor() {
     this.root.className = 'app';
@@ -102,7 +108,44 @@ class StudioSession {
       changed: () => this.publish(),
       pdfSettings: () => this.settingsCache,
       draftScope: () => this.draftScope(),
+      toggleFocus: () => this.focus?.toggle(),
+      isFocus: () => !!this.focus?.isOn(),
     };
+  }
+
+  /** Run a Studio command by id (the page header's palette and shortcuts buttons; WP-21). */
+  run(id: string): void { this.app?.run(id); }
+
+  /** The ribbon is folded to its tab strip (WP-21). */
+  get ribbonCollapsed(): boolean { return !!this.app?.ribbonCollapsed; }
+
+  /** WP-21 (PRD-004): the saved version of a module now (someone else's), to compare with the author's. */
+  async serverVersion(file: string): Promise<{ xml: string; hash: string }> {
+    const pid = this.projectId; if (!pid) throw new Error('No project is open.');
+    const d = await contentApi.readDm(pid, file);
+    return { xml: d.xml, hash: d.hash ?? '' };
+  }
+
+  /** WP-21 (PRD-004): check a merged text with the Studio's own validation (schema and BREX), without touching the open document. */
+  async checkText(xml: string, file: string): Promise<{ errors: number; messages: string[] }> {
+    const app = await this.ensure();
+    const { EditorDocument } = await import('../studio/core/document');
+    let doc;
+    try { doc = await EditorDocument.fromText(xml, file); } catch (e) { return { errors: 1, messages: [e instanceof Error ? e.message : String(e)] }; }
+    const r = await app.validator.validate(doc, { xsd: true, brex: true });
+    const errs = r.issues.filter((i) => i.severity === 'error');
+    return { errors: errs.length, messages: errs.map((i) => (i.line ? `Line ${i.line}: ${i.message}` : i.message)) };
+  }
+
+  /** WP-21 (PRD-004): put the merged text into the open module and save it over the other version (`hash`: the version the merge was made against). */
+  async saveMerged(file: string, xml: string, hash: string): Promise<boolean> {
+    const app = this.app; const ed = this.editorFor(file); const ref = ed ? this.refs.get(ed.doc) : undefined;
+    if (!app || !ed || !ref) throw new Error(`${file} is no longer open in the editor.`);
+    ed.commitXmlText(xml);
+    if (ed.xmlError) throw new Error(`The merged text is not well-formed XML: ${ed.xmlError.message}`);
+    this.refs.set(ed.doc, { ...ref, hash });
+    await app.save(ed);
+    return !app.hasUnsavedWork(ed);
   }
 
   /** The Administrator's lists for the New data module wizard (languages, countries, DM types, enterprises ...); refreshed each time the wizard opens. */
@@ -282,7 +325,7 @@ class StudioSession {
       }
       ed = restore && draft ? await app.openText(draft.text, file, null, { draftId: draft.id }) : await app.openText(doc.xml, file, null);
       if (!ed) return;
-      this.refs.set(ed.doc, object ? { file, hash: doc.hash ?? '', object: true } : { file, hash: doc.hash ?? '' });
+      this.refs.set(ed.doc, object ? { file, hash: doc.hash ?? '', object: true } : { file, hash: doc.hash ?? '', base: doc.xml });
       if (!restore) ed.doc.markSaved();
       else this.notify('Your unsaved changes are back. Save to keep them.', 'info');
       if (!object) await this.linkArtwork(doc.xml);
@@ -338,7 +381,7 @@ class StudioSession {
         this.refs.set(ed.doc, { ...ref, hash: out.hash });
       } else if (ref) {
         const out = await contentApi.saveDm(id, ref.file, text, ref.hash);
-        this.refs.set(ed.doc, { file: ref.file, hash: out.hash });
+        this.refs.set(ed.doc, { file: ref.file, hash: out.hash, base: text });
       } else {
         const suggested = ed.doc.suggestedFileName();
         if (!DM_FILE.test(suggested)) {
@@ -346,7 +389,7 @@ class StudioSession {
           return false;
         }
         const out = await contentApi.createDm(id, suggested, text);
-        this.refs.set(ed.doc, { file: suggested, hash: out.hash });
+        this.refs.set(ed.doc, { file: suggested, hash: out.hash, base: text });
         ed.doc.fileName = suggested;
       }
       void this.refreshProjectData({ dmsOnly: true });   // first, so the side list's request (started by onSaved's render) joins it
@@ -357,10 +400,13 @@ class StudioSession {
         // FE-007: the author keeps their version: as a file now, and as the draft (kept until they save or discard it).
         const app = this.app;
         const name = ref?.file ?? ed.doc.fileName;
+        // WP-21 (PRD-004): or compare the two versions and keep what is wanted from each (the platform's dialog, the same in the three editors)
+        const canCompare = !!this.onConflict && !!ref?.base;
         const choice = app ? await app.dialogs.confirm('Not saved: someone else changed this data module',
-          `${name} was saved by someone else after you opened it, so your save was refused. Your changes are still in the editor. Download your version to keep a copy, then reopen the module to see theirs and re-apply what you need.`,
-          [{ id: 'keep', label: 'Keep editing' }, { id: 'download', label: 'Download my version', primary: true }]) : null;
+          `${name} was saved by someone else after you opened it, so your save was refused. Your changes are still in the editor. ${canCompare ? 'Compare your version with theirs and keep what you want from each, or download' : 'Download'} your version to keep a copy, then reopen the module to see theirs and re-apply what you need.`,
+          [{ id: 'keep', label: 'Keep editing' }, { id: 'download', label: 'Download my version', primary: !canCompare }, ...(canCompare ? [{ id: 'compare', label: 'Compare and merge…', primary: true }] : [])]) : null;
         if (choice === 'download') downloadText(name.replace(/\.xml$/i, '') + ' (my version).xml', text);
+        if (choice === 'compare' && ref?.base) this.onConflict?.({ file: ref.file, base: ref.base, mine: text });
       } else if (e instanceof ApiError && e.status === 403) {
         this.notify(e.message || 'You do not have permission to change this data module.', 'error');
       } else {

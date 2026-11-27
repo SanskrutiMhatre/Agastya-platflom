@@ -3,28 +3,35 @@
 // =============================================================================
 
 import { tuneServer, sweepStaleUploads } from './services/uploads';
-import http from 'http';
+import type http from 'http';
 import path from 'path';
 import { sweepTempFiles } from './storage/atomicWrite';
 import { config, nowIso } from './config';
 import { createApp } from './app';
-import { store, audit, workspaceDir, registryDb } from './context';
+import { store, audit, workspaceDir, registryDb, defaultContext } from './context';
+import { startScheduler, stopScheduler } from './services/dataProtection';
 import { acquireWorkspaceLock, releaseWorkspaceLock } from './services/workspaceLock';
 import * as broadcast from './services/broadcast';
 import { reconcileRegistry, sweepPendingImports } from './services/projects';
 import { startRenderer, stopRenderer, rendererStatus } from './services/publisher';
+import { loadTls, listen, hostCheckFor, setHostCheck, describeNetwork } from './services/network';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { ensureBootstrapAdmin } = require('./core/auth/bootstrap');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 import { assertPasswordHashing } from './core/auth/crypto';
 
-let server: http.Server | null = null;
+let servers: http.Server[] = [];
 
 export async function start(port: number = config.port): Promise<number> {
   // WP-13 (ARC-019): Argon2 is required. Without it no stored password can be checked, so the server stops here with the cause instead of
   // starting and refusing every sign-in.
   assertPasswordHashing();
+  // WP-26: the certificate is read and checked before anything else (a bad one stops here naming the variable), and the Host rule learns
+  // the names in it.
+  const material = config.tls ? loadTls(config.tls) : null;
+  setHostCheck(hostCheckFor(config, material?.info.altNames ?? []));
+  if (material && material.info.daysLeft <= 30) console.warn(`[network] the TLS certificate expires in ${material.info.daysLeft} days (${material.info.validTo}); renew it (docs/OPERATIONS.md)`);
   // WP-06 (DEP-017): one server per data folder; a second one stops here naming the owner's process. Test harnesses that start several
   // in-process apps on one workspace on purpose opt out with AGASTYA_NO_WORKSPACE_LOCK=1.
   if (config.workspaceLock) acquireWorkspaceLock(workspaceDir);
@@ -36,32 +43,27 @@ export async function start(port: number = config.port): Promise<number> {
   const app = createApp();
   startRenderer();
 
-  return new Promise((resolve, reject) => {
-    const s = http.createServer(app);
-    tuneServer(s);
-    try { sweepStaleUploads(); } catch { /* the temp folder is a convenience */ }
-    setInterval(() => { try { sweepStaleUploads(); } catch { /* best effort */ } }, 3600_000).unref();     // aborted uploads must not pile up on a server that stays up
-    broadcast.attach(s);
-    s.on('error', reject);
-    const onListening = (): void => {
-      server = s;
-      const bound = (s.address() as { port: number }).port;
-      const r = rendererStatus();
-      console.log(`Agastya Platform v2 running on http://localhost:${bound}${config.host ? `  (listening on ${config.host} only)` : ''}`);
-      console.log(`  Workspace: ${workspaceDir}`);
-      console.log(`  Renderer:  ${r.warm ? 'warm FOP ready' : 'cold (per-request FOP)'}  java=${r.java}`);
-      console.log(`  Setup:     ${store.anyAdminExists() ? 'administrator exists' : 'first run - open the app to create the administrator'}  (${nowIso()})`);
-      resolve(bound);
-    };
-    if (config.host) s.listen(port, config.host, onListening);
-    else s.listen(port, onListening);
-  });
+  try { sweepStaleUploads(); } catch { /* the temp folder is a convenience */ }
+  setInterval(() => { try { sweepStaleUploads(); } catch { /* best effort */ } }, 3600_000).unref();     // aborted uploads must not pile up on a server that stays up
+  startScheduler(defaultContext());   // WP-12: scheduled backup, weekly restore test, retention (first run 10 minutes after start)
+  // WP-26: Mode A listens on loopback only, Mode B on the network with TLS only (services/network.ts; the certificate was checked above).
+  const l = await listen(app, port, config, material, (s) => { tuneServer(s); broadcast.attach(s); });
+  servers = l.servers;
+  const r = rendererStatus();
+  console.log(`Agastya Platform v2 running on ${l.scheme}://localhost:${l.port}  (listening on ${l.addresses.join(', ')})`);
+  console.log(`  Network:   ${describeNetwork(config, material?.info ?? null)}`);
+  console.log(`  Workspace: ${workspaceDir}`);
+  console.log(`  Renderer:  ${r.warm ? 'warm FOP ready' : 'cold (per-request FOP)'}  java=${r.java}`);
+  console.log(`  Setup:     ${store.anyAdminExists() ? 'administrator exists' : 'first run - open the app to create the administrator'}  (${nowIso()})`);
+  return l.port;
 }
 
 export function stop(): void {
+  stopScheduler();
   stopRenderer();
   broadcast.close();
-  if (server) { server.close(); server = null; }
+  for (const s of servers) s.close();
+  servers = [];
   releaseWorkspaceLock();
 }
 
@@ -71,20 +73,24 @@ export function stop(): void {
  */
 export function shutdownGracefully(graceMs = 15000): Promise<void> {
   return new Promise((resolve) => {
-    const s = server; server = null;
+    const all = servers; servers = [];
     let done = false;
     const finish = (): void => {
       if (done) return; done = true;
+      stopScheduler();
       try { stopRenderer(); } catch { /* best effort */ }
       try { registryDb.close(); } catch (e) { console.warn('[stop] database close:', (e as Error).message); }
       releaseWorkspaceLock();
       resolve();
     };
     try { broadcast.close(); } catch { /* best effort */ }
-    if (!s) return finish();
-    s.close(() => finish());
-    s.closeIdleConnections?.();                     // keep-alive sockets with nothing running must not hold the stop
-    setTimeout(() => { console.warn('[stop] requests still running after the grace period; stopping anyway'); s.closeAllConnections?.(); finish(); }, graceMs).unref();
+    if (!all.length) return finish();
+    let open = all.length;
+    for (const s of all) {
+      s.close(() => { if (--open === 0) finish(); });
+      s.closeIdleConnections?.();                   // keep-alive sockets with nothing running must not hold the stop
+    }
+    setTimeout(() => { console.warn('[stop] requests still running after the grace period; stopping anyway'); for (const s of all) s.closeAllConnections?.(); finish(); }, graceMs).unref();
   });
 }
 

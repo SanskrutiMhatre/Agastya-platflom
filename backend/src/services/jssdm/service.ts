@@ -13,6 +13,7 @@ import { nowIso } from '../../config';
 import { projectDirFor, workspaceDir, content } from '../../context';
 import { bad } from '../http';
 import { readProjectJson, updateProjectJson, csdbRel, mediaRel } from '../projects';
+import { assertS1000dPublication } from '../projectRecord';
 import { createDm, writeDm, csdbDir, listDms, listMedia, sha, type DmSummary } from '../csdb';
 import { pmPath, parseModel } from '../pm';
 import { buildPmXml, defaultPmMeta, pmContentXml, spliceContent, type PmEntryOut } from '../sns/pmxml';
@@ -187,6 +188,7 @@ export function idsForProject(projectId: string, over: GenIds = {}): GenIds {
 
 export async function generateForProject(projectId: string, req: GenerateRequest, actor: { id: string; username: string; role?: string }, projectRole: string): Promise<GenerateOutcome> {
   const pj = readProjectJson(projectId);
+  if (req.pm === 'merge' && !req.dryRun) assertS1000dPublication(projectId);    // WP-16 (PUB-022): the front matter is merged into an S1000D publication only
   const fm = req.frontMatter ?? pj.frontMatter ?? {};
   const publication = req.publication ?? pj.publication ?? {};
   if (!fm || typeof fm !== 'object' || Array.isArray(fm)) throw bad('frontMatter must be an object.', 'BAD_FRONT_MATTER');

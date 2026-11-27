@@ -10,17 +10,23 @@
 //                                pinned in packaging/product.json runtime.node, Node 24 LTS since WP-13)
 //            --no-arial       leave the four proprietary Arial font files out (Liberation Sans, metric-compatible, is used instead). Use it when
 //                             the party distributing the product does not hold a licence that lets it redistribute Arial.
+//            --release        a customer release (WP-24): refuses an unsigned or untimestamped build, a tree with uncommitted changes, the
+//                             placeholder publisher data and a missing EULA, and fails unless the finished release verifies offline.
 //
 // Output (in release/):
 //   Agastya-Platform-<version>-win-x64/                 the staged product (what both packages contain)
 //   Agastya-Platform-<version>-win-x64-portable.zip     unzip anywhere and run AgastyaPlatform.exe
 //   Agastya-Platform-<version>-win-x64-Setup.exe        the installer
-//   SHA256SUMS.txt
+//   Agastya-Platform-<version>-win-x64-SBOM.cdx.json    the software bill of materials (CycloneDX 1.5; also inside the product as SBOM.cdx.json)
+//   Verify-Release.ps1                                  offline verifier for the customer (Windows PowerShell 5.1, no other tool)
+//   SHA256SUMS.txt (+ SHA256SUMS.txt.sig when signed)   checksums of the above; the signature covers them all
+//   BUILD-INFO.json                                     commit, toolchain, signing set-up, artefact hashes
+// Inside the product: MANIFEST.sha256 (+ .sig): SHA-256 of every shipped file, checked by AgastyaCtl.exe --verify and at every start.
 //
-// Code signing: set AGASTYA_SIGN_CMD to a command containing $f where the file name goes, e.g.
-//   signtool sign /fd SHA256 /tr http://timestamp.example/ /td SHA256 /a $f
-// It is run on both executables and handed to the installer compiler to sign Setup.exe and the uninstaller. Without it the output is unsigned
-// and Windows SmartScreen will warn when a user first runs it - see docs/PACKAGING.md.
+// Code signing (WP-24, docs/SIGNING.md): set AGASTYA_SIGN_THUMBPRINT (certificate store / HSM) or AGASTYA_SIGN_PFX + AGASTYA_SIGN_PASSWORD, and
+// AGASTYA_SIGN_TIMESTAMP_URL; scripts/release/signing.mjs explains them. Every unsigned .exe/.dll/.node of the product, Setup.exe and the
+// uninstaller get an Authenticode signature; the manifest and SHA256SUMS.txt a detached signature with the same certificate. AGASTYA_SIGN_CMD
+// (a command with $f) still works for the executables. Without any, the output is unsigned and Windows SmartScreen will warn on first run.
 // =============================================================================
 
 import { spawnSync } from 'node:child_process';
@@ -29,6 +35,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { signingConfig, releaseSigningRefusals, signFiles, signDetached, describeSigning } from './release/signing.mjs';
+import { writeManifest, authenticode, signedIntact, isPe, listFiles, formatSums, MANIFEST_NAME } from './release/lib.mjs';
+import { buildSbom, checkSbom, sbomStats } from './release/sbom.mjs';
+import { verifyRelease } from './release/verify-release.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
@@ -53,6 +63,8 @@ const zipPath = path.join(outDir, `${stageName}-portable.zip`);
 const setupName = `${stageName}-Setup.exe`;
 const nodeExe = path.resolve(opt('--node') || process.execPath);
 const noArial = flag('--no-arial');
+const releaseMode = flag('--release');
+const signing = signingConfig();
 
 function run(cmd, args, o = {}) {
   const r = spawnSync(cmd, args, { stdio: 'inherit', cwd: root, ...o });
@@ -87,6 +99,20 @@ const feDist = path.join(root, 'frontend', 'dist', 'index.html');
 if (!fs.existsSync(beDist) || !fs.existsSync(feDist)) fail('There is no build. Run with --build (or npm run build first).');
 if (newest(path.join(root, 'backend', 'src')) > fs.statSync(beDist).mtimeMs) fail('backend/dist is older than backend/src. Run with --build.');
 if (newest(path.join(root, 'frontend', 'src')) > fs.statSync(feDist).mtimeMs) fail('frontend/dist is older than frontend/src. Run with --build.');
+// WP-16: the Studio bundles backend/src/shared (the BREX value forms and the XSD-pattern translator it shares with the server)
+if (newest(path.join(root, 'backend', 'src', 'shared')) > fs.statSync(feDist).mtimeMs) fail('frontend/dist is older than backend/src/shared, which it bundles. Run with --build.');
+
+// ---- 1b. a customer release refuses what it must not ship (WP-24: DEP-003, DEP-020, QA-001) -------------------------------------------------
+if (signing.problems.length) fail(`the signing set-up is not usable: ${signing.problems.join('; ')}`);
+if (releaseMode) {
+  const refusals = releaseSigningRefusals(signing);
+  const dirtyNow = spawnSync('git', ['status', '--porcelain', '--untracked-files=no'], { cwd: root, encoding: 'utf8' });
+  if (dirtyNow.status === 0 && dirtyNow.stdout.trim()) refusals.push('the working tree has uncommitted changes: a release is built from a commit');
+  if (!product.copyright || !product.url) refusals.push('packaging/product.json copyright and url are empty: set the distributing organisation (DEP-020)');
+  if (!fs.existsSync(path.join(root, 'docs', 'EULA.txt'))) refusals.push('docs/EULA.txt is missing: the installer must show the approved licence (DEP-020; template docs/legal/EULA.template.txt)');
+  if (refusals.length) fail(`--release refused:\n  - ${refusals.join('\n  - ')}`);
+  log(`release build; signing ${JSON.stringify(describeSigning(signing))}`);
+}
 
 // ---- 2. the Node.js runtime ----------------------------------------------------------------------------------------------------------------
 if (!fs.existsSync(nodeExe)) fail(`node.exe not found: ${nodeExe}`);
@@ -200,15 +226,16 @@ fs.writeFileSync(asmInfo, [
   `[assembly: AssemblyFileVersion("${version}.0")]`,
   '',
 ].join('\r\n'));
-const hostSrc = path.join(root, 'packaging', 'host', 'AgastyaHost.cs');
+// every .cs file of packaging/host (AgastyaHost.cs, and WP-24's Integrity.cs and SupportBundle.cs)
+const hostSrc = fs.readdirSync(path.join(root, 'packaging', 'host')).filter((f) => f.endsWith('.cs')).sort().map((f) => path.join(root, 'packaging', 'host', f));
 const icon = path.join(root, 'packaging', 'assets', 'agastya.ico');
-const common = ['-nologo', '-platform:x64', '-optimize+', `-win32icon:${icon}`, '-r:System.ServiceProcess.dll'];
+const common = ['-nologo', '-platform:x64', '-optimize+', `-win32icon:${icon}`, '-r:System.ServiceProcess.dll', '-r:System.IO.Compression.dll', '-r:System.Security.dll'];
 log('compiling the host program (AgastyaPlatform.exe, AgastyaCtl.exe)');
 for (const [out, extra] of [
   ['AgastyaPlatform.exe', ['-target:winexe', '-define:GUI', '-r:System.Windows.Forms.dll', '-r:System.Drawing.dll']],
   ['AgastyaCtl.exe', ['-target:exe']],
 ]) {
-  const r = capture(csc, [...common, ...extra, `-out:${path.join(stage, out)}`, hostSrc, asmInfo]);
+  const r = capture(csc, [...common, ...extra, `-out:${path.join(stage, out)}`, ...hostSrc, asmInfo]);
   if (r.status !== 0) fail(`csc failed for ${out}:\n${r.stdout}\n${r.stderr}`);
   const warn = (r.stdout + r.stderr).split(/\r?\n/).filter((l) => /warning CS/.test(l));
   if (warn.length) fail(`the host compiles with warnings, fix them:\n${warn.join('\n')}`);
@@ -301,11 +328,48 @@ fs.writeFileSync(path.join(stage, 'version.json'), JSON.stringify({
   node: nodeVer, java: jreVer, fop: '2.10', packages: npmPackages.length, commit: buildCommit, dirty: buildDirty,
 }, null, 2) + '\n');
 
-// ---- 8. signing (optional) -----------------------------------------------------------------------------------------------------------------
-const signCmd = process.env.AGASTYA_SIGN_CMD;
-const signFile = (f) => { const r = spawnSync(signCmd.replace(/\$f/g, `"${f}"`), { shell: true, stdio: 'inherit' }); if (r.status !== 0) fail(`signing ${path.basename(f)} failed`); };
-if (signCmd) { log('signing the executables'); for (const e of ['AgastyaPlatform.exe', 'AgastyaCtl.exe']) signFile(path.join(stage, e)); }
-else log('AGASTYA_SIGN_CMD is not set: the executables and the installer will be UNSIGNED (Windows SmartScreen will warn on first run)');
+// ---- 8. signing (WP-24) -----------------------------------------------------------------------------------------------------------------------
+// Every portable-executable file of the product that carries no signature yet is signed (the host executables, and the third-party files their
+// vendors shipped unsigned: xsltproc.exe and its DLLs, the argon2 native module); vendor-signed files (node.exe, the JRE) keep theirs.
+const signed = signing.mode !== 'none';
+const peFiles = listFiles(stage).filter(isPe).map((r) => path.join(stage, ...r.split('/')));
+let peStatus = await authenticode(peFiles);
+if (signed) {
+  const toSign = peStatus.filter((a) => a.status === 'NotSigned').map((a) => a.file);
+  log(`signing ${toSign.length} of ${peFiles.length} executable files (${peFiles.length - toSign.length} already carry their vendor's signature)`);
+  try { signFiles(signing, toSign, { description: product.name, log }); } catch (e) { fail(e.message); }
+  peStatus = await authenticode(peFiles);
+  const bad = peStatus.filter((a) => !signedIntact(a));
+  if (bad.length) fail(`after signing, ${bad.length} file(s) still carry no intact signature: ${bad.slice(0, 5).map((a) => `${path.relative(stage, a.file)} ${a.status}`).join(', ')}`);
+  if (releaseMode && signing.timestampUrl) {
+    const own = peStatus.filter((a) => toSign.includes(a.file) && !a.timestamped);
+    if (own.length) fail(`${own.length} signature(s) carry no time stamp although AGASTYA_SIGN_TIMESTAMP_URL is set: ${own.slice(0, 3).map((a) => path.basename(a.file)).join(', ')}`);
+  }
+} else log(`signing is not configured: the ${peStatus.filter((a) => a.status === 'NotSigned').length} unsigned executable files and the installer stay UNSIGNED (Windows SmartScreen will warn on first run)`);
+
+// ---- 8b. the software bill of materials, from the shipped bytes (DEP-026, RES-005) -------------------------------------------------------------
+const builtAt = new Date().toISOString();
+const sbomBuilt = buildSbom({ stage, commit: buildCommit, builtAt, product, version, nodeVersion: nodeVer });
+if (sbomBuilt.problems.length) fail(`SBOM: ${sbomBuilt.problems.join('; ')}`);
+if (sbomBuilt.lockfileDrift.length) {
+  // the shipped node_modules is not exactly backend/package-lock.json (install with `npm ci` before a release); the SBOM lists what ships
+  const msg = `${sbomBuilt.lockfileDrift.length} shipped npm package(s) are not in backend/package-lock.json at that place and version: ${sbomBuilt.lockfileDrift.slice(0, 6).join(', ')}${sbomBuilt.lockfileDrift.length > 6 ? ' ...' : ''}`;
+  if (releaseMode) fail(`${msg}. A release ships exactly the lockfile: run npm ci in backend/ and package again.`);
+  log(`NOTE: ${msg} (marked in the SBOM)`);
+}
+fs.writeFileSync(path.join(stage, 'SBOM.cdx.json'), JSON.stringify(sbomBuilt.bom, null, 2) + '\n');
+{
+  const problems = checkSbom(path.join(stage, 'SBOM.cdx.json'), { stage });
+  if (problems.length) fail(`the SBOM does not check: ${problems.join('; ')}`);
+  const s = sbomStats(sbomBuilt.bom);
+  log(`  SBOM: ${s.components} components (${s.backendNpm} backend npm, ${s.frontendNpm} web-client npm, ${s.other} other)`);
+}
+
+// ---- 8c. the file manifest of the product, signed with the same certificate (DEP-013) ----------------------------------------------------------
+const manifest = writeManifest(stage, { product: product.name, version, commit: buildCommit });
+log(`  ${MANIFEST_NAME}: ${manifest.count} files`);
+if (signed && signing.canSignManifest) { try { log(signDetached(signing, [manifest.file])); } catch (e) { fail(e.message); } }
+else if (signed) log(`NOTE: ${MANIFEST_NAME} is not signed (AGASTYA_SIGN_CMD alone cannot sign it; set AGASTYA_SIGN_THUMBPRINT or AGASTYA_SIGN_PFX)`);
 
 // ---- 9. the portable ZIP -------------------------------------------------------------------------------------------------------------------
 const outputs = [];
@@ -330,7 +394,9 @@ if (!flag('--no-installer')) {
   log(`building the installer with ${iscc}`);
   const args = ['/Q', `/DAppVersion=${version}`, `/DSourceDir=${stage}`, `/DOutputDir=${outDir}`, `/DRepoRoot=${root}`, `/DSetupIcon=${icon}`,
     `/DAppGuid=${product.appId}`, `/DAppPublisher=${product.publisher}`, `/DAppCopyright=${copyright}`, `/DAppUrl=${product.url || ''}`, `/DFirewallRule=${product.firewallRuleName}`];
-  if (signCmd) args.push('/DSigned=1', `/Sagastyasign=${signCmd.replace(/\$f/g, '$f')}`);
+  // Inno Setup signs Setup.exe and the uninstaller through the same configuration ($q is Inno's quote, $f the quoted file name); the password
+  // stays in the environment, it is never on the ISCC command line
+  if (signed) args.push('/DSigned=1', `/Sagastyasign=$q${process.execPath}$q $q${path.join(root, 'scripts', 'release', 'signing.mjs')}$q --sign $f`);
   args.push(path.join(root, 'packaging', 'installer', 'agastya.iss'));
   run(iscc, args);
   const setup = path.join(outDir, setupName);
@@ -338,15 +404,36 @@ if (!flag('--no-installer')) {
   outputs.push(setup);
 }
 
-// ---- 11. checksums -------------------------------------------------------------------------------------------------------------------------
-const sums = outputs.map((f) => `${sha256(f)} *${path.basename(f)}`);
-fs.writeFileSync(path.join(outDir, 'SHA256SUMS.txt'), sums.join('\n') + '\n');
+// ---- 11. the SBOM and the verifier beside the artefacts, checksums, their signature (WP-24) --------------------------------------------------
+const sbomOut = path.join(outDir, `${stageName}-SBOM.cdx.json`);
+fs.copyFileSync(path.join(stage, 'SBOM.cdx.json'), sbomOut);
+const verifier = path.join(outDir, 'Verify-Release.ps1');
+fs.copyFileSync(path.join(root, 'scripts', 'signing', 'Verify-Release.ps1'), verifier);
+// the deployment kit's detection rule for Intune / Configuration Manager (DEP-014, ENT-014; docs/DEPLOYMENT-KIT.md)
+const detect = path.join(outDir, 'Detect-AgastyaPlatform.ps1');
+fs.copyFileSync(path.join(root, 'packaging', 'deploy', 'Detect-AgastyaPlatform.ps1'), detect);
+outputs.push(sbomOut, verifier, detect);
+for (const f of ['SHA256SUMS.txt.sig']) fs.rmSync(path.join(outDir, f), { force: true });   // never leave the signature of an older build
+fs.writeFileSync(path.join(outDir, 'SHA256SUMS.txt'), formatSums(outDir, outputs.map((f) => path.basename(f))));
+if (signed && signing.canSignManifest) { try { log(signDetached(signing, [path.join(outDir, 'SHA256SUMS.txt')])); } catch (e) { fail(e.message); } }
+
+// the toolchain that made the build (DEP-026, reproducible-build record)
+const firstLine = (cmd, args) => { try { const r = spawnSync(cmd, args, { encoding: 'utf8', windowsHide: true }); return (r.stdout || r.stderr || '').split(/\r?\n/).map((l) => l.trim()).find(Boolean) || null; } catch { return null; } };
+const toolchain = { packagerNode: process.version, shippedNode: nodeVer, csc: firstLine(csc, ['-help']), java: jreVer, signtool: signing.signtool || null, os: `${os.type()} ${os.release()}` };
 fs.writeFileSync(path.join(outDir, 'BUILD-INFO.json'), JSON.stringify({
-  version, commit: buildCommit, dirty: buildDirty, builtAt: new Date().toISOString(), node: nodeVer, signed: !!signCmd,
+  version, commit: buildCommit, dirty: buildDirty, builtAt, node: nodeVer, release: releaseMode, signed, signing: describeSigning(signing), toolchain,
+  manifest: { files: manifest.count, signed: fs.existsSync(manifest.file + '.sig') }, sbom: path.basename(sbomOut),
   outputs: outputs.map((f) => ({ file: path.basename(f), sha256: sha256(f) })),
 }, null, 2) + '\n');
+
+// ---- 12. the finished release must verify offline, the way the customer will check it -------------------------------------------------------------
+const check = await verifyRelease({ release: outDir, requireSigned: releaseMode, requireTimestamp: releaseMode && !signing.allowNoTimestamp, thumbprint: signing.thumbprint || undefined });
+for (const r of check.rows) if (r.status !== 'PASS' || releaseMode) log(`  verify: ${r.status} ${r.check}: ${r.detail}`);
+if (!check.ok) fail('the release does not verify (scripts/release/verify-release.mjs); see the FAIL lines above');
+log(`  verify-release: OK (${check.rows.filter((r) => r.status === 'PASS').length} checks passed, ${check.rows.filter((r) => r.status === 'WARN').length} warnings)`);
+
 log('done:');
 for (const f of outputs) log(`  ${path.basename(f)}   ${(fs.statSync(f).size / 1048576).toFixed(1)} MB`);
 log(`  staged folder: ${stage}`);
-log('  SHA256SUMS.txt written');
-if (!signCmd) log('NOTE: unsigned build. For distribution, sign it (AGASTYA_SIGN_CMD) - see docs/PACKAGING.md.');
+log(`  SHA256SUMS.txt written${fs.existsSync(path.join(outDir, 'SHA256SUMS.txt.sig')) ? ' and signed' : ''}`);
+if (!signed) log('NOTE: unsigned build. For distribution, sign it (AGASTYA_SIGN_THUMBPRINT or AGASTYA_SIGN_PFX) - see docs/SIGNING.md.');

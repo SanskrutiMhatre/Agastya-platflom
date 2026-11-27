@@ -24,10 +24,10 @@ import { listItems } from './adminConfig';
 import { readProjectJson } from './projects';
 import { ISSUE_LABEL, type IssueKey } from './s1000dRef';
 import { expectedFileName, listObjects } from './csdbObjects';
+import { escAttr as esc } from '../lib/xml';
 
 const { validateDocument } = require('../../vendor/engine/validateSchema');
 
-const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const SCHEMA_URL = (issue: IssueKey, schema: string) => `http://www.s1000d.org/S1000D_${issue}/xml_schema_flat/${schema}.xsd`;
 const NS = 'xmlns:dc="http://www.purl.org/dc/elements/1.1/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"';
 const CAGE_RE = /^[A-Z0-9]{5}$/;

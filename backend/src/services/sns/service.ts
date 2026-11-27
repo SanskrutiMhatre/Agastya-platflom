@@ -8,6 +8,7 @@ import path from 'path';
 import { vendor } from '../../config';
 import { bad } from '../http';
 import { readProjectJson } from '../projects';
+import { assertS1000dPublication } from '../projectRecord';
 import { csdbDir, listDms, type DmSummary } from '../csdb';
 import { pmPath, parseModel } from '../pm';
 import { parseBrexModel } from '../brex';
@@ -158,6 +159,7 @@ function keepBackup(abs: string): string {
 
 /** Write a derived publication into the project (the previous file is kept as <name>.bak and in a timestamped history, see keepBackup). */
 export function applyDerived(projectId: string, out: ReturnType<typeof deriveForProject>): { counts: { folders: number; dms: number; total: number }; backup: string | null } {
+  assertS1000dPublication(projectId);                                  // WP-16 (PUB-022): never over a JSS document
   if (!structureDms(out.structure).length && out.pm.placement === 'replace') throw bad('Refusing to replace the publication with an empty one: there are no data modules to place.', 'EMPTY_PM');
   const abs = out.absPm;
   let backup: string | null = null;

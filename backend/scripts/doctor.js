@@ -30,6 +30,39 @@ row('Workspace path length (Windows 259-character limit)', process.platform !== 
   `${workspace} is ${workspace.length} characters; with an 80-character project name and a long data module file name a file path reaches ${worst}` +
   (worst < 260 || process.platform !== 'win32' ? '' : ' - move the workspace nearer the drive root (AGASTYA_WORKSPACE_DIR) or keep project names short'));
 
+// WP-26: the network setting as the server will apply it (Mode A loopback only; Mode B TLS only on the network), and the certificate's state.
+try {
+  const { config } = require(path.join(root, 'dist', 'config'));
+  const net = require(path.join(root, 'dist', 'services', 'network'));
+  const info = config.tls ? net.loadTls(config.tls).info : null;
+  row('Network and TLS', true, net.describeNetwork(config, info) + (info && info.daysLeft <= 30 ? ` - WARNING: the certificate expires in ${info.daysLeft} days; renew it` : ''));
+} catch (e) {
+  row('Network and TLS', false, /Cannot find module/.test(e.message) ? 'backend/dist is missing: build first' : `${e.message} - the server will not start with this setting`);
+}
+
+// WP-12 (PLT-013, DEP-013, G-REL-9): the database itself - quick_check, a schema from a newer version, and how old the newest backup is.
+// Opened read-only; nothing is written. A workspace without a database yet (first run) is not a failure.
+const dbFile = path.join(workspace, 'publisher.db');
+if (fs.existsSync(dbFile)) {
+  try {
+    const { DatabaseSync } = require('node:sqlite');
+    const db = new DatabaseSync(dbFile, { readOnly: true });
+    try {
+      const qc = db.prepare('PRAGMA quick_check').all().map((r) => String(Object.values(r)[0]));
+      row('Database quick_check', qc.length === 1 && qc[0] === 'ok', qc.length === 1 && qc[0] === 'ok' ? dbFile : `${qc.slice(0, 3).join('; ')} - restore the latest backup (docs/OPERATIONS.md, "Restore")`);
+      const known = new Set(require(path.join(root, 'src', 'storage', 'migrations')).ORDER);
+      let applied = []; try { applied = db.prepare('SELECT name FROM schema_migrations').all().map((r) => r.name); } catch { /* none yet */ }
+      const unknown = applied.filter((n) => !known.has(n));
+      row('Database schema not newer than this version', unknown.length === 0, unknown.length ? `written by a newer version (migrations ${unknown.join(', ')}); install that version again` : `${applied.length} of ${known.size} migrations applied`);
+    } finally { db.close(); }
+  } catch (e) { row('Database quick_check', false, e.message); }
+  const backupDir = process.env.AGASTYA_BACKUP_DIR || path.join(workspace, 'backups', 'platform');
+  let newest = null;
+  try { newest = fs.readdirSync(backupDir).filter((f) => /^agastya-backup-\d{8}-\d{6}Z-[a-z-]+(-\d+)?\.zip$/.test(f)).sort((a, b) => (a.slice(15, 31) < b.slice(15, 31) ? 1 : -1))[0] || null; } catch { /* no folder yet */ }
+  const ageDays = newest ? (Date.now() - Date.parse(newest.replace(/^agastya-backup-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})Z.*$/, '$1-$2-$3T$4:$5:$6Z'))) / 86400000 : Infinity;
+  row('Platform backup in the last 7 days (optional)', ageDays < 7, newest ? `${newest} (${ageDays.toFixed(1)} days old) in ${backupDir}` : `none in ${backupDir} - Administrator > Maintenance > Back up now`);
+}
+
 row('Client build (optional)', fs.existsSync(path.resolve(root, '..', 'frontend', 'dist', 'index.html')), 'run "npm run build" in frontend/ to serve the UI from this process');
 
 let bad = 0;

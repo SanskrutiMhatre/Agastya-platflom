@@ -23,6 +23,8 @@ import type { Duplex } from 'stream';
 import { WebSocketServer, WebSocket } from 'ws';
 import { authz, store, sessionsSvc } from '../context';
 import { originAllowed } from './origin';
+import { hostAllowed } from './network';
+import { clientAccepted } from './version';
 
 interface Client { ws: WebSocket; user: any; sessionId: string; can: Map<string, { ok: boolean; at: number }> }
 
@@ -55,12 +57,13 @@ export function recheck(userId: string | null): void {
 
 export function attach(server: HttpServer): void {
   server.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) => {
-    if (!req.url || !req.url.startsWith('/ws')) { socket.destroy(); return; }
-    if (!originAllowed(req.headers.origin, req.headers.host)) {
-      socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
-      socket.destroy();
-      return;
-    }
+    // WP-26: exactly /ws (not any path that starts with it); the same Host, Origin and client-version rules as the HTTP API, in that order.
+    const url = new URL(req.url ?? '/', 'http://upgrade.invalid');
+    if (url.pathname !== '/ws') { socket.destroy(); return; }
+    const refuse = (status: string): void => { socket.write(`HTTP/1.1 ${status}\r\nConnection: close\r\n\r\n`); socket.destroy(); };
+    if (!hostAllowed(req.headers.host)) { refuse('421 Misdirected Request'); return; }
+    if (!originAllowed(req.headers.origin, req.headers.host)) { refuse('403 Forbidden'); return; }
+    if (!clientAccepted(url.searchParams.get('client') ?? undefined)) { refuse('426 Upgrade Required'); return; }
     const auth = authz.authForUpgrade(req);
     if (!auth) {
       const reason = sessionsSvc.endReasonFromCookieHeader(req.headers.cookie || '');

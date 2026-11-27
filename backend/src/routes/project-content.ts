@@ -30,6 +30,7 @@ import { publicationSources } from '../services/pm';
 import * as review from '../services/review';
 import { createProjectBrex, missingBrex } from '../services/projectBrex';
 import { isS1000dProject } from '../services/projects';
+import { assertS1000dPublication } from '../services/projectRecord';
 import { checkDmEnterprises } from '../services/enterprises';
 import * as validation from '../services/validation';
 import * as publisher from '../services/publisher';
@@ -274,6 +275,7 @@ export function registerProjectContentRoutes(app: Express): void {
     if (!guard.ok) throw bad(guard.error, 'UNSAFE_XML');
     const parsed = vendor('engine/pmc').parsePm(text);
     if (!parsed.entries.length) throw bad('That publication module has no entries.', 'EMPTY_PM');
+    assertS1000dPublication(req.project.id);                           // WP-16 (PUB-022): refused by the writer itself, not only by routes/jss-guard.ts
     const abs = pm.pmPath(req.project.id);
     if (fs.existsSync(abs)) fs.copyFileSync(abs, abs + '.bak');
     content.writeText(req.project.id, abs, text);

@@ -29,12 +29,6 @@ export interface ObjectSummary {
   title: string; schema: string; issue: string; size: number; modified: string;
 }
 
-const attrs = (src: string): Record<string, string> => {
-  const out: Record<string, string> = {};
-  const re = /([\w:.-]+)\s*=\s*"([^"]*)"/g; let m: RegExpExecArray | null;
-  while ((m = re.exec(src))) out[m[1]] = m[2];
-  return out;
-};
 const tag = (xml: string, name: string): Record<string, string> | null => { const m = new RegExp(`<${name}\\b([^>]*?)\\/?>`).exec(xml); return m ? attrs(m[1]) : null; };
 
 export function kindOfXml(xml: string): ObjectKind | null {
@@ -147,6 +141,7 @@ import { checkXmlSafetyOf, contentCheck } from './csdbGuard';
 import { sha } from './csdbIndex';
 import { saveRevisioned, withDocumentLock } from './projectFiles';
 import { conflict } from './http';
+import { readAttrs as attrs } from './xmlHead';
 
 export interface ObjectActor { id: string; username: string; role?: string }
 

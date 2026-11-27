@@ -4,6 +4,7 @@ import { teamApi, workspaceApi } from '../api';
 import { StatusBadge, BackupButton } from '../components/Oversight';
 import { useSession } from '../store/session';
 import { Icon } from '../components/Icon';
+import { RowLink } from '../components/a11y';
 import { SampleButton } from '../components/SampleButton';
 import { CreateProjectModal, RoleBadge, formatLabel } from '../components/project';
 import { Alert, Badge, Empty, Loading, PromptModal, ago, useAsync } from '../components/ui';
@@ -60,7 +61,7 @@ export function Projects() {
             <tbody>
               {rows.slice(0, shown.limit).map((p) => (
                 <tr key={p.id} className="clickable" onClick={() => open(p.id)} data-testid="project-row">
-                  <td><strong>{p.name}</strong>{p.hasPdf ? <> <Badge tone="ok">PDF built</Badge></> : null}{p.missingSince ? <> <Badge tone="bad">Folder missing</Badge></> : null}</td>
+                  <td><strong><RowLink href={`/projects/${p.id}`} onOpen={() => open(p.id)}>{p.name}</RowLink></strong>{p.hasPdf ? <> <Badge tone="ok">PDF built</Badge></> : null}{p.missingSince ? <> <Badge tone="bad">Folder missing</Badge></> : null}</td>
                   {overseer ? <td>{status.data?.get(p.id) ? <StatusBadge status={status.data.get(p.id)!.status} stale={status.data.get(p.id)!.changedSinceRelease} /> : null}</td> : null}
                   <td>{p.folder || <span className="v2-hint">—</span>}</td>
                   {role === 'admin' ? <td>{p.owners[0] ?? '-'}</td> : <td><RoleBadge role={p.role} /></td>}

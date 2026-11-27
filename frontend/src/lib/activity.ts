@@ -56,7 +56,11 @@ export const ACTION_LABEL: Record<string, string> = {
   'auth.session.revoked': 'had the sessions ended',
   'reset.requested': 'asked for a password reset', 'reset.approved': 'approved a password reset', 'reset.rejected': 'refused a password reset',
   'settings.platform': 'changed the platform settings', 'settings.security_policy': 'changed the security policy', 'maintenance.reindex': 're-indexed the documents',
-  'backup.exported': 'exported the project data',
+  'backup.exported': 'exported the project files',
+  // WP-12: the platform backup
+  'backup.created': 'made a platform backup', 'backup.failed': 'could not make a platform backup', 'backup.downloaded': 'downloaded a platform backup',
+  'backup.copied': 'copied a platform backup', 'backup.restored': 'restored a platform backup into a new folder', 'backup.deleted': 'deleted a platform backup',
+  'backup.restore_tested': 'tested the restore of a platform backup', 'backup.pruned': 'removed old scheduled backups', 'retention.purged': 'removed records past their retention',
 };
 
 /** An action's sentence; an unknown one is worded from its code (never shown as a dotted code). */

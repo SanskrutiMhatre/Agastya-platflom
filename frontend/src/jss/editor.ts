@@ -131,9 +131,11 @@ export class JssEditor {
     const norm = (t: string): string => t.replace(/[‘’´`]/g, "'").replace(/\s+/g, ' ').trim().toLowerCase();
     let node: object | null = null;
     if (key.startsWith('id:')) node = this.nodeById(key.slice(3));
-    else { const m = /^t:(\d+):(.*?)(?:#\d+)?$/.exec(key); if (m) {
+    else { const m = /^t:(\d+):(.*?)(?:#(\d+))?$/.exec(key); if (m) {
       const ch = this.doc.chapters[Number(m[1]) - 1]; const title = m[2].replace(/ \(introduction\)$/, '');
-      node = ch ? (ch.children.filter(isSection).find((s) => norm(s.title) === title) ?? (norm(ch.title) === title ? ch : null)) : null;
+      // WP-21 (GAP-004): "#n" is the n-th section of that title without an id (the server numbers them so, xengine/outline.ts keyOf)
+      const same = ch ? ch.children.filter(isSection).filter((s) => !s.id && norm(s.title) === title) : [];
+      node = ch ? (same[Number(m[3] ?? 1) - 1] ?? (m[3] ? null : ch.children.filter(isSection).find((s) => norm(s.title) === title)) ?? (!m[3] && norm(ch.title) === title ? ch : null)) : null;
     } }
     if (!node) return false;
     this.setView('edit'); this.scrollToNode(node); return true;
@@ -646,7 +648,7 @@ export class JssEditor {
     this.outlineEl.textContent = '';
     this.outlineEl.append(h('h3', {}, 'Outline'));
     const add = (node: Chapter | Section, label: string, num: string, cls: string) => {
-      const row = h('div', { class: `jss-ol ${cls}`, role: 'button', tabindex: 0, title: label, on: { click: () => this.scrollToNode(node), keydown: (e: KeyboardEvent) => { if (e.key === 'Enter') this.scrollToNode(node); } } }, h('span', { class: 'n' }, num), h('span', {}, label));
+      const row = h('div', { class: `jss-ol ${cls}`, role: 'button', tabindex: 0, title: label, on: { click: () => this.scrollToNode(node), keydown: (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.scrollToNode(node); } } } }, h('span', { class: 'n' }, num), h('span', {}, label));
       this.elNode.set(row, node); row.setAttribute('data-ol', ''); this.outlineEl.append(row);
     };
     const walk = (children: Children, indent: number) => { for (const c of children) if (isSection(c)) { add(c, c.title || '(untitled)', this.numbers.heading.get(c) ?? '', ''); (this.outlineEl.lastElementChild as HTMLElement).style.paddingLeft = `${12 + indent * 12}px`; walk(c.children, indent + 1); } };
@@ -688,7 +690,7 @@ export class JssEditor {
     this.problemsEl.append(h('summary', {}, this.findings.length ? `Problems: ${errors} error${errors === 1 ? '' : 's'}, ${warns} warning${warns === 1 ? '' : 's'}` : 'No problems found'));
     if (errors) this.problemsEl.open = true;
     for (const f of this.findings) {
-      this.problemsEl.append(h('div', { class: 'jss-pr', role: 'button', tabindex: 0, on: { click: () => this.goTo(f.location), keydown: (e: KeyboardEvent) => { if (e.key === 'Enter') this.goTo(f.location); } } },
+      this.problemsEl.append(h('div', { class: 'jss-pr', role: 'button', tabindex: 0, on: { click: () => this.goTo(f.location), keydown: (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.goTo(f.location); } } } },
         h('span', { class: `sev ${f.severity}`, title: f.severity }), h('span', { class: 'rule' }, f.rule), h('span', {}, f.message), h('span', { class: 'at' }, `line ${f.line}`)));
     }
   }

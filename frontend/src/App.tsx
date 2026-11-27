@@ -3,7 +3,8 @@ import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { useSession } from './store/session';
 import { authApi } from './api';
 import { Loading, Toasts } from './components/ui';
-import { ReauthDialog, UnreachableBanner } from './components/SessionDialogs';
+import { ReauthDialog, UnreachableBanner, VersionMismatchDialog } from './components/SessionDialogs';
+import { runHandshake } from './lib/handshake';
 import { AuthScreens } from './pages/AuthScreens';
 import { AppShell } from './layouts/AppShell';
 import { Overview } from './pages/Overview';
@@ -42,6 +43,8 @@ export function App() {
   const user = useSession((s) => s.user);
   const unreachable = useSession((s) => s.unreachable);
   useEffect(() => { void load(); }, [load]);
+  // WP-26: the version handshake, once per page load, beside the session check (it never delays it).
+  useEffect(() => { void runHandshake(); }, []);
 
   // WP-03 / FE-003: on every page (the editors included), typing or clicking is reported as activity at most every four minutes, so a working
   // author is not signed out for being idle; and a background check every minute notices an ended session early, while the work is still
@@ -104,5 +107,5 @@ export function App() {
       <Route path="*" element={<Navigate to="/overview" replace />} />
     </Routes>
   );
-  return <>{body}{status === 'authed' ? <ReauthDialog /> : null}<UnreachableBanner /><Toasts /><FocusTooltip /></>;
+  return <>{body}{status === 'authed' ? <ReauthDialog /> : null}<UnreachableBanner /><VersionMismatchDialog /><Toasts /><FocusTooltip /></>;
 }

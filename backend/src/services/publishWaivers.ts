@@ -23,6 +23,19 @@ const FILE = 'publish-waivers.json';
 
 const fileOf = (projectId: string): string => path.join(projectDirFor(projectId), FILE);
 
+/**
+ * WP-16 (S1K-002): the subject as the gate names it. The gate names a missing BREX by its bare data module code
+ * (`DMC-S1KSTUDIO-A-00-00-00-00A-022A-D`); an author or a script may send the module's file name instead
+ * (`DMC-..._001-00_EN-US.XML`). Both mean the same BREX, so the issue/language suffix and the extension are taken off and the case is
+ * folded. Formerly a subject that one of the two strings merely ended with matched (a waiver for `022A-D` covered every BREX), and a
+ * file-name subject matched nothing: it was accepted (201) and silently never applied.
+ */
+export function waiverSubject(subject: string): string {
+  return String(subject ?? '').trim().replace(/\.xml$/i, '').replace(/_\d{3}-\d{2}(_[A-Za-z]{2}-[A-Za-z]{2})?$/, '').toUpperCase();
+}
+/** The comparison key: the normalised subject without a leading `DMC-` (a subject sent without the prefix names the same module). */
+const subjectKey = (subject: string): string => waiverSubject(subject).replace(/^DMC-/, '');
+
 export function listWaivers(projectId: string): Waiver[] {
   try {
     const raw = JSON.parse(fs.readFileSync(fileOf(projectId), 'utf8'));
@@ -41,13 +54,14 @@ function save(projectId: string, list: Waiver[]): void {
 export function addWaiver(projectId: string, input: { kind?: unknown; subject?: unknown; reason?: unknown }, by: string): Waiver {
   const kind = String(input.kind ?? '');
   if (!WAIVER_KINDS.includes(kind as WaiverKind)) throw bad(`kind must be one of: ${WAIVER_KINDS.join(', ')}.`, 'BAD_WAIVER_KIND');
-  const subject = String(input.subject ?? '').trim();
-  if (!SUBJECT.test(subject)) throw bad('subject must be the data module code or file name the gate named (letters, digits, . _ -).', 'BAD_WAIVER_SUBJECT');
+  const raw = String(input.subject ?? '').trim();
+  const subject = waiverSubject(raw);
+  if (!SUBJECT.test(raw) || !SUBJECT.test(subject)) throw bad('subject must be the data module code or file name the gate named (letters, digits, . _ -).', 'BAD_WAIVER_SUBJECT');
   const reason = String(input.reason ?? '').trim();
   if (reason.length < 10) throw bad('Say why in at least a sentence (10 characters): the reason is recorded with the waiver.', 'WAIVER_REASON_REQUIRED');
   if (reason.length > 500) throw bad('The reason is limited to 500 characters.', 'WAIVER_REASON_TOO_LONG');
   const w: Waiver = { id: crypto.randomBytes(6).toString('hex'), kind: kind as WaiverKind, subject, reason, by, at: new Date().toISOString() };
-  const rest = listWaivers(projectId).filter((x) => !(x.kind === w.kind && x.subject.toLowerCase() === subject.toLowerCase()));
+  const rest = listWaivers(projectId).filter((x) => !(x.kind === w.kind && subjectKey(x.subject) === subjectKey(subject)));
   save(projectId, [...rest, w]);
   return w;
 }
@@ -61,6 +75,6 @@ export function removeWaiver(projectId: string, id: string): boolean {
 }
 
 export function waiverFor(projectId: string, kind: WaiverKind, subject: string): Waiver | undefined {
-  const s = String(subject).toLowerCase();
-  return listWaivers(projectId).find((w) => w.kind === kind && (w.subject.toLowerCase() === s || s.endsWith(w.subject.toLowerCase()) || w.subject.toLowerCase().endsWith(s)));
+  const s = subjectKey(subject);
+  return listWaivers(projectId).find((w) => w.kind === kind && subjectKey(w.subject) === s);
 }

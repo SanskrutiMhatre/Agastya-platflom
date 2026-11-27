@@ -15,9 +15,9 @@ import { expectedFileName, type ObjectKind } from './csdbObjects';
 import { listDms, csdbDir } from './csdb';
 import fs from 'fs';
 import path from 'path';
+import { escAttr as esc } from '../lib/xml';
 
 const { validateDocument } = require('../../vendor/engine/validateSchema');
-const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const NS = 'xmlns:dc="http://www.purl.org/dc/elements/1.1/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"';
 const pad = (n: number, w: number) => String(n).padStart(w, '0');
 const ymd = () => { const d = new Date(); return { year: String(d.getFullYear()), month: pad(d.getMonth() + 1, 2), day: pad(d.getDate(), 2) }; };

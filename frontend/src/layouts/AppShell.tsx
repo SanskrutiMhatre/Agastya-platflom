@@ -4,8 +4,9 @@
 //   author           Overview, Workspace, Projects, Graphics, CIR, Backup, Settings
 // Notifications and the account menu sit together at the right of the top bar, icons only.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { HeadingLevel, MAIN_ID, SkipLink, useDocumentTitle } from '../components/a11y';
 import { Icon, type IconName } from '../components/Icon';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { useSession } from '../store/session';
@@ -56,9 +57,26 @@ export function AppShell() {
   const items = NAV.filter((n) => !n.roles || (user && n.roles.includes(user.role)));
   const current = items.find((n) => loc.pathname.startsWith(n.to));
   const title = current?.label ?? TITLES[loc.pathname] ?? appName;
+  useDocumentTitle(title, appName);
+
+  // WP-23 (UX-005 d): the account menu behaves as a menu: opening it puts focus on the first item, Up/Down/Home/End move between the items,
+  // Escape closes it and returns focus to the button, Tab closes it and moves on. Down on the closed button opens it.
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const menuItems = () => Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
+  useEffect(() => { if (menu) menuItems()[0]?.focus(); }, [menu]);
+  const menuKeys = (e: ReactKeyboardEvent) => {
+    if (!menu) { if (e.key === 'ArrowDown' && e.target === menuButton.current) { e.preventDefault(); setMenu(true); } return; }
+    const items = menuItems();
+    const at = items.indexOf(document.activeElement as HTMLElement);
+    if (e.key === 'Escape') { e.preventDefault(); setMenu(false); menuButton.current?.focus(); }
+    else if (e.key === 'Tab') setMenu(false);
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); items[(at + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus(); }
+    else if (e.key === 'Home' || e.key === 'End') { e.preventDefault(); items[e.key === 'Home' ? 0 : items.length - 1]?.focus(); }
+  };
 
   return (
     <div className="v2-shell">
+      <SkipLink />
       <aside className="v2-side" aria-label="Sidebar">
         <div className="v2-brand"><span className="v2-brand-mark"><Icon name="book" size={16} /></span><span className="v2-trunc">{appName}</span></div>
         <nav className="v2-nav" aria-label="Main navigation">
@@ -82,22 +100,24 @@ export function AppShell() {
             <Icon name="bell" size={17} />
             {unread > 0 ? <span className="v2-count v2-bell-count" data-testid="unread-count">{unread > 99 ? '99+' : unread}</span> : null}
           </NavLink>
-          <div ref={menuRef} style={{ position: 'relative' }}>
-            <button className="icon-btn" onClick={() => setMenu((m) => !m)} aria-haspopup="menu" aria-expanded={menu} aria-label="Account menu" title="Account" data-testid="account-menu">
+          <div ref={menuRef} style={{ position: 'relative' }} onKeyDown={menuKeys}>
+            <button ref={menuButton} className="icon-btn" onClick={() => setMenu((m) => !m)} aria-haspopup="menu" aria-expanded={menu} aria-label="Account menu" title="Account" data-testid="account-menu">
               <Icon name="user" size={20} />
             </button>
             {menu ? (
-              <div className="v2-card" role="menu" style={{ position: 'absolute', right: 0, top: 38, width: 200, zIndex: 20, padding: 6, boxShadow: 'var(--shadow-2)' }}>
+              <div className="v2-card" role="menu" aria-label="Account" style={{ position: 'absolute', right: 0, top: 38, width: 200, zIndex: 20, padding: 6, boxShadow: 'var(--shadow-2)' }}>
                 <div style={{ padding: '4px 10px 6px' }}><span className="v2-hint">{globalLabel(user?.role)}</span></div>
                 <div className="v2-nav" style={{ padding: 0 }}>
-                  <button className="v2-navbtn" role="menuitem" onClick={() => { setMenu(false); nav('/settings'); }}><Icon name="settings" />Account settings</button>
-                  <button className="v2-navbtn" role="menuitem" onClick={() => void logout()}><Icon name="logout" />Sign out</button>
+                  <button className="v2-navbtn" role="menuitem" tabIndex={-1} onClick={() => { setMenu(false); nav('/settings'); }}><Icon name="settings" />Account settings</button>
+                  <button className="v2-navbtn" role="menuitem" tabIndex={-1} onClick={() => void logout()}><Icon name="logout" />Sign out</button>
                 </div>
               </div>
             ) : null}
           </div>
         </header>
-        <Outlet />
+        <main id={MAIN_ID} className="v2-main-region" tabIndex={-1}>
+          <HeadingLevel level={2}><Outlet /></HeadingLevel>
+        </main>
       </div>
     </div>
   );

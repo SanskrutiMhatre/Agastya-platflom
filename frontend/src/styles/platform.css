@@ -40,6 +40,14 @@ a:hover { text-decoration: underline; }
 .v2-nav .v2-count { margin-left: auto; font-size: 11px; background: var(--accent); color: var(--accent-text); border-radius: 10px; padding: 0 6px; min-width: 18px; text-align: center; line-height: 18px; }
 .v2-side-foot { margin-top: auto; padding: 8px; border-top: 1px solid var(--border); }
 .v2-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+/* WP-23 (UX-005): the main landmark of the shell (it fills the column like the page did), the skip link and the keyboard target of a table row */
+.v2-main-region { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.v2-main-region:focus, main.v2-main:focus { outline: none; }
+.v2-skip { position: absolute; left: 8px; top: 8px; z-index: var(--z-tooltip); padding: 6px 12px; min-height: 24px; border-radius: var(--radius-sm); background: var(--accent); color: var(--accent-text); font-weight: 600; text-decoration: none; transform: translateY(-200%); }
+.v2-skip:focus, .v2-skip:focus-visible { transform: none; outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.v2-row-link { padding: 0; margin: 0; border: 0; background: none; font: inherit; color: inherit; text-align: inherit; text-decoration: none; cursor: pointer; }
+.v2-row-link:hover { text-decoration: underline; }
+.v2-row-link:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 2px; }
 .v2-top { display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 20px; background: var(--bg-elev); border-bottom: 1px solid var(--border); flex: none; }
 .v2-top h1 { font-size: 16px; margin: 0; font-weight: 650; }
 /* WP-07 (UX-006): the editors' header wraps onto a second row instead of pushing Split / PDF / Generate past the right edge (stop-gap before WP-22) */
@@ -136,6 +144,9 @@ a:hover { text-decoration: underline; }
 
 /* ------------------------------------------------------------ toasts */
 .v2-toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 300; }
+/* WP-23: the two live regions of Toasts (ui.tsx); an empty region takes no room and adds no gap */
+.v2-toast-region { display: flex; flex-direction: column; gap: 8px; }
+.v2-toast-region:empty { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .v2-toast { padding: 10px 14px; border-radius: 8px; background: var(--text); color: var(--bg-elev); box-shadow: var(--shadow-2); font-size: 13px; max-width: 420px; }
 .v2-toast.error { background: var(--toast-error); color: var(--text-on-solid); }
 .v2-toast.success { background: var(--toast-success); color: var(--text-on-solid); }
@@ -245,7 +256,7 @@ a:hover { text-decoration: underline; }
 .v2-ph-main { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .v2-ph-icon { width: 46px; height: 46px; border-radius: 12px; background: linear-gradient(135deg, var(--accent-soft), var(--bg-active)); color: var(--accent); display: grid; place-items: center; flex: none; }
 .v2-ph-text { flex: 1; min-width: 200px; }
-.v2-ph-text h2 { margin: 0; font-size: 21px; font-weight: 700; letter-spacing: -.01em; }
+.v2-ph-text :is(h1, h2) { margin: 0; font-size: 21px; font-weight: 700; letter-spacing: -.01em; }
 .v2-ph-text p { margin: 3px 0 0; color: var(--text-muted); font-size: 13px; }
 .v2-ph-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .v2-ph-stats { display: flex; gap: 10px; flex-wrap: wrap; margin: 16px 0 0; padding: 0; }
@@ -438,3 +449,51 @@ html.v2-compact .v2-table th { padding-top: 5px; padding-bottom: 5px; }
 /* FE-004: the server is not answering; the page stays usable. */
 .v2-offline-banner { position: fixed; left: 50%; top: 8px; transform: translateX(-50%); z-index: 1000; padding: 6px 14px; border-radius: 6px;
   background: var(--warning-soft); color: var(--warning); border: 1px solid currentColor; font-size: 13px; box-shadow: var(--shadow-banner); }
+
+/* ------------------------------------------------ WP-21: the editor host chrome (editors/host) */
+.v2-edactions { display: contents; }
+.v2-edstate { flex: none; }
+.v2-edcmd { gap: 6px; color: var(--text-muted); }
+.v2-kbd { display: inline-flex; align-items: center; height: 18px; padding: 0 5px; border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 4px; background: var(--bg-sunken); color: var(--text-muted); font: 600 10.5px/1 var(--font-mono); white-space: nowrap; }
+.v2-kbd + .v2-kbd { margin-left: 3px; }
+.icon-btn.is-on { background: var(--accent-soft); color: var(--accent); }
+/* focus mode: the page and a slim header (06 section 7.2); the project rail steps aside */
+.v2-edhead.is-focus { min-height: 34px; padding-top: 2px; padding-bottom: 2px; }
+html[data-editor-focus] .v2-pshell { grid-template-columns: 0 1fr !important; }
+html[data-editor-focus] .v2-pshell > .v2-rail { visibility: hidden; overflow: hidden; width: 0; padding: 0; border: 0; }
+@media (max-width: 1100px) { .v2-edcmd-label { display: none; } }
+@media (max-width: 760px) { .v2-edcmd .v2-kbd { display: none; } }
+
+/* the command palette */
+.v2-palette { list-style: none; margin: 8px 0 0; padding: 0; max-height: min(52vh, 420px); overflow: auto; border: 1px solid var(--border); border-radius: 6px; }
+.v2-palette li { display: flex; align-items: center; gap: 10px; padding: 6px 10px; cursor: pointer; border-bottom: 1px solid var(--border); }
+.v2-palette li:last-child { border-bottom: 0; }
+.v2-palette li.on { background: var(--accent-soft); }
+.v2-palette li.off { color: var(--text-disabled); cursor: not-allowed; }
+.v2-palette-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2-palette-group { font-size: 11px; color: var(--text-faint); }
+.v2-palette-none { padding: 10px; color: var(--text-muted); }
+
+/* the shortcuts dialog */
+.v2-shortcuts-h { margin: 6px 0; font-size: 13px; }
+.v2-shortcuts-t td { vertical-align: top; }
+.v2-shortcuts-t td:first-child { white-space: nowrap; }
+
+/* the JSS find bar */
+.v2-findbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 6px 12px; border-bottom: 1px solid var(--border); background: var(--bg-elev); color: var(--text-muted); }
+.v2-findbar .v2-input { width: 200px; height: 28px; }
+.v2-findbar-case { gap: 4px; font-size: 12px; }
+::highlight(host-find) { background: var(--paper-find); color: var(--paper-ink); }
+::highlight(host-find-cur) { background: var(--paper-find-current); color: var(--paper-ink); }
+
+/* compare and merge */
+.v2-merge-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; max-height: 58vh; overflow: auto; }
+.v2-merge-item { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; background: var(--bg-elev); }
+.v2-merge-item.conflict { border-color: var(--warning); }
+.v2-merge-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; margin-top: 6px; }
+.v2-merge-lines { margin: 2px 0 0; padding: 6px 8px; max-height: 180px; overflow: auto; border-radius: 4px; font: 12px/1.45 var(--font-mono); white-space: pre-wrap; word-break: break-word; background: var(--bg-sunken); color: var(--text); }
+.v2-merge-lines.del { background: var(--danger-soft); }
+.v2-merge-lines.add { background: var(--success-soft); }
+.v2-merge-pick { display: block; padding: 6px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+.v2-merge-pick.on { border-color: var(--accent); background: var(--accent-soft); }
+@media (max-width: 760px) { .v2-merge-cols { grid-template-columns: minmax(0, 1fr); } }

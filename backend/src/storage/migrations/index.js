@@ -25,6 +25,8 @@ const ORDER = [
   '019-review-comment-anchor',
   '020-login-throttle',
   '021-project-lifecycle',
+  // WP-12: from here on every step is appended with the next number (storage/schema.ts checkOrder refuses anything else).
+  '022-audit-project-index',
   '023-document-leases',
 ];
 

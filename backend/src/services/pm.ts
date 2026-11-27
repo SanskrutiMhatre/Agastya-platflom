@@ -16,6 +16,7 @@ import { projectDirFor, content } from '../context';
 import { bad, conflict } from './http';
 import { sha } from './csdbIndex';
 import { readProjectJson, csdbRel, pmRel } from './projects';
+import { assertS1000dPublication } from './projectRecord';
 import { listDms, type DmSummary } from './csdb';
 import { parsePmComplete } from './importer/pmComplete';
 import { RECONSTRUCTED_MARKER } from './importer/package';
@@ -138,6 +139,7 @@ export function carryReconstructedMarker(prior: string, next: string): string {
 
 /** `baseHash` (mandatory on the route, WP-11 FE-008): the version of the publication module the editor loaded; a newer file refuses the save (409 EDIT_CONFLICT). */
 export function writePm(projectId: string, model: { meta?: unknown; entries: PmEntry[] }, allowEmpty = false, baseHash?: string) {
+  assertS1000dPublication(projectId);                                  // WP-16 (PUB-022): a JSS document project's publication.xml is not a <pm>
   if (!Array.isArray(model?.entries)) throw bad('entries[] is required.');
   const counts = pmc.countEntries(model.entries);
   if (counts.total === 0 && !allowEmpty) throw bad('Refusing to save an empty publication. Pass allowEmpty=1 if that is intended.', 'EMPTY_PM');

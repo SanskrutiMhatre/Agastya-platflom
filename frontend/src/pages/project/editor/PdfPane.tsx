@@ -8,6 +8,7 @@
 // Release, watermark and publication settings are not here.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { contentApi } from '../../../api';
 import { onlyRuleBreaks } from '../../../lib/ruleBreaks';
 import { ApiError } from '../../../api/client';
@@ -28,7 +29,12 @@ import { refusalOf, type Refusal } from '../../../lib/waivers';
  */
 interface Problem { message: string; hint?: string; file?: string; line?: number; onlyRules?: boolean; refusal?: Refusal; mode?: Mode }
 
-export function PdfPane({ ctx, savedTick, onOpenAt, onPopped }: { ctx: ProjectCtx; savedTick: number; onOpenAt: (file: string, line?: number) => void; onPopped?: (both: boolean) => void }) {
+/**
+ * WP-21: while the pane is closed (the editor is shown alone, the default of a new session) Quick preview and Generate are drawn into `slot`, a
+ * place in the editor's header, so they stay one click away; pressing one there opens the pane (`onReveal`) to show the result. They are drawn
+ * in one place at a time, with the same names and test ids.
+ */
+export function PdfPane({ ctx, savedTick, onOpenAt, onPopped, slot = null, onReveal }: { ctx: ProjectCtx; savedTick: number; onOpenAt: (file: string, line?: number) => void; onPopped?: (both: boolean) => void; slot?: HTMLElement | null; onReveal?: () => void }) {
   const { id, role, can, summary } = ctx;
   const active = useStudio((s) => s.docs.find((d) => d.active));
   const progress = useProgress(id);
@@ -131,19 +137,22 @@ export function PdfPane({ ctx, savedTick, onOpenAt, onPopped }: { ctx: ProjectCt
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedTick]);
 
+  const quickBtn = <button className="btn btn-sm btn-primary" onClick={() => { onReveal?.(); void quick(); }} disabled={busy !== null || !active} data-testid="quick-preview-btn" title="Preview the data module you are editing">
+    {busy === 'quick' ? <Spinner /> : <Icon name="play" size={12} />}Quick preview
+  </button>;
+  const generateBtn = summary.project.type === 'CIR' ? null : <button className="btn btn-sm" onClick={() => { onReveal?.(); void generate(); }} disabled={busy !== null} data-testid="generate-btn" title="Build the whole publication">
+    {busy === 'build' ? <Spinner /> : <Icon name="rocket" size={12} />}Generate
+  </button>;
   return (
     <>
+      {slot ? createPortal(<>{quickBtn}{generateBtn}</>, slot) : null}
       <div className="v2-pdfbar" role="toolbar" aria-label="PDF controls">
         <span className="v2-btngroup">
-          <button className="btn btn-sm btn-primary" onClick={() => void quick()} disabled={busy !== null || !active} data-testid="quick-preview-btn" title="Preview the data module you are editing">
-            {busy === 'quick' ? <Spinner /> : <Icon name="play" size={12} />}Quick preview
-          </button>
+          {slot ? null : quickBtn}
           <button className={`btn btn-sm btn-primary ${popped.quick ? 'is-on' : ''}`} onClick={() => pop('quick')} title="Open Quick preview in its own window" aria-label="Open Quick preview in a separate window" data-testid="popout-quick"><Icon name="external" size={12} /></button>
         </span>
         {summary.project.type === 'CIR' ? null : <span className="v2-btngroup">
-          <button className="btn btn-sm" onClick={() => void generate()} disabled={busy !== null} data-testid="generate-btn" title="Build the whole publication">
-            {busy === 'build' ? <Spinner /> : <Icon name="rocket" size={12} />}Generate
-          </button>
+          {slot ? null : generateBtn}
           <button className={`btn btn-sm ${popped.build ? 'is-on' : ''}`} onClick={() => pop('build')} title="Open Generate in its own window" aria-label="Open Generate in a separate window" data-testid="popout-build"><Icon name="external" size={12} /></button>
         </span>}
         <span className="spacer" />

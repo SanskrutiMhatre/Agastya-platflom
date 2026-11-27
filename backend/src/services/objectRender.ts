@@ -12,11 +12,11 @@ import { projectDirFor, workspaceDir } from '../context';
 import { bad } from './http';
 import { CSS } from './htmlPublish';
 import { vendor } from '../config';
+import { escAttr as esc } from '../lib/xml';
 
 const fopd = vendor('engine/fopd');
 const foGuard = vendor('engine/foGuard');
 
-const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const strip = (xml: string) => xml.replace(/<!DOCTYPE[^[>]*(\[[\s\S]*?\])?\s*>/, '');
 const SKIP = new Set(['xmlns', 'xmlns:xsi', 'xmlns:xlink', 'xmlns:dc', 'xmlns:rdf', 'xsi:noNamespaceSchemaLocation']);
 const kids = (n: any): any[] => Array.from(n.childNodes ?? []);

@@ -43,12 +43,13 @@ const { checkXmlSafety } = require('../core/auth/xmlGuard');
 export { MAX_UPLOAD_BYTES } from './uploads';
 import { MAX_UPLOAD_BYTES } from './uploads';
 import { config as appConfig } from '../config';
+import { sha256File } from '../lib/hash';
+import { readAttrs } from './xmlHead';
 export const importLimits = (): ExtractLimits => ({ ...DEFAULT_LIMITS, maxEntryBytes: MAX_UPLOAD_BYTES, maxTotalBytes: appConfig.limits.maxExpandedBytes });
 
 export type FileKind = 'dm' | 'pm' | 'object' | 'asset' | 'manifest' | 'other';
 export interface PackageFile { path: string; abs: string; kind: FileKind; size: number; sha256: string }
 
-const sha256File = (abs: string): string => { const h = crypto.createHash('sha256'); const fd = fs.openSync(abs, 'r'); const b = Buffer.alloc(1 << 20); try { for (let n; (n = fs.readSync(fd, b, 0, b.length, null)) > 0;) h.update(b.subarray(0, n)); } finally { fs.closeSync(fd); } return h.digest('hex'); };
 
 export function classify(name: string): FileKind {
   const base = path.basename(name);
@@ -66,7 +67,7 @@ export const entityControl = (file: string): string => stripExt(file).replace(/^
 /** Publication module file name from its own identification (Chap 7.5.1 para 2.3.6); null when the identification is incomplete. */
 export function pmFileName(xml: string): string | null {
   const head = headOf(xml, 'pm', 20000);
-  const g = (tag: string) => { const m = new RegExp(`<${tag}\\b([^>]*?)/?>`).exec(head); const o: Record<string, string> = {}; if (m) for (const a of m[1].matchAll(/([\w:.-]+)\s*=\s*"([^"]*)"/g)) o[a[1]] = a[2]; return o; };
+  const g = (tag: string) => { const m = new RegExp(`<${tag}\\b([^>]*?)/?>`).exec(head); return m ? readAttrs(m[1]) : {}; };
   const c = g('pmCode'), i = g('issueInfo'), l = g('language');
   if (!c.modelIdentCode || !c.pmIssuer || !c.pmNumber || !c.pmVolume || !i.issueNumber || !l.languageIsoCode) return null;
   return `PMC-${[c.modelIdentCode, c.pmIssuer, c.pmNumber, c.pmVolume].join('-')}_${i.issueNumber}-${i.inWork}_${l.languageIsoCode}-${l.countryIsoCode}.XML`.toUpperCase();

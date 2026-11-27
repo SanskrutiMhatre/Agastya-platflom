@@ -2,71 +2,48 @@
 //
 // The document is one XML file, the project's source of truth. Saving writes that XML as the editor produces it; Generate saves, then asks the server to
 // build the PDF from the saved file through the JSS pipeline (XML -> XSL-FO -> PDF), so what is shown is what the server renders, never a browser approximation.
+//
+// WP-21: the page is an adapter of the editor host (src/editors/host): the host owns the header, save state, saving and refused saves, drafts,
+// the leave guard, the layout, the palette, the shortcuts, the find bar and focus mode; this page says how to build the JSS editor and what its
+// header offers.
 
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
 import { contentApi, graphicsApi } from '../../api';
-import { ApiError } from '../../api/client';
-import { jssApi, type JssDocument, type JssFinding } from '../../api/jss';
+import { jssApi, type JssDocument } from '../../api/jss';
 import { Icon } from '../../components/Icon';
-import { LazyPdfViewer } from '../../components/pdf/LazyPdfViewer';
-import { ThemeToggle } from '../../components/ThemeToggle';
-import { Alert, ConfirmModal, Loading, Spinner, ago, errText } from '../../components/ui';
-import { canBuild, canWrite, useProject } from '../../layouts/ProjectShell';
+import { Spinner, errText } from '../../components/ui';
+import { canBuild, useProject } from '../../layouts/ProjectShell';
 import { JssEditor, type GraphicInfo } from '../../jss/editor';
-import { JssParseError, parseJss } from '../../jss/xml';
+import { JssParseError, parseJss, serializeJss } from '../../jss/xml';
 import { PackagePanel } from '../../jss/PackagePanel';
 import { ConvertButton, ExportProjectButton, useSectionCode } from '../../components/DocCodes';
-import { useLeaveGuard } from '../../lib/leaveGuard';
-import { downloadText, useLocalDraft } from '../../lib/localDraft';
-import { useProgress } from '../../lib/progress';
 import { useUi } from '../../store/ui';
+import { DocEditorShell } from '../../editors/host/DocEditorShell';
+import { DocPdfPane } from '../../editors/host/DocPdfPane';
+import { useDocEditor, type DocAdapter } from '../../editors/host/useDocEditor';
+import { useEditorLayout } from '../../editors/host/useEditorLayout';
 
-type View = 'edit' | 'split' | 'pdf';
-const VIEW_KEY = 'agastya.jss.view';
-const SPLIT_KEY = 'agastya.jss.split';
+const ADAPTER: DocAdapter<JssDocument> = {
+  kind: 'jss',
+  read: (id) => jssApi.read(id),
+  save: (id, xml, hash) => jssApi.save(id, xml, hash),
+  validate: (id, xml) => jssApi.validate(id, xml),
+  build: (id) => contentApi.build(id),
+  pdfUrl: (id, download) => contentApi.pdfUrl(id, download),
+  builtNote: (out) => `Built in ${((out.totalMs ?? 0) / 1000).toFixed(1)} s${out.releaseLabel ? ` · ${out.releaseLabel}` : ' · stamped NOT RELEASED'}`,
+  findingsWhere: 'listed below the page',
+  parse: (xml) => { parseJss(xml); },
+  normalize: (xml) => serializeJss(parseJss(xml)),
+  reloadProject: true,
+};
 
 export function JssEditorPage() {
-  const ctx = useProject(); const { id, role, can, summary } = ctx;
+  const ctx = useProject(); const { id, can, summary } = ctx;
   const toast = useUi((s) => s.toast);
-  const progress = useProgress(id);
+  const layout = useEditorLayout({ format: 'jss', split: [30, 80, 58] });
+  const host = useDocEditor(ctx, ADAPTER, layout);
+  const { loaded, writable, dirty, saving, checking, building } = host;
   const hostRef = useRef<HTMLDivElement>(null);
-  const editorRef = useRef<JssEditor | null>(null);
-  const hashRef = useRef('');
-  const splitRef = useRef<HTMLDivElement>(null);
-  const [loaded, setLoaded] = useState<JssDocument | null>(null);
-  const [error, setError] = useState('');
-  const [dirty, setDirty] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [building, setBuilding] = useState(false);
-  const [stale, setStale] = useState(false);
-  const [savedAt, setSavedAt] = useState<Date | null>(null);
-  const [src, setSrc] = useState<string | null>(null);
-  const [note, setNote] = useState('');
-  const [view, setView] = useState<View>(() => { const v = localStorage.getItem(VIEW_KEY); return v === 'edit' || v === 'pdf' ? v : 'split'; });
-  const [pct, setPct] = useState(() => Math.min(80, Math.max(30, Number(localStorage.getItem(SPLIT_KEY)) || 58)));
-  const [dragging, setDragging] = useState(false);
-  const writable = canWrite(can);
-
-  useEffect(() => { localStorage.setItem(VIEW_KEY, view); }, [view]);
-
-  // On a narrow window two panes side by side are unusable: show one at a time.
-  const [narrow, setNarrow] = useState(() => window.matchMedia('(max-width: 900px)').matches);
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 900px)');
-    const on = () => setNarrow(mq.matches);
-    mq.addEventListener('change', on);
-    return () => mq.removeEventListener('change', on);
-  }, []);
-  const shown: View = narrow && view === 'split' ? 'edit' : view;
-  const [checking, setChecking] = useState(false);
-
-  const load = useCallback(async () => {
-    setError(''); setLoaded(null);
-    try { const d = await jssApi.read(id); hashRef.current = d.hash; setLoaded(d); setStale(false); }
-    catch (e) { setError(errText(e)); }
-  }, [id]);
-  useEffect(() => { void load(); }, [load]);
 
   // mount the editor once the document is here
   useEffect(() => {
@@ -74,7 +51,7 @@ export function JssEditorPage() {
     let doc;
     try { doc = parseJss(loaded.xml); }
     catch (e) {
-      setError(e instanceof JssParseError
+      host.setError(e instanceof JssParseError
         ? (/root element is <pm>/.test(e.message)
           ? 'This project holds an imported package, not an editable document. Press "Import project" above and choose the project .zip again to turn it into an editable document.'
           : `The editor cannot open this document: ${e.message}`)
@@ -92,168 +69,46 @@ export function JssEditorPage() {
           return { src: `${g.dir === 'csdb' ? 'csdb' : 'Media'}/${g.name}`, name: g.name, url: graphicsApi.url(id, g.name) };
         },
         imageUrl: (s) => graphicsApi.url(id, s.split('/').pop() ?? s),
-        onDirty: setDirty,
-        onSaveRequested: () => { void save(); },
-        onCheckRequested: () => { void check(); },
+        onDirty: host.setDirty,
+        onSaveRequested: () => { void host.save(); },
+        onCheckRequested: () => { void host.check(); },
         notify: (m, kind) => toast(m, kind === 'error' ? 'error' : 'info'),
       },
     });
-    editorRef.current = editor; setDirty(editor.isDirty()); editor.setFindings(loaded.report.findings);          // a freshly loaded document has nothing unsaved
-    return () => { editor.destroy(); editorRef.current = null; };
+    host.editorRef.current = editor; host.setDirty(editor.isDirty()); editor.setFindings(loaded.report.findings);          // a freshly loaded document has nothing unsaved
+    return () => { editor.destroy(); host.editorRef.current = null; };
     // the editor is built once per loaded document
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded, id, writable]);
 
-  // opened from the Publication or Explore page at a row: scroll to that section (the key is the one the server gives its data module)
-  const [params] = useSearchParams(); const goto = params.get('goto');
-  useEffect(() => { if (!loaded || !goto) return; const t = setTimeout(() => editorRef.current?.goToModule(goto), 150); return () => clearTimeout(t); }, [loaded, goto]);
-
   // the sections' document codes beside their headings, when the author has switched them on (on the Publication page); the codes themselves are not listed here
-  const sectionCode = useSectionCode(id, savedAt);
-  useEffect(() => { editorRef.current?.setSectionBadge(sectionCode); }, [sectionCode, loaded]);
-
-  const applyFindings = (findings: JssFinding[]) => editorRef.current?.setFindings(findings);
-
-  // PUB-023 / FE-006: a local draft while there are unsaved changes, offered back when the editor opens again
-  const draft = useLocalDraft(id, 'jss', () => { const ed = editorRef.current; return ed && ed.isDirty() ? ed.getXml() : null; }, dirty, () => hashRef.current, loaded?.xml ?? null);
-  const recover = () => {
-    const d = draft.found; const ed = editorRef.current; if (!d || !ed) return;
-    try { ed.restoreDocument(parseJss(d.xml)); draft.dismiss(); toast('Your unsaved changes are back. Save to keep them.', 'info'); }
-    catch (e) { toast(`The draft cannot be opened: ${errText(e)}`, 'error'); }
-  };
-  const [confirmReload, setConfirmReload] = useState(false);
-  // FE-007: after a refused save the author can keep their version: download it, or (managers and owners) save it over the other one
-  const overwrite = async () => {
-    try { const d = await jssApi.read(id); hashRef.current = d.hash; setStale(false); if (await save()) toast('Saved: your version replaced the other one.', 'success'); }
-    catch (e) { toast(errText(e), 'error'); }
-  };
-  const downloadMine = () => { const ed = editorRef.current; if (ed) downloadText(`${summary.project.name || 'document'} (my version).xml`, ed.getXml()); };
-
-  const save = useCallback(async (): Promise<boolean> => {
-    const ed = editorRef.current; if (!ed || !writable) return true;
-    if (!ed.isDirty()) return true;
-    setSaving(true);
-    try {
-      const out = await jssApi.save(id, ed.getXml(), hashRef.current);
-      hashRef.current = out.hash; ed.markSaved(); void draft.clear(); setSavedAt(new Date()); applyFindings(out.report.findings); ctx.reload();
-      // WP-11 (decision D22): the save was merged with another author's changes to other parts; show the merged document
-      if (out.merged) { toast('Saved. Another author had changed other parts meanwhile; their changes are kept and shown now.', 'info'); void load(); }
-      if (out.report.errors) toast(`Saved as a draft: ${out.report.errors} error${out.report.errors === 1 ? '' : 's'} to fix before a PDF can be built.`, 'info');
-      return true;
-    } catch (e) {
-      if (e instanceof ApiError && e.code === 'STALE_DOCUMENT') setStale(true); else toast(errText(e), 'error');
-      return false;
-    } finally { setSaving(false); }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, writable]);
-
-  // going to another tab of the project with unsaved work asks first (the browser's own question for closing the tab is asked below)
-  const guard = useLeaveGuard(dirty, { what: 'changes to the document', save, unload: false });
-
-  const check = useCallback(async () => {
-    const ed = editorRef.current; if (!ed) return;
-    setChecking(true);
-    try { const r = await jssApi.validate(id, ed.getXml()); applyFindings(r.findings); toast(r.errors ? `${r.errors} error${r.errors === 1 ? '' : 's'}, ${r.warnings} warning${r.warnings === 1 ? '' : 's'}.` : r.warnings ? `No errors; ${r.warnings} warning${r.warnings === 1 ? '' : 's'}.` : 'No problems found.', r.errors ? 'error' : 'success'); }
-    catch (e) { toast(errText(e), 'error'); }
-    finally { setChecking(false); }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
-
-  const generate = useCallback(async () => {
-    if (!canBuild(can)) return;
-    setBuilding(true); setNote(''); progress.clear();
-    try {
-      if (!(await save())) return;
-      const out = await contentApi.build(id);
-      setSrc(`${contentApi.pdfUrl(id)}?t=${Date.now()}`);
-      setNote(`Built in ${((out.totalMs ?? 0) / 1000).toFixed(1)} s${out.releaseLabel ? ` · ${out.releaseLabel}` : ' · stamped NOT RELEASED'}`);
-      if (view === 'edit') setView(window.matchMedia('(max-width: 900px)').matches ? 'pdf' : 'split');
-      ctx.reload();
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 422) {
-        const findings = ((e.body as { findings?: JssFinding[] } | undefined)?.findings ?? []).filter((f) => f && typeof f.message === 'string');
-        if (findings.length) applyFindings(findings);
-        setNote(`The PDF was not built: ${findings.length ? `${findings.length} problem${findings.length === 1 ? '' : 's'} in the document (listed below the page).` : e.message}`);
-      } else setNote(errText(e));
-    } finally { setBuilding(false); }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, role, view, save]);
+  const sectionCode = useSectionCode(id, host.savedAt);
+  useEffect(() => { (host.editorRef.current as JssEditor | null)?.setSectionBadge(sectionCode); }, [sectionCode, loaded, host.editorRef]);
 
   // the last built PDF is shown at first
-  useEffect(() => { if (!src && summary.build) setSrc(`${contentApi.pdfUrl(id)}?t=${new Date(summary.build.builtAt).getTime()}`); /* eslint-disable-next-line */ }, [id]);
+  useEffect(() => { if (!host.src && summary.build) host.setSrc(`${contentApi.pdfUrl(id)}?t=${new Date(summary.build.builtAt).getTime()}`); /* eslint-disable-next-line */ }, [id]);
 
-  // leaving with unsaved work
-  useEffect(() => {
-    const warn = (e: BeforeUnloadEvent) => { if (editorRef.current?.isDirty()) { e.preventDefault(); e.returnValue = ''; } };
-    window.addEventListener('beforeunload', warn); return () => window.removeEventListener('beforeunload', warn);
-  }, []);
-
-  const startDrag = (e: ReactPointerEvent) => {
-    e.preventDefault(); const rect = splitRef.current!.getBoundingClientRect(); let last = pct; setDragging(true);
-    const move = (ev: PointerEvent) => { last = Math.min(80, Math.max(30, ((ev.clientX - rect.left) / rect.width) * 100)); setPct(last); };
-    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); setDragging(false); localStorage.setItem(SPLIT_KEY, String(Math.round(last))); };
-    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  // PUB-023 / FE-006: the draft kept on this computer goes back into the editor
+  const recover = () => {
+    const d = host.draft.found; const ed = host.editorRef.current as JssEditor | null; if (!d || !ed) return;
+    try { ed.restoreDocument(parseJss(d.xml)); host.draft.dismiss(); toast('Your unsaved changes are back. Save to keep them.', 'info'); }
+    catch (e) { toast(`The draft cannot be opened: ${errText(e)}`, 'error'); }
   };
 
   return (
-    <>
-      {guard}
-      <header className="v2-top v2-edhead">
-        <h1 style={{ fontSize: 14 }} className="v2-trunc">{summary.project.name}</h1>
-        {loaded ? <span className="v2-badge accent" title={`Document type ${loaded.docType}, from the stencil ${loaded.stencil}`}>{loaded.label}</span> : null}
-        <span className={`v2-badge ${dirty ? 'warn' : 'ok'}`} data-testid="jss-state" aria-live="polite">{saving ? 'Saving…' : dirty ? '● Unsaved changes' : savedAt ? `✓ Saved ${ago(savedAt.toISOString())}` : '✓ All changes saved'}</span>
-        <span className="spacer" />
-        <button className="btn btn-sm" onClick={() => void check()} disabled={!loaded || checking} data-testid="jss-check" title="Check the document for problems without saving or building">{checking ? <Spinner /> : <Icon name="search" size={12} />}Check</button>
-        <button className="btn btn-sm" onClick={() => void save()} disabled={!writable || !dirty || saving} data-testid="jss-save" title={!writable ? 'You have read-only access' : !dirty ? 'Nothing to save' : 'Save the document (Ctrl+S)'}>{saving ? <Spinner /> : <Icon name="check" size={12} />}Save</button>
-        <PackagePanel id={id} writable={writable} dirty={dirty} saveFirst={save} onImported={() => { setDirty(false); void load(); ctx.reload(); }} />
-        <ConvertButton id={id} from="jss" name={summary.project.name} dirty={dirty} saveFirst={save} />
+    <DocEditorShell kind="jss" shortcuts="jss" layout={layout} title={summary.project.name} hostRef={hostRef} loaded={!!loaded} find readOnly={!writable}
+      crumb={loaded ? <span className="v2-badge accent" title={`Document type ${loaded.docType}, from the stencil ${loaded.stencil}`}>{loaded.label}</span> : null}
+      saveState={host.saveState} guard={host.guard} banners={host.banners(recover)}
+      actions={<>
+        <button className="btn btn-sm" onClick={() => void host.check()} disabled={!loaded || checking} data-testid="jss-check" title="Check the document for problems without saving or building">{checking ? <Spinner /> : <Icon name="search" size={12} />}Check</button>
+        <button className="btn btn-sm" onClick={() => void host.save()} disabled={!writable || !dirty || saving} data-testid="jss-save" title={!writable ? 'You have read-only access' : !dirty ? 'Nothing to save' : 'Save the document (Ctrl+S)'}>{saving ? <Spinner /> : <Icon name="check" size={12} />}Save</button>
+        <PackagePanel id={id} writable={writable} dirty={dirty} saveFirst={host.save} onImported={() => { host.setDirty(false); void host.load(); ctx.reload(); }} />
+        <ConvertButton id={id} from="jss" name={summary.project.name} dirty={dirty} saveFirst={host.save} />
         {/* WP-07 (UX-019): two different exports, so two names; WP-22 folds them into the Document menu */}
-        <ExportProjectButton id={id} dirty={dirty} saveFirst={save} label="Export project" />
-        <button className="btn btn-sm btn-primary" onClick={() => void generate()} disabled={!canBuild(can) || building || !loaded} data-testid="jss-generate" title={!canBuild(can) ? 'Reviewers, editors and owners can build the PDF' : 'Save, then build the whole publication as a PDF'}>{building ? <Spinner /> : <Icon name="play" size={12} />}{building ? 'Building…' : 'Generate PDF'}</button>
-        <div className="v2-seg" role="group" aria-label="Editor layout">
-          <button className={view === 'edit' ? 'on' : ''} onClick={() => setView('edit')} aria-pressed={view === 'edit'} title="Write only">Editor</button>
-          {narrow ? null : <button className={view === 'split' ? 'on' : ''} onClick={() => setView('split')} aria-pressed={view === 'split'} title="Write and see the PDF side by side">Split</button>}
-          <button className={view === 'pdf' ? 'on' : ''} onClick={() => setView('pdf')} aria-pressed={view === 'pdf'} title="PDF only">PDF</button>
-        </div>
-        <ThemeToggle />
-      </header>
-      {!writable ? <Alert tone="warn">You have {role} access to this project: you can read the document, but changes cannot be saved.</Alert> : null}
-      {stale ? <Alert tone="warn"><span data-testid="jss-conflict">Someone else saved this document after you opened it, so your save was refused. Your changes are still here.</span>{' '}
-        <button className="btn btn-sm" onClick={downloadMine} data-testid="conflict-download">Download my version</button>{' '}
-        {role === 'manager' || role === 'owner' ? <><button className="btn btn-sm" onClick={() => void overwrite()} data-testid="conflict-overwrite">Save mine over theirs</button>{' '}</> : null}
-        <button className="btn btn-sm" onClick={() => { if (!dirty) void load(); else setConfirmReload(true); }} data-testid="conflict-reload">Open their version</button></Alert> : null}
-      {confirmReload ? <ConfirmModal title="Open the other version?" danger confirmLabel="Discard my changes" body={<p>Your unsaved changes will be discarded. Download your version first if you want to keep a copy.</p>} onClose={() => setConfirmReload(false)} onConfirm={() => { setConfirmReload(false); void draft.clear(); void load(); }} /> : null}
-      {draft.found && !stale ? <Alert tone="warn"><span data-testid="draft-found">Unsaved changes from {new Date(draft.found.savedAt).toLocaleString()} were kept on this computer.</span>{' '}
-        <button className="btn btn-sm btn-primary" onClick={recover} data-testid="draft-recover">Recover them</button>{' '}
-        <button className="btn btn-sm" onClick={() => void draft.clear()} data-testid="draft-discard">Discard them</button></Alert> : null}
-      {error ? <Alert tone="bad">{error}</Alert> : null}
-      {!loaded && !error ? <Loading label="Opening the document…" /> : null}
-      <div className="v2-split" data-testid="jss-split" ref={splitRef} style={{ display: loaded ? undefined : 'none', ...(dragging ? { userSelect: 'none' } : {}) }}>
-        <div className="a" style={{ display: shown === 'pdf' ? 'none' : 'flex', flex: shown === 'edit' ? '1 1 0' : `0 0 ${pct}%`, minWidth: 0 }}>
-          <div ref={hostRef} style={{ flex: 1, minWidth: 0, minHeight: 0, position: 'relative' }} data-testid="jss-host" />
-        </div>
-        {shown === 'split' ? <div className={`v2-divider ${dragging ? 'drag' : ''}`} role="separator" aria-orientation="vertical" aria-label="Resize editor and PDF" onPointerDown={startDrag} /> : null}
-        <div className="b" style={{ flex: '1 1 0', display: shown === 'edit' ? 'none' : 'flex', flexDirection: 'column', minWidth: 0, borderLeft: shown === 'pdf' ? 0 : undefined }}>
-          <div className="v2-pdfbar">
-            <span className="v2-hint">{src ? 'The PDF built by the server from the saved document' : 'Press Generate PDF to build the publication'}</span>
-            <span className="spacer" />
-            {src ? <a className="btn btn-sm" href={contentApi.pdfUrl(id, true)} data-testid="jss-download">Download</a> : null}
-          </div>
-          <div style={{ flex: 1, minHeight: 0, position: 'relative' }} data-testid="pdf-pane">
-            <LazyPdfViewer autoFit src={src} downloadName={`${summary.project.name}.pdf`}
-              placeholder={<div className="v2-center"><div className="v2-empty v2-empty-steps">
-                <Icon name="pdf" size={30} />
-                <h3>No PDF yet</h3>
-                <ol>
-                  <li>Write in the editor on the left. <strong>Ctrl+S</strong> saves.</li>
-                  <li>Press <strong>Check</strong> to find problems early.</li>
-                  <li>Press <strong>Generate PDF</strong> to save and build the whole publication here.</li>
-                </ol>
-              </div></div>} />
-          </div>
-          {note || (building && progress.lines.length) ? <div className="v2-log" aria-live="polite" data-testid="jss-note">{building ? progress.lines.slice(-4).map((l, i) => <div key={i}>{l}</div>) : <div>{note}</div>}</div> : null}
-        </div>
-      </div>
-    </>
+        <ExportProjectButton id={id} dirty={dirty} saveFirst={host.save} label="Export project" />
+        <button className="btn btn-sm btn-primary" onClick={() => void host.generate()} disabled={!canBuild(can) || building || !loaded} data-testid="jss-generate" title={!canBuild(can) ? 'Reviewers, editors and owners can build the PDF' : 'Save, then build the whole publication as a PDF'}>{building ? <Spinner /> : <Icon name="play" size={12} />}{building ? 'Building…' : 'Generate PDF'}</button>
+      </>}
+      pdf={<DocPdfPane kind="jss" src={host.src} downloadHref={contentApi.pdfUrl(id, true)} downloadName={`${summary.project.name}.pdf`} builtBy="the server" what="the publication"
+        note={host.note} building={building} progressLines={host.progress.lines} />} />
   );
 }

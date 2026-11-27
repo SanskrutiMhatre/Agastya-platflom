@@ -6,7 +6,8 @@
 //   AgastyaPlatform.exe --service  entry point the Windows Service Control Manager uses
 //   AgastyaCtl.exe <command>       the same code built as a console program, for administrators and scripts
 //
-// Commands (AgastyaCtl.exe):  --console  --doctor  --status  --start  --stop  --install-service  --uninstall-service  --version  --help
+// Commands (AgastyaCtl.exe):  --console  --doctor [--deep]  --verify  --support-bundle [file]  --status  --start  --stop  --install-service
+//                             --uninstall-service  --version  --help   (--verify / --support-bundle / the start-up file check: Integrity.cs, SupportBundle.cs)
 // Options:                    --home <dir>   keep config, data and logs under <dir> (tests and portable use)
 //                             --port <n>     --lan   (with --install-service: written to the configuration)
 //
@@ -100,7 +101,22 @@ namespace Agastya
         public int LogMaxMb = 10;
         public int LogKeep = 5;
         public string ServiceName = "AgastyaPlatform";
+        // WP-26: Mode B (a server on the network) serves TLS only. Empty Mode = "server" when Bind is not loopback, else "local".
+        public string Mode = "";
+        public string ServerNames = "";
+        public string TlsCert = "", TlsKey = "", TlsPfx = "", TlsPassphraseFile = "", HstsMaxAge = "";
         public List<string> Problems = new List<string>();
+
+        public bool TlsConfigured { get { return TlsCert.Length > 0 || TlsPfx.Length > 0; } }
+        public bool Loopback { get { string b = BindAddress; return b.StartsWith("127.") || b == "::1" || b.Equals("localhost", StringComparison.OrdinalIgnoreCase); } }
+        public string EffectiveMode { get { return Mode.Length > 0 ? Mode.ToLowerInvariant() : (Loopback ? "local" : "server"); } }
+        /// <summary>A path in agastya.ini may be relative to the folder of agastya.ini.</summary>
+        public static string StatePath(string p)
+        {
+            if (string.IsNullOrEmpty(p)) return p;
+            string x = Environment.ExpandEnvironmentVariables(p);
+            return Path.IsPathRooted(x) ? x : Path.Combine(Path.GetDirectoryName(Layout.ConfigFile), x);
+        }
 
         public string WorkspaceDir
         {
@@ -122,7 +138,7 @@ namespace Agastya
             }
         }
 
-        public string Url { get { return "http://localhost:" + Port + "/"; } }
+        public string Url { get { return (TlsConfigured ? "https" : "http") + "://localhost:" + Port + "/"; } }
 
         public static Settings Load()
         {
@@ -153,6 +169,13 @@ namespace Agastya
                     case "logging.maxfilemb": int mb; if (int.TryParse(val, out mb) && mb >= 1) s.LogMaxMb = mb; break;
                     case "logging.keepfiles": int kf; if (int.TryParse(val, out kf) && kf >= 1) s.LogKeep = kf; break;
                     case "service.name": if (val.Length > 0) s.ServiceName = val; break;
+                    case "server.mode": s.Mode = val; break;
+                    case "server.servernames": s.ServerNames = val; break;
+                    case "tls.certificate": s.TlsCert = val; break;
+                    case "tls.key": s.TlsKey = val; break;
+                    case "tls.pfx": s.TlsPfx = val; break;
+                    case "tls.passphrasefile": s.TlsPassphraseFile = val; break;
+                    case "tls.hstsmaxage": s.HstsMaxAge = val; break;
                     default: s.Problems.Add("line " + lineNo + ": unknown setting '" + key + "'"); break;
                 }
             }
@@ -337,6 +360,7 @@ namespace Agastya
         public void Start()
         {
             stopping = false; GaveUp = false;
+            Integrity.CheckAtStartInBackground();   // WP-24 (DEP-013): once per process, logged only, never blocks the start
             loop = new Thread(Run); loop.IsBackground = true; loop.Name = "server-supervisor"; loop.Start();
         }
 
@@ -384,6 +408,14 @@ namespace Agastya
             psi.EnvironmentVariables["AGASTYA_CLIENT_DIST"] = Path.Combine(Path.Combine(Layout.AppDir, "frontend"), "dist");
             psi.EnvironmentVariables["AGASTYA_SHUTDOWN_ON_STDIN_CLOSE"] = "1";
             if (cfg.SecureCookies) psi.EnvironmentVariables["AGASTYA_SECURE_COOKIES"] = "1";
+            // WP-26: the server refuses a network address without TLS and names the setting in the server log.
+            psi.EnvironmentVariables["AGASTYA_MODE"] = cfg.EffectiveMode;
+            if (cfg.ServerNames.Length > 0) psi.EnvironmentVariables["AGASTYA_SERVER_NAMES"] = cfg.ServerNames;
+            if (cfg.TlsCert.Length > 0) psi.EnvironmentVariables["AGASTYA_TLS_CERT"] = Settings.StatePath(cfg.TlsCert);
+            if (cfg.TlsKey.Length > 0) psi.EnvironmentVariables["AGASTYA_TLS_KEY"] = Settings.StatePath(cfg.TlsKey);
+            if (cfg.TlsPfx.Length > 0) psi.EnvironmentVariables["AGASTYA_TLS_PFX"] = Settings.StatePath(cfg.TlsPfx);
+            if (cfg.TlsPassphraseFile.Length > 0) psi.EnvironmentVariables["AGASTYA_TLS_PASSPHRASE_FILE"] = Settings.StatePath(cfg.TlsPassphraseFile);
+            if (cfg.HstsMaxAge.Length > 0) psi.EnvironmentVariables["AGASTYA_HSTS_MAX_AGE"] = cfg.HstsMaxAge;
             try { Directory.CreateDirectory(cfg.WorkspaceDir); } catch (Exception e) { Host.Error("cannot create the data folder " + cfg.WorkspaceDir + ": " + e.Message); return -2; }
 
             Process p = new Process(); p.StartInfo = psi; p.EnableRaisingEvents = true;
@@ -427,13 +459,20 @@ namespace Agastya
 
     internal static class Probe
     {
-        /// <summary>True when something on this port answers the platform's liveness check.</summary>
-        public static bool Alive(int port)
+        static Probe() { try { ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12; } catch { } }
+
+        /// <summary>True when something on this port answers the platform's liveness check (plain HTTP in Mode A, HTTPS in Mode B, WP-26).</summary>
+        public static bool Alive(int port) { return Get("http", port) || Get("https", port); }
+
+        private static bool Get(string scheme, int port)
         {
             try
             {
-                HttpWebRequest r = (HttpWebRequest)WebRequest.Create("http://127.0.0.1:" + port + "/api/health");
+                HttpWebRequest r = (HttpWebRequest)WebRequest.Create(scheme + "://127.0.0.1:" + port + "/api/health");
                 r.Timeout = 2500; r.Proxy = null;
+                // A liveness probe of this computer's own server over loopback: the certificate is checked by the clients, not here
+                // (it rarely names 127.0.0.1).
+                if (scheme == "https") r.ServerCertificateValidationCallback = delegate { return true; };
                 using (HttpWebResponse resp = (HttpWebResponse)r.GetResponse()) { return (int)resp.StatusCode == 200; }
             }
             catch { return false; }
@@ -595,8 +634,9 @@ namespace Agastya
             catch { return null; }
         }
 
-        public static int Run(Settings cfg)
+        public static int Run(Settings cfg, bool deep)
         {
+            fails = 0; warns = 0;
             Console.WriteLine("Agastya Platform " + Layout.Version + " - self-check");
             Console.WriteLine("  mode      " + (Layout.Portable ? "portable" : "installed"));
             Console.WriteLine("  program   " + Layout.ExeDir);
@@ -606,7 +646,8 @@ namespace Agastya
             Console.WriteLine();
 
             if (Environment.Is64BitOperatingSystem) Pass("64-bit Windows"); else Fail("this product needs 64-bit Windows");
-            foreach (string p in cfg.Problems) Warn("agastya.ini " + p);
+            // WP-24 (G-DEP-4): a value the program cannot use (it falls back to the default) is a problem; a key it does not know stays a warning
+            foreach (string p in cfg.Problems) { if (p.IndexOf("unknown setting", StringComparison.Ordinal) >= 0) Warn("agastya.ini " + p); else Fail("agastya.ini " + p + " (the default is used instead)"); }
             if (cfg.Problems.Count == 0) Pass("agastya.ini is valid");
 
             string[] must = new string[] {
@@ -622,14 +663,38 @@ namespace Agastya
             foreach (string f in must) { if (!(File.Exists(f) || Directory.Exists(f))) { Fail("missing: " + f); all = false; } }
             if (all) Pass("program files are complete");
 
+            // WP-24 (DEP-013): the program files against the signed manifest (quick: sizes + hashes of the executables and server code; --deep: all)
+            IntegrityResult ir = Integrity.Check(Layout.ExeDir, deep);
+            if (!ir.ManifestPresent) Warn(ir.FilesLine());
+            else if (ir.FilesOk) Pass(ir.FilesLine()); else Fail(ir.FilesLine());
+            if (ir.ManifestPresent)
+            {
+                if (!ir.SignaturePresent) Warn(ir.SignatureLine());
+                else if (ir.SignatureValid && ir.SignerMatchesExe) Pass(ir.SignatureLine()); else Fail(ir.SignatureLine());
+            }
+
             string nv = File.Exists(Layout.NodeExe) ? RunCapture(Layout.NodeExe, "--version", 10000) : null;
             if (nv != null && nv.StartsWith("v")) Pass("Node.js runtime " + nv); else Fail("the bundled Node.js does not run");
             string jv = File.Exists(must[3]) ? RunCapture(must[3], "-version", 15000) : null;
             if (jv != null && jv.IndexOf("version", StringComparison.OrdinalIgnoreCase) >= 0) Pass("Java runtime (for the PDF renderer): " + jv.Split('\n')[0].Trim()); else Fail("the bundled Java runtime does not run");
 
             string bind = cfg.BindAddress;
-            if (bind == "0.0.0.0") Warn("the server is set to listen on every network interface (Bind=" + cfg.Bind + "). Make sure that is intended; see OPERATIONS.md");
-            else Pass("listens on " + bind + " only");
+            // WP-26: a network address is Mode B and needs TLS; the server refuses to start without it.
+            if (!cfg.Loopback && !cfg.TlsConfigured) Fail("Bind=" + cfg.Bind + " serves the network, which needs TLS: set Certificate and Key (or Pfx) under [tls] in agastya.ini; the server does not start without them (OPERATIONS.md, \"Mode B: TLS\")");
+            else if (!cfg.Loopback) Pass("listens on " + bind + " (Mode B) with TLS: " + (cfg.TlsPfx.Length > 0 ? Settings.StatePath(cfg.TlsPfx) : Settings.StatePath(cfg.TlsCert)));
+            else Pass("listens on " + bind + " only (Mode " + (cfg.EffectiveMode == "server" ? "B behind a TLS proxy on this computer" : "A") + ")");
+            if (cfg.TlsCert.Length > 0)
+            {
+                try
+                {
+                    var c = new System.Security.Cryptography.X509Certificates.X509Certificate2(Settings.StatePath(cfg.TlsCert));
+                    int days = (int)Math.Floor((c.NotAfter - DateTime.Now).TotalDays);
+                    if (days < 0) Fail("the TLS certificate expired on " + c.NotAfter.ToString("yyyy-MM-dd"));
+                    else if (days <= 30) Warn("the TLS certificate expires in " + days + " days (" + c.NotAfter.ToString("yyyy-MM-dd") + "); renew it");
+                    else Pass("TLS certificate " + c.Subject + ", " + days + " days left, SHA-256 thumbprint in the server log");
+                }
+                catch (Exception e) { Fail("the TLS certificate " + Settings.StatePath(cfg.TlsCert) + " cannot be read: " + e.Message); }
+            }
 
             if (Probe.Alive(cfg.Port)) Pass("an Agastya Platform server is answering on port " + cfg.Port);
             else if (Probe.PortFree(cfg.Port, bind == "0.0.0.0" ? "0.0.0.0" : "127.0.0.1")) Pass("port " + cfg.Port + " is free");
@@ -749,7 +814,9 @@ namespace Agastya
         private const string Usage =
             "Agastya Platform {0}\r\n\r\n" +
             "  AgastyaCtl.exe --console              run the server in this window (Ctrl+C stops it)\r\n" +
-            "  AgastyaCtl.exe --doctor               check the installation and this machine\r\n" +
+            "  AgastyaCtl.exe --doctor [--deep]      check the installation and this machine (--deep: hash every program file)\r\n" +
+            "  AgastyaCtl.exe --verify [--require-signed]  check every program file against the signed manifest (exit 0 = intact)\r\n" +
+            "  AgastyaCtl.exe --support-bundle [<file.zip>]  write a ZIP for support: reports and redacted logs, never the database\r\n" +
             "  AgastyaCtl.exe --status               show whether the service / server is running\r\n" +
             "  AgastyaCtl.exe --install-service      register the Windows service (Administrator)\r\n" +
             "  AgastyaCtl.exe --uninstall-service    remove it (your data is kept)\r\n" +
@@ -764,11 +831,14 @@ namespace Agastya
         [STAThread]
         private static int Main(string[] args)
         {
-            string home = null, mode = null, port = null, label = null; bool lan = false;
+            string home = null, mode = null, port = null, label = null; bool lan = false, deep = false, requireSigned = false;
             for (int i = 0; i < args.Length; i++)
             {
                 string a = args[i];
                 if (a == "--home" && i + 1 < args.Length) home = args[++i];
+                else if (a == "--deep") deep = true;
+                else if (a == "--require-signed") requireSigned = true;
+                else if (a == "--support-bundle") { mode = a; if (i + 1 < args.Length && !args[i + 1].StartsWith("--")) label = args[++i]; }
                 else if (a == "--port" && i + 1 < args.Length) port = args[++i];
                 else if (a == "--lan") lan = true;
                 else if (a == "--backup-db" && i + 1 < args.Length) { mode = a; label = args[++i]; }
@@ -796,7 +866,9 @@ namespace Agastya
                 {
                     case "--version": Console.WriteLine("Agastya Platform " + Layout.Version + " (win-x64)"); return 0;
                     case "--help": Console.WriteLine(string.Format(Usage, Layout.Version)); return 0;
-                    case "--doctor": return Doctor.Run(cfg);
+                    case "--doctor": return Doctor.Run(cfg, deep);
+                    case "--verify": return Integrity.VerifyCommand(requireSigned);
+                    case "--support-bundle": return SupportBundle.Create(cfg, label);
                     case "--status":
                         Console.WriteLine("service '" + cfg.ServiceName + "': " + ServiceTools.StateOf(cfg.ServiceName));
                         Console.WriteLine("server on port " + cfg.Port + ": " + (Probe.Alive(cfg.Port) ? "answering" : "not answering"));

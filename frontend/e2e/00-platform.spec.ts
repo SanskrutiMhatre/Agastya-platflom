@@ -194,6 +194,9 @@ test('editor: import data modules, open one in the Studio, edit it and save to t
 });
 
 test('editor: Quick preview and Generate live together in the panel on the right', async () => {
+  // WP-21: a new session opens in Write (the editor alone, Quick preview and Generate in the header); Split brings the PDF panel back
+  await expect(page.getByTestId('chrome-preview-slot').getByTestId('quick-preview-btn')).toBeVisible();
+  await page.getByRole('group', { name: 'Editor layout' }).getByRole('button', { name: 'Split' }).click();
   const panel = page.getByRole('toolbar', { name: 'PDF controls' });
   await expect(panel.getByRole('button', { name: 'Quick preview', exact: true })).toBeVisible();
   await expect(panel.getByRole('button', { name: 'Generate', exact: true })).toBeVisible();

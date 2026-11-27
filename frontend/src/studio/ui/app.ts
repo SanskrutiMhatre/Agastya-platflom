@@ -74,11 +74,15 @@ export interface StudioHost {
   pdfSettings(): Partial<import('../export/pdf-settings').PublicationSettings> | undefined;
   /** FE-006: "<user>/<project>" for drafts, or null when no draft may be kept (nobody signed in, no project). */
   draftScope?(): string | null;
+  /** WP-21: the platform's focus mode (only the document and a slim header), the same in the three editors; Ctrl+. in the Studio. */
+  toggleFocus?(): void;
+  isFocus?(): boolean;
 }
 
 export class App {
   settings: Settings = loadLocal('studio.settings', DEFAULT_SETTINGS);
-  layout = loadLocal('studio.layout', { left: true, right: true, bottom: true, rightTab: 'attributes' as 'attributes' | 'elements' | 'pdf', ribbonTab: 'home' });
+  // ribbonCollapsed: null = not chosen: collapsed inside the platform (WP-21, UX-002: the editing surface comes first), open in the standalone Studio
+  layout = loadLocal('studio.layout', { left: true, right: true, bottom: true, rightTab: 'attributes' as 'attributes' | 'elements' | 'pdf', ribbonTab: 'home', ribbonCollapsed: null as boolean | null });
   readonly commands: Command[] = buildCommands();
   private byId = new Map(this.commands.map((c) => [c.id, c]));
   editors: DocumentEditor[] = [];
@@ -96,6 +100,10 @@ export class App {
   private tabsEl!: HTMLElement;
   private ribbonTabs!: HTMLElement;
   private ribbonBody!: HTMLElement;
+  private ribbonEl!: HTMLElement;
+  private ribbonPin!: HTMLButtonElement;
+  /** the collapsed ribbon is showing one tab's commands for a moment (a tab was clicked) */
+  private ribbonPeek = false;
   private editorHost!: HTMLElement;
   private startPage!: HTMLElement;
   private leftPane!: HTMLElement;
@@ -189,9 +197,13 @@ export class App {
     this.ribbonTabs = h('div', { class: 'ribbon-tabs', role: 'tablist', 'aria-label': 'Ribbon' });
     this.ribbonBody = h('div', { class: 'ribbon-body', role: 'toolbar' });
     const ribbon = h('div', { class: 'ribbon' }, this.ribbonTabs, this.ribbonBody);
+    this.ribbonEl = ribbon;
     this.editorHost = h('div', { class: 'editor-host' });
     this.startPage = h('div', { class: 'start-page' });
-    const center = h('main', { class: 'center' }, this.find.el, this.editorHost, this.startPage);
+    // WP-23: inside the platform the project shell's <main> already holds the Studio; one main landmark per page (a region here instead)
+    const center = this.host
+      ? h('div', { class: 'center', role: 'region', 'aria-label': 'Document' }, this.find.el, this.editorHost, this.startPage)
+      : h('main', { class: 'center' }, this.find.el, this.editorHost, this.startPage);
     this.leftPane = h('aside', { class: 'pane pane-left' }, this.outline.el, h('div', { class: 'pane-resize', 'data-pane': 'left' }));
     const rtabs = h('div', { class: 'panel-tabs pane-tabs', role: 'tablist' },
       h('button', { class: 'panel-tab', 'data-rtab': 'attributes', role: 'tab', on: { click: () => this.setRightTab('attributes') } }, 'Attributes'),
@@ -224,7 +236,7 @@ export class App {
     const fileBtn = h('button', { class: 'ribbon-tab file-tab', 'aria-haspopup': 'menu', on: { click: (e: Event) => { e.stopPropagation(); this.toggleFileMenu(); } } }, 'File');
     this.ribbonTabs.appendChild(fileBtn);
     for (const tab of RIBBON) {
-      const t = h('button', { class: 'ribbon-tab' + (tab.contextual ? ' contextual' : ''), role: 'tab', 'data-tab': tab.id, on: { click: () => this.selectRibbonTab(tab.id) } }, tab.label);
+      const t = h('button', { class: 'ribbon-tab' + (tab.contextual ? ' contextual' : ''), role: 'tab', 'data-tab': tab.id, title: 'Double-click to pin or collapse the ribbon', on: { click: () => this.ribbonTabClick(tab.id), dblclick: () => this.toggleRibbon() } }, tab.label);
       this.ribbonTabs.appendChild(t);
     }
     this.ribbonTabs.appendChild(h('span', { class: 'spacer' }));
@@ -235,6 +247,9 @@ export class App {
       return b;
     }));
     this.ribbonTabs.appendChild(viewSwitch);
+    // WP-21 (UX-002, UX-012): the ribbon folds to its tab strip; a tab click shows that tab's commands until one is used
+    this.ribbonPin = h('button', { class: 'icon-btn ribbon-pin', 'data-testid': 'ribbon-pin', on: { click: () => this.toggleRibbon() } }) as HTMLButtonElement;
+    this.ribbonTabs.appendChild(this.ribbonPin);
     for (const tab of RIBBON) {
       const panel = h('div', { class: 'ribbon-panel', 'data-panel': tab.id, role: 'tabpanel' });
       for (const g of tab.groups) {
@@ -246,7 +261,7 @@ export class App {
           const cmd = this.byId.get(it);
           if (!cmd) continue;
           const isLarge = large.has(it);
-          const b = h('button', { class: isLarge ? 'rb rb-large' : 'rb rb-small', title: tooltip(cmd), 'aria-label': cmd.label, 'data-cmd': cmd.id, on: { click: () => this.run(cmd.id) } }, icon(cmd.icon ?? 'dot', isLarge ? 22 : 16), isLarge ? h('span', { class: 'rb-label' }, cmd.label.replace('…', '')) : h('span', { class: 'rb-label' }, shortLabel(cmd.label)));
+          const b = h('button', { class: isLarge ? 'rb rb-large' : 'rb rb-small', title: tooltip(cmd), 'aria-label': cmd.label, 'data-cmd': cmd.id, on: { click: () => { this.endRibbonPeek(); this.run(cmd.id); } } }, icon(cmd.icon ?? 'dot', isLarge ? 22 : 16), isLarge ? h('span', { class: 'rb-label' }, cmd.label.replace('…', '')) : h('span', { class: 'rb-label' }, shortLabel(cmd.label)));
           this.ribbonButtons.push({ el: b, cmd });
           if (isLarge) items.appendChild(b);
           else smalls.push(b);
@@ -260,6 +275,48 @@ export class App {
       this.ribbonBody.appendChild(panel);
     }
     this.selectRibbonTab(this.layout.ribbonTab);
+    this.applyRibbon();
+  }
+
+  /** Whether the ribbon shows only its tab strip (the author's choice; by default folded inside the platform, open standalone). */
+  get ribbonCollapsed(): boolean { return this.layout.ribbonCollapsed ?? !!this.host; }
+
+  /** Pin the ribbon open, or fold it to its tab strip (the pin button, a double-click on a tab, Ctrl+F1). */
+  toggleRibbon() {
+    this.layout.ribbonCollapsed = !this.ribbonCollapsed;
+    this.ribbonPeek = false;
+    saveLocal('studio.layout', this.layout);
+    this.applyRibbon();
+    this.updateChrome();
+  }
+
+  private ribbonTabClick(id: string) {
+    if (!this.ribbonCollapsed) return this.selectRibbonTab(id);
+    // folded: the click shows that tab's commands below the strip; a second click on the same tab folds it again
+    const same = this.ribbonPeek && this.layout.ribbonTab === id;
+    this.selectRibbonTab(id);
+    this.ribbonPeek = !same;
+    this.applyRibbon();
+    if (this.ribbonPeek) this.ribbonBody.querySelector<HTMLElement>('.ribbon-panel:not([hidden]) .rb:not(:disabled)')?.focus({ preventScroll: true });
+  }
+
+  /** A folded ribbon that was showing a tab folds again (a command was used, Escape, a click elsewhere). */
+  endRibbonPeek(): boolean {
+    if (!this.ribbonPeek) return false;
+    this.ribbonPeek = false;
+    this.applyRibbon();
+    return true;
+  }
+
+  private applyRibbon() {
+    const folded = this.ribbonCollapsed;
+    this.ribbonEl.classList.toggle('is-collapsed', folded && !this.ribbonPeek);
+    this.ribbonEl.classList.toggle('is-peek', folded && this.ribbonPeek);
+    this.ribbonPin.replaceChildren(icon(folded ? 'expand' : 'collapse', 15));
+    const label = folded ? 'Pin the ribbon open (Ctrl+F1)' : 'Collapse the ribbon to its tabs (Ctrl+F1)';
+    this.ribbonPin.title = label; this.ribbonPin.setAttribute('aria-label', folded ? 'Pin the ribbon open' : 'Collapse the ribbon');
+    this.ribbonPin.setAttribute('aria-expanded', String(!folded || this.ribbonPeek));
+    this.active?.xml.view.requestMeasure();
   }
 
   selectRibbonTab(id: string) {
@@ -470,6 +527,7 @@ export class App {
     }, { signal });
     document.addEventListener('mousedown', (e) => {
       if (this.ctxMenu && !this.ctxMenu.contains(e.target as Node)) this.closeContextMenu();
+      if (this.ribbonPeek && !this.ribbonEl.contains(e.target as Node) && !(e.target as Element | null)?.closest?.('.ctx-menu, .file-menu, .modal-backdrop')) this.endRibbonPeek();
     }, { signal });
     window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', () => this.applySettings(), { signal });
     window.addEventListener('studio:modal-closed', () => { if (this.root.isConnected) this.active?.focus(); }, { signal });
@@ -491,6 +549,10 @@ export class App {
         e.preventDefault();
         return;
       }
+      if (this.endRibbonPeek()) {
+        e.preventDefault();
+        return;
+      }
       if (this.find.isOpen && !(this.active?.elementSelection)) {
         this.find.close();
         e.preventDefault();
@@ -504,7 +566,7 @@ export class App {
     const inField = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT');
     const inCm = !!t?.closest?.('.cm-editor');
     // let form fields and CodeMirror keep their own editing keys
-    if (inField && !/^(Mod\+S|Mod\+Shift\+S|Mod\+O|F7|Shift\+F7|F1|Mod\+Shift\+P|F3|Shift\+F3|Mod\+Alt\+N)$/.test(k)) return;
+    if (inField && !/^(Mod\+S|Mod\+Shift\+S|Mod\+O|F7|Shift\+F7|F1|Mod\+Shift\+P|Mod\+K|Mod\+\.|Mod\+F1|F3|Shift\+F3|Mod\+Alt\+N)$/.test(k)) return;
     if (inCm && /^(Mod\+Z|Mod\+Y|Mod\+Shift\+Z|Mod\+F|Mod\+H|Mod\+G|Mod\+A|Alt\+Shift\+Arrow(Up|Down)|Mod\+Shift\+K|F3|Shift\+F3|Mod\+E|Mod\+B|Mod\+I|Mod\+U)$/.test(k)) {
       if (k === 'Mod+Z' || k === 'Mod+Y' || k === 'Mod+Shift+Z') return; // handled by CodeMirror keymap -> app
       if (k === 'Mod+H') {

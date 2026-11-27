@@ -22,7 +22,10 @@
 //   visual           the theme and accessibility suite (WP-20): per-theme screenshots, G-UX-1 checks on the ten named routes; its own port
 //                    (E2E_VISUAL_PORT, default 4060) and config (frontend/playwright.visual.config.ts)
 //   perf             performance probes (WP-20, QA-013): scripts/ci/perf.mjs against the runner's history; the release fails on +40 %
-//   package          npm run package:win, then verify:package
+//   release-tools    WP-24: the release-engineering tests (scripts/release/*.test.mjs, listed in test-plan.json scriptTests): manifest, SBOM,
+//                    signing with a throwaway certificate, both offline verifiers, the host's --verify, doctor faults, support-bundle redaction
+//   package          release-tools, then npm run package:win (with --release in the release profile: signed, time-stamped, EULA and publisher
+//                    data present, or it refuses), verify:package, and scripts/release/verify-release.mjs over the result
 //   readiness        scripts/ci/readiness.mjs (RES-011): the static release gates
 //
 // Profiles: pr = build, frontend-build, lint, parity, theme, tools, security, backend, pdf-smoke, frontend (about the PR budget of QA-001); nightly = everything
@@ -69,6 +72,8 @@ const keepGoing = flag('keep-going');
 const allBackend = fs.readdirSync(path.join(BACKEND, 'test')).filter((f) => f.endsWith('.test.js')).sort();
 const inPlan = new Set([PLAN.tools, ...PLAN.security, ...PLAN.pdfSmoke, ...PLAN.heavy]);
 for (const f of inPlan) if (!allBackend.includes(f)) { console.error(`scripts/ci/test-plan.json names ${f}, which is not in backend/test`); process.exit(2); }
+const scriptTests = PLAN.scriptTests || {};
+for (const list of Object.values(scriptTests).filter(Array.isArray)) for (const f of list) if (!fs.existsSync(path.join(ROOT, f))) { console.error(`scripts/ci/test-plan.json scriptTests names ${f}, which does not exist`); process.exit(2); }
 const backendFiles = {
   tools: [PLAN.tools],
   security: PLAN.security,
@@ -221,8 +226,19 @@ const STAGES = {
   },
   perf: async () => (await simpleStage('perf-rule', nodeBin, ['--test', path.join(ROOT, 'scripts', 'ci', 'perf-compare.test.mjs')], { limitMs: 2 * 60_000 }))
     && simpleStage('perf', nodeBin, [path.join(ROOT, 'scripts', 'ci', 'perf.mjs'), '--profile', profile === 'release' ? 'release' : 'nightly', '--evidence', EVIDENCE], { limitMs: 120 * 60_000 }),
-  package: async () => (await simpleStage('package', nodeBin, [path.join(ROOT, 'scripts', 'package-windows.mjs')], { limitMs: 60 * 60_000 }))
-    && simpleStage('verify-package', nodeBin, [path.join(ROOT, 'scripts', 'verify-package-offline.mjs')], { limitMs: 30 * 60_000 }),
+  // WP-24: the release-engineering tests, one file per process (they compile the host, make and delete a throwaway certificate)
+  'release-tools': async () => {
+    let ok = true;
+    for (const f of scriptTests['release-tools'] || []) {
+      ok = (await simpleStage(`release-tools-${path.basename(f, '.test.mjs')}`, nodeBin, ['--test', '--test-concurrency=1', path.join(ROOT, f)], { limitMs: 10 * 60_000 })) && ok;
+    }
+    return ok;
+  },
+  package: async () => (await STAGES['release-tools']())
+    && (await simpleStage('package', nodeBin, [path.join(ROOT, 'scripts', 'package-windows.mjs'), ...(profile === 'release' ? ['--release'] : [])], { limitMs: 60 * 60_000 }))
+    && (await simpleStage('verify-package', nodeBin, [path.join(ROOT, 'scripts', 'verify-package-offline.mjs')], { limitMs: 30 * 60_000 }))
+    && simpleStage('verify-release', nodeBin, [path.join(ROOT, 'scripts', 'release', 'verify-release.mjs'), '--release', path.join(ROOT, 'release'),
+      ...(profile === 'release' ? ['--require-signed', '--require-timestamp'] : [])], { limitMs: 30 * 60_000 }),
   readiness: () => simpleStage('readiness', nodeBin, [path.join(ROOT, 'scripts', 'ci', 'readiness.mjs'), '--evidence', EVIDENCE], { limitMs: 30 * 60_000 }),
 };
 

@@ -10,6 +10,7 @@
 // API responses (JSON, PDFs, HTML previews shown in the application's own frames) keep their own content and get only
 // the framing rule, nosniff and the referrer rule, so a published HTML preview is not broken by the application policy.
 import type { Request, Response, NextFunction } from 'express';
+import { config } from '../config';
 
 export const APP_CSP = [
   "default-src 'self'",
@@ -35,6 +36,9 @@ export function securityHeaders(req: Request, res: Response, next: NextFunction)
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()');
+  // WP-26: HSTS on a TLS answer of a Mode B server only. Never in Mode A: a header on "localhost" would bind every other local web server
+  // of the machine to HTTPS. No includeSubDomains and no preload (intranet names; audit ENT-001).
+  if (req.secure && config.mode === 'server' && config.hstsMaxAge > 0) res.setHeader('Strict-Transport-Security', `max-age=${config.hstsMaxAge}`);
   if (req.path.startsWith('/api/')) res.setHeader('Content-Security-Policy', "frame-ancestors 'self'");
   else res.setHeader('Content-Security-Policy', APP_CSP);
   next();

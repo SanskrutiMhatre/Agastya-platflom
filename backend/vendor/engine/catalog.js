@@ -26,8 +26,15 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const crypto = require('crypto');
 const { SCHEMAS } = require('./paths');
 
+// AGASTYA (vendor exception no. 3, amended 2026-11-27): the file is named after its content. Every checkout and every install writes
+// absolute schema paths of its own, and they all used ONE name in %TEMP%: a build could read a catalogue that pointed at another
+// checkout's schemas, and on Windows a rename over a file another process held open failed (EPERM -> HTTP 500 in publish-gate while
+// other suites ran). Now identical catalogues share a file, different ones never meet, and an existing file is never replaced.
+const catalogFileFor = (xml) => path.join(os.tmpdir(), `jsspub-s1000d-catalog-${crypto.createHash('sha256').update(xml).digest('hex').slice(0, 16)}.xml`);
+/** The legacy shared name (nothing writes it any more); kept so an importer of the old export still loads. */
 const CATALOG_FILE = path.join(os.tmpdir(), 'jsspub-s1000d-catalog.xml');
 
 // 4.2 -> S1000D_4-2, which is how the URLs are written.
@@ -95,18 +102,20 @@ function writeCatalog() {
     // rewritten on EVERY launch, so a child starting meanwhile read an empty catalogue ("Document is empty") and a valid data module was
     // reported as unparseable. Now: unchanged content is left alone, and a change is written to a temp file and renamed over it, so a
     // reader sees the old or the new file, never a partial one. Nothing else in this file changed.
-    try { if (fs.readFileSync(CATALOG_FILE, 'utf8') === xml) return CATALOG_FILE; } catch { /* not there yet */ }
-    const tmp = `${CATALOG_FILE}.${process.pid}.${Date.now()}.tmp`;
+    // (2026-11-27: the file name now carries the content hash, see catalogFileFor, so "a change" can only be a file that is not there yet.)
+    const file = catalogFileFor(xml);
+    try { if (fs.readFileSync(file, 'utf8') === xml) return file; } catch { /* not there yet */ }
+    const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
     try {
         fs.writeFileSync(tmp, xml, 'utf8');
-        fs.renameSync(tmp, CATALOG_FILE);
+        fs.renameSync(tmp, file);
     } catch (e) {
         try { fs.unlinkSync(tmp); } catch { /* none */ }
-        // Windows can refuse to replace a file a child has open; the other writer's content is identical, so that is fine
-        try { if (fs.readFileSync(CATALOG_FILE, 'utf8') === xml) return CATALOG_FILE; } catch { /* fall through */ }
+        // Windows can refuse to replace a file a child has open; another writer of the same name wrote the same content, so that is fine
+        try { if (fs.readFileSync(file, 'utf8') === xml) return file; } catch { /* fall through */ }
         throw e;
     }
-    return CATALOG_FILE;
+    return file;
 }
 
 /*

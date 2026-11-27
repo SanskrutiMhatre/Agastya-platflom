@@ -908,6 +908,90 @@ order of 08 section 7:
 * Limits: the installer is **not** rebuilt with Node 24 (release work: `npm run package:win -- --node C:\Users\Admin\Desktop\_tools\node-v24.22.3-win-x64\node.exe`,
   then `verify-installer`); the full backend suite, the gate and Playwright were not run on Node 24 (or on this branch); the performance
   baseline (B1-B13) is not re-taken on Node 24, so the phase-2 exit criterion "baseline re-measured" is open.
+
+### WP-12 Data protection: complete backup, tested restore, safe migrations, retention (PLT-001, PLT-005, PERF-006, PLT-006, PLT-007, PLT-011, PLT-013, DEP-001 part, DEP-002, DEP-008, ENT-006, ENT-013, ENT-015, ARC-005, DEP-025, PLT-029, RES-002, DEP-013, ARC-003) - done, with the limits listed
+
+Decisions taken from the audit (no owner question): the platform backup is a ZIP (the existing ZIP64 streaming writer) of a SQLite
+online-backup image + every data-folder file + a SHA-256 manifest; restore goes only into a NEW or empty folder and the switch-over is an
+operator step (point `AGASTYA_WORKSPACE_DIR` at it), so the owner's live data folder is never overwritten; migrations stay additive and
+forward-only ("down" = the pre-migration copy); the historical migration order (014, 015 first) is kept and only new steps must be appended
+in number order; schedule 24 h, retention 7/4/12 for scheduled backups only (manual / pre-update archives are kept until an administrator
+deletes them); pre-migration copies keep the newest 5; housekeeping retention 30 d sessions / 90 d read notifications / 90 d decided reset
+requests / 730 d audit (archived to a gzip file first); all are settings, 0 = off / keep for ever. RPO = backup interval, RTO = measured by Verify.
+
+* **Migration framework (PLT-011, PLT-006, ARC-003, DEP-002, ENT-013, PLT-013).** `storage/schema.ts`, called by `AppContext.start()` in this
+  order before anything is written: `checkOrder` (unique names and NNN numbers, no gap, new steps appended), `quickCheck` (a damaged file stops
+  the start: "failed its integrity check ... restore the latest backup"), `inspectSchema` (a migration unknown to this build or a
+  `user_version` above its highest number = a database from a NEWER build: refused, file untouched; a recorded checksum that differs from the
+  step = an edited shipped migration: refused naming it), `snapshotBeforePendingMigrations` (ONE `VACUUM INTO` copy before the first pending
+  step of ANY number, `publisher-before-<step>.db`, never overwriting, checked with quick_check; failure = `SNAPSHOT_FAILED`, nothing migrated;
+  newest 5 kept), then `AuthStore.migrate` unchanged, then `recordApplied` (SHA-256 checksum + program version per step, backfilled for
+  existing rows, and `PRAGMA user_version`). `schema_migrations` gets two columns by `ALTER TABLE ADD COLUMN` (additive). `context.ts` prints
+  the refusal on top before the process stops. The old 016-only `snapshotBeforeMigration` is kept unchanged for its test, no longer called.
+* **Migration 022-audit-project-index** (PLT-007): `ix_audit_project ON audit_log(project_id, id)`; the activity query plan uses it (tested).
+  NOTE for the merge: if another package also added a `022-...`, renumber one of them (`checkOrder` refuses two 022s).
+* **Platform backup (PLT-001, PLT-005, PERF-006, DEP-008, DEP-025, ENT-006, ARC-005).** `storage/dbImage.ts` (node:sqlite `backup()` in page
+  steps, VACUUM INTO fallback, image switched to rollback journal = one self-contained file; `inspectDatabaseFile` = integrity_check,
+  foreign_key_check, applied migrations, user_version, per table rows + SHA-256 over every row; run in a worker thread so the server keeps
+  answering), `services/platformBackup.ts` (`createPlatformBackup`: image checked before use, every file streamed from disk into the ZIP with
+  its SHA-256 (`ZipStreamWriter.addFile` now returns size/CRC/SHA-256), `.partial` + fsync + rename, one at a time (`BUSY`); excludes the live
+  db/wal/shm, the server lock and `backups/`), `restorePlatformBackup` (refuses a non-empty target, a non-ZIP, a foreign/newer manifest format,
+  a backup whose manifest OR database carries migrations this build does not know, a missing or an unlisted entry, any size/SHA-256
+  mismatch, a database whose integrity, foreign keys or any table's rows/digest differ; extracts into a sibling staging folder and renames
+  only when everything matched; leaves nothing on failure), `verifyPlatformBackup` (= restore into a scratch folder, then removed),
+  `retainedBackups`/`pruneScheduledBackups` (grandfather-father-son), `copyBackupTo` (copy + SHA-256 comparison, never overwrites).
+* **Jobs (ENT-006, RES-002 9.7, PLT-007, ENT-015).** `services/dataProtection.ts`: `backupNow` (audited `backup.created`/`backup.failed`),
+  `restoreTest` (newest backup; failure audited and sent to every administrator's notifications), `runRetention` (repository
+  `repositories/retentionRepository.ts`; audit rows paged by id, written to `<workspace>/audit-archive/audit-<ids>-<date>.jsonl.gz`, read back,
+  then removed up to the archived id - so the archive travels with the next backup), `tick` (scheduled backup when due + pruning, restore test
+  weekly, retention daily; each independent), `startScheduler` (from `index.ts` only, first run 10 min after start, hourly, unref'd; stopped on
+  shutdown), `status`. State in `<backup dir>/backup-state.json` (atomic write). Config (`config.ts`): `AGASTYA_BACKUP_DIR`,
+  `AGASTYA_BACKUP_INTERVAL_HOURS`, `AGASTYA_BACKUP_KEEP`, `AGASTYA_KEEP_MIGRATION_SNAPSHOTS`, `AGASTYA_RESTORE_TEST_DAYS`,
+  `AGASTYA_RETENTION_{SESSIONS,NOTIFICATIONS,RESET_REQUESTS}_DAYS`, `AGASTYA_AUDIT_RETENTION_DAYS` (invalid values stop the start, named).
+* **Routes (administrators only, authz snapshot updated: 8 new rows, all `requireAdmin`).** `routes/backups.ts`: `GET/POST /api/admin/backups`,
+  `GET .../:name/download` (streamed), `POST .../:name/verify|copy|restore`, `DELETE .../:name`; names must match the archive pattern (no path
+  parts); copy/restore targets must be absolute and outside the running data folder and the backups folder; restore answers the switch-over steps.
+* **Project files export (PERF-006, PLT-005, DEP-025, PLT-029).** `GET /api/backup` keeps its scope and content (authors: their projects) but is
+  now streamed from disk with the ZIP64 writer through a pipeline (a client that disconnects stops it), one at a time per server (409 `BUSY`);
+  its manifest says `restorable: false`. The in-memory `services/zip.ts` is deleted.
+* **CLI and doctor (DEP-013, PLT-013, DEP-001 part).** `backend/scripts/agastya-backup.js backup|verify|restore|check` (works with the server
+  running; `--kind pre-update` for the installer of WP-25). `npm run doctor`: database quick_check, schema not newer than this version, newest
+  platform backup under 7 days (read-only open).
+* **UI.** Administrator > Maintenance: new *Platform backup* panel (`pages/PlatformBackups.tsx`: back up now, stale/failed warnings, schedule
+  and last restore test, per archive Download / Verify / Copy to... / Restore... / delete, the switch-over steps after a restore); the old card
+  renamed *Project files export* with "not a backup" wording; the Backup page's administrator note points to the platform backup; activity labels.
+* **Docs.** `docs/OPERATIONS.md` sections 7-8 rewritten: what the backup holds, schedule, restore test, copy elsewhere, CLI, restore runbook
+  (never overwrite; switch-over), RPO/RTO, pre-migration copies, retention, forward-only upgrades and the downgrade refusal, the SQLite
+  switch criteria (RES-002); five new rows in "When something is wrong".
+* Verified (backend `tsc` 0 errors; each file alone, `--test-concurrency=1`, `AGASTYA_CLIENT_DIST` = the main checkout's `frontend/dist`):
+  new `wp12-migrations` 10/10 (order rules; checksums/version/user_version recorded; newer database refused and the file byte-identical;
+  edited migration refused; a scribbled database refused at start; the copy before a pending 022 predates it, holds the data and, put in place
+  of the database in a new folder, starts with the data; synthetic future step gets its own copy beside an existing file; copy failure =
+  nothing migrated; snapshot pruning; the G-REL-3 matrix: databases stopped after steps 1, 3, 13, 15, 16, 18, 20, 21 upgrade to the same
+  schema as a new one with their rows, a named copy, foreign_key_check and quick_check clean); new `wp12-backup-restore` 7/7 (G-REL-1: every
+  table incl. audit_log row-for-row and every file byte-for-byte equal after a restore, a server started from `dist/index.js` on the restored
+  folder signs `meera` in with her old password and serves the module, its history and `/api/version` compatible; a backup during concurrent
+  saves verifies; a second concurrent backup BUSY; refusals: non-empty target, truncated, changed file, added entry, newer manifest, a database
+  carrying an unknown migration behind a clean manifest, a foreign format - nothing left behind; admin routes incl. 403 for a project manager,
+  download = file, path-traversal name 404, verify, copy + no overwrite, restore refused inside the data folder / relative, restore, refused
+  twice, delete; GFS keeps 7 days / one per month for 12 months / manual and foreign files; retention with archive file and the query plan;
+  the schedule due/not due); `wp10-storage-contract` 11/11 (new retention case); `wp10-seams` 11/11 (ORDER with 022 appended); `db-snapshot`
+  4/4; `s1000d-migration` 2/2 (the generic copy keeps the 016 name); `wp06-lifecycle` 5/5; `project-archive` 5/5; `notifications` 6/6
+  (the streamed export); `phase13` 12/12; `wp13-version` 4/4; `api` 17/17; `admin-ops` 8/8; `packages` 10/10; `authz-matrix` 6/6 (after the
+  reviewed snapshot update); `routes-guarded` 1/1; `zipio` 5/5; `settings-hostile-input` 6/6; `wp02-routes` 6/6; `wp03-auth` 11/11; `rbac` 7/7;
+  `phase17-security` 5/5; `project-formats` 4/4; `import-enterprise-refusal` 2/2; `wp13-sqlite-contract` 8/8. CLI tried by hand on a scratch workspace: backup, verify, restore, restore into a non-empty
+  folder refused, check; `npm run doctor` with `AGASTYA_WORKSPACE_DIR` = that workspace shows the three new rows ok. Frontend: `tsc --noEmit`
+  clean; vitest `src/pages/PlatformBackups.test.tsx` 2/2. `node scripts/ci/lint.mjs` green (no new `any` / `require(`).
+* Limits / not done: (1) DEP-001 installer side - `packaging/host/AgastyaHost.cs` still makes its fixed-wait `pre-upgrade-*` copy; making the
+  installer call `agastya-backup.js backup --kind pre-update` and refuse to continue on failure belongs to WP-25 (release engineering runs in
+  parallel; the packaging code was not touched). The server-side generic pre-migration copy now covers every start, installer or not.
+  (2) "Restore ... runs migrations": the restore does not migrate; the first start on the restored folder does, after its own verified copy
+  (proven in `wp12-migrations`). (3) The weekly restore test checks files, tables, integrity and foreign keys; it does not boot a second server
+  (the round-trip test does that). (4) ZIP64 is exercised by the writer's forced-ZIP64 case in `zipio.test.js`, not by a real 4 GiB backup;
+  no 1 GB event-loop measurement was taken on this machine (shared host). (5) The archive is not encrypted (it holds password hashes); the
+  docs say to keep it administrator-only; encryption at rest is left to the OS / WP-28 (central backup). (6) Revisions and blobs are not
+  purged by retention (the audit: explicit action only). (7) The node:sqlite `backup()` call exists in Node 22.23.2 (used here) and is part of
+  Node 24 (WP-13 pin); it was not run on 24.22.3 in this package. (8) Playwright, the full backend suite and the gate were not run.
 ## Phase 3
 
 ### WP-33 S1000D FO-stage scaling, the vendored stylesheet (PERF-003, P0) - done
@@ -1031,6 +1115,7 @@ What changed:
   `version` and keeps the new one; the ancillary page sends the page hash; the JSS and JSG editors reload the merged document after a
   merged save (toast); the CIR upload asks "Replace …?" on `CIR_EXISTS` and resends with `baseHashes`. e2e specs `00-platform`,
   `jsg-editor`, `publish-waivers` send the hash in their direct PUTs (not run).
+* **Merged with main 54874d8.** The JSS/JSG editor behaviour lives in WP-21's shared host (`editors/host/useDocEditor.tsx`): every save sends the loaded hash; a save the server merged (D22) reloads the merged document; a 409 `STALE_DOCUMENT` (an overlapping part) opens WP-21's banner and "Compare and merge…", whose save names the hash it compared against; a 423 `CHECKED_OUT` is shown as the server's message naming the holder. Migration 023 follows WP-12's 022; `wp12-migrations` takes the duplicate and gap cases from the tip of the list, and its pending-migration case makes 022 and every later step pending (it checks 022's index).
 
 Tests: new `test/wp11-integrity.test.js` (registered in `scripts/ci/test-plan.json`):
 * an injected failure before the rename leaves the old file and no temporary file; the start-up sweep;
@@ -1066,3 +1151,335 @@ Limits / not done:
 * The merge is by part only: cross-part data (numbering, front matter) is in the frame and conflicts as a whole; the identity record
   (`doc-identity.json`) is a separate file, atomic but not merged.
 * Not run: Playwright, the full backend suite, the gate, full vitest.
+
+## Phase 4
+
+### WP-21 Editor host contract and unified editor chrome (UX-003, UX-002, UX-017, UX-012, UX-020, FE-021, FE-025, PRD-004, GAP-004) - done, with the limits listed
+
+Decision D16 taken as the audit recommends: the chrome, panels and modes are unified, the three canvases (Studio, JSS sheet, JSG
+sheet) are kept as they are. No feature removed: the parity check reports 0 removals (routes 72, rail 23, commands 113 -> 115, keys
+125 -> 153, test ids 372 -> 398, tests 275 -> 310).
+
+* **The host** (`frontend/src/editors/host/`): `saveState.ts` (one vocabulary: Saving… / Save failed: retry / Unsaved changes (n
+  documents) / Saved HH:MM / All changes saved), `useEditorLayout.ts` (Editor | Split | PDF, divider by pointer and arrow keys,
+  focus mode, `reveal()`; per-format storage `agastya.<format>.view|split|focus`; **Write is the default of a new session**),
+  `EditorHeader.tsx` (one header: lead, title, document, state chip, page actions, Commands Ctrl+K, shortcuts F1, focus Ctrl+., the
+  "Editor layout" group, theme), `useHostKeys.ts` (Ctrl+K / Ctrl+Shift+P, F1, Ctrl+., Ctrl+F / Ctrl+H, Esc; never while a dialog is
+  open or when the editor already handled the key), `CommandPalette.tsx` (the header actions, the host commands and every toolbar
+  button of the editor, `data-cmd`, by name; the hidden toolbar tab is opened before its button is pressed), `ShortcutsDialog.tsx`
+  (from `lib/editorShortcuts.ts`, so the dialog and the registry cannot drift), `FindBar.tsx` (JSS find and replace),
+  `merge.ts` + `ConflictDialog.tsx` (three-way line merge: patience anchors + LCS; per-change and per-conflict choice; the merged text
+  is parsed and validated by the server before it is saved), `useDocEditor.tsx` (the JSS/JSG contract: load, save, check, generate,
+  drafts, conflict banner, leave guard, deep link) + `DocEditorShell.tsx` + `DocPdfPane.tsx`, `testIds.ts` (the old test ids
+  written out in full so the parity scan still sees them where they are drawn).
+* **JSS** (`JssEditorPage.tsx`, now an adapter): the shared header with every former button and id (Check, Save, packages, Convert,
+  Export project, Generate PDF); Write by default, Generate opens the PDF pane; **find and replace** (UX-017: count, next/previous,
+  replace, replace all as one Undo step, match case; CSS Custom Highlight with the `--paper-find*` tokens); palette and shortcuts
+  dialog (UX-017); compare and merge on a refused save; focus mode.
+* **JSG** (`JsgEditorPage.tsx`, the same adapter shape): same header and keys (Ctrl+F/H stay the JSG editor's own find bar);
+  autosave, Word import, Convert (UHB), Export kept; the Word import's `window.confirm` became a ConfirmModal "Replace this
+  handbook?" (GAP-002, WP-35's finding, done in passing); the ISPL editor gets its own shortcuts list.
+* **S1000D** (`EditorPage.tsx`, `PdfPane.tsx`, `lib/studioSession.ts`, `studio/ui/app.ts`, `studio/ui/commands.ts`): the shared header
+  (the data-module panel toggle as its lead); `save-state` always shown, `save-now` beside it while unsaved; in Write, Quick preview
+  and Generate are drawn in the header (same ids, one place at a time) and open the PDF pane; the Studio's ribbon **folds to its 32 px
+  tab strip** by default inside the platform (a tab click shows that tab until a command is used, Esc or a click elsewhere; the pin,
+  a double-click on a tab or Ctrl+F1 keeps it open; remembered; standalone Studio unchanged); new commands `view.ribbon` (Ctrl+F1)
+  and `view.focus` (Ctrl+.), Ctrl+K added to `tools.palette`; the refused-save dialog gains "Compare and merge…" (base = the text the
+  hash stands for, kept per open module; the merged text is checked with the Studio's schema+BREX validation before it is saved over
+  the other version).
+* **Focus mode** (all three): the project rail, the side panels and the PDF step aside; `html[data-editor-focus]`; slim header.
+* **GAP-004**: `goToModule` in `jss/editor.ts` and `jsg/editor.ts` honours `#n` (the n-th id-less section of that title, as
+  `xengine/outline.ts keyOf` numbers them); a deep link that matches nothing shows `goto-missing` instead of silently landing at the top.
+* **Registry and parity**: `lib/editorShortcuts.ts` gains the `host.*` entries and `shortcutsFor()`; `editorShortcuts.test.ts` and
+  `scripts/parity/scan.mjs` scan the three host files. CHECKLIST.md sections 5, 13 and 14 filled in.
+* **Measured** (`e2e/wp21-editor-chrome.spec.ts`, fresh profile, 1366x768, Write): S1000D `.editor-host` 61.3% (80.6% in focus),
+  JSS host 86.5% (95.6%), JSG host 86.0% (95.6%). Before: 28.9% (UX-002).
+* **Tests**: new `editors/host/merge.test.ts` (10) and `editors/host/FindBar.test.ts` (3; it caught a live-Range bug in Replace all:
+  a change to a text node moved the other matches in it); new e2e `wp21-editor-chrome.spec.ts` (12: header, keys, palette,
+  shortcuts, focus and the 55%/70% measures per editor; Esc; Ctrl+S/Ctrl+F per editor; JSS find/replace; JSS compare-and-merge;
+  deep link; the folding ribbon; no sideways scroll at 683/820/1024 px). `00-platform.spec.ts` "Quick preview and Generate live
+  together in the panel on the right" now first checks the header slot and switches to Split (Write is the default now).
+* **Runs**: `wp21-editor-chrome.spec.ts` alone on port 4071 with msedge after `vite build`: 12/12 on the last run (earlier runs found
+  the Replace-all bug above and a Studio XML-view find check that had to accept CodeMirror's own search panel). Not run: the main e2e
+  suite (the lead's), the visual suite, full vitest, the backend suite, the gate.
+* **Limits**: after the JSS find bar is closed with Esc, Ctrl+S did not save in the e2e run (the find bar now hands the focus back to
+  the sheet, but that was not enough there; the Save button and Ctrl+S with the caret in the text work, both tested); the spec saves
+  with the button at that point and this is open for WP-22. The Problems pane as a bottom drawer of at most 25% height (06 section 7.2) is not done; Esc leaves focus mode in JSS and
+  JSG, in the Studio the Studio's own Esc (clear the selection) comes first, so Ctrl+. or the header button leaves it there; the
+  visual baselines of the three editors (`e2e/visual`) change (new header, folded ribbon, Write default) and need re-capturing by
+  whoever runs the visual suite; the server still writes `t:` keys for id-less sections (preferring ids server-side is not in
+  this package); the JSG compare-and-merge path is the JSS one (same hook) but only the JSS path has an e2e test.
+
+## Phase 8
+
+### WP-26 Network security and the client/server protocol (ENT-001, SEC-006, DEP-010) - done (installer TLS page and VM listener scan left to WP-28)
+
+Decisions taken from the audit (no owner question): native TLS in the Node server (no bundled proxy); a network address without TLS is
+**refused at start**, not warned about (roadmap "refuse non-loopback binding without TLS"; G-SEC-1 counts 0 plain-HTTP answers); a reverse
+proxy is supported only on the same computer (Mode B on 127.0.0.1); HSTS on in Mode B over TLS, 180 days, no includeSubDomains or preload
+(roadmap "HSTS for server mode"; ENT-001's "off by default" was the earlier position); the administrator supplies the certificate, an
+internal CA is the recommended path, and the generator is a separate tool, not a default (ENT-001); a passphrase only from a file.
+
+* **Config (WP-10 rules: only `config.ts` reads the environment; each error names the variable).** New `AGASTYA_MODE` (`local` = Mode A,
+  default; `server` = Mode B), `AGASTYA_TLS_CERT` + `AGASTYA_TLS_KEY` or `AGASTYA_TLS_PFX`, `AGASTYA_TLS_PASSPHRASE_FILE`,
+  `AGASTYA_SERVER_NAMES`, `AGASTYA_HSTS_MAX_AGE`. `buildConfig` refuses: a non-loopback `AGASTYA_HOST` in Mode A (`AGASTYA_HOST: ... is not a
+  loopback address`); Mode B on a network address, or on every interface, without a certificate (`AGASTYA_TLS_CERT: Mode B listens on ...`);
+  half a PEM pair; PEM and PFX together; a passphrase file alone; a server name with a scheme or port; a negative HSTS age. TLS on forces
+  `secureCookies`. `isLoopbackHost` (127/8, ::1, IPv4-mapped, `localhost`, `*.localhost`) is the one loopback test.
+* **Listening (`services/network.ts`, `index.ts`).** Mode A with no `AGASTYA_HOST` now listens on **127.0.0.1 and ::1** (same port; ::1
+  skipped with a warning when the machine lacks it) instead of every interface: from this computer `localhost` keeps working whichever
+  address family a client tries first (browser, Vite proxy, Playwright), and nothing listens on a network interface. The packaged product
+  already set 127.0.0.1 and is unchanged. With TLS the listener is `https.createServer` (TLS 1.2 minimum); a plain HTTP request to that port
+  gets no HTTP answer (the TLS layer drops it). `start()`, `stop()` and `shutdownGracefully()` handle a list of servers (the drain waits for
+  all). The start-up log has a `Network:` line (mode, addresses, certificate subject and names, days left, SHA-256 thumbprint).
+* **Certificate (`loadTls`).** Read and checked before the workspace lock: unreadable file, not a certificate, key not matching
+  (`X509Certificate.checkPrivateKey`), wrong passphrase, unreadable PKCS#12 (`AGASTYA_TLS_PFX`), expired - each stops the start naming the
+  variable; 30 days or less left is a warning at every start. The PKCS#12 details are read from a server-side `TLSSocket` on its context.
+* **Host rule (DNS rebinding; the same on HTTP and the WebSocket).** Every request and every upgrade must name a loopback host, an
+  `AGASTYA_SERVER_NAMES` entry (one-label wildcards; `*` turns the rule off on purpose), a name or address in the certificate, or the
+  `AGASTYA_HOST` address; otherwise `421 {code: MISDIRECTED_REQUEST}`. Before this, `Origin` was only compared with `Host`, so a page whose DNS
+  name was re-pointed at 127.0.0.1 passed the Origin check - for example it could create the first administrator of a fresh install (now a
+  test). Order at the WebSocket upgrade: exact path `/ws` (it was any path starting with `/ws`), Host (421), Origin (403), client version
+  (426), session (401).
+* **Version handshake (WP-13 `/api/version`).** Server: a request carrying `X-Agastya-Client` older than `MIN_CLIENT_VERSION` (a pre-release
+  ranks below its release; a malformed value counts as old) gets `426 {code: CLIENT_TOO_OLD, minClientVersion, version}`; `/api/version`,
+  `/api/health` and `/api/ready` always answer; a request without the header (scripts, tools) is not refused; the WebSocket takes the same
+  value as `?client=`. Client (`frontend/src/lib/handshake.ts`): the version is the root `package.json`, written in by Vite (`define`
+  `__AGASTYA_CLIENT_VERSION__`), API level 1; `GET /api/version` once at start; every API request sends the header and the socket the
+  parameter; a page below `minClientVersion`, a server on a newer API level, or a 426 opens a sticky "A newer version is on the server -
+  Reload" dialog over the page (the page stays mounted, drafts are kept); a server on an older API level says the server needs an update.
+  A network failure is not a mismatch (the existing "not answering" banner handles it).
+* **HSTS** (`securityHeaders.ts`): `Strict-Transport-Security: max-age=<AGASTYA_HSTS_MAX_AGE>` on TLS answers in Mode B only (never on
+  `localhost`, where it would pin every other local web server of the machine to HTTPS).
+* **Administrator tooling.** `backend/scripts/make-tls-cert.js --out <dir> --name <host> [--name ...] [--days] [--with-ca]` writes a server
+  certificate (ECDSA P-256, subjectAltName, serverAuth), self-signed or signed by a new private CA, and prints the thumbprints and settings;
+  it installs nothing. The DER writer is `src/services/tlsCert.ts` (Node can sign but not write certificates); the tests use the same writer,
+  so they need no OpenSSL (the PKCS#12 test uses `openssl` when present and skips otherwise). `npm run doctor` has a "Network and TLS" row
+  (FAIL with the server's own message when the setting cannot start; certificate days left). Host program (`packaging/host/AgastyaHost.cs`):
+  new ini keys `[server] Mode, ServerNames` and `[tls] Certificate, Key, Pfx, PassphraseFile, HstsMaxAge` (relative to `agastya.ini`) passed
+  as environment; a `Bind` other than loopback means Mode B; the liveness probe tries HTTP, then HTTPS on 127.0.0.1 (TLS 1.2; certificate not
+  checked for this loopback probe only); the browser URL is `https://` with TLS; `--doctor` FAILs a network `Bind` without TLS and shows the
+  certificate's days left. `agastya.ini.template` documents the keys; `docs/OPERATIONS.md` section 5 "Mode B: TLS" (internal CA, private CA
+  tool, same-machine proxy, host names, renewal and rotation on air-gapped networks, handshake).
+* Verified (backend `tsc` 0 errors; each file alone, `--test-concurrency=1`, `AGASTYA_CLIENT_DIST` = the main checkout's `frontend/dist`):
+  new `wp26-network` 9/9 - configuration refusals naming each variable; Host rule incl. wildcards, IPv6 and certificate names; certificate
+  errors; PKCS#12 with a passphrase file (openssl present, not skipped); DNS-rebinding setup refused with 421 and nothing created, WebSocket
+  421, exact `/ws`; 426 for old, pre-release and malformed client versions on HTTP and the WebSocket, version routes exempt; a real Mode B
+  process with a throwaway CA and server certificate in a temp folder: HTTPS with a client trusting only the CA, plain HTTP to the port
+  unanswered, a client without the CA refused, `Secure` session cookie, HSTS, Host rule with certificate and configured names, `wss` works
+  and `ws` does not; Mode B without TLS on 0.0.0.0, Mode A on 0.0.0.0, an expired certificate and a wrong key each exit non-zero naming the
+  variable and never listen; Mode A by default listens on loopback and this machine's LAN address refuses the connection. Also `wp03-auth`
+  11/11, `auth-http` 10/10, `auth-core` 11/11, `ws-broadcast` 5/5, `routes-guarded` 1/1, `phase17-security` 5/5, `wp10-seams` 11/11,
+  `wp13-version` 4/4, `authz-matrix` 6/6 (snapshot unchanged: no route added), `wp06-lifecycle` 5/5, `wp13-password-hashing` 3/3,
+  `uploads-config` 4/4. Frontend: `tsc --noEmit` clean; vitest `src/lib/handshake.test.ts` 5/5, `src/api/query.test.ts` +
+  `src/components/ui.test.tsx` 19/19, `importRefusal` + `waivers` + `AuthScreens` + `stores` 33/33. Host program: both executables compile
+  with the packager's `csc` flags (into a scratch folder; not executed). `scripts/ci/lint.mjs` green; `wp26-network.test.js` is in the
+  security stage of `scripts/ci/test-plan.json`. `make-tls-cert.js --with-ca` and the doctor row were run by hand (three configurations).
+* Not done / left: the installer's LAN page does not collect a certificate yet - an upgraded `Bind=lan` install without `[tls]` now stops
+  the server with a clear log line and a `--doctor` FAIL; the installer TLS page, a DPAPI-protected passphrase and the service-only ACL on
+  `tls\` belong to WP-28. G-SEC-1's listener scan on a VM (`Get-NetTCPConnection`) was not run here. The frontend was not rebuilt and
+  Playwright was not run (what a browser on this computer sees on loopback is unchanged). The host program's `--doctor` and probe changes
+  were compiled, not executed. Certificate pinning for a thin Mode B client (WP-28) is not built; browsers use the Windows trust store.
+## Phase 6 (taken early)
+
+### WP-23 Accessibility to WCAG 2.2 AA (UX-004, UX-005, FE-014, ENT-018, UX-010, UX-027, UX-028) - done in part (automated and keyboard parts; manual screen-reader pass open)
+
+* Landmarks and bypass (UX-005 a, WCAG 1.3.1 / 2.4.1): the main shell wraps its pages in `<main id="main-content">` (`.v2-main-region`, the
+  same flex column the page had); the project shell's content column is now `<main>`; the sign-in screens are a `<main>`. Every signed-in
+  page starts with a skip link (`components/a11y.tsx` `SkipLink`, `data-testid="skip-link"`): hidden until it has keyboard focus, it moves
+  focus to the main landmark without changing the address (no `#hash` route). Inside the platform the Studio's own `<main class="center">`
+  becomes a named region (`role="region"`, "Document"), so a page has exactly one main; the standalone Studio keeps its `<main>`.
+* Headings (WCAG 1.3.1): `PageHeader` renders `h1` on project pages and `h2` under the main shell, whose top bar already holds the page's
+  `h1` (context `HeadingLevel`); same look (`.v2-ph-text :is(h1, h2)`). Fixes "no level-one heading" on Publication, Release, Explore,
+  Validation, Graphics, Ancillary and project Settings (WP-20's report named publication and release).
+* Titles (UX-005, WCAG 2.4.2): `useDocumentTitle` gives every route its own title: "Projects · Agastya Platform",
+  "Publication · <project> · Agastya Platform", "Sign in · Agastya Platform" (app name from the administrator settings).
+* Rows (UX-005 b, FE-014, WCAG 2.1.1): the project name in the Projects and the oversight status tables is a real link (`RowLink`: Enter
+  opens, Ctrl/middle click opens a tab, the row click still works); the numbering-preset rows and the Explore tables (S1000D and JSS/JSG
+  documents, pictures) get a button on the name (`RowButton`, `aria-pressed` for the selected row). Validation issue rows and the JSS
+  outline/problem rows (`role="button"`) now answer Space as well as Enter.
+* Account menu (UX-005 d, WCAG 4.1.2): focus goes to the first item on open; Up/Down (wrapping), Home/End move; Escape closes and returns
+  focus to the button; Tab closes; Down on the closed button opens it; the menu is named "Account"; items are `tabindex=-1` (roving).
+* Tabs: the platform tab strips (Settings, project Settings, S1000D configuration, Activity views, the S1000D code lists, the import dialog)
+  move focus with Left/Right/Up/Down/Home/End (`tablistKeys`) and have names. The JSS/JSG/Studio editor toolbars are WP-21's (not touched).
+* Dividers (UX-005 e): the editor/PDF divider of the Studio, JSS and JSG pages is focusable and resizes with the arrow keys (2 % steps),
+  PageUp/PageDown (8 %), Home/End (limits), stored where a drag stores it; all dividers expose `aria-valuenow/min/max`.
+* Dialogs (UX-004, FE-014): WP-19 already trapped and returned focus. Added: Escape closes only the top dialog (a stack in `Modal`); the
+  New-project wizard asks "Discard the new project?" before Escape, the close button or a backdrop click throw away typed input. Decision
+  (audit's recommendation, the owner's standing approval): the explicit Cancel button closes at once without asking - it is the deliberate
+  way out, and the main e2e suite (00-platform) relies on it.
+* Status messages (UX-028, WCAG 4.1.3): success and information toasts go into a polite live region that is in the page before any message;
+  an error toast is a `role="alert"` outside it (announced at once). Reduced motion: the platform rule already exists in `styles/base.css`
+  (moved there by WP-18); the keyboard spec now proves transitions are off under the setting.
+* UX-027: the Studio command palette is on Ctrl+K (primary, shown in menus) with Ctrl+Shift+P kept as an alias; Ctrl+K also works from a field.
+* UX-010 was done by WP-05 (JSS/JSG drafts in IndexedDB every 3 s, offered on open; JSG autosave on by default); nothing added here.
+* Audit extended (`e2e/visual/a11y-audit.ts`), each rule proven by a planted-defect page and a clean twin (`a11y.spec.ts` "the audit finds
+  planted keyboard and structure defects (WP-23)"): `focusable-role` (a widget role nobody can Tab to, serious), `clickable-row` (a
+  pointer row or list item with no keyboard target, serious; FE-014), `aria-required-attr` (focusable separator, slider, scrollbar without
+  `aria-valuenow`, critical), `landmark-no-duplicate-main`, and `skip-link` (a page with a navigation block whose first Tab stop is not a
+  link to the main landmark, serious; axe "bypass"). The structure rules `landmark-one-main`, `landmark-no-duplicate-main` and
+  `page-has-heading-one` stay "moderate" (axe's level) but are now in the budget of the ten named routes. The allow-list stays empty.
+* Keyboard scripts (`e2e/visual/keyboard.spec.ts`, light project only): skip link first and focus to main on two shells; distinct titles on
+  eight routes; open a project from the Projects table with Tab and Enter; account menu arrows/End/Escape/Down; Escape on an empty wizard
+  closes it and returns focus, on a filled one asks, a second Escape closes only the question; divider arrows/Home/End; live regions exist
+  and transitions are off under reduced motion. Unit tests `src/components/a11y.test.tsx` (9): skip link, titles, heading level, row
+  link/button, tab keys, splitter keys, Escape on the top of two dialogs, the toast regions.
+* Defect found by the new rules and fixed: the Studio inside the project shell made two `main` landmarks (its `main.center`), on the project
+  and Studio routes in both themes (`landmark-no-duplicate-main`, run 1).
+* Test-harness fix (`e2e/visual/seed.ts`): every spec file signed in again, and each sign-in is an `auth.login` event; the Overview reads
+  the newest 12 events before dropping sign-ins, so adding the keyboard spec pushed the seeded project events out and the dark Overview
+  baseline failed with "Nothing yet" (runs 1 and 2; 21 084 px, data only, no visual change of mine). Sessions are now reused across spec
+  files and projects of the worker (checked with `/api/auth/me`, a fresh sign-in if they ended). No baseline was updated.
+* Verified (this worktree, Edge, my own port 4081 and `--output=test-results-wp23`; port 4050 and the main suite not touched): frontend
+  `tsc --noEmit` clean, the e2e/visual files type-checked strict on their own; vitest `src/components/a11y.test.tsx` 9/9,
+  `src/components/ui.test.tsx` 10/10, `src/components/theme.test.ts` 15/15, `src/styles/states.test.ts` 131/131,
+  `src/styles/tokens/coverage.test.ts` 3/3; `npm run -s lint:theme` ok (0 literals); `scripts/ci/lint.mjs` ok (no new any/require);
+  `vite build` ok; `check:bundle` PASS; parity check PASS (nothing removed; test ids kept). Visual/a11y suite:
+  Run 1: 62 passed, 5 failed (duplicate main on project/studio x2 themes; dark Overview data); run 2 after the Studio fix: 66 passed,
+  1 failed (dark Overview data); run 3 after the seed fix: **67 passed, 7 skipped (the keyboard spec in the dark project), 0 failed**, no
+  moderate notes left on any named route.
+* Not done / limits: G-UX-4, the manual screen-reader pass on three routes, and the manual parts of RES-007 (200 % zoom, reflow) need a person
+  with NVDA/JAWS/Narrator: not done. G-UX-2 is covered in part: sign-in is a plain form, opening a project and the dialogs are scripted
+  above, but "create and edit a data module, validate, request and approve a release" keyboard-only was not scripted (the Studio's
+  contenteditable surface and ribbon are WP-21's chrome). axe-core itself is still not in the offline cache (the in-repo subset grew).
+  The editors' own toolbars, menus and tablists (Studio ribbon, JSS/JSG tabs) were left to WP-21 except the targeted fixes named above.
+  Not run here: the main e2e suite (00-platform's wizard Cancel and account-menu tests should be unaffected: Cancel still closes at once,
+  menu items are still `menuitem` buttons), the full vitest, the backend suite, the gate.
+### WP-24 Release engineering: signing, SBOM, integrity, offline verification (DEP-003, ENT-014, RES-005, DEP-020, DEP-006, DEP-014, DEP-019, DEP-026, ENT-007, DEP-024, RES-006, DEP-013)
+
+* **Signing as one configured step** (`scripts/release/signing.mjs`): `AGASTYA_SIGN_THUMBPRINT` (+ `AGASTYA_SIGN_STORE`; certificate store or
+  hardware token, the only route for a public certificate after the CA/B Forum rules of 1 March 2026) or `AGASTYA_SIGN_PFX` + `AGASTYA_SIGN_PASSWORD`;
+  `AGASTYA_SIGN_TIMESTAMP_URL`; `AGASTYA_SIGNTOOL` (default: newest x64 signtool of an installed Windows SDK, fallback `Set-AuthenticodeSignature`);
+  legacy `AGASTYA_SIGN_CMD` kept. The packager signs every PE file of the stage that carries no signature (vendor-signed `node.exe` / JRE keep
+  theirs), Inno signs Setup and the uninstaller through `signing.mjs --sign` (password never on the ISCC command line), `--show` prints the set-up.
+* **Integrity**: `MANIFEST.sha256` (format `agastya-manifest/1`, SHA-256 + size of every shipped file, runtime-owned paths excluded) inside the
+  product, `SHA256SUMS.txt` over all release outputs; both get a detached signature (`agastya-detached-signature/1`, RSA-PKCS1/ECDSA-P1363 SHA-256,
+  certificate embedded) by `scripts/signing/Sign-Manifest.ps1` with the Authenticode certificate. Verifiers: `scripts/release/verify-release.mjs`
+  (build side, run by the packager as its last step), `scripts/signing/Verify-Release.ps1` (customer side, PS 5.1, shipped beside Setup), and the host
+  (`packaging/host/Integrity.cs`): `AgastyaCtl --verify [--require-signed]`, `--doctor` quick / `--doctor --deep`, and a quick check in the background
+  at every server start (log line + Application-log warning). The manifest signer must equal the Authenticode signer of `AgastyaCtl.exe`
+  (WinVerifyTrust, cache only, no revocation fetch).
+* **SBOM** (`scripts/release/sbom.mjs`): CycloneDX 1.5, no network, content-derived serial number; npm packages from what the stage really ships
+  (lockfile integrity as hash; a package not in the lockfile at that place/version is marked and refuses a `--release`), web-client npm from the
+  frontend lockfile, non-npm components from `packaging/bundled-components.json` with file hashes. Written into the product and the release folder;
+  `--check` validates it (against the stage when given).
+* **Release mode** (`--release`): refuses unsigned, untimestamped (unless `AGASTYA_SIGN_ALLOW_NO_TIMESTAMP=1`, recorded), dirty tree, lockfile drift,
+  empty `copyright`/`url` in `packaging/product.json`, missing `docs/EULA.txt`; the final verification then requires signed + time-stamped.
+* **Support and deployment**: `AgastyaCtl --support-bundle [file]` (`packaging/host/SupportBundle.cs`, allow-list ZIP, line redaction of
+  passwords/Bearer/Basic/session cookies/argon2+scrypt hashes, no database or project data); `--doctor` now FAILs on an unusable ini value (WARN for
+  an unknown key) and reports integrity. `packaging/deploy/Detect-AgastyaPlatform.ps1` (uninstall key `{AppId}_is1` + file version);
+  `docs/DEPLOYMENT-KIT.md` (silent commands, Inno exit codes, detection rule, Intune/ConfigMgr/GPO recipes, Windows support matrix with NOT VERIFIED rows).
+* **Gates**: `scripts/ci/readiness.mjs` G-SEC-11a (Setup + both host exes Valid and time-stamped), G-SEC-11c (verify-release signed+timestamped),
+  RES-005 (SBOM checks and is covered by the sums), G-DEP-4 (host.test.mjs), G-DEP-3 (detection, with `--install`), DEP-013 (installed `--verify
+  --require-signed`); G-DEP-6 fixed (`--doctor`, was `doctor`). `scripts/ci/gate.mjs`: new `release-tools` stage from `test-plan.json`
+  `scriptTests`, package stage = release-tools, package (`--release` in the release profile), verify-package, verify-release.
+  `scripts/vm-acceptance/Test-InstallerInVm.ps1` gained `-RequireSigned` and a WP-24 block (signatures, `--verify`, seeded fault, start-up log line,
+  support bundle without db/admin password) - parse-checked only, **not run** in a guest.
+* Docs: `docs/SIGNING.md` (rewritten), `docs/DEPLOYMENT-KIT.md` (new), `docs/OPERATIONS.md`, `docs/PACKAGING.md`, `docs/BUNDLED-COMPONENTS.md`.
+* Recorded decisions: the start-up integrity check is log-only (never blocks an air-gapped site); a detached-signature format of our own instead of
+  CMS/catalog files (verifiable by Node, PS 5.1 and .NET 4 without extra tools); unsigned third-party PE files are signed by us, vendor signatures
+  are never replaced; a release ships exactly the lockfile.
+* Verified (2026-11-27): `scripts/release/release.test.mjs` 8/8 and `scripts/release/host.test.mjs` 6/6 (throwaway certificates in temp folders;
+  tampering: changed byte, same-size change, missing file, planted DLL, foreign signer, edited manifest; doctor seeded faults; support-bundle canaries;
+  detection against a throwaway HKCU uninstall key, removed afterwards); `node scripts/ci/lint.mjs` exit 0; `node --check` on the changed scripts.
+  A **complete package** was built with signing on, into a scratch folder (Node 24.22.3, installer included, a throwaway self-signed `.pfx`
+  `CN=Agastya WP-24 Package Test Only`, no time stamp): 12 of 84 PE files signed by us, 72 vendor-signed, SBOM 261 components (148 backend npm),
+  manifest 2,437 files, signed manifest and sums, packager self-verification OK (2 warnings: no time stamp). Independently re-checked with
+  `Verify-Release.ps1 -Thumbprint ... -RequireSigned` (OK), `AgastyaCtl.exe --verify --require-signed` on the stage (intact) and
+  `verify-release.mjs --release` (OK). The certificate-store mode was exercised once: the same throwaway certificate imported into
+  **CurrentUser\My only**, signtool + `Sign-Manifest.ps1` by thumbprint, verified, and the certificate and its key deleted straight after. No other
+  store was touched; the scratch folder (pfx, password, package) was deleted. That first package run had found a real bug (SBOM compared the shipped
+  `node_modules` with the lockfile and failed on a nested `ms`); fixed by listing what ships and marking drift.
+* Not done / blocked: **real certificate** (owner, decision D4) and therefore a time-stamped signature (no TSA reachable here); the VM matrix and
+  no-NIC runs (G-OFF-1/3/4, Windows 10/11/Server 2019/2022, ARM64) need guest images; the new VM-harness block was not executed; Intune/ConfigMgr
+  run of the detection rule (no tenant); MSI (WP-31/D6); unattended first administrator from the installer (WP-25); structured JSON logs and
+  Event-Log security events (WP-29); low-disk / stopped-service / TLS-certificate doctor faults; the release installer in `release/` was not rebuilt.
+### WP-16 One validation framework and shared helpers (S1K-002, S1K-003, S1K-006, S1K-007, PUB-022, ARC-007, ARC-008, ARC-018, PUB-028) - done in part (see limits)
+
+Behaviour-preserving unless stated; decisions taken from the audit's recommendations (no owner question).
+
+* **Validation framework** (`services/validationFramework.ts`, 03 section 4): one finding model (`Issue`, `issueOf` = the former private
+  `norm`), rule sets per standard (`RuleSet`: id, standard, `applies(input)`, `run(input)`), one runner (`runRuleSets`: in order, a
+  `setImmediate` turn before each set, as WP-32 put between the scans) and `summarise`. A rule set takes plain data (`ValidationInput`: ids,
+  folders, issue in use, flags) and returns plain data, never a request, so WP-14 can run it in a worker. `validation.ts` keeps the schema
+  stage (well-formedness, XSD, extensions: what it finds decides what the others read) and lists the S1000D rule sets
+  (`S1000D_RULE_SETS`: applic, graphics, ids, icn, pm, brex; BREX only when asked and only for an S1000D project). Same issues, same order,
+  same notes, same messages; the only difference is one more event-loop turn (before BREX). `Issue`/`Severity` are re-exported from
+  `validation.ts` for the existing importers.
+* **Format-neutral gate (S1K-006)** (`services/publishChecks.ts`, a leaf): `registerPublishCheck({ format, owns, check })`, the S1000D check
+  registered by `publishGate.ts` as the default, the JSS check by `jss/service.ts` when the engine loads (the `documentCreators` pattern of
+  WP-10; `app.ts` and `publisher.ts` load it). `assertPublishable` is one line; `publishGate.ts` no longer imports the JSS service. Messages
+  and codes unchanged (`NOT_S1000D` for a one-module preview of a JSS document). JSG keeps publishing through its own engine
+  (`assertJsgPublishable`) and is not registered: registering it would change what the S1000D publish route does for a JSG project.
+* **Waiver subjects (S1K-002)** (`publishWaivers.ts`): `waiverSubject()` takes the issue/language suffix and `.xml` off and folds the case, at
+  write time (stored as the gate names it) and at match time (a stored older waiver still matches); a missing `DMC-` prefix is accepted.
+  Matching is now equality of the normalised subjects. Changed on purpose: the former `endsWith` match let a waiver for `022A-D` cover every
+  BREX ending so, and a file-name subject (`..._001-00_EN-US.XML`) was accepted (201) and never matched; now it matches.
+* **One source for the XSD-pattern translator and the BREX value forms (S1K-003, ARC-008)**: `backend/src/shared/xsdRegex.ts` and
+  `backend/src/shared/brexValues.ts` (`valueMatches`, `contextApplies`, `isXPath2`; no Node, DOM or outside imports, checked by the test).
+  The backend compiles them; the Studio imports them by relative path (`frontend/src/studio/validation/brex.ts`, `ui/panels.ts`);
+  `frontend/src/studio/core/xsdRegex.ts` and `backend/src/services/xsdRegex.ts` are gone. `vite.config.ts` lets the dev server read that
+  folder (`server.fs.allow`: the default root plus `backend/src/shared`); `scripts/package-windows.mjs` treats a change there as making
+  `frontend/dist` stale. The BREX parse and document walk stay per runtime (xmldom + `xpath` vs the browser DOM); the parity suite stays as
+  the guard. The frontend `isXPath2` had `matches` twice in its alternation: same semantics.
+* **Shared helpers (PUB-028, S1K-007)**: `backend/src/lib/xml.ts` (`escText` & < >, `escAttr` & < > ", `readAttrs`) and `lib/hash.ts`
+  (`sha256`, `sha256File` streamed in 1 MB blocks, `sha256FileOr`). Replaced: the 14 `esc` copies (each caller keeps the variant it had:
+  `escAttr` where the copy escaped `"`), the 6 attribute escapers built on them (`escA`/`escAttr` in jsg/docx, jsg/service, jss/service,
+  jss/rwi/canonical, jss/rwi/serialize, jssdm/toDms, and the inline one in xengine/jsg-model), `importer/xmlScan` `escapeText/escapeAttr`
+  (now re-exports), the 5 named hash helpers (`csdbIndex.sha`, `jss/service.sha`, `jsg/service.sha`, `jss/rwi/exporter.sha`,
+  `publishGate.sha` = `sha256FileOr`) and the streaming file hash of `packages.ts`; the attribute reader of `csdbIndex`, `csdbObjects`,
+  `lifecycle`, `sns/dms`, `findings`, `packages`, `projectConfig` (2) and `jssdm/fromDms` is `readAttrs` (re-exported by `xmlHead.ts`, as
+  S1K-007 asked). Exported names (`esc`, `sha`, `escA`, `escapeText`) are kept as re-exports, so no importer changed. Left on purpose:
+  the two serialisers that escape attributes as `& " <` without `>` (`miniXml.ts`, `importer/xmlScan.ts` setAttrs) - switching them would
+  change bytes the importer writes; the inline hashes that slice or hash JSON (`applicEval`, `jss/ancillary`, `release` digest Buffers).
+* **JSS document projects (PUB-022, ARC-018)**: `projectRecord.assertS1000dPublication(projectId)` (409 `JSS_PROJECT_PROTECTED`, the guard's
+  message) is called by the writers themselves: `pm.writePm` (PUT pmc, import/assign, placeNewDm, sample), the `pmc/import` route before it
+  writes, `importer/apply.applyImport`, `sns/service.applyDerived` and `jssdm.generateForProject` with `pm: 'merge'`. `routes/jss-guard.ts`
+  stays as defence in depth (decision: no global allow-list middleware, the audit's own recommendation is "decide inside the writers").
+  Found while doing it: `POST sns-rows/derive` with `apply` (one of the "NOT VERIFIED" writers of ARC-018) was not in the guard's list and
+  its writer did not check the project kind (on a JSS project without data modules it stopped at "empty publication"; with modules in the
+  CSDB nothing stood between it and the JSS document - read from the code, not reproduced on the old build); it is now refused with 409. Kept as designed: a NEW JSS project made from an S1000D package
+  (`POST /api/projects/import`, format jss) takes the package's publication (`xengine-import-wizard.test.js` "keeps the data"), so the
+  package importer does not assert; `packages/import` into an existing JSS project is refused by the guard as before.
+* New test `test/wp16-validation-framework.test.js` (default backend stage: `test-plan.json` lists only the special stages): lib helpers
+  pinned (escapes, attributes, 2 MB streamed hash, the services hand out the shared functions); the duplicate scan (no escaper, hash helper,
+  attribute reader, XSD translator or BREX value-form function outside `lib/` and `shared/`, the Studio copy is gone, both runtimes import
+  `shared/`, `shared/` is runtime-free); the framework (normalisation, order, skipped set, a turn between sets, S1000D rule-set list and the
+  BREX condition); the gate registry (JSS check owns a JSS project, the S1000D one is the default, a probe format plugs in without touching
+  the gate, `publishGate.ts` code has no JSS reference); waiver subjects (file name = bare code = no prefix; a different BREX and a mere
+  suffix do not match; the second form replaces instead of adding); and the table of every route that can write publication.xml on a JSS
+  project (PUT pmc, pmc/import, import/apply, import/assign, packages/import, dms-import, sns-rows/derive apply, jssdm/generate merge: 409
+  and the file byte-identical) plus the writers called below the routes (writePm, applyImport, applyDerived: 409).
+* Verified (backend `tsc` 0 errors, frontend `tsc --noEmit` 0 errors, `scripts/ci/lint.mjs` green with `any.backend` lowered 280 -> 279
+  (the untyped `norm` parameter went); each backend file alone, `--test-concurrency=1`, `AGASTYA_CLIENT_DIST` at the main checkout's
+  `frontend/dist`): new `wp16-validation-framework` 6/6; `wp32-validation-scale` 8/8, `wp32-validator-crash` 1/1, `brex` 16/16,
+  `applicability` 4/4, `repeated-dm-ids` 6/6, `extensions` 5/5, `jss-authoring` 12/12 (1 skip: stencils not in the checkout),
+  `importer-repairs` 19/19, `importer-scan` 16/16, `importer-structure` 12/12, `jssdm` 20/20, `jssdm-http` 9/9, `wp10-seams` 11/11,
+  `wp10-storage-contract` 10/10, `publish-waivers` 2/2, `html-gate` 1/1, `html-publish` 6/6, `csdb-objects` 4/4, `import` 5/5,
+  `importer-http` 12/12, `packages` 10/10, `project-formats` 4/4, `routes-guarded` 1/1, `settings-hostile-input` 6/6, `sns` 16/16,
+  `sns-http` 10/10, `sns-polish` 4/4, `sns-separation` 6/6, `lifecycle` 5/5, `lifecycle-reinstate` 2/2, `jsg-engine` 7/7, `jsg-ispl` 5/5,
+  `wp07-jsg-deep-path` 1/1, `xengine-convert` 7/7, `xengine-import-wizard` 4/4, `xengine-legacy-import` 5/5, `xengine-identity` 11/11,
+  `xengine-content-types` 2/2, `xengine-pictures` 2/2, `pm-multi-ref` 5/5, `object-docs` 4/4, `api` 17/17, `phase13` 12/12,
+  `import-enterprise-refusal` 2/2, `wp06-lifecycle` 5/5, `brex-gate` 3/3 (962 s), `publish-gate` 21/24 then the three failures re-run
+  alone 4/4 (with the 5-0 setup): the three were HTTP 500 from `EPERM ... rename ... %TEMP%\jsspub-s1000d-catalog.xml` in
+  `vendor/engine/catalog.js` - every process on the machine writes that ONE temp file, and other agents' suites ran at the same time
+  (a pre-existing shared-temp race, not touched here; worth its own fix: a per-process catalog name). Frontend: `brex-parity` 4/4
+  (AGASTYA_VERIFY=1, against this build of the server engine), `lib/waivers.test.ts` 12/12, `vite build` to a scratch folder bundles
+  `backend/src/shared` (the Studio chunk contains the shared code). Not runnable here: `brex-xpath` (needs a native `xmllint` on PATH;
+  4/4 fail with no libxml2 counts, an environment limit).
+* `wp32-event-loop` (limit 100 ms) did not hold on this machine under the load of the parallel agents (CPU at 99 %, validation 16-21 s
+  instead of 11.6 s). A/B on the same load, the 8a04aa2 build against this one, alternately: base 82.8 / 140.1 ms, WP-16 131.9 / 86.4 /
+  119.3 ms (two more single runs of WP-16: 95.3 ms pass, 136.2 ms). The stall is one BREX check of one module stretched by the load
+  (WP-32's stated limit, WP-14's job); the runner adds no work to a turn. To be re-checked by the lead on a quiet machine.
+* Not done, and why:
+  - ARC-007 document model (JSS/JSG vocabulary in `jss/rwi/canonical.ts`, `xengine/jsg-model.ts`, `frontend/src/jss/xml.ts`,
+    `frontend/src/jsg/xml.ts`): the copies have already diverged in output (the editor writes `indent="none"`, drops empty marks,
+    self-closes an empty `xref`, writes a chapter `orientation` and a section title on the section's own line; the backend canonical model has none of these, and the two name a
+    notice's content differently).
+    One shared module therefore changes what the converters or the editor write: a behaviour decision with the round-trip suites, not a
+    mechanical refactor. Recommended as its own change: the editor's writer (the superset) moved to `backend/src/shared/`, the canonical
+    model extended to it, `xengine-convert`, `jss/jss.test.ts`, `jsg/jsg.test.ts` as the guard.
+  - ZIP: `services/zip.ts` (the weak writer) guards the backup, which WP-12 (in parallel) owns; `importer/zipRead.ts` was left beside
+    `zipio.ts`. PNG encoders: the vendor copy stays (ARC-007 says so).
+  - `serial` (2 job chains) and `runTool` (process runner): WP-14's job service, as 03 section 3 recommends. `paths.ts` / `atomic.ts`: WP-11.
+  - Frontend escapers (`studio/core/xml.ts` and the JSS/JSG editors' own) were not part of the PUB-028 count and were not touched.

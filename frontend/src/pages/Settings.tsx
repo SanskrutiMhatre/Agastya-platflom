@@ -14,6 +14,7 @@ import { useUi } from '../store/ui';
 import { BackupButton } from '../components/Oversight';
 import { actionLabel } from '../lib/activity';
 import { MoreRows, useProgressive } from '../components/windowing';
+import { tablistKeys } from '../components/a11y';
 
 function Account() {
   const { user, logout } = useSession();
@@ -282,7 +283,7 @@ export function Settings() {
   return (
     <div className="v2-page">
       <div className="v2-page-head"><div><h2>Settings</h2><p className="v2-sub">{isAdmin ? 'Account, people and platform administration.' : isManager ? 'Your account and your authors.' : 'Your account and preferences.'}</p></div></div>
-      <div className="v2-tabs" role="tablist">
+      <div className="v2-tabs" role="tablist" aria-label="Settings sections" onKeyDown={tablistKeys}>
         {tabs.map((t) => <NavLink key={t.to} to={t.to} className={({ isActive }) => `v2-tab ${isActive ? 'active' : ''}`} role="tab" style={{ textDecoration: 'none' }}>{t.label}</NavLink>)}
       </div>
       <Routes>
