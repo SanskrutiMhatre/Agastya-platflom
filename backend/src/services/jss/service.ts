@@ -20,6 +20,7 @@ import { parseTree, walk, norm, type MNode } from '../miniXml';
 import { wellFormedError } from '../wellFormed';
 import { readProjectJson, updateProjectJson, pmRel } from '../projectRecord';
 import { registerDocumentCreator } from '../documentCreators';
+import { registerPublishCheck } from '../publishChecks';
 import { jssTypeById, type JssDocType, type OutlineNode, type StartBlock, type TableTemplate } from './registry';
 import { escText as esc } from '../../lib/xml';
 import { sha256 as sha } from '../../lib/hash';
@@ -337,6 +338,18 @@ export async function assertJssPublishable(projectId: string): Promise<{ validat
     verifyUnchanged: () => { if (readSource(projectId).hash !== hash) throw conflict('The document changed while the PDF was being prepared; build again.', 'CHANGED_DURING_VALIDATION'); },
   };
 }
+
+// The publication gate asks the format's own check (publishChecks.ts, WP-16 S1K-006): a JSS document has its own schema and the stencil's rules,
+// not S1000D's; the same fresh check, run here.
+registerPublishCheck({
+  format: 'jss',
+  owns: isJssAuthored,
+  check: async (projectId, scope) => {
+    if (scope !== 'publication') throw conflict('A single-module preview is an S1000D feature; a JSS document is built as a whole.', 'NOT_S1000D');
+    const g = await assertJssPublishable(projectId);
+    return { validatedAt: g.validatedAt, files: [pmRel(readProjectJson(projectId))], warnings: g.warnings, ruleBreaks: [], verifyUnchanged: g.verifyUnchanged };
+  },
+});
 
 // ── The book the pipeline renders ───────────────────────────────────────────────────────────────────────────────────────────────
 
