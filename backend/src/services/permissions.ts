@@ -32,18 +32,52 @@ export function capabilityTableFrom(app: RouterView): Record<string, string> {
   return out;
 }
 
-export function setCapabilityTable(t: Record<string, string>): void { table = { ...t }; }
+/** WP-27: the capabilities every route of which only reads (GET/HEAD): what a read-only auditor's map may show as allowed. */
+export function readOnlyCapabilitiesFrom(app: RouterView & { _router?: { stack?: Array<{ route?: { methods?: Record<string, boolean> } }> } }): Set<string> {
+  const writes = new Set<string>(); const all = new Set<string>();
+  for (const layer of app?._router?.stack ?? []) {
+    const route = layer.route as undefined | { methods?: Record<string, boolean>; stack: Array<{ handle?: { cap?: unknown } }> };
+    if (!route) continue;
+    const write = Object.keys(route.methods ?? {}).some((m) => !['get', 'head', 'options'].includes(m));
+    for (const s of route.stack) {
+      const cap = s.handle?.cap;
+      if (typeof cap !== 'string') continue;
+      all.add(cap); if (write) writes.add(cap);
+    }
+  }
+  return new Set([...all].filter((c) => !writes.has(c)));
+}
+
+let readOnlyCaps = new Set<string>();
+export function setCapabilityTable(t: Record<string, string>, readOnly?: Set<string>): void { table = { ...t }; if (readOnly) readOnlyCaps = new Set(readOnly); }
 export function capabilityTable(): Record<string, string> { return { ...table }; }
+export function readOnlyCapabilities(): Set<string> { return new Set(readOnlyCaps); }
+
+/** WP-27: what changes the plain role answer for one person on one project. */
+export interface CanOptions {
+  /** A read-only auditor: only the read-only capabilities are allowed. */
+  readOnly?: boolean;
+  /** The project's capability rules that apply to the person (authz.rulesFor): deny wins, allow grants one capability below its role. */
+  rules?: Array<{ capability: string; effect: string }>;
+}
 
 /**
  * What a person with this effective project role may do. A project that is not active (pending approval, rejected) supports reading only,
- * and only for its owner: the same rule authz.evaluate applies.
+ * and only for its owner: the same rule authz.evaluate applies. Capability rules and the auditor flag (WP-27) are applied the same way
+ * authz.evaluate applies them; an owner is never affected by a rule.
  */
-export function canFor(role: string | null | undefined, status: string = 'active'): Record<string, boolean> {
+export function canFor(role: string | null | undefined, status: string = 'active', opts: CanOptions = {}): Record<string, boolean> {
   const have = RANK[String(role)] || 0;
   const out: Record<string, boolean> = {};
+  const rules = role === 'owner' || opts.readOnly ? [] : (opts.rules ?? []);
   for (const [cap, min] of Object.entries(table)) {
-    out[cap] = status === 'active' ? have >= (RANK[min] || 1) : (cap === 'project.read' && role === 'owner');
+    if (status !== 'active') { out[cap] = cap === 'project.read' && role === 'owner'; continue; }
+    let ok = have >= (RANK[min] || 1);
+    const mine = cap === 'project.access' ? [] : rules.filter((r) => r.capability === cap);
+    if (mine.some((r) => r.effect === 'deny')) ok = false;
+    else if (!ok && mine.some((r) => r.effect === 'allow')) ok = true;
+    if (opts.readOnly && !readOnlyCaps.has(cap)) ok = false;
+    out[cap] = ok;
   }
   return out;
 }

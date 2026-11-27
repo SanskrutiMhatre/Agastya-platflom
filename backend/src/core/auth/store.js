@@ -133,14 +133,27 @@ class AuthStore {
   anyAdminExists() { return this.countAdmins() > 0; }
 
   updateUser(id, fields, now) {
-    const allowed = ['full_name', 'role', 'password_hash', 'must_change_password', 'onboarding_pending', 'username_locked', 'disabled_at', 'active_project_id', 'username'];
+    const allowed = ['full_name', 'role', 'password_hash', 'must_change_password', 'onboarding_pending', 'username_locked', 'disabled_at', 'active_project_id', 'username',
+      // WP-27 (migration 024): directory link, why an account is disabled, the read-only auditor flag
+      'auth_source', 'external_id', 'directory_dn', 'directory_checked_at', 'disabled_reason', 'auditor'];
     const keys = Object.keys(fields).filter((k) => allowed.includes(k));
     if (!keys.length) return this.getUser(id);
     const sets = keys.map((k) => `${k} = ?`).join(', ');
     this.stmt(`UPDATE users SET ${sets}, updated_at = ? WHERE id = ?`)
       .run(...keys.map((k) => fields[k]), now, id);
-    if (keys.includes('disabled_at') || keys.includes('role')) this.emitAccessChanged(id);
+    if (keys.includes('disabled_at') || keys.includes('role') || keys.includes('auditor')) this.emitAccessChanged(id);
     return this.getUser(id);
+  }
+
+  /** WP-27: the accounts that sign in against the directory (the sync job checks each of them). */
+  listDirectoryUsers() {
+    return this.stmt("SELECT * FROM users WHERE auth_source = 'directory' ORDER BY username").all();
+  }
+
+  /** WP-27: the account a directory entry was provisioned as (by its stable id), or null. */
+  findUserByExternalId(externalId) {
+    if (!externalId) return null;
+    return this.stmt("SELECT * FROM users WHERE auth_source = 'directory' AND external_id = ?").get(String(externalId)) || null;
   }
 
   /*

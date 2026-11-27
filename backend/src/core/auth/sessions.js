@@ -131,6 +131,9 @@ class SessionService {
         disabledAt: row.disabled_at,
         activeProjectId: row.active_project_id,
         createdAt: row.created_at,
+        // WP-27: the read-only auditor flag and where the identity comes from (authz.js reads both)
+        auditor: !!row.auditor,
+        authSource: row.auth_source === 'directory' ? 'directory' : 'local',
       },
     };
   }

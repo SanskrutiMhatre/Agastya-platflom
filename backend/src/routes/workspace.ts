@@ -113,7 +113,7 @@ export function registerWorkspaceRoutes(app: Express): void {
 
   app.get('/api/projects/:id', requireProject('viewer', { from: 'param', cap: 'project.read' }), wrap((req, res) => {
     const row = store.getProjectRow(req.project.id);
-    res.json({ project: P.projectCard(row, req.project.role, req.auth.user.role === 'admin' ? 'admin' : 'project') });
+    res.json({ project: P.projectCard(row, req.project.role, req.auth.user.role === 'admin' ? 'admin' : 'project', req.auth.user) });
   }));
 
   // Opening a project is what makes it the "recent" one; it is not a write to its content.
@@ -154,7 +154,7 @@ export function registerWorkspaceRoutes(app: Express): void {
     const rel = (() => { try { return releaseStateOf(id, { reuse: true, known: dms }); } catch { return null; } })();   // display only (WP-18)
     const pdf = path.join(projectDirFor(id), PDF_NAME);
     res.json({
-      project: P.projectCard(store.getProjectRow(id), req.project.role, req.auth.user.role === 'admin' ? 'admin' : 'project'),
+      project: P.projectCard(store.getProjectRow(id), req.project.role, req.auth.user.role === 'admin' ? 'admin' : 'project', req.auth.user),
       role: req.project.role,
       dataModules: { total: dms.length, withIssues: validation ? new Set(validation.issues.filter((i) => i.sev !== 'info').map((i) => i.file)).size : null },
       publication: pm,

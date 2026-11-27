@@ -88,6 +88,72 @@ export interface Config {
    * decided password-reset requests; audit rows older than `auditDays` are written to a compressed archive file first, then removed.
    */
   retention: { sessionsDays: number; notificationsDays: number; resetRequestsDays: number; auditDays: number };
+  /**
+   * WP-27 (ENT-005, DEP-015): directory sign-on over LDAPS, Mode B only (null = local accounts only, as in Mode A). Set by
+   * AGASTYA_DIRECTORY_URL and its companions; the group-to-role mapping is kept in the database and edited by administrators.
+   */
+  directory: DirectoryConfig | null;
+}
+
+/** The directory connection (AGASTYA_DIRECTORY_*). The service account's password and the CA come from files, never from the environment. */
+export interface DirectoryConfig {
+  /** ldaps://host[:port], tried in order (a second domain controller is the fallback). */
+  urls: string[];
+  /** The service account that searches for people (AGASTYA_DIRECTORY_BIND_DN) and the file holding its password (AGASTYA_DIRECTORY_BIND_PASSWORD_FILE). */
+  bindDn: string;
+  bindPasswordFile: string;
+  /** Where people are searched (AGASTYA_DIRECTORY_BASE_DN) and where nested groups are searched (AGASTYA_DIRECTORY_GROUP_BASE_DN, default the same). */
+  baseDn: string;
+  groupBaseDn: string;
+  /** The attribute a person types as user name (AGASTYA_DIRECTORY_LOGIN_ATTRIBUTE, default sAMAccountName) and the people's object class (AGASTYA_DIRECTORY_USER_CLASS, default user). */
+  loginAttribute: string;
+  userObjectClass: string;
+  /** Follow nested groups with Active Directory's LDAP_MATCHING_RULE_IN_CHAIN (AGASTYA_DIRECTORY_NESTED_GROUPS=1); off = memberOf only. */
+  nestedGroups: boolean;
+  /** PEM file of the CA(s) the directory's certificate must chain to (AGASTYA_DIRECTORY_CA_FILE); unset = the Windows/Node trust store. */
+  caFile: string | undefined;
+  /** Connect and per-operation timeout (AGASTYA_DIRECTORY_TIMEOUT_MS, default 10000). */
+  timeoutMs: number;
+  /** How often the offboarding sync runs, in hours (AGASTYA_DIRECTORY_SYNC_HOURS, default 24, 0 = only on demand). */
+  syncHours: number;
+}
+
+const ATTRIBUTE = /^[A-Za-z][A-Za-z0-9-]{0,63}$/;
+
+function parseDirectory(env: Env, mode: DeploymentMode): DirectoryConfig | null {
+  const pick = (n: string): string | undefined => { const v = env[n]; return v === undefined || v.trim() === '' ? undefined : v.trim(); };
+  const raw = pick('AGASTYA_DIRECTORY_URL');
+  if (!raw) return null;
+  if (mode !== 'server') {
+    throw new ConfigError('AGASTYA_DIRECTORY_URL', 'directory sign-on is for Mode B (AGASTYA_MODE=server). Mode A serves one person on this computer with a local account.');
+  }
+  const urls = raw.split(',').map((s) => s.trim()).filter(Boolean);
+  for (const u of urls) {
+    let parsed: URL | null = null;
+    try { parsed = new URL(u); } catch { parsed = null; }
+    if (!parsed || parsed.protocol !== 'ldaps:' || !parsed.hostname || parsed.pathname.replace(/\/$/, '') !== '') {
+      throw new ConfigError('AGASTYA_DIRECTORY_URL', `"${u}" is not an LDAPS address: use ldaps://host[:port] (636, or 3269 for the global catalogue). Plain ldap:// and StartTLS are not supported.`);
+    }
+  }
+  const baseDn = pick('AGASTYA_DIRECTORY_BASE_DN');
+  if (!baseDn) throw new ConfigError('AGASTYA_DIRECTORY_BASE_DN', 'is required with AGASTYA_DIRECTORY_URL: where people are searched, for example "OU=Staff,DC=corp,DC=local".');
+  const bindDn = pick('AGASTYA_DIRECTORY_BIND_DN');
+  const bindPasswordFile = pick('AGASTYA_DIRECTORY_BIND_PASSWORD_FILE');
+  if (!bindDn) throw new ConfigError('AGASTYA_DIRECTORY_BIND_DN', 'is required with AGASTYA_DIRECTORY_URL: the service account that searches for people.');
+  if (!bindPasswordFile) throw new ConfigError('AGASTYA_DIRECTORY_BIND_PASSWORD_FILE', 'is required with AGASTYA_DIRECTORY_BIND_DN: a file holding the service account\'s password (never the password itself).');
+  const loginAttribute = pick('AGASTYA_DIRECTORY_LOGIN_ATTRIBUTE') ?? 'sAMAccountName';
+  if (!ATTRIBUTE.test(loginAttribute)) throw new ConfigError('AGASTYA_DIRECTORY_LOGIN_ATTRIBUTE', `"${loginAttribute}" is not an attribute name.`);
+  const userObjectClass = pick('AGASTYA_DIRECTORY_USER_CLASS') ?? 'user';
+  if (!ATTRIBUTE.test(userObjectClass)) throw new ConfigError('AGASTYA_DIRECTORY_USER_CLASS', `"${userObjectClass}" is not an object class name.`);
+  const nested = (pick('AGASTYA_DIRECTORY_NESTED_GROUPS') ?? '0').toLowerCase();
+  if (!/^(0|1|true|false|on|off)$/.test(nested)) throw new ConfigError('AGASTYA_DIRECTORY_NESTED_GROUPS', `"${nested}" is not 0 or 1.`);
+  return {
+    urls, bindDn, bindPasswordFile, baseDn, groupBaseDn: pick('AGASTYA_DIRECTORY_GROUP_BASE_DN') ?? baseDn,
+    loginAttribute, userObjectClass, nestedGroups: /^(1|true|on)$/.test(nested),
+    caFile: pick('AGASTYA_DIRECTORY_CA_FILE'),
+    timeoutMs: envPositive('AGASTYA_DIRECTORY_TIMEOUT_MS', 10000, env),
+    syncHours: envCount('AGASTYA_DIRECTORY_SYNC_HOURS', 24, env),
+  };
 }
 
 export type DeploymentMode = 'local' | 'server';
@@ -250,6 +316,7 @@ export function buildConfig(env: Env = process.env): Config {
       resetRequestsDays: envCount('AGASTYA_RETENTION_RESET_REQUESTS_DAYS', 90, env),
       auditDays: envCount('AGASTYA_AUDIT_RETENTION_DAYS', 730, env),
     },
+    directory: parseDirectory(env, mode),
   };
 }
 
