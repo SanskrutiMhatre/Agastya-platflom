@@ -25,12 +25,6 @@ export interface NewDmOptions {
   date?: Date;
   /** Optional project BREX DMC; defaults to the S1000D default BREX for the issue. */
   brex?: DmCodeParts;
-  /**
-   * Structured applicability (a host with a project ACT): the complete <applic> element to write instead of the plain-text one, and the
-   * data module code of the ACT the assertions refer to (written as <applicCrossRefTableRef>).
-   */
-  applicXml?: string;
-  actRef?: DmCodeParts;
 }
 
 export interface TemplateDef {
@@ -482,18 +476,11 @@ export function buildDataModule(o: NewDmOptions): string {
       <originator ${o.originatorCode ? `enterpriseCode="${escapeAttr(o.originatorCode)}"` : ent}>
         <enterpriseName>${escapeText(o.originatorCode ? (o.originatorName ?? '') : o.enterpriseName)}</enterpriseName>
       </originator>
-${o.actRef ? `      <applicCrossRefTableRef>
-        <dmRef>
-          <dmRefIdent>
-            ${dmCodeXml(o.actRef)}
-          </dmRefIdent>
-        </dmRef>
-      </applicCrossRefTableRef>
-` : ''}${o.applicXml ?? `      <applic>
+      <applic>
         <displayText>
           <simplePara>${escapeText(o.applicability || 'All')}</simplePara>
         </displayText>
-      </applic>`}
+      </applic>
       <brexDmRef>
         <dmRef>
           <dmRefIdent>
