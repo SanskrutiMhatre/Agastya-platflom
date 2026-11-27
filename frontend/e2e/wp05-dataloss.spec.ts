@@ -94,15 +94,22 @@ test('FE-003: a session revoked while typing keeps the editor; signing in again 
 });
 
 test('FE-004: one failed /api/auth/me (503) does not sign the person out', async () => {
-  await page.goto('/overview');
-  await expect(page.getByRole('heading').first()).toBeVisible();
-  let failed = 0;
-  await page.route('**/api/auth/me', async (r) => { if (failed++ === 0) await r.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"restarting"}' }); else await r.continue(); });
-  await page.getByRole('link', { name: 'Projects' }).first().click();
-  await expect(page.getByLabel('Username')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Sign in' })).toHaveCount(0);
-  await page.unroute('**/api/auth/me');
-  expect(failed).toBeGreaterThan(0);
+  // WP-18 (FE-020): moving around reuses the signed-in answer for 30 s, so the page's clock is moved past that to make the next move ask
+  // again. Own page with its own clock: the shared page's autosave and draft timers must keep real time for the tests after this one.
+  const p = await ctx.newPage();
+  try {
+    await p.clock.install();
+    await p.goto('/overview');
+    await expect(p.getByRole('heading').first()).toBeVisible();
+    let failed = 0;
+    await p.route('**/api/auth/me', async (r) => { if (failed++ === 0) await r.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"restarting"}' }); else await r.continue(); });
+    await p.clock.fastForward(31_000);
+    await p.getByRole('link', { name: 'Projects' }).first().click();
+    await expect.poll(() => failed, { message: 'the move asked the server who is signed in (and got the 503)' }).toBeGreaterThan(0);
+    await expect(p.getByLabel('Username')).toHaveCount(0);
+    await expect(p.getByRole('button', { name: 'Sign in' })).toHaveCount(0);
+    await p.unroute('**/api/auth/me');
+  } finally { await p.close(); }
 });
 
 test('FE-005: Back from a JSS project to the S1000D project never asks about another project\'s editor', async () => {
