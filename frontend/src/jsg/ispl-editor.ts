@@ -12,6 +12,7 @@ import { plain as plainOf } from './model';
 import { BASE_CSS, button, injectCss, mk, pickGraphic, type JsgEditorLike, type JsgEditorOptions, type JsgFinding, type JsgHost } from './shared';
 import { mountIsplPreview, type PreviewHandle } from './ispl-preview';
 import { serializeJsg } from './xml';
+import { confirmDialog, promptDialog } from '../lib/dialogs';
 
 const CSS = `
 .jsg-isplsheet{margin:0 auto;max-width:1180px;padding:18px 24px 60px;background:var(--paper);color:var(--paper-ink);box-shadow:var(--paper-sheet-shadow);font:12pt/1.2 var(--font-paper-serif)}
@@ -125,8 +126,13 @@ export class IsplEditor implements JsgEditorLike {
   }
   private deletePlate(): void {
     const p = this.doc.plates[this.sel]; if (!p) return;
-    if (!window.confirm(`Delete plate ${p.ref} ${p.title} with its views and parts?`)) return;
-    this.doc.plates.splice(this.sel, 1); this.sel = Math.min(this.sel, this.doc.plates.length - 1); this.redraw();
+    // WP-35 (GAP-002): the application's dialog with the exact consequence; the plate is found again after the answer (the list may have moved)
+    const parts = p.views.reduce((n, v) => n + v.parts.length, 0);
+    void confirmDialog({ title: 'Delete the plate?', message: `This removes plate ${p.ref} ${p.title} with its ${p.views.length} view${p.views.length === 1 ? '' : 's'} and ${parts} part${parts === 1 ? '' : 's'}.`, confirmLabel: 'Delete plate', danger: true })
+      .then((ok) => {
+        const i = this.doc.plates.indexOf(p); if (!ok || i < 0) return;
+        this.doc.plates.splice(i, 1); this.sel = Math.min(this.sel, this.doc.plates.length - 1); this.redraw();
+      });
   }
 
   // ── rendering ────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -180,7 +186,10 @@ export class IsplEditor implements JsgEditorLike {
       h.append(mk('b', '', 'APPX \u2018'), inp('ref', 'A', () => a.label, (v) => { a.label = v; }), mk('b', '', '\u2019'), inp('ttl', 'LIST OF CARRIED SPARES', () => a.title, (v) => { a.title = v; }));
       if (!this.readOnly) {
         h.append(button('\u2191', () => { if (ai) { [apps[ai - 1], apps[ai]] = [apps[ai], apps[ai - 1]]; this.redraw(); } }), button('\u2193', () => { if (ai < apps.length - 1) { [apps[ai + 1], apps[ai]] = [apps[ai], apps[ai + 1]]; this.redraw(); } }),
-          button('Delete', () => { if (window.confirm(`Delete appendix ${a.label} ${a.title}?`)) { apps.splice(ai, 1); this.redraw(); } }));
+          button('Delete', () => {
+            void confirmDialog({ title: 'Delete the appendix?', message: `This removes appendix ${a.label} ${a.title} and everything in it.`, confirmLabel: 'Delete appendix', danger: true })
+              .then((ok) => { const i = apps.indexOf(a); if (ok && i >= 0) { apps.splice(i, 1); this.redraw(); } });
+          }));
       }
       a.children.forEach((b, bi) => {
         if (b.k === 'para') {
@@ -215,11 +224,11 @@ export class IsplEditor implements JsgEditorLike {
         const bar = mk('div');
         bar.append(button('+ row', () => { t.body.push({ cells: Array.from({ length: cols() }, () => ({ parts: [{ k: 'text' as const, inline: [] }] })) }); this.touch(); draw(); }),
           button('+ group row', () => { t.body.push({ cells: [{ colspan: cols(), parts: [{ k: 'text' as const, inline: [] }] }] }); this.touch(); draw(); }),
-          button('Paste rows', () => {
-            const txt = window.prompt('Paste rows copied from a spreadsheet (tab-separated, one row per line).', ''); if (!txt) return; const n = cols();
+          button('Paste rows', () => void promptDialog({ title: 'Paste rows', label: 'Rows', hint: 'Tab-separated, one row per line.', message: 'Paste rows copied from a spreadsheet (tab-separated, one row per line).', multiline: true, confirmLabel: 'Add rows' }).then((txt) => {
+            if (!txt) return; const n = cols();
             for (const line of txt.split(/\r?\n/)) { if (!line.trim()) continue; const cells = line.split('\t'); t.body.push({ cells: Array.from({ length: n }, (_, k) => ({ parts: [{ k: 'text' as const, inline: text((cells[k] ?? '').trim()) }] })) }); }
             this.touch(); draw();
-          }), button('Remove table', () => { remove(); this.redraw(); }));
+          })), button('Remove table', () => { remove(); this.redraw(); }));
         wrap.appendChild(bar);
       }
     };
@@ -272,12 +281,15 @@ export class IsplEditor implements JsgEditorLike {
       if (!this.readOnly) {
         const bar = mk('div');
         bar.append(button('+ part', () => { const n = v.parts.length + 1; const r = newPart(String(n).padStart(2, '0')); r.plateRef = `${p.ref}/${n}`; v.parts.push(r); this.touch(); draw(); }),
-          button('Paste rows', () => {
-            const txt = window.prompt(`Paste rows copied from a spreadsheet (tab-separated, one part per line).\nColumns in order: ${cols.map((c) => c.label).join(' | ')}`, '');
+          button('Paste rows', () => void promptDialog({ title: 'Paste parts', label: 'Rows', hint: `Columns in order: ${cols.map((c) => c.label).join(' | ')}`, message: 'Paste rows copied from a spreadsheet (tab-separated, one part per line).', multiline: true, confirmLabel: 'Add parts' }).then((txt) => {
             if (!txt) return;
             for (const line of txt.split(/\r?\n/)) { if (!line.trim()) continue; const cells = line.split('\t'); const r = newPart(); cols.forEach((c, k) => { r[c.key] = (cells[k] ?? '').trim(); }); v.parts.push(r); }
             this.touch(); draw();
-          }), button('Remove view', () => { if (p.views.length > 1 || window.confirm('Remove the only view of this plate?')) { p.views.splice(vi, 1); this.redraw(); } }));
+          })), button('Remove view', () => {
+            const drop = (): void => { const i = p.views.indexOf(v); if (i >= 0) { p.views.splice(i, 1); this.redraw(); } };
+            if (p.views.length > 1) { drop(); return; }
+            void confirmDialog({ title: 'Remove the only view?', message: `This removes the only view of plate ${p.ref} with its ${v.parts.length} part${v.parts.length === 1 ? '' : 's'}.`, confirmLabel: 'Remove view', danger: true }).then((ok) => { if (ok) drop(); });
+          }));
         wrap.appendChild(bar);          // inside the grid's own wrapper: a redraw replaces it, it never piles up
       }
     };

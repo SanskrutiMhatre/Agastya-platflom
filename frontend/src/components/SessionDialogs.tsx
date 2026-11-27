@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useSession } from '../store/session';
 import { Alert, Field, Modal, errText } from './ui';
+import { PasswordInput } from './PasswordInput';
 import { useHandshake } from '../lib/handshake';
 
 /**
@@ -28,7 +29,7 @@ export function ReauthDialog() {
       <form id="reauth-form" className="v2-stack" onSubmit={(e) => { e.preventDefault(); void go(); }} data-testid="reauth-dialog">
         <Alert tone="warn">{reauth.reason}</Alert>
         <p className="v2-hint" style={{ margin: 0 }}>Nothing you typed has been lost. Sign in as {user.fullName || user.username} and the page carries on where it was; a save that was refused is sent again.</p>
-        <Field label="Password"><input className="v2-input" type="password" autoFocus autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} data-testid="reauth-password" /></Field>
+        <Field label="Password"><PasswordInput autoFocus autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} data-testid="reauth-password" /></Field>
         {err ? <Alert tone="bad">{err}</Alert> : null}
       </form>
     </Modal>

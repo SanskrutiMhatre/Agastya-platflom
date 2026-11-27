@@ -39,7 +39,9 @@ export function Field({ label, hint, error, children }: { label: string; hint?: 
   // WP-09: the label points at the control's own id when it has one (it used to point at the generated id, which then named nothing)
   let controlId = id;
   const kids = Children.map(children, (c) => {
-    if (!tagged && isValidElement(c) && typeof c.type === 'string' && /^(input|select|textarea)$/.test(c.type)) {
+    // WP-35: a component that marks itself `fieldControl` (PasswordInput) is tagged like a native control and passes the props to its input
+    const isControl = isValidElement(c) && (typeof c.type === 'string' ? /^(input|select|textarea)$/.test(c.type) : !!(c.type as { fieldControl?: boolean }).fieldControl);
+    if (!tagged && isValidElement(c) && isControl) {
       tagged = true;
       const el = c as ReactElement<{ id?: string; 'aria-describedby'?: string; 'aria-invalid'?: boolean }>;
       controlId = el.props.id ?? id;

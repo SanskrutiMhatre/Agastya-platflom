@@ -12,6 +12,7 @@ import { Alert, Badge, ConfirmModal, Empty, Loading, Modal, ago, errText, fmtDat
 import { useSession } from '../store/session';
 import { useUi } from '../store/ui';
 import { may } from '../lib/roles';
+import { confirmDialog } from '../lib/dialogs';
 
 // The copy route checks dm.write on the target project; the server's `can` map on each card says where that holds (WP-13, FE-019).
 
@@ -93,7 +94,7 @@ function AddModal({ onClose, onDone }: { onClose: () => void; onDone: () => void
       catch (e) {
         // WP-11: some are already in the repository. Replacing them is a deliberate step: ask, then send again naming the versions replaced.
         const existing = (e as ApiError).code === 'CIR_EXISTS' ? (e as ApiError).body?.existing as Array<{ file: string; hash: string }> | undefined : undefined;
-        if (!existing?.length || !window.confirm(`${errText(e)}\n\nReplace ${existing.map((x) => x.file).join(', ')}?`)) throw e;
+        if (!existing?.length || !(await confirmDialog({ title: 'Replace in the repository?', message: `${errText(e)} Replace ${existing.map((x) => x.file).join(', ')}?`, confirmLabel: 'Replace', danger: true }))) throw e;
         r = await cirApi.add(files, note, Object.fromEntries(existing.map((x) => [x.file, x.hash])));
       }
       toast(`Added ${r.added.length} data module${r.added.length === 1 ? '' : 's'} to the repository`, 'success'); onDone(); }

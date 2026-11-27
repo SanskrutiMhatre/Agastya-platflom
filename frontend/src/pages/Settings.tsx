@@ -2,7 +2,7 @@
 // management, the approval queues (password resets, release requests), active
 // sessions and the audit log - all backed by the JSS Publisher admin routes.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import { adminApi, authApi, teamApi, type GlobalRole, type User } from '../api';
 import { globalLabel } from '../lib/roles';
@@ -15,16 +15,20 @@ import { BackupButton } from '../components/Oversight';
 import { actionLabel } from '../lib/activity';
 import { MoreRows, useProgressive } from '../components/windowing';
 import { tablistKeys } from '../components/a11y';
+import { PasswordInput } from '../components/PasswordInput';
 
 function Account() {
   const { user, logout } = useSession();
   const toast = useUi((s) => s.toast);
   const [cur, setCur] = useState(''); const [p, setP] = useState(''); const [p2, setP2] = useState('');
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
+  const [mismatch, setMismatch] = useState(false); const repeatId = useId();
 
   const change = async () => {
     setErr('');
-    if (p !== p2) return setErr('The new passwords do not match.');
+    // WP-35 (UID-002): the mismatch is the repeat field's own message, with the focus on it
+    if (p !== p2) { setMismatch(true); document.getElementById(repeatId)?.focus(); return; }
+    setMismatch(false);
     setBusy(true);
     try { await authApi.changePassword(cur, p); toast('Password changed. Other sessions were signed out.', 'success'); setCur(''); setP(''); setP2(''); }
     catch (e) { setErr(errText(e)); } finally { setBusy(false); }
@@ -43,9 +47,9 @@ function Account() {
       <div className="v2-card v2-card-pad">
         <h3 style={{ marginTop: 0 }}>Change password</h3>
         <form className="v2-stack" onSubmit={(e) => { e.preventDefault(); void change(); }}>
-          <Field label="Current password"><input className="v2-input" type="password" value={cur} onChange={(e) => setCur(e.target.value)} autoComplete="current-password" /></Field>
-          <Field label="New password" hint="At least 15 characters (a few words make a good one), and not a common password or your name."><input className="v2-input" type="password" value={p} onChange={(e) => setP(e.target.value)} autoComplete="new-password" /></Field>
-          <Field label="Repeat new password"><input className="v2-input" type="password" value={p2} onChange={(e) => setP2(e.target.value)} autoComplete="new-password" /></Field>
+          <Field label="Current password"><PasswordInput value={cur} onChange={(e) => setCur(e.target.value)} autoComplete="current-password" /></Field>
+          <Field label="New password" hint="At least 15 characters (a few words make a good one), and not a common password or your name."><PasswordInput value={p} onChange={(e) => setP(e.target.value)} autoComplete="new-password" /></Field>
+          <Field label="Repeat new password" error={mismatch && p !== p2 ? 'The new passwords do not match.' : undefined}><PasswordInput id={repeatId} value={p2} onChange={(e) => setP2(e.target.value)} autoComplete="new-password" /></Field>
           {err ? <Alert tone="bad">{err}</Alert> : null}
           <div><button className="btn btn-primary" disabled={busy || !cur || !p}>Change password</button></div>
         </form>

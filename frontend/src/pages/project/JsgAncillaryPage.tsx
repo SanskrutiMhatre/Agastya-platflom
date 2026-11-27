@@ -18,6 +18,7 @@ import { coverCard } from '../../jsg/shared';
 import { JsgParseError, parseJsg, serializeJsg } from '../../jsg/xml';
 import { useUi } from '../../store/ui';
 import { useLeaveGuard } from '../../lib/leaveGuard';
+import { confirmDialog } from '../../lib/dialogs';
 
 type Kind = 'always' | 'optional' | 'auto';
 interface PageDef { id: string; label: string; kind: Kind; hint: string }
@@ -163,7 +164,7 @@ export function JsgAncillaryPage() {
         </> : undefined}
         stats={[{ label: 'Printed', value: `${counts.on} of ${list.length}` }, { label: 'Left out', value: counts.off, tone: counts.off ? 'warn' : undefined }]} />
       {!writable ? <Alert tone="warn">You have {role} access to this project: you can read these pages, but changes cannot be saved.</Alert> : null}
-      {stale ? <Alert tone="warn">Someone else saved this handbook after you opened it, so your save was refused. <button className="btn btn-sm" onClick={() => { if (!dirty || window.confirm('Reload the saved handbook? Your unsaved changes will be lost.')) void load(); }}>Reload the saved handbook</button></Alert> : null}
+      {stale ? <Alert tone="warn">Someone else saved this handbook after you opened it, so your save was refused. <button className="btn btn-sm" onClick={async () => { if (!dirty || await confirmDialog({ title: 'Reload the saved handbook?', message: 'Your unsaved changes will be lost.', confirmLabel: 'Reload', danger: true })) void load(); }}>Reload the saved handbook</button></Alert> : null}
 
       <div className="v2-anc" data-testid="jsg-ancillary">
         <div className="v2-card v2-anc-list" role="list" aria-label="Ancillary pages">

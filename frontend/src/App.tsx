@@ -36,6 +36,7 @@ const lazyEl = (el: ReactNode) => <Suspense fallback={<Loading />}>{el}</Suspens
 
 // The editors (the S1000D Studio: CodeMirror, pdfmake, the schema engine; the JSS editor) are large and only this route needs them: EditorRoute loads the one that fits.
 import { FocusTooltip } from './components/FocusTooltip';
+import { DialogHost } from './components/DialogHost';
 import { EditorRoute } from './pages/project/EditorRoute';
 
 export function App() {
@@ -109,5 +110,5 @@ export function App() {
       <Route path="*" element={<Navigate to="/overview" replace />} />
     </Routes>
   );
-  return <>{body}{status === 'authed' ? <ReauthDialog /> : null}<UnreachableBanner /><VersionMismatchDialog /><Toasts /><FocusTooltip /></>;
+  return <>{body}{status === 'authed' ? <ReauthDialog /> : null}<UnreachableBanner /><VersionMismatchDialog /><Toasts /><DialogHost /><FocusTooltip /></>;
 }

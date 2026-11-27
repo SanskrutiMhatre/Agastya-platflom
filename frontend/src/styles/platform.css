@@ -86,6 +86,7 @@ a:hover { text-decoration: underline; }
 .v2-badge.accent { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
 .v2-input, .v2-select, .v2-textarea { height: var(--input-h); padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--bg-elev); width: 100%; }
 .v2-textarea { height: auto; padding: 8px 10px; resize: vertical; }
+.v2-dialog-area { min-height: 160px; font-family: var(--font-mono); font-size: var(--fs-xs); white-space: pre; overflow-wrap: normal; }
 .v2-input:focus, .v2-select:focus, .v2-textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
 .v2-field { display: flex; flex-direction: column; gap: 5px; }
 .v2-field > label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
@@ -138,9 +139,19 @@ a:hover { text-decoration: underline; }
 .v2-tile .stat { margin-top: auto; padding-top: 8px; border-top: 1px dashed var(--border); font-size: 12px; color: var(--text-muted); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 
 /* ------------------------------------------------------------ login */
-.v2-auth { min-height: 100%; display: grid; place-items: center; padding: 24px; background: var(--bg); overflow: auto; }
+.v2-auth { min-height: 100%; display: grid; place-items: center; align-content: center; padding: 24px; background: var(--bg); overflow: auto; }
 .v2-auth-card { width: 400px; max-width: 100%; padding: 28px; }
 .v2-auth-card h1 { margin: 0 0 4px; font-size: 20px; }
+/* WP-35 (group 1): the auth card's parts as classes (were inline styles); a button that reads as a link (was <a href="#">) */
+.v2-auth-brand { margin-bottom: 16px; }
+.v2-auth-brand strong { font-size: 15px; }
+.v2-auth-card > .v2-sub { margin-bottom: 16px; }
+.v2-auth-gap { height: 12px; }
+.v2-auth-submit { justify-content: center; height: 34px; }
+.v2-auth-alt { margin-top: 14px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.v2-auth-foot { margin-top: 14px; text-align: center; font-size: var(--fs-xs); color: var(--text-faint); }
+.v2-linkbtn { min-height: 24px; padding: 2px 0; border: 0; background: none; color: var(--accent); font: inherit; cursor: pointer; }
+.v2-linkbtn:hover { text-decoration: underline; }
 
 /* ------------------------------------------------------------ toasts */
 .v2-toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 300; }
@@ -535,3 +546,25 @@ html[data-editor-focus] .v2-pshell > .v2-rail { visibility: hidden; overflow: hi
 .btn.is-on { background: var(--accent-soft); color: var(--accent); }
 /* a page that failed to draw */
 .v2-errpanel { max-width: 640px; }
+
+/* WP-35 (UID-001): password field with Show / Hide and the Caps Lock notice */
+.v2-pw { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.v2-pw-row { position: relative; display: flex; }
+.v2-pw-row > .v2-input { padding-right: 60px; }
+.v2-pw-toggle { position: absolute; right: 3px; top: 3px; bottom: 3px; min-width: 50px; padding: 0 8px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--accent); font-weight: 600; font-size: var(--fs-xs); cursor: pointer; }
+.v2-pw-toggle:hover { background: var(--bg-hover); }
+.v2-pw-toggle[aria-pressed="true"] { background: var(--accent-soft); }
+.v2-pw-caps { font-size: var(--fs-xs); font-weight: 600; color: var(--warning); }
+
+/* WP-35 (UID-005): the context menu of rows and headings (mirrors their visible buttons) */
+.v2-ctx { position: fixed; z-index: var(--z-menu); min-width: 200px; padding: 4px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow-2); }
+.v2-ctx-item { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 30px; padding: 0 10px; border: 0; border-radius: var(--radius-sm); background: none; color: var(--text); font: inherit; text-align: left; white-space: nowrap; cursor: pointer; }
+.v2-ctx-item:hover, .v2-ctx-item:focus { background: var(--bg-hover); }
+.v2-ctx-item:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.v2-ctx-item.danger { color: var(--danger); }
+.v2-ctx-item:disabled { color: var(--text-disabled); background: none; cursor: not-allowed; }
+.v2-ctx-pad { width: 14px; flex: none; }
+/* a small panel under a button (Samples) */
+.v2-pop-anchor { position: relative; display: inline-flex; }
+.v2-pop { position: absolute; right: 0; top: calc(100% + 4px); z-index: var(--z-menu); display: flex; flex-direction: column; align-items: stretch; gap: 4px; min-width: 190px; padding: 6px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow-2); }
+.v2-pop > .btn { justify-content: flex-start; }
