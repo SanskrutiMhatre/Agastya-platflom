@@ -11,7 +11,8 @@
 // =============================================================================
 
 import { config, nowIso } from '../config';
-import { repos } from '../context';
+import { repos, docIndex } from '../context';
+import { broadcast } from './broadcast';
 import { HttpError, notFound } from './http';
 import { documentIdOf } from './projectFiles';
 import type { LeaseRow } from '../repositories';
@@ -49,7 +50,10 @@ export async function checkOut(projectId: string, rel: string, part: string, act
     const holder = repos.leases.get(id, part);
     if (holder) throw checkedOut(holder);
   }
-  return view(repos.leases.get(id, part) as LeaseRow, actor.id);
+  const got = repos.leases.get(id, part) as LeaseRow;
+  // WP-28 (PRD-003): a new check-out (not a renewal) is announced to the project's readers, who refresh their lists
+  if (got.acquired_at === now) broadcast(projectId, { type: 'leases', path: rel, part, holder: got.username, released: false });
+  return view(got, actor.id);
 }
 
 /** Check in. `breakIt`: remove another author's lease (the route allows it to owners, managers and administrators). */
@@ -58,7 +62,10 @@ export async function checkIn(projectId: string, rel: string, part: string, acto
   const row = repos.leases.get(id, part);
   if (!row) return { released: false, holder: null };
   if (row.user_id !== actor.id && !breakIt && live(row, nowIso())) throw checkedOut(row);
-  return { released: repos.leases.release(id, part, row.user_id === actor.id || breakIt ? null : actor.id), holder: row.username };
+  const released = repos.leases.release(id, part, row.user_id === actor.id || breakIt ? null : actor.id);
+  // WP-28 (PRD-003): "released" tells an author waiting for this document that it is free now
+  if (released) broadcast(projectId, { type: 'leases', path: rel, part, holder: row.username, released: true, broken: row.user_id !== actor.id });
+  return { released, holder: row.username };
 }
 
 /**
@@ -75,7 +82,12 @@ export async function assertNotLeasedByOther(projectId: string, rel: string, act
   }
 }
 
-/** The live leases of a project, for the file tree and the editors. */
-export function projectLeases(projectId: string, me: string | null): Array<LeaseView & { documentId: string }> {
-  return repos.leases.listActive(projectId, nowIso()).map((r) => ({ ...view(r, me), documentId: r.document_id }));
+/** The live leases of a project, for the file tree, the editors and the project Home (WP-28: with the document's path in the project). */
+export function projectLeases(projectId: string, me: string | null): Array<LeaseView & { documentId: string; path: string | null }> {
+  const paths = new Map<string, string | null>();
+  const pathOf = (id: string): string | null => {
+    if (!paths.has(id)) { const d = docIndex.getDocument(id) as { rel_path?: string } | null; paths.set(id, d?.rel_path ?? null); }
+    return paths.get(id) ?? null;
+  };
+  return repos.leases.listActive(projectId, nowIso()).map((r) => ({ ...view(r, me), documentId: r.document_id, path: pathOf(r.document_id) }));
 }

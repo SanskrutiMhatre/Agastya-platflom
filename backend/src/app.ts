@@ -44,6 +44,8 @@ import { API_VERSION, MIN_CLIENT_VERSION, CLIENT_VERSION_HEADER, buildInfo, clie
 import { hostAllowed, MISDIRECTED } from './services/network';
 import { capabilityTableFrom, readableCapabilitiesFrom, setCapabilityTable } from './services/permissions';
 import { registerAccessRoutes } from './routes/access';
+import { requestMetrics } from './services/metrics';
+import { registerTeamServerRoutes } from './routes/teamServer';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { registerAuthRoutes } = require('./core/auth/routes');
@@ -58,6 +60,7 @@ export function createApp(): express.Express {
   // (the Secure cookie flag) is right behind a local TLS-terminating proxy and no client can choose its own address.
   app.set('trust proxy', config.trustProxy);
   app.disable('x-powered-by');
+  app.use(requestMetrics);                        // WP-28: request time, in-flight and 5xx counts for /api/admin/metrics
   app.use(requestContextMiddleware(clientIp));   // every audit row gets the client address; a 500 answers with this request's id (WP-03)
   app.use(securityHeaders);                      // CSP, nosniff, framing, referrer (ENT-012, FE-017); HSTS on TLS in Mode B (WP-26)
   // WP-26: the Host must name this server (DNS rebinding); the same rule guards the WebSocket upgrade (services/broadcast.ts).
@@ -137,6 +140,7 @@ export function createApp(): express.Express {
   registerBrandRoutes(app);
   registerBackupRoutes(app);             // WP-12: platform backup, verify, copy, restore into a new folder (administrators)
   registerAccessRoutes(app);             // WP-27: directory sign-on administration, groups, project group grants and capability rules
+  registerTeamServerRoutes(app);         // WP-28: who is working where (presence), server load figures (administrators)
   // The client's `can` map is read from the guards just registered (WP-13, FE-019): one rule, stated once, on the server.
   setCapabilityTable(capabilityTableFrom(app), readableCapabilitiesFrom(app));
 
