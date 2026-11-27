@@ -7,7 +7,8 @@ import fs from 'fs';
 import path from 'path';
 import { config, nowIso } from './config';
 import { dbBusy, diskFull } from './services/http';
-import { store, sessionsSvc, authz, audit, limiter, docIndex, projectDirFor, publicRoute, clientIp, securityPolicy, auditHealth, authProvider } from './context';
+import { store, sessionsSvc, authz, audit, limiter, docIndex, projectDirFor, publicRoute, clientIp, securityPolicy, auditHealth, authProvider, defaultContext } from './context';
+import { readiness } from './services/readiness';
 import { requestContextMiddleware } from './services/requestContext';
 import { securityHeaders } from './services/securityHeaders';
 import { compressResponses, clientStatic, STUDIO_SCHEMA_SETS } from './services/delivery';
@@ -29,6 +30,8 @@ import { registerSnsRoutes } from './routes/sns';
 import { registerJssdmRoutes } from './routes/jssdm';
 import { registerJssRoutes } from './routes/jss';
 import { registerJsgRoutes } from './routes/jsg';
+import './services/jss/service';      // registers the JSS document creator (services/documentCreators.ts, WP-10)
+import './services/jsg/service';      // registers the JSG document creator
 import { registerJssRwiRoutes } from './routes/jss-rwi';
 import { registerIdentityRoutes } from './routes/identity';
 import { registerXengineRoutes } from './routes/xengine';
@@ -67,6 +70,9 @@ export function createApp(): express.Express {
 
   app.get('/api/health', publicRoute('Liveness probe: reveals only that the server is up.'),
     (_req, res) => { res.json({ status: 'ok', version: '2.0.0', time: nowIso() }); });
+  // WP-10 (PLT-031): readiness, for a monitor in front of a server: the database answers, the data folder is writable, disk is above the floor.
+  app.get('/api/ready', publicRoute('Readiness probe: reveals only which of three checks (database, data folder, disk) pass.'),
+    (_req, res) => { const r = readiness(defaultContext()); res.status(r.ready ? 200 : 503).json({ status: r.ready ? 'ready' : 'not-ready', checks: r.checks }); });
 
   registerAuthRoutes({
     app, store, sessionsSvc, authz, audit, limiter, nowIso, projectDirFor, docIndex,

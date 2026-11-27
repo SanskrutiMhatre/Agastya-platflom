@@ -16,7 +16,8 @@ import { resolveFormat, type ResolvedFormat } from './formats';
 import fs from 'fs';
 import path from 'path';
 import { config, nowIso, vendor } from '../config';
-import { store, registryDb, workspace, projectDirFor, workspaceDir, docIndex, audit } from '../context';
+import { store, registryDb, workspace, projectDirFor, workspaceDir, docIndex, audit, authz } from '../context';
+import { documentCreator } from './documentCreators';
 import { bad, conflict, forbidden, notFound } from './http';
 import { removeReleasingRenderer } from './renderer';
 import { chapterEntries, profileById } from './profiles';
@@ -24,7 +25,6 @@ import * as PC from './projectConfig';
 import * as SNS from './sns';
 
 const { newId } = require('../core/auth/crypto');
-const { safeRelPath, safeArtworkRef } = require('../core/auth/xmlGuard');
 
 export interface User { id: string; username: string; fullName: string; role: string }
 
@@ -39,84 +39,12 @@ export function assertNotCir(id: string, what = 'do that to'): void {
   if (isCirProject(id)) throw forbidden(`The Common Information Repository is a shared workspace: you cannot ${what} it.`, 'CIR_WORKSPACE');
 }
 
-export function projectJsonPath(id: string): string {
-  return path.join(projectDirFor(id), 'project.json');
-}
-
-export function readProjectJson(id: string): any {
-  try { return JSON.parse(fs.readFileSync(projectJsonPath(id), 'utf8')) || {}; } catch { return {}; }
-}
-
-/** Read-modify-write so every setting the caller does not touch survives. */
-export function updateProjectJson(id: string, mutate: (pj: any) => void): any {
-  const pj = readProjectJson(id);
-  mutate(pj);
-  fs.writeFileSync(projectJsonPath(id), JSON.stringify(pj, null, 2) + '\n', 'utf8');
-  return pj;
-}
-
-// ── Path fields of project.json (WP-01, SEC-002 / S1K-001 / PUB-001) ──────
-// `input.csdbDir`, `input.mediaDir` and `input.pm` are joined onto the project folder by every content route and by the
-// publisher. They are only ever honoured when they are a plain relative path inside the project; anything else (an
-// absolute or drive path, a UNC path, `..`, an empty segment, an alternate data stream, a reserved device name) is
-// ignored and the default is used. This is the read-site defence; the write sites (settings route, archive import)
-// refuse or drop such values too.
-const RESERVED_NAME = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\..*)?$/i;
-export function safeProjectRel(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const rel = safeRelPath(value.trim());
-  if (!rel) return null;
-  const segs = rel.split('/');
-  if (segs.some((s: string) => s.includes(':') || RESERVED_NAME.test(s) || /[<>"|?*\x00-\x1f]/.test(s) || /[. ]$/.test(s))) return null;
-  return rel;
-}
-const inputField = (pj: any, key: 'csdbDir' | 'mediaDir' | 'pm', def: string): string => safeProjectRel(pj?.input?.[key]) ?? def;
-/**
- * Artwork references in a project.json (publisher logos, emblems, any key named like a logo or emblem) that a build
- * would hand to FOP and that are not a relative path inside the project or a data: image (WP-02, SEC-003). By path.
- */
-export function unsafeArtwork(value: any, at = 'project', depth = 0, out: string[] = []): string[] {
-  if (depth > 8 || value == null || typeof value !== 'object') return out;
-  for (const [k, v] of Object.entries(value)) {
-    const here = Array.isArray(value) ? `${at}[${k}]` : `${at}.${k}`;
-    if (typeof v === 'string' && /(^|[a-z])(logo|emblem)$/i.test(k) && !safeArtworkRef(v)) out.push(here);
-    else if (v && typeof v === 'object') unsafeArtwork(v, here, depth + 1, out);
-  }
-  return out;
-}
-/** The unsafe path values in a project.json (`input.*`), by key. Empty when the file is clean. */
-export function unsafeInputFields(pj: any): string[] {
-  const input = pj?.input;
-  if (input == null) return [];
-  if (typeof input !== 'object' || Array.isArray(input)) return ['input'];
-  return (['csdbDir', 'mediaDir', 'pm'] as const).filter((k) => input[k] !== undefined && input[k] !== null && input[k] !== '' && !safeProjectRel(input[k]));
-}
-/** A copy of `input` with every unsafe path field removed (the defaults then apply). */
-export function cleanInput(input: any): any {
-  if (input == null || typeof input !== 'object' || Array.isArray(input)) return undefined;
-  const out: any = { ...input };
-  for (const k of ['csdbDir', 'mediaDir', 'pm']) if (out[k] !== undefined && !safeProjectRel(out[k])) delete out[k];
-  return out;
-}
-
-/**
- * project.json keys that only the platform itself sets (create, import, rename, move): the project settings route keeps
- * them as they are on disk. `format`, `authoring` and `type` decide which engine and which routes a project gets (kind
- * confusion, PUB-026); `input` decides where its files are (SEC-002); `name` and `group` have their own routes.
- */
-export const PROTECTED_PROJECT_KEYS = ['id', 'format', 'authoring', 'jssDocType', 'domain', 'manualType', 'type', 'input', 'group', 'name'] as const;
-/** Same value for the protected-key check: null and a missing key are the same thing. */
-export const sameSetting = (a: unknown, b: unknown): boolean => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
-
-export const csdbRel = (pj: any): string => inputField(pj, 'csdbDir', 'csdb');
-/** Is this an S1000D project? Business rules (BREX), the S1000D configuration and the CSDB belong to S1000D only; JSS and JSG projects have none of them. */
-export function isS1000dProject(projectId: string): boolean {
-  const pj = readProjectJson(projectId);
-  const format = pj.format ?? (pj.type === 'JSS' || pj.templateRef === 'uhb' ? 'jss' : 's1000d');
-  return format === 's1000d';
-}
-export const mediaRel = (pj: any): string => inputField(pj, 'mediaDir', 'Media');
-export const pmRel = (pj: any): string => inputField(pj, 'pm', 'publication.xml');
+// project.json and its path fields live in the leaf module projectRecord.ts (WP-10, ARC-006); re-exported here for compatibility.
+export {
+  projectJsonPath, readProjectJson, updateProjectJson, safeProjectRel, unsafeArtwork, unsafeInputFields, cleanInput, PROTECTED_PROJECT_KEYS, sameSetting,
+  csdbRel, isS1000dProject, mediaRel, pmRel,
+} from './projectRecord';
+import { readProjectJson, updateProjectJson, pmRel, csdbRel, unsafeInputFields } from './projectRecord';
 
 // ── Project cards ─────────────────────────────────────────────────────────
 
@@ -249,7 +177,7 @@ export async function createProject(user: User, input: CreateProjectInput): Prom
   let fromId: string | undefined;
   if (input.from) {
     fromId = String(input.from);
-    const v = require('../context').authz.evaluate(user, fromId, { minRole: 'viewer', cap: 'project.clone' });
+    const v = authz.evaluate(user, fromId, { minRole: 'viewer', cap: 'project.clone' });
     if (!v.ok) throw notFound('No such source project.');
     assertNotCir(fromId, 'copy');
   }
@@ -277,14 +205,10 @@ export async function createProject(user: User, input: CreateProjectInput): Prom
   const pmFile = path.join(dir, pmRel(pj));
   if (!fromId && fmt?.jssType) {
     // a JSS document is authored as JSS XML (services/jss): the stencil's chapters, not an S1000D publication module
-    const { createInitialDocument } = require('./jss/service');
-    const { jssTypeById } = require('./jss/registry');
-    createInitialDocument(id, jssTypeById(fmt.jssType), {});
+    documentCreator('jss')(id, fmt.jssType, { projectName: name });
   } else if (!fromId && fmt?.jsgType) {
     // a JSG document is authored as JSG XML (services/jsg), in its own file: no S1000D publication module
-    const { createInitialDocument } = require('./jsg/service');
-    const { jsgTypeById } = require('./jsg/registry');
-    createInitialDocument(id, jsgTypeById(fmt.jsgType), { projectName: name.toUpperCase() });
+    documentCreator('jsg')(id, fmt.jsgType, { projectName: name.toUpperCase() });
   } else if (!fromId && !fs.existsSync(pmFile)) fs.writeFileSync(pmFile, EMPTY_PM(name, profile ? chapterEntries(profile) : ''), 'utf8');
   if (!fromId && cfgPatch?.mic && fs.existsSync(pmFile)) {
     // the publication module's own code: model code - issuer (the responsible partner) - number - volume, and the language and partner it names

@@ -23,6 +23,8 @@ export type { ProjectRegistry, SnsRepository, ProjectConfigRepository, Reference
 export interface Repositories extends UnitOfWork {
   /** The engine behind these repositories ('sqlite'); a contract test and the migration runner use it to pick a dialect. */
   readonly dialect: string;
+  /** Throws when the database does not answer (the readiness probe, PLT-031). */
+  ping(): void;
   registry: ProjectRegistry;
   sns: SnsRepository;
   projectConfig: ProjectConfigRepository;
@@ -36,6 +38,7 @@ export interface Repositories extends UnitOfWork {
 export function createSqliteRepositories(db: SqlDatabase): Repositories {
   return {
     dialect: 'sqlite',
+    ping: (): void => { db.prepare('SELECT 1 AS ok').get(); },
     transaction: <T>(fn: () => T): T => sqliteTransaction(db, fn),
     registry: new SqliteProjectRegistry(db),
     sns: new SqliteSnsRepository(db),

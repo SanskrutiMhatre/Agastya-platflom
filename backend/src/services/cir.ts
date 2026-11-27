@@ -20,7 +20,7 @@ import { placeNewDm } from './pm';
 import fs from 'fs';
 import path from 'path';
 import { config, nowIso } from '../config';
-import { store, registryDb, workspace, workspaceDir, projectDirFor, docIndex } from '../context';
+import { store, repos, registryDb, workspace, workspaceDir, projectDirFor, docIndex } from '../context';
 import { bad, conflict, forbidden, notFound, HttpError } from './http';
 import * as csdb from './csdb';
 import { checkDmEnterprises } from './enterprises';
@@ -139,8 +139,7 @@ export async function copyToProject(actor: Actor, file: string, projectId: strin
   void readProjectJson;
   placeNewDm(projectId, file);                          // the copy joins the publication, like any new module
   // a LINKED copy: which CIR content it was taken from, so a later change in the repository can be noticed and, when a Project Manager approves, taken over
-  store.stmt('INSERT OR REPLACE INTO cir_links (project_id, file, cir_file, cir_issue, cir_hash, local_hash, linked_at, linked_by, approved_issue, approved_by, approved_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
-    .run(projectId, file, file, issueOf(xml), csdb.sha(xml), csdb.sha(xml), nowIso(), actor.id, issueOf(xml), actor.id, nowIso());
+  repos.cirLinks.put({ project_id: projectId, file, cir_file: file, cir_issue: issueOf(xml), cir_hash: csdb.sha(xml), local_hash: csdb.sha(xml), linked_at: nowIso(), linked_by: actor.id, approved_issue: issueOf(xml), approved_by: actor.id, approved_at: nowIso() });
   return { file, linked: true };
 }
 
@@ -151,7 +150,7 @@ const issueOf = (xml: string): string => { const m = /<issueInfo\b[^>]*issueNumb
 export type LinkState = 'up-to-date' | 'update-available' | 'locally-modified' | 'update-available-and-locally-modified' | 'source-removed';
 export interface LinkView { file: string; cirFile: string; linkedIssue: string; cirIssue: string | null; state: LinkState; linkedAt: string; approvedBy: string | null; approvedAt: string | null }
 
-export function linkOf(projectId: string, file: string): Row | undefined { return store.stmt('SELECT * FROM cir_links WHERE project_id = ? AND file = ?').get(projectId, file); }
+export function linkOf(projectId: string, file: string): Row | undefined { return repos.cirLinks.get(projectId, file); }
 
 /** A linked copy is changed in the repository, not in the project: the guard every write path calls. */
 export function assertNotLinked(projectId: string, file: string): void {
@@ -160,7 +159,7 @@ export function assertNotLinked(projectId: string, file: string): void {
 
 export async function linksOf(projectId: string): Promise<LinkView[]> {
   const cirId = await workspaceId(); const out: LinkView[] = [];
-  for (const l of store.stmt('SELECT * FROM cir_links WHERE project_id = ? ORDER BY file').all(projectId) as Row[]) {
+  for (const l of repos.cirLinks.listForProject(projectId) as Row[]) {
     let cirXml: string | null = null; let localXml: string | null = null;
     try { cirXml = csdb.readDm(cirId, l.cir_file).xml; } catch { /* removed from the repository */ }
     try { localXml = csdb.readDm(projectId, l.file).xml; } catch { /* removed locally */ }
@@ -175,7 +174,7 @@ export async function linksOf(projectId: string): Promise<LinkView[]> {
 export async function announceChange(file: string, actor: Actor): Promise<number> {
   const cirId = await workspaceId(); let xml: string; try { xml = csdb.readDm(cirId, file).xml; } catch { return 0; }
   const h = csdb.sha(xml); let n = 0;
-  for (const l of store.stmt('SELECT * FROM cir_links WHERE cir_file = ? AND cir_hash != ?').all(file, h) as Row[]) {
+  for (const l of repos.cirLinks.listStale(file, h) as Row[]) {
     const { notify, approversOf } = require('./notifications');
     notify(approversOf(l.project_id), { kind: 'cir.update', title: 'Update available for a shared module', body: `${file} changed in the Common Information Repository (now issue ${issueOf(xml) || '?'}). Review and approve the update in the project.`, projectId: l.project_id, actorId: actor.id }); n++;
   }
@@ -190,9 +189,8 @@ export async function approveUpdate(actor: Actor, projectId: string, file: strin
   if (csdb.sha(local.xml) !== l.local_hash && !force) throw conflict('The project copy was changed after it was linked; taking the update would overwrite those changes. Confirm to overwrite.', 'LOCALLY_MODIFIED');
   if (csdb.sha(cirXml) === l.cir_hash && csdb.sha(local.xml) === l.local_hash) return { file, changed: false };
   await csdb.writeDm(projectId, l.file, cirXml, undefined, actor, role, false);
-  store.stmt('UPDATE cir_links SET cir_issue = ?, cir_hash = ?, local_hash = ?, approved_issue = ?, approved_by = ?, approved_at = ? WHERE project_id = ? AND file = ?')
-    .run(issueOf(cirXml), csdb.sha(cirXml), csdb.sha(cirXml), issueOf(cirXml), actor.id, nowIso(), projectId, file);
+  repos.cirLinks.approve(projectId, file, { issue: issueOf(cirXml), hash: csdb.sha(cirXml), by: actor.id, at: nowIso() });
   return { file, changed: true, issue: issueOf(cirXml) };
 }
 
-export function detach(projectId: string, file: string): void { if (!store.stmt('DELETE FROM cir_links WHERE project_id = ? AND file = ?').run(projectId, file).changes) throw notFound('That module is not a linked copy.'); }
+export function detach(projectId: string, file: string): void { if (!repos.cirLinks.remove(projectId, file)) throw notFound('That module is not a linked copy.'); }

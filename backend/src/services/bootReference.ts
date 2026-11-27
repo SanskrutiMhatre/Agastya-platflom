@@ -4,7 +4,7 @@
 // =============================================================================
 
 import { nowIso } from '../config';
-import { store } from '../context';
+import { store, repos } from '../context';
 import { seedReference, CODE_KINDS, ISSUE_KEYS, getCode, KIND_RULE, SPEC_EVIDENCE } from './s1000dRef';
 import { seedPresets, createPreset, putPresetNode, listPresets } from './sns';
 import { backfillProjects, BackfillReport } from './projectConfig';
@@ -30,8 +30,7 @@ function carryOverLegacy(): { codes: number; sns: number } {
     if (!/^[A-Z0-9]{3}$/.test(code) || !name || OLD_SEED_INFO.has(`${code}|${name}`)) continue;
     for (const issue of ISSUE_KEYS) {
       if (getCode('infoCode', issue, code)) continue;
-      store.db.prepare(`INSERT OR IGNORE INTO ref_codes (kind, issue, code, title, origin, source_id, rule_id, created_at, updated_at) VALUES ('infoCode', ?, ?, ?, 'custom', NULL, NULL, ?, ?)`)
-        .run(issue, code, name, nowIso(), nowIso());
+      repos.reference.insertCustomCodeIfAbsent({ kind: 'infoCode', issue, code, title: name, now: nowIso() });
       codes++;
     }
   }

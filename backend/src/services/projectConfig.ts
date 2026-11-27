@@ -23,10 +23,10 @@
 import fs from 'fs';
 import path from 'path';
 import { nowIso } from '../config';
-import { store, projectDirFor } from '../context';
+import { store, repos, projectDirFor } from '../context';
 import { bad, conflict, HttpError } from './http';
-import { listDms, DmSummary } from './csdb';
-import { readProjectJson, csdbRel } from './projects';
+import { listDms, DmSummary } from './csdbIndex';
+import { readProjectJson, csdbRel } from './projectRecord';
 import { listItems } from './adminConfig';
 import { declaredIssue } from './brex';
 import {
@@ -34,7 +34,8 @@ import {
 } from './s1000dRef';
 import { listProjectSns } from './sns';
 
-const dbh = () => store.db;
+// WP-10 (PRD-002): every statement is in repositories/projectConfigRepository.ts; this file holds the rules.
+const R = () => repos.projectConfig;
 
 export const DEFAULT_ISSUE: IssueKey = '4-2';          // the wizard's default (settings.defaultIssue)
 export const DEFAULT_LANGUAGE = 'en';
@@ -80,7 +81,7 @@ export function defaultConfig(over: Partial<ProjectConfig> = {}): ProjectConfig 
 // ── Reading ──────────────────────────────────────────────────────────────────
 
 export function getConfigRow(projectId: string): ConfigRow | null {
-  const r: any = dbh().prepare('SELECT * FROM project_config WHERE project_id = ?').get(projectId);
+  const r: any = R().get(projectId);
   if (!r) return null;
   return { config: { ...defaultConfig(), ...JSON.parse(r.data) }, version: r.version, createdAt: r.created_at, updatedAt: r.updated_at, updatedBy: r.updated_by ?? null };
 }
@@ -97,11 +98,8 @@ const cirConfig = (): ProjectConfig => defaultConfig({ issue: null, snsEnforced:
 
 function writeConfig(projectId: string, config: ProjectConfig, by: string | null, create = false): void {
   const now = nowIso();
-  if (create) {
-    dbh().prepare('INSERT INTO project_config (project_id, data, version, created_at, updated_at, updated_by) VALUES (?,?,1,?,?,?)').run(projectId, JSON.stringify(config), now, now, by);
-  } else {
-    dbh().prepare('UPDATE project_config SET data = ?, version = version + 1, updated_at = ?, updated_by = ? WHERE project_id = ?').run(JSON.stringify(config), now, by, projectId);
-  }
+  if (create) R().insert(projectId, JSON.stringify(config), now, by);
+  else R().update(projectId, JSON.stringify(config), now, by);
 }
 
 // ── Data modules in the project ──────────────────────────────────────────────
@@ -317,14 +315,11 @@ export function copyConfig(fromId: string, toId: string, actorId: string | null)
   const cfg: ProjectConfig = JSON.parse(JSON.stringify(src));
   cfg.origin = { by: 'api', notes: [`Copied from project ${fromId}.`] };
   if (!getConfigRow(toId)) writeConfig(toId, cfg, actorId, true);
-  const db = dbh();
-  db.prepare('INSERT OR IGNORE INTO project_codes (project_id, kind, code) SELECT ?, kind, code FROM project_codes WHERE project_id = ?').run(toId, fromId);
-  db.prepare('INSERT OR IGNORE INTO project_sns (project_id, path, level, code, title, preset_id) SELECT ?, path, level, code, title, preset_id FROM project_sns WHERE project_id = ?').run(toId, fromId);
-  db.prepare('INSERT OR IGNORE INTO project_dm_types (project_id, schema, enabled) SELECT ?, schema, enabled FROM project_dm_types WHERE project_id = ?').run(toId, fromId);
+  R().copyProjectRows(fromId, toId);
 }
 
 export function deleteProjectConfig(projectId: string): void {
-  for (const t of ['project_config', 'project_codes', 'project_sns', 'project_dm_types']) dbh().prepare(`DELETE FROM ${t} WHERE project_id = ?`).run(projectId);
+  R().deleteProject(projectId);
 }
 
 // ── Enabled codes and DM types ───────────────────────────────────────────────
@@ -335,12 +330,12 @@ export function enabledCodes(projectId: string, kind: CodeKind, cfg: ProjectConf
   const all = listCodes(kind, issue);
   // only information codes can be narrowed by a project; learn, learn-event and item-location codes are always the whole catalogue
   if (kind !== 'infoCode' || cfg.codeMode === 'all') return all;
-  const sel = new Set((dbh().prepare('SELECT code FROM project_codes WHERE project_id = ? AND kind = ?').all(projectId, kind) as any[]).map((r) => r.code));
+  const sel = new Set(R().selectedCodes(projectId, kind));
   return all.filter((c) => sel.has(c.code));
 }
 
 export function selectedCodes(projectId: string, kind: CodeKind): string[] {
-  return (dbh().prepare('SELECT code FROM project_codes WHERE project_id = ? AND kind = ? ORDER BY code').all(projectId, kind) as any[]).map((r) => r.code);
+  return R().selectedCodes(projectId, kind);
 }
 
 /** Replace the project's selection of one kind. Codes must exist in the catalogue of the project's issue. */
@@ -350,30 +345,18 @@ export function setSelectedCodes(projectId: string, kind: CodeKind, codes: strin
   const wanted = [...new Set(codes.map((c) => String(c).trim().toUpperCase()).filter(Boolean))];
   const unknown = wanted.filter((c) => !getCode(kind, issue, c));
   if (unknown.length) throw bad(`Not in the Issue ${ISSUE_LABEL[issue]} ${KIND_RULE[kind].label.toLowerCase()} catalogue: ${unknown.slice(0, 8).join(', ')}${unknown.length > 8 ? '…' : ''}.`, 'UNKNOWN_CODE');
-  const db = dbh();
-  db.exec('BEGIN');
-  try {
-    db.prepare('DELETE FROM project_codes WHERE project_id = ? AND kind = ?').run(projectId, kind);
-    for (const c of wanted) db.prepare('INSERT INTO project_codes (project_id, kind, code) VALUES (?,?,?)').run(projectId, kind, c);
-    db.exec('COMMIT');
-  } catch (e) { db.exec('ROLLBACK'); throw e; }
+  R().replaceSelectedCodes(projectId, kind, wanted);
 }
 
 export function disabledTypes(projectId: string): Set<string> {
-  return new Set((dbh().prepare('SELECT schema FROM project_dm_types WHERE project_id = ? AND enabled = 0').all(projectId) as any[]).map((r) => r.schema));
+  return new Set(R().disabledTypes(projectId));
 }
 export function setDmTypes(projectId: string, enabled: string[]): void {
   const types = (listItems('dm-types') as any[]).map((t) => t.schema);
   const unknown = enabled.filter((s) => !types.includes(s));
   if (unknown.length) throw bad(`Unknown DM type: ${unknown.join(', ')}.`, 'UNKNOWN_TYPE');
   if (!enabled.length) throw bad('A project must offer at least one data module type.', 'NO_TYPES');
-  const db = dbh();
-  db.exec('BEGIN');
-  try {
-    db.prepare('DELETE FROM project_dm_types WHERE project_id = ?').run(projectId);
-    for (const t of types) if (!enabled.includes(t)) db.prepare('INSERT INTO project_dm_types (project_id, schema, enabled) VALUES (?,?,0)').run(projectId, t);
-    db.exec('COMMIT');
-  } catch (e) { db.exec('ROLLBACK'); throw e; }
+  R().replaceDisabledTypes(projectId, types.filter((t) => !enabled.includes(t)));
 }
 
 // ── What the authoring screens need, in one call ─────────────────────────────
@@ -481,6 +464,6 @@ export function codeImpact(kind: CodeKind, issue: IssueKey, rawCode: string): Im
 }
 
 export function recordImpact(actorId: string | null, change: string, impact: Impact): void {
-  dbh().prepare('INSERT INTO catalogue_impacts (at, actor_id, change, impact) VALUES (?,?,?,?)').run(nowIso(), actorId, change, JSON.stringify(impact));
+  R().recordImpact(nowIso(), actorId, change, JSON.stringify(impact));
 }
 

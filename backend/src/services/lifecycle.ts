@@ -19,7 +19,7 @@
 import fs from 'fs';
 import path from 'path';
 import { nowIso } from '../config';
-import { store } from '../context';
+import { repos } from '../context';
 import { bad, conflict, notFound } from './http';
 import * as csdb from './csdb';
 import { findAll, norm, parseTree, setAttrs, walk, type MNode } from './miniXml';
@@ -90,12 +90,10 @@ function withRevision(xml: string, file: string, issue: number, inWork: number, 
 }
 
 const record = (projectId: string, file: string, action: string, a: Actor, o: { from?: string; reason?: string; detail?: unknown } = {}) =>
-  store.stmt('INSERT INTO lifecycle_events (project_id, file, action, from_file, reason, detail, actor_id, actor_username, at) VALUES (?,?,?,?,?,?,?,?,?)')
-    .run(projectId, file, action, o.from ?? null, o.reason ?? null, o.detail === undefined ? null : JSON.stringify(o.detail), a.id, a.username, nowIso());
+  repos.lifecycle.record({ projectId, file, action, from: o.from ?? null, reason: o.reason ?? null, detail: o.detail === undefined ? null : JSON.stringify(o.detail), actorId: a.id, actorUsername: a.username, at: nowIso() });
 
 export function events(projectId: string, file?: string) {
-  const rows = file ? store.stmt('SELECT * FROM lifecycle_events WHERE project_id = ? AND (file = ? OR from_file = ?) ORDER BY id DESC').all(projectId, file, file)
-    : store.stmt('SELECT * FROM lifecycle_events WHERE project_id = ? ORDER BY id DESC LIMIT 500').all(projectId);
+  const rows = repos.lifecycle.list(projectId, file);
   return rows.map((r: any) => ({ id: r.id, file: r.file, action: r.action, from: r.from_file, reason: r.reason, detail: r.detail ? JSON.parse(r.detail) : null, by: r.actor_username, at: r.at }));
 }
 

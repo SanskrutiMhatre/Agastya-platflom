@@ -25,13 +25,14 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { nowIso } from '../config';
-import { store, projectDirFor } from '../context';
+import { repos, projectDirFor } from '../context';
 import { bad, conflict, notFound } from './http';
 import { csvRow } from './csv';
-import { readProjectJson, csdbRel } from './projects';
+import { readProjectJson, csdbRel } from './projectRecord';
 
 const { newId } = require('../core/auth/crypto');
-const dbh = () => store.db;
+// WP-10 (PRD-002): every statement is in repositories/snsRepository.ts; this file holds the rules.
+const R = () => repos.sns;
 
 export const LEVELS = [
   { level: 1, name: 'System', pattern: /^[A-Z0-9]{2,3}$/, hint: '2 or 3 letters/digits' },
@@ -66,30 +67,24 @@ export function seedPresets(): number {
   const raw = fs.readFileSync(file);
   const j = JSON.parse(raw.toString('utf8'));
   const sha = crypto.createHash('sha256').update(raw).digest('hex');
-  const db = dbh(); const now = nowIso(); let n = 0;
-  db.exec('BEGIN');
-  try {
+  const now = nowIso(); let n = 0;
+  repos.transaction(() => {
     for (const p of j.presets) {
       const id = `spec42-${String(p.chapter).replace(/\./g, '-')}`;
       const source = `S1000D Issue 4.2, Chap ${p.chapter} Maintained SNS - ${p.name} (${j.provenance.file}, pages ${j.provenance.pages}, sha256 ${sha.slice(0, 12)}…)`;
-      const have: any = db.prepare('SELECT source FROM sns_presets WHERE id = ?').get(id);
-      if (have?.source === source && Number((db.prepare('SELECT COUNT(*) AS n FROM sns_preset_nodes WHERE preset_id = ?').get(id) as any).n) === p.nodes.length) { n += p.nodes.length; continue; }   // unchanged
-      db.prepare(`INSERT INTO sns_presets (id, name, source, limitation, created_at) VALUES (?,?,?,?,?)
-                  ON CONFLICT(id) DO UPDATE SET source = excluded.source, limitation = excluded.limitation`)
-        .run(id, `S1000D 4.2 · ${p.name}`, source, j.limitation, now);
-      db.prepare('DELETE FROM sns_preset_nodes WHERE preset_id = ?').run(id);       // read-only preset: the file is the source of truth
+      if (R().presetSource(id) === source && R().presetNodeCount(id) === p.nodes.length) { n += p.nodes.length; continue; }   // unchanged
+      R().upsertSpecPreset({ id, name: `S1000D 4.2 · ${p.name}`, source, limitation: j.limitation, now });
+      R().clearPresetNodes(id);       // read-only preset: the file is the source of truth
       for (const node of p.nodes) {
-        db.prepare('INSERT INTO sns_preset_nodes (preset_id, path, level, code, title, definition) VALUES (?,?,?,?,?,?)')
-          .run(id, node.path, node.level, node.code, node.title ?? '', JSON.stringify({
+        R().insertPresetNode(id, { path: node.path, level: node.level, code: node.code, title: node.title ?? '', definition: JSON.stringify({
             definition: node.definition || '', ...(node.rangeEnd ? { rangeEnd: node.rangeEnd } : {}), ...(node.ambiguous ? { ambiguous: true, variant: node.variant } : {}),
             ...(node.category ? { category: true } : {}), ...(node.categoryCode ? { categoryCode: node.categoryCode } : {}),
             ...(node.captionTitle ? { captionTitle: node.captionTitle } : {}), ...(node.indexTitle ? { indexTitle: node.indexTitle } : {}),
-          }));
+          }) });
         n++;
       }
     }
-    db.exec('COMMIT');
-  } catch (e) { db.exec('ROLLBACK'); throw e; }
+  });
   presetsSeeded = true;
   return n;
 }
@@ -99,15 +94,14 @@ export interface PresetSummary { id: string; name: string; source: string; limit
 
 export function listPresets(): PresetSummary[] {
   ensurePresets();
-  return dbh().prepare(`SELECT p.*, (SELECT COUNT(*) FROM sns_preset_nodes n WHERE n.preset_id = p.id AND n.level = 1) AS systems,
-                               (SELECT COUNT(*) FROM sns_preset_nodes n WHERE n.preset_id = p.id) AS entries FROM sns_presets p ORDER BY p.id`).all()
+  return R().listPresets()
     .map((r: any) => ({ id: r.id, name: r.name, source: r.source, limitation: r.limitation, readOnly: String(r.id).startsWith('spec42-'), systems: Number(r.systems), entries: Number(r.entries), model: r.model_code ?? null }));
 }
 
 export function getPreset(id: string): { preset: PresetSummary; nodes: Array<SnsNode & { definition: string; note?: Record<string, unknown> }> } {
   const preset = listPresets().find((p) => p.id === id);
   if (!preset) throw notFound('No such SNS preset.');
-  const rows = dbh().prepare('SELECT * FROM sns_preset_nodes WHERE preset_id = ? ORDER BY rowid').all(id) as any[];
+  const rows = R().presetNodes(id) as any[];
   return {
     preset,
     nodes: rows.map((r) => {
@@ -127,38 +121,35 @@ export function createPreset(rawName: unknown, rawModel?: unknown): PresetSummar
   const name = String(rawName ?? '').trim().replace(/\s+/g, ' ');
   if (!name) throw bad('A preset name is required.', 'FIELD_REQUIRED');
   if (name.length > 100) throw bad('That name is too long.');
-  if (dbh().prepare('SELECT 1 FROM sns_presets WHERE lower(name) = lower(?)').get(name)) throw conflict(`A preset named "${name}" already exists.`, 'DUPLICATE');
+  if (R().presetNameTaken(name)) throw conflict(`A preset named "${name}" already exists.`, 'DUPLICATE');
   const model = cleanModel(rawModel);
   const id = `custom-${newId()}`;
-  dbh().prepare('INSERT INTO sns_presets (id, name, source, limitation, created_at, model_code) VALUES (?,?,?,?,?,?)').run(id, name, 'Created by an Administrator', null, nowIso(), model);
+  R().insertCustomPreset({ id, name, source: 'Created by an Administrator', now: nowIso(), model });
   return listPresets().find((p) => p.id === id)!;
 }
 
 /** Set (or clear) the model code of a custom preset. */
 export function setPresetModel(id: string, rawModel: unknown): PresetSummary {
   assertCustom(id);
-  dbh().prepare('UPDATE sns_presets SET model_code = ? WHERE id = ?').run(cleanModel(rawModel), id);
+  R().setPresetModel(id, cleanModel(rawModel));
   return listPresets().find((p) => p.id === id)!;
 }
 
 function assertCustom(id: string): void {
-  const p = dbh().prepare('SELECT id FROM sns_presets WHERE id = ?').get(id);
-  if (!p) throw notFound('No such SNS preset.');
+  if (!R().presetExists(id)) throw notFound('No such SNS preset.');
   if (String(id).startsWith('spec42-')) throw conflict('A preset taken from the S1000D specification is read-only: its source is the specification. Copy it into a custom preset to change it.', 'READ_ONLY');
 }
 
 export function deletePreset(id: string): void {
   assertCustom(id);
-  dbh().prepare('DELETE FROM sns_preset_nodes WHERE preset_id = ?').run(id);
-  dbh().prepare('DELETE FROM sns_presets WHERE id = ?').run(id);                      // projects keep the nodes they copied
+  R().deletePreset(id);                      // projects keep the nodes they copied
 }
 
 /** Copy any preset into a new custom one. */
 export function duplicatePreset(id: string, rawName: unknown): PresetSummary {
   const src = getPreset(id);
   const np = createPreset(rawName ?? `${src.preset.name} (copy)`);
-  const ins = dbh().prepare('INSERT INTO sns_preset_nodes (preset_id, path, level, code, title, definition) VALUES (?,?,?,?,?,?)');
-  for (const n of src.nodes) if (n.level >= 1 && !n.note?.category) ins.run(np.id, n.path, n.level, n.code, n.title, JSON.stringify({ definition: n.definition }));
+  for (const n of src.nodes) if (n.level >= 1 && !n.note?.category) R().insertPresetNode(np.id, { path: n.path, level: n.level, code: n.code, title: n.title, definition: JSON.stringify({ definition: n.definition }) });
   return listPresets().find((p) => p.id === np.id)!;
 }
 
@@ -166,18 +157,17 @@ export function duplicatePreset(id: string, rawName: unknown): PresetSummary {
 export function putPresetNode(id: string, rawPath: unknown, rawTitle: unknown): void {
   assertCustom(id);
   const { path: p, level } = normalisePath(rawPath);
-  if (level > 1 && !dbh().prepare('SELECT 1 FROM sns_preset_nodes WHERE preset_id = ? AND path = ?').get(id, parentPath(p))) throw bad(`Add ${parentPath(p)} first: a ${LEVELS[level - 1].name.toLowerCase()} belongs to its parent.`, 'NO_PARENT');
-  dbh().prepare(`INSERT INTO sns_preset_nodes (preset_id, path, level, code, title, definition) VALUES (?,?,?,?,?, '{}')
-                 ON CONFLICT(preset_id, path) DO UPDATE SET title = excluded.title`).run(id, p, level, p.split('/').pop(), cleanTitle(rawTitle));
+  if (level > 1 && !R().presetNodeExists(id, parentPath(p))) throw bad(`Add ${parentPath(p)} first: a ${LEVELS[level - 1].name.toLowerCase()} belongs to its parent.`, 'NO_PARENT');
+  R().putPresetNode(id, { path: p, level, code: p.split('/').pop()!, title: cleanTitle(rawTitle) });
 }
 export function deletePresetNode(id: string, rawPath: unknown, cascade = false): number {
   assertCustom(id);
   const p = String(rawPath ?? '');
-  const kids = dbh().prepare(`SELECT path FROM sns_preset_nodes WHERE preset_id = ? AND path LIKE ? ESCAPE '\\'`).all(id, p.replace(/[%_\\]/g, '\\$&') + '/%') as any[];
+  const kids = R().presetPathsBelow(id, p);
   if (kids.length && !cascade) throw conflict(`${p} has ${kids.length} entr${kids.length === 1 ? 'y' : 'ies'} below it. Delete the branch to remove them too.`, 'HAS_CHILDREN');
-  const r = dbh().prepare(`DELETE FROM sns_preset_nodes WHERE preset_id = ? AND (path = ? OR path LIKE ? ESCAPE '\\')`).run(id, p, p.replace(/[%_\\]/g, '\\$&') + '/%');
-  if (!Number(r.changes)) throw notFound('No such entry.');
-  return Number(r.changes);
+  const removed = R().deletePresetBranch(id, p);
+  if (!removed) throw notFound('No such entry.');
+  return removed;
 }
 
 /** "21/10/00" (case-insensitive, "-" or "/" separated) -> a validated path and its level. */
@@ -193,7 +183,7 @@ export function normalisePath(raw: unknown): { path: string; level: number; code
 const rowToNode = (r: any): SnsNode => ({ path: r.path, level: r.level, code: r.code, title: r.title, presetId: r.preset_id ?? null });
 
 export function listProjectSns(projectId: string): SnsNode[] {
-  return (dbh().prepare('SELECT * FROM project_sns WHERE project_id = ? ORDER BY path').all(projectId) as any[]).map(rowToNode);
+  return (R().listProjectNodes(projectId) as any[]).map(rowToNode);
 }
 
 export function treeOf(nodes: SnsNode[]): SnsNode[] {
@@ -240,24 +230,23 @@ export function projectSnsView(projectId: string, q = ''): { nodes: SnsNode[]; t
 export function putProjectNode(projectId: string, rawPath: unknown, rawTitle: unknown, presetId: string | null = null): SnsNode {
   const { path: p, level } = normalisePath(rawPath);
   const title = cleanTitle(rawTitle);
-  if (level > 1 && !dbh().prepare('SELECT 1 FROM project_sns WHERE project_id = ? AND path = ?').get(projectId, parentPath(p))) {
+  if (level > 1 && !R().projectNode(projectId, parentPath(p))) {
     throw bad(`Add ${parentPath(p)} first: a ${LEVELS[level - 1].name.toLowerCase()} belongs to its parent.`, 'NO_PARENT');
   }
-  dbh().prepare(`INSERT INTO project_sns (project_id, path, level, code, title, preset_id) VALUES (?,?,?,?,?,?)
-                 ON CONFLICT(project_id, path) DO UPDATE SET title = excluded.title`).run(projectId, p, level, p.split('/').pop(), title, presetId);
-  return rowToNode(dbh().prepare('SELECT * FROM project_sns WHERE project_id = ? AND path = ?').get(projectId, p));
+  R().putProjectNode(projectId, { path: p, level, code: p.split('/').pop()!, title, presetId });
+  return rowToNode(R().projectNode(projectId, p));
 }
 
 export function createProjectNode(projectId: string, rawPath: unknown, rawTitle: unknown): SnsNode {
   const { path: p } = normalisePath(rawPath);
-  if (dbh().prepare('SELECT 1 FROM project_sns WHERE project_id = ? AND path = ?').get(projectId, p)) throw conflict(`${p} is already in this project's SNS.`, 'DUPLICATE');
+  if (R().projectNode(projectId, p)) throw conflict(`${p} is already in this project's SNS.`, 'DUPLICATE');
   return putProjectNode(projectId, p, rawTitle);
 }
 
 /** Change a node's title and/or its own code. A code change moves the whole branch; it is refused when data modules use any part of it. */
 export function updateProjectNode(projectId: string, rawPath: string, patch: { title?: unknown; code?: unknown }): SnsNode {
   const p = String(rawPath ?? '').toUpperCase();
-  const cur: any = dbh().prepare('SELECT * FROM project_sns WHERE project_id = ? AND path = ?').get(projectId, p);
+  const cur: any = R().projectNode(projectId, p);
   if (!cur) throw notFound('No such SNS entry.');
   // validate EVERYTHING first, then write both changes in one transaction: a refused request changes nothing
   const title = patch.title !== undefined ? cleanTitle(patch.title) : null;
@@ -266,40 +255,35 @@ export function updateProjectNode(projectId: string, rawPath: string, patch: { t
     const code = cleanCode(cur.level, patch.code);
     const parent = parentPath(p);
     const np = parent ? `${parent}/${code}` : code;
-    if (dbh().prepare('SELECT 1 FROM project_sns WHERE project_id = ? AND path = ?').get(projectId, np)) throw conflict(`${np} is already in this project's SNS.`, 'DUPLICATE');
+    if (R().projectNode(projectId, np)) throw conflict(`${np} is already in this project's SNS.`, 'DUPLICATE');
     const use = usageByPath(projectId);
     const used = [...use.entries()].filter(([k]) => k === p || k.startsWith(p + '/')).reduce((a, [, n]) => a + n, 0);
     if (used) throw conflict(`${p} is used by ${used} data module${used === 1 ? '' : 's'}. Its code cannot change: the data modules' codes would no longer match the SNS.`, 'IN_USE');
-    move = { np, branch: dbh().prepare(`SELECT * FROM project_sns WHERE project_id = ? AND (path = ? OR path LIKE ? ESCAPE '\\') ORDER BY path`).all(projectId, p, p.replace(/[%_\\]/g, '\\$&') + '/%') as any[] };
+    move = { np, branch: R().projectBranch(projectId, p) as any[] };
   }
-  const db = dbh();
-  db.exec('BEGIN');
-  try {
-    if (title !== null) db.prepare('UPDATE project_sns SET title = ? WHERE project_id = ? AND path = ?').run(title, projectId, p);
+  repos.transaction(() => {
+    if (title !== null) R().setProjectNodeTitle(projectId, p, title);
     if (move) {
       const { np, branch } = move;
-      db.prepare(`DELETE FROM project_sns WHERE project_id = ? AND (path = ? OR path LIKE ? ESCAPE '\\')`).run(projectId, p, p.replace(/[%_\\]/g, '\\$&') + '/%');
+      R().deleteProjectBranch(projectId, p);
       for (const b of branch) {
         const moved = np + b.path.slice(p.length);
-        db.prepare('INSERT INTO project_sns (project_id, path, level, code, title, preset_id) VALUES (?,?,?,?,?,?)').run(projectId, moved, b.level, moved.split('/').pop(), b.path === p && title !== null ? title : b.title, b.preset_id);
+        R().insertProjectNode(projectId, { path: moved, level: b.level, code: moved.split('/').pop()!, title: b.path === p && title !== null ? title : b.title, presetId: b.preset_id });
       }
     }
-    db.exec('COMMIT');
-  } catch (e) { db.exec('ROLLBACK'); throw e; }
-  return rowToNode(dbh().prepare('SELECT * FROM project_sns WHERE project_id = ? AND path = ?').get(projectId, move ? move.np : p));
+  });
+  return rowToNode(R().projectNode(projectId, move ? move.np : p));
 }
 
 export function deleteProjectNode(projectId: string, rawPath: string, cascade = false): number {
   const p = String(rawPath ?? '').toUpperCase();
-  if (!dbh().prepare('SELECT 1 FROM project_sns WHERE project_id = ? AND path = ?').get(projectId, p)) throw notFound('No such SNS entry.');
-  const esc = p.replace(/[%_\\]/g, '\\$&') + '/%';
-  const kids = (dbh().prepare(`SELECT path FROM project_sns WHERE project_id = ? AND path LIKE ? ESCAPE '\\'`).all(projectId, esc) as any[]).length;
+  if (!R().projectNode(projectId, p)) throw notFound('No such SNS entry.');
+  const kids = R().projectPathsBelow(projectId, p).length;
   if (kids && !cascade) throw conflict(`${p} has ${kids} entr${kids === 1 ? 'y' : 'ies'} below it. Delete the branch to remove them too.`, 'HAS_CHILDREN');
   const use = usageByPath(projectId);
   const used = [...use.entries()].filter(([k]) => k === p || k.startsWith(p + '/')).reduce((a, [, n]) => a + n, 0);
   if (used) throw conflict(`${p} is used by ${used} data module${used === 1 ? '' : 's'}. Remove or recode those data modules first.`, 'IN_USE');
-  const r = dbh().prepare(`DELETE FROM project_sns WHERE project_id = ? AND (path = ? OR path LIKE ? ESCAPE '\\')`).run(projectId, p, esc);
-  return Number(r.changes);
+  return R().deleteProjectBranch(projectId, p);
 }
 
 // ── Apply a preset / import / export ────────────────────────────────────────
@@ -311,9 +295,7 @@ function mergeNodes(projectId: string, nodes: Array<{ path: string; title: strin
   const rep: ImportReport = { added: 0, unchanged: 0, conflicts: [], skipped: [], errors: [] };
   const have = new Map<string, string>(listProjectSns(projectId).map((n) => [n.path, n.title]));
   const ordered = [...nodes].sort((a, b) => levelOfPath(a.path) - levelOfPath(b.path) || a.path.localeCompare(b.path));
-  const db = dbh();
-  if (!dryRun) db.exec('BEGIN');
-  try {
+  const merge = (): void => {
     for (const n of ordered) {
       let norm: ReturnType<typeof normalisePath>;
       try { norm = normalisePath(n.path); } catch (e: any) { rep.errors.push({ line: n.path, message: e.message }); continue; }
@@ -329,8 +311,8 @@ function mergeNodes(projectId: string, nodes: Array<{ path: string; title: strin
       if (!dryRun) putProjectNode(projectId, p, n.title, presetId);
       have.set(p, n.title.trim()); rep.added++;
     }
-    if (!dryRun) db.exec('COMMIT');
-  } catch (e) { if (!dryRun) db.exec('ROLLBACK'); throw e; }
+  };
+  if (dryRun) merge(); else repos.transaction(merge);
   return rep;
 }
 

@@ -11,138 +11,31 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { vendor, nowIso } from '../config';
-import { docIndex, revisions, projectDirFor } from '../context';
+import { docIndex, revisions, projectDirFor, content } from '../context';
 import { bad, conflict, notFound, forbidden } from './http';
 import { HEAD_BYTES, MAX_PROLOG, headOf, rootStart } from './xmlHead';
 import { FileMemo } from './fileMemo';
 import { wellFormedError } from './wellFormed';
-import { readProjectJson, csdbRel, mediaRel } from './projects';
+import { readProjectJson, csdbRel, mediaRel } from './projectRecord';
 import { assertNewDmAllowed } from './projectConfig';
 
 const { checkXmlSafety } = require('../core/auth/xmlGuard');
 const { isDoubledXml, DOUBLED_MESSAGE } = vendor('engine/doubled');
 
 
-export const DM_FILE_RE = /^DMC-[A-Za-z0-9._-]+\.xml$/i;
+// The read-only index (file names, identities, the list) lives in csdbIndex.ts (WP-10, ARC-006); re-exported here for compatibility.
+export * from './csdbIndex';
+import { DM_FILE_RE, DmSummary, sha, csdbDir, resolveDmFile, dmcString, parseIdent, listDms } from './csdbIndex';
 
-export interface DmSummary {
-  file: string; dmc: string; techName: string; infoName: string; title: string;
-  issueNumber: string; inWork: string; language: string; schema: string; issue: string;
-  security: string; size: number; modified: string;
-  /** The identity attributes a <dmRef> to this module is written from. */
-  dmCodeAttrs: Record<string, string>; identExtension?: Record<string, string>;
-  issueInfoAttrs: Record<string, string>; languageAttrs: Record<string, string>;
-}
-
-export const sha = (s: string | Buffer): string => crypto.createHash('sha256').update(s).digest('hex');
-
-export function csdbDir(projectId: string): string {
-  return path.join(projectDirFor(projectId), csdbRel(readProjectJson(projectId)));
-}
-
-/** The file inside csdb/, refusing anything that could leave it. */
-export function resolveDmFile(projectId: string, file: string): string {
-  const name = String(file ?? '');
-  if (!DM_FILE_RE.test(name)) throw bad('A data module file name looks like DMC-<code>.xml.', 'BAD_FILE_NAME');
-  const dir = csdbDir(projectId);
-  const abs = path.resolve(dir, name);
-  if (path.dirname(abs) !== path.resolve(dir)) throw bad('Bad path.', 'BAD_FILE_NAME');
-  return abs;
-}
-
-const attrs = (src: string): Record<string, string> => {
-  const out: Record<string, string> = {};
-  const re = /([\w:.-]+)\s*=\s*"([^"]*)"/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(src))) out[m[1]] = m[2];
-  return out;
-};
-
-/** "MODEL-AA-00-00-00-00A-040A-D" from dmCode attributes. */
-export function dmcString(a: Record<string, string>): string {
-  const g = (k: string) => a[k] ?? '';
-  const s = [g('modelIdentCode'), g('systemDiffCode'), g('systemCode'), `${g('subSystemCode')}${g('subSubSystemCode')}`,
-    g('assyCode'), `${g('disassyCode')}${g('disassyCodeVariant')}`, `${g('infoCode')}${g('infoCodeVariant')}`, g('itemLocationCode')];
-  return s.join('-');
-}
-
-export function parseIdent(head: string, file: string): Omit<DmSummary, 'size' | 'modified'> {
-  const scope = (/<dmIdent>([\s\S]*?)<\/dmIdent>/.exec(head) || [null, head])[1] as string;
-  const code = /<dmCode\b([^>]*)\/?>/.exec(scope);
-  const issueInfo = /<issueInfo\b([^>]*)\/?>/.exec(scope);
-  const lang = /<language\b([^>]*)\/?>/.exec(scope);
-  const ext = /<identExtension\b([^>]*)\/?>/.exec(scope);
-  const tech = /<techName>([\s\S]*?)<\/techName>/.exec(head);
-  const info = /<infoName>([\s\S]*?)<\/infoName>/.exec(head);
-  const sec = /<security\b([^>]*)\/?>/.exec(head);
-  const loc = /noNamespaceSchemaLocation\s*=\s*"([^"]+)"/.exec(head);
-  const schemaFile = loc ? loc[1].split('/').pop() ?? '' : '';
-  const iss = loc ? /S1000D[_-]?(\d)[-._](\d)/i.exec(loc[1]) : null;
-  const ca = code ? attrs(code[1]) : {};
-  const ia = issueInfo ? attrs(issueInfo[1]) : {};
-  const la = lang ? attrs(lang[1]) : {};
-  const techName = tech ? tech[1].replace(/\s+/g, ' ').trim() : '';
-  const infoName = info ? info[1].replace(/\s+/g, ' ').trim() : '';
-  return {
-    file,
-    dmc: code ? dmcString(ca) : file.replace(/^DMC-/i, '').replace(/\.xml$/i, ''),
-    techName, infoName, title: [techName, infoName].filter(Boolean).join(' - '),
-    issueNumber: ia.issueNumber ?? '', inWork: ia.inWork ?? '',
-    language: la.languageIsoCode ? `${la.languageIsoCode}-${(la.countryIsoCode ?? '').toUpperCase()}` : '',
-    schema: schemaFile.replace(/\.xsd$/i, ''), issue: iss ? `${iss[1]}.${iss[2]}` : '',
-    security: sec ? attrs(sec[1]).securityClassification ?? '' : '',
-    dmCodeAttrs: ca, identExtension: ext ? attrs(ext[1]) : undefined, issueInfoAttrs: ia, languageAttrs: la,
-  };
-}
-
-function readHead(abs: string): string {
-  let fd: number | undefined;
-  try {
-    fd = fs.openSync(abs, 'r');
-    // Normally the first 12 KB hold the identity. A long DOCTYPE (one entity per graphic) pushes the root
-    // element further down: read on, up to the prolog limit, until it shows up.
-    let size = HEAD_BYTES;
-    for (;;) {
-      const buf = Buffer.alloc(size);
-      const n = fs.readSync(fd, buf, 0, buf.length, 0);
-      const text = buf.toString('utf8', 0, n);
-      const at = rootStart(text, 'dmodule');
-      const complete = at >= 0 && text.length >= at + HEAD_BYTES;      // root found AND its identity section read in full
-      if (n < size || size >= MAX_PROLOG + HEAD_BYTES || complete) return headOf(text, 'dmodule', HEAD_BYTES);
-      size = Math.min(size * 4, MAX_PROLOG + HEAD_BYTES);
-    }
-  } catch { return ''; } finally { if (fd !== undefined) try { fs.closeSync(fd); } catch { /* ignore */ } }
-}
-
-// WP-18 (PERF-016, FE-029): a module's identity is read from its head once and kept until the file changes (size, mtime or ctime), so the list,
-// the summary, the explorer and the BREX check stop re-reading every module on every request.
-const identMemo = new FileMemo<ReturnType<typeof parseIdent>>();
-
-export function listDms(projectId: string): DmSummary[] {
-  const dir = csdbDir(projectId);
-  if (!fs.existsSync(dir)) return [];
-  const out: DmSummary[] = [];
-  for (const f of fs.readdirSync(dir)) {
-    if (!DM_FILE_RE.test(f)) continue;
-    const abs = path.join(dir, f);
-    let st: fs.Stats;
-    try { st = fs.statSync(abs); } catch { continue; }
-    const ident = identMemo.get(abs, st, () => parseIdent(readHead(abs), f));
-    // a fresh copy per call: callers may change what they are given without touching the memo
-    out.push({
-      ...ident, size: st.size, modified: st.mtime.toISOString(),
-      dmCodeAttrs: { ...ident.dmCodeAttrs }, issueInfoAttrs: { ...ident.issueInfoAttrs }, languageAttrs: { ...ident.languageAttrs },
-      identExtension: ident.identExtension ? { ...ident.identExtension } : ident.identExtension,
-    });
-  }
-  return out.sort((a, b) => a.file.localeCompare(b.file));
-}
+// WP-10: data module files are read and written through the ContentStore (storage/contentStore.ts), addressed inside the project.
+const inProject = (projectId: string, abs: string): string => path.relative(content.projectDir(projectId), abs);
+const modifiedOf = (projectId: string, at: string): string => new Date(content.stat(projectId, at)!.mtimeMs).toISOString();
 
 export function readDm(projectId: string, file: string): { file: string; xml: string; hash: string; modified: string } {
-  const abs = resolveDmFile(projectId, file);
-  if (!fs.existsSync(abs)) throw notFound('No such data module.');
-  const xml = fs.readFileSync(abs, 'utf8');
-  return { file, xml, hash: sha(xml), modified: fs.statSync(abs).mtime.toISOString() };
+  const at = inProject(projectId, resolveDmFile(projectId, file));
+  if (!content.exists(projectId, at)) throw notFound('No such data module.');
+  const xml = content.readText(projectId, at);
+  return { file, xml, hash: sha(xml), modified: modifiedOf(projectId, at) };
 }
 
 interface Actor { id: string; username: string; role?: string }
@@ -199,25 +92,25 @@ export async function cut(projectId: string, rel: string, xml: string, actor: Ac
 }
 
 export async function writeDm(projectId: string, file: string, xml: string, baseHash: string | undefined, actor: Actor, projectRole: string, lenient = false) {
-  const abs = resolveDmFile(projectId, file);
+  const at = inProject(projectId, resolveDmFile(projectId, file));
   const rel = `${csdbRel(readProjectJson(projectId))}/${file}`;
-  if (!fs.existsSync(abs)) throw notFound('No such data module. Create it first.');
+  if (!content.exists(projectId, at)) throw notFound('No such data module. Create it first.');
   if (lockedFor(projectId, rel, actor, projectRole)) throw forbidden('This data module is locked. Only a project owner can edit it.', 'DOCUMENT_LOCKED');
   validateContent(rel, xml, lenient);
   assertUnique(projectId, file, xml);
 
   // Optimistic concurrency: refuse to overwrite a version the author never saw.
-  const current = fs.readFileSync(abs, 'utf8');
+  const current = content.readText(projectId, at);
   const currentHash = sha(current);
   if (baseHash && baseHash !== currentHash) {
     throw conflict('This data module was changed by someone else since you opened it.', 'EDIT_CONFLICT',
-      { currentHash, modified: fs.statSync(abs).mtime.toISOString() });
+      { currentHash, modified: modifiedOf(projectId, at) });
   }
   if (current !== xml) {
-    fs.writeFileSync(abs, xml, 'utf8');
+    content.writeText(projectId, at, xml);
     await cut(projectId, rel, xml, actor, 'save');
   }
-  return { file, hash: sha(xml), modified: fs.statSync(abs).mtime.toISOString(), changed: current !== xml };
+  return { file, hash: sha(xml), modified: modifiedOf(projectId, at), changed: current !== xml };
 }
 
 /**
@@ -225,29 +118,29 @@ export async function writeDm(projectId: string, file: string, xml: string, base
  * code and issue by design, so the project's own MIC/issue/SNS rules do not apply to it (XSD and BREX still judge it).
  */
 export async function createDm(projectId: string, file: string, xml: string, actor: Actor, lenient = false, opts: { fromRepository?: boolean; revisionOf?: string } = {}) {
-  const abs = resolveDmFile(projectId, file);
+  const abs = resolveDmFile(projectId, file); const at = inProject(projectId, abs);
   const rel = `${csdbRel(readProjectJson(projectId))}/${file}`;
   validateContent(rel, xml, lenient);
   assertUnique(projectId, file, xml);
-  if (fs.existsSync(abs)) throw conflict(`A data module named ${file} already exists in this project.`, 'ALREADY_EXISTS');
+  if (content.exists(projectId, at)) throw conflict(`A data module named ${file} already exists in this project.`, 'ALREADY_EXISTS');
   // A NEW module must fit the project's S1000D configuration (MIC, issue, offered types and codes, SNS). The server decides this, not the form.
   // Imports (lenient) are brought in as they are: validation and the publication gate report what does not fit.
   if (!lenient && !opts.fromRepository && !opts.revisionOf) assertNewDmAllowed(projectId, xml);   // a revision of a module the project already holds is not a NEW module
-  fs.mkdirSync(path.dirname(abs), { recursive: true });
-  fs.writeFileSync(abs, xml, 'utf8');
+  content.mkdir(projectId, path.dirname(at));
+  content.writeText(projectId, at, xml);
   await docIndex.syncProject(projectId, projectDirFor(projectId), nowIso());
   await cut(projectId, rel, xml, actor, 'create');
-  return { file, hash: sha(xml), modified: fs.statSync(abs).mtime.toISOString() };
+  return { file, hash: sha(xml), modified: modifiedOf(projectId, at) };
 }
 
 export async function deleteDm(projectId: string, file: string, actor: Actor, projectRole: string) {
-  const abs = resolveDmFile(projectId, file);
+  const at = inProject(projectId, resolveDmFile(projectId, file));
   const rel = `${csdbRel(readProjectJson(projectId))}/${file}`;
-  if (!fs.existsSync(abs)) throw notFound('No such data module.');
+  if (!content.exists(projectId, at)) throw notFound('No such data module.');
   if (lockedFor(projectId, rel, actor, projectRole)) throw forbidden('This data module is locked. Only a project owner can delete it.', 'DOCUMENT_LOCKED');
   // Keep the last content in history so a deletion can be undone by hand.
-  await cut(projectId, rel, fs.readFileSync(abs, 'utf8'), actor, 'before-delete');
-  fs.unlinkSync(abs);
+  await cut(projectId, rel, content.readText(projectId, at), actor, 'before-delete');
+  content.remove(projectId, at);
   await docIndex.syncProject(projectId, projectDirFor(projectId), nowIso());
 }
 

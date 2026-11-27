@@ -13,6 +13,7 @@
 
 // WP-10 (PRD-002): the migrations live in storage/migrations/, one engine-neutral file per step; this store runs the SQLite bodies.
 const MIGRATIONS = require('../../storage/migrations').forDialect('sqlite');
+const STMT_CACHE_MAX = 500;
 
 /*
   Role strength as a number, inside SQL, so a project membership and a
@@ -31,7 +32,11 @@ class AuthStore {
 
   stmt(sql) {
     let s = this._stmts.get(sql);
-    if (!s) { s = this.db.prepare(sql); this._stmts.set(sql, s); }
+    if (!s) {
+      // WP-10 (PLT-031): bounded. Statements built from changing text (a SET list, an IN list) would otherwise grow the cache for ever.
+      if (this._stmts.size >= STMT_CACHE_MAX) this._stmts.clear();
+      s = this.db.prepare(sql); this._stmts.set(sql, s);
+    }
     return s;
   }
 
@@ -520,6 +525,11 @@ class AuthStore {
       if (/UNIQUE/i.test(e.message)) return { created: false, duplicate: true };
       throw e;
     }
+  }
+
+  // The fingerprint of what was issued, recorded when a release is carried out (formerly an inline UPDATE in routes/project-content.ts; WP-10).
+  setReleaseContentHash(id, contentHash) {
+    this.stmt('UPDATE releases SET content_hash = ? WHERE id = ?').run(contentHash, id);
   }
 
   getRelease(id) {
