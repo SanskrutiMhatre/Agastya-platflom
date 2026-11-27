@@ -154,7 +154,8 @@ covered by the signed checksums) and, with `--install <folder>`, **DEP-013** (`A
 ## 6. What was and was not verified
 
 Verified (WP-24, Windows Server 2025 build host, 2026-11-27), with a throwaway self-signed certificate made in a temporary folder by
-`New-SigningCertificate.ps1` (no certificate store touched; the folder deleted afterwards):
+`New-SigningCertificate.ps1` (the folder deleted afterwards; the only store use was one check of the certificate-store mode, for which the certificate
+was imported into CurrentUser\My and deleted with its key straight after):
 
 * `signtool` (Windows SDK 10.0.26100, `/f` with the `.pfx`) signs copies of `xsltproc.exe` and a freshly compiled `AgastyaCtl.exe`; Windows reports them
   signed and intact with an untrusted root; one changed byte gives `HashMismatch` (`scripts/release/release.test.mjs`, `host.test.mjs`).
@@ -171,7 +172,7 @@ Not verified, and not claimed:
 
 * **A time-stamped signature.** The build host has no network and no time-stamp authority; the time-stamp path (`/tr ... /td SHA256`) is the
   standard signtool usage but was not executed. A release with a time-stamp server is the owner's first signed build.
-* **A real organisation or public certificate, and a hardware key.** The certificate-store mode was exercised only through its command line.
+* **A real organisation or public certificate, and a hardware key.** The certificate-store mode was exercised with a software key in CurrentUser\My only.
 * **SmartScreen.** "Windows protected your PC - Unknown publisher" is decided by Microsoft's reputation service for files that carry a web
   "Mark of the Web" (downloaded, or copied from a browser/e-mail). It cannot be tested offline, and a signature from your own CA earns no reputation with
   Microsoft. A file delivered by software-deployment tooling or a network share normally carries no such mark and is not subject to it. If your users
