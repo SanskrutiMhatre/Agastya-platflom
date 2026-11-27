@@ -369,19 +369,22 @@
             <xsl:with-param name="refs" select="$refs"/>
         </xsl:call-template>
     </xsl:template>
+    <!-- WP-33 / PERF-003: the warnings (and, below, cautions) a reference names are read from key('by-id') (s1000dtofo.xsl,
+         every element with an @id, in document order) filtered to the element kind, instead of //warning[@id = ...], a walk
+         of the whole book per reference. Same nodes in the same order. -->
     <xsl:template name="process-warning-refs">
         <xsl:param name="refs"/>
         <xsl:choose>
             <xsl:when test="contains($refs, ' ')">
                 <xsl:variable name="first" select="substring-before($refs, ' ')"/>
                 <xsl:variable name="rest" select="substring-after($refs, ' ')"/>
-                <xsl:apply-templates select="//warning[@id = $first]"/>
+                <xsl:apply-templates select="key('by-id', $first)[self::warning]"/>
                 <xsl:call-template name="process-warning-refs">
                     <xsl:with-param name="refs" select="$rest"/>
                 </xsl:call-template>
             </xsl:when>
             <xsl:otherwise>
-                <xsl:apply-templates select="//warning[@id = $refs]"/>
+                <xsl:apply-templates select="key('by-id', $refs)[self::warning]"/>
             </xsl:otherwise>
         </xsl:choose>
     </xsl:template>
@@ -400,13 +403,13 @@
             <xsl:when test="contains($refs, ' ')">
                 <xsl:variable name="first" select="substring-before($refs, ' ')"/>
                 <xsl:variable name="rest" select="substring-after($refs, ' ')"/>
-                <xsl:apply-templates select="//caution[@id = $first]"/>
+                <xsl:apply-templates select="key('by-id', $first)[self::caution]"/>
                 <xsl:call-template name="process-caution-refs">
                     <xsl:with-param name="refs" select="$rest"/>
                 </xsl:call-template>
             </xsl:when>
             <xsl:otherwise>
-                <xsl:apply-templates select="//caution[@id = $refs]"/>
+                <xsl:apply-templates select="key('by-id', $refs)[self::caution]"/>
             </xsl:otherwise>
         </xsl:choose>
     </xsl:template>
