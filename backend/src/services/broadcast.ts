@@ -16,6 +16,12 @@
 //   * whether a user may read a project is decided once and cached per connection (refreshed after 10 s, and at once
 //     when the store announces a change for that user), instead of one database lookup per client per message;
 //   * backpressure: a client that does not keep up is skipped for progress lines, and closed when it falls far behind.
+//
+// WP-28 (team server, PRD-003): the socket also carries presence. A page sends { type: 'presence', projectId, doc?, mode? } (services/presence.ts);
+// it is accepted only for a project the user can read, at most 4 KB, and at most 20 messages per 10 seconds per connection (more are dropped;
+// past 100 in one window the connection is closed with 1008). Readers of a project get { type: 'presence' } when its set of people changes and
+// { type: 'leases', ... } when a check-out is taken, given back or broken. Limits: AGASTYA_WS_MAX_CLIENTS connections on the server (503 above
+// it) and 8 per session (429): a misbehaving page cannot exhaust the server for the rest of the team.
 // =============================================================================
 
 import type { Server as HttpServer, IncomingMessage } from 'http';
@@ -25,23 +31,63 @@ import { authz, store, sessionsSvc } from '../context';
 import { originAllowed } from './origin';
 import { hostAllowed } from './network';
 import { clientAccepted } from './version';
+import { config } from '../config';
+import * as presence from './presence';
+import { registerGauge } from './metrics';
 
-interface Client { ws: WebSocket; user: any; sessionId: string; can: Map<string, { ok: boolean; at: number }> }
+interface Client { id: number; ws: WebSocket; user: any; sessionId: string; can: Map<string, { ok: boolean; at: number }>; inbox: { start: number; n: number } }
 
 export const WS_CLOSE_SESSION_ENDED = 4401;
 const AUTH_CACHE_MS = 10_000;
 const SKIP_PROGRESS_BYTES = 1 << 20;    // 1 MB queued: progress lines are skipped for this client
 const CLOSE_BACKLOG_BYTES = 8 << 20;    // 8 MB queued: the client is closed (it reconnects and reloads)
 
-const wss = new WebSocketServer({ noServer: true });
+export const MAX_SOCKETS_PER_SESSION = 8;
+const MAX_INBOUND_BYTES = 4096;
+const INBOX_WINDOW_MS = 10_000;
+const INBOX_MAX = 20;
+
+const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_INBOUND_BYTES });
 const clients = new Set<Client>();
+let nextId = 1;
 let sweep: NodeJS.Timeout | null = null;
+let presenceSweep: NodeJS.Timeout | null = null;
 let unlisten: (() => void) | null = null;
+registerGauge('wsClients', () => clients.size);
+registerGauge('presenceEntries', () => presence.size());
+
+/** A connection is gone: forget it, and tell its project when that removed someone from it. */
+function forget(c: Client): void {
+  const had = clients.delete(c);
+  const pid = presence.dropConnection(c.id);
+  if (had && pid) announcePresence(pid);
+}
 
 function endSession(c: Client, reason: string): void {
-  clients.delete(c);
+  forget(c);
   try { c.ws.close(WS_CLOSE_SESSION_ENDED, reason.slice(0, 120)); } catch { /* already closed */ }
 }
+
+/** One message from a page. Only presence is understood; anything else, or too much of it, is dropped. */
+function inbound(c: Client, data: unknown): void {
+  const now = Date.now();
+  if (now - c.inbox.start > INBOX_WINDOW_MS) { c.inbox.start = now; c.inbox.n = 0; }
+  if (++c.inbox.n > INBOX_MAX) {
+    // a page sends one heartbeat in 25 s: five times the limit in one window is not a page, it is a loop or an attack
+    if (c.inbox.n > INBOX_MAX * 5) { forget(c); try { c.ws.close(1008, 'too many messages'); } catch { /* gone */ } }
+    return;
+  }
+  let m: { type?: unknown; projectId?: unknown; doc?: unknown; mode?: unknown } | null;
+  try { m = JSON.parse(String(data)); } catch { return; }
+  if (!m || typeof m !== 'object' || m.type !== 'presence') return;
+  const pid = typeof m.projectId === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(m.projectId) ? m.projectId : null;
+  if (pid && !mayRead(c, pid)) return;
+  const changed = presence.setPresence(c.id, c.user, pid, presence.cleanDoc(m.doc), m.mode === 'editing' ? 'editing' : 'viewing', now);
+  for (const p of changed) announcePresence(p);
+}
+
+/** Tell a project's readers that its set of people changed (they ask GET /api/projects/:id/presence for the list). */
+function announcePresence(projectId: string): void { broadcast(projectId, { type: 'presence' }); }
 
 /** Re-check the connections of `userId` (or of everyone): close those whose session ended, forget cached permissions. */
 export function recheck(userId: string | null): void {
@@ -51,7 +97,10 @@ export function recheck(userId: string | null): void {
     c.can.clear();
     let live = false;
     try { live = store.sessionIsLive(c.sessionId, now); } catch { live = true; /* a busy database is not a revocation */ }
-    if (!live) endSession(c, 'session-ended');
+    if (!live) { endSession(c, 'session-ended'); continue; }
+    // WP-28: someone who lost access to a project leaves its presence list at once
+    const pid = presence.projectOf(c.id);
+    if (pid && !mayRead(c, pid)) { presence.dropConnection(c.id); announcePresence(pid); }
   }
 }
 
@@ -71,20 +120,30 @@ export function attach(server: HttpServer): void {
       socket.destroy();
       return;
     }
+    // WP-28: connection limits (the server as a whole, then this session)
+    if (clients.size >= config.wsMaxClients) { refuse('503 Service Unavailable'); return; }
+    let mine = 0; for (const c of clients) if (c.sessionId === auth.session.id) mine++;
+    if (mine >= MAX_SOCKETS_PER_SESSION) { refuse('429 Too Many Requests'); return; }
     wss.handleUpgrade(req, socket, head, (ws) => {
-      const client: Client = { ws, user: auth.user, sessionId: auth.session.id, can: new Map() };
+      const client: Client = { id: nextId++, ws, user: auth.user, sessionId: auth.session.id, can: new Map(), inbox: { start: Date.now(), n: 0 } };
       clients.add(client);
-      ws.on('close', () => clients.delete(client));
-      ws.on('error', () => clients.delete(client));
+      ws.on('message', (data) => inbound(client, data));
+      ws.on('close', () => forget(client));
+      ws.on('error', () => forget(client));
     });
   });
   if (!unlisten && typeof store.onAccessChanged === 'function') unlisten = store.onAccessChanged((userId: string | null) => recheck(userId));
   if (!sweep) { sweep = setInterval(() => recheck(null), 30_000); sweep.unref(); }
+  if (!presenceSweep) { presenceSweep = setInterval(() => { for (const p of presence.expire()) announcePresence(p); }, 15_000); presenceSweep.unref(); }
 }
 
 export type BroadcastMessage =
   | { type: 'progress'; message: string; done?: boolean; error?: boolean; file?: string; line?: number; hint?: string; preview?: boolean; jobId?: string }
   | { type: 'reload'; kind?: string; jobId?: string }
+  /** WP-28: the people in the project changed; ask GET /api/projects/:id/presence */
+  | { type: 'presence' }
+  /** WP-28: a check-out was taken (released false) or given back / broken / expired (released true) */
+  | { type: 'leases'; path: string; part: string; holder: string | null; released: boolean; broken?: boolean }
   /** WP-14: a job changed state (queued, running, succeeded, failed, cancelled). No `message` field, so a progress pane ignores it. */
   | { type: 'job'; job: Record<string, unknown> };
 
@@ -114,7 +173,7 @@ export function deliver(projectId: string, msg: BroadcastMessage): void {
   const payload = JSON.stringify({ ...msg, projectId });
   for (const c of clients) {
     if (c.ws.readyState !== WebSocket.OPEN) continue;
-    if (c.ws.bufferedAmount > CLOSE_BACKLOG_BYTES) { clients.delete(c); try { c.ws.terminate(); } catch { /* gone */ } continue; }
+    if (c.ws.bufferedAmount > CLOSE_BACKLOG_BYTES) { forget(c); try { c.ws.terminate(); } catch { /* gone */ } continue; }
     if (msg.type === 'progress' && !msg.done && !msg.error && c.ws.bufferedAmount > SKIP_PROGRESS_BYTES) continue;
     if (mayRead(c, projectId)) c.ws.send(payload);
   }
@@ -123,7 +182,9 @@ export function deliver(projectId: string, msg: BroadcastMessage): void {
 export function close(): void {
   for (const c of clients) { try { c.ws.close(); } catch { /* already closed */ } }
   clients.clear();
+  presence.clear();
   if (sweep) { clearInterval(sweep); sweep = null; }
+  if (presenceSweep) { clearInterval(presenceSweep); presenceSweep = null; }
   if (unlisten) { unlisten(); unlisten = null; }
   wss.close();
 }

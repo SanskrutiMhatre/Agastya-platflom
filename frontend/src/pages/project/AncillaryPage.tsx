@@ -5,6 +5,7 @@
 // who needs to change a page's structure. A page edited here is kept when Settings change; "Give back to Settings" undoes that.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import '../../styles/pages/structure.css';   // WP-35: this page's styles load with its chunk
 import { ancillaryApi, type AncillaryPage } from '../../api/jss';
 import { Icon } from '../../components/Icon';
 import { PageHeader } from '../../components/PageHeader';

@@ -12,7 +12,7 @@
 // =============================================================================
 
 import type { Express, Request } from 'express';
-import { requireProject, audit } from '../context';
+import { requireProject, audit, auditedTx } from '../context';
 import { wrap, param, forbidden, bad } from '../services/http';
 import { versionGuard } from '../services/versionGuard';
 import { checkIn, checkOut, leasesOf } from '../services/leases';
@@ -84,8 +84,12 @@ export function registerOneFileDocumentRoutes(app: Express, o: OneFileDocumentRo
     const part = partOf(req.query.part);
     const breakIt = req.query.break === '1';
     if (breakIt && !mayBreak(req)) throw forbidden('Only a project owner, a manager or an administrator can break another author\'s check-out.', 'BREAK_NOT_ALLOWED');
-    const out = await checkIn(pr(req).project.id, o.rel(pr(req).project.id), part, actorOf(req), breakIt);
-    if (out.released) log(req, breakIt ? 'checkout-broken' : 'checked-in', { part, holder: out.holder });
+    const r = pr(req);
+    // WP-29: breaking someone else's check-out is critical - released and recorded together, or neither
+    const out = await checkIn(r.project.id, o.rel(r.project.id), part, actorOf(req), breakIt, breakIt
+      ? (fn) => auditedTx((x: { released: boolean; holder: string | null }) => (x.released ? { actorId: r.auth.user.id, actorUsername: r.auth.user.username, action: `${o.auditPrefix}.checkout-broken`, projectId: r.project.id, targetType: 'project', targetId: r.project.id, meta: { part, holder: x.holder } } : null), fn)
+      : undefined);
+    if (out.released && !breakIt) log(req, 'checked-in', { part, holder: out.holder });
     res.json(out);
   }));
 }

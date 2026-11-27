@@ -10,12 +10,15 @@ import { config, nowIso } from './config';
 import { createApp } from './app';
 import { store, audit, workspaceDir, registryDb, defaultContext } from './context';
 import { startScheduler, stopScheduler } from './services/dataProtection';
+import { startDirectorySync } from './services/directorySync';
 import { acquireWorkspaceLock, releaseWorkspaceLock } from './services/workspaceLock';
 import * as broadcast from './services/broadcast';
 import { reconcileRegistry, sweepPendingImports } from './services/projects';
 import { startRenderer, stopRenderer, rendererStatus } from './services/publisher';
 import { shutdownJobs } from './services/jobs';
 import { loadTls, listen, hostCheckFor, setHostCheck, describeNetwork } from './services/network';
+import { installLogging } from './services/log';
+import { enableHostEventSink } from './services/securityEvents';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { ensureBootstrapAdmin } = require('./core/auth/bootstrap');
@@ -25,6 +28,10 @@ import { assertPasswordHashing } from './core/auth/crypto';
 let servers: http.Server[] = [];
 
 export async function start(port: number = config.port): Promise<number> {
+  // WP-29 (ENT-007, RES-004): every console line becomes a structured log record (JSON on standard output in production, and always JSON
+  // in <log dir>/agastya-server.jsonl, rotated); security events also go to the Windows host when it asked for them.
+  installLogging(config);
+  enableHostEventSink(config.log.eventSink === 'host');
   // WP-13 (ARC-019): Argon2 is required. Without it no stored password can be checked, so the server stops here with the cause instead of
   // starting and refusing every sign-in.
   assertPasswordHashing();
@@ -48,6 +55,7 @@ export async function start(port: number = config.port): Promise<number> {
   try { sweepStaleUploads(); } catch { /* the temp folder is a convenience */ }
   setInterval(() => { try { sweepStaleUploads(); } catch { /* best effort */ } }, 3600_000).unref();     // aborted uploads must not pile up on a server that stays up
   startScheduler(defaultContext());   // WP-12: scheduled backup, weekly restore test, retention (first run 10 minutes after start)
+  startDirectorySync(defaultContext());   // WP-27: directory offboarding sync (Mode B with a directory only; daily by default)
   // WP-26: Mode A listens on loopback only, Mode B on the network with TLS only (services/network.ts; the certificate was checked above).
   const l = await listen(app, port, config, material, (s) => { tuneServer(s); broadcast.attach(s); });
   servers = l.servers;

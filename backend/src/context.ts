@@ -39,14 +39,19 @@ export const revisions = ctx.revisions;
 export const registryDb = ctx.registryDb;
 export const workspace = ctx.workspace;
 
-export const { requireAuth, requireAdmin, requireRoles, requireProject, publicRoute } = ctx.authz as {
+export const { requireAuth, requireAdmin, requireRoles, requireProject, publicRoute, requireGlobal } = ctx.authz as {
   requireAuth: (o?: any) => any; requireAdmin: () => any; requireRoles: (...roles: string[]) => any;
   requireProject: (minRole: string, o?: any) => any; publicRoute: (reason: string) => any;
+  /** WP-27: a global capability (audit.read, access.read) held by administrators and read-only auditors. */
+  requireGlobal: (cap: 'audit.read' | 'access.read') => any;
 };
 
 export { redactAuditMeta };
 export const auditHealth = ctx.auditHealth;
 export const audit = ctx.audit;
+/** WP-29: the critical-action forms of audit() (appContext.ts). */
+export const auditStrict = ctx.auditStrict;
+export const auditedTx = ctx.auditedTx;
 
 /** The client's address: Express's req.ip, which honours the trust-proxy setting (config.trustProxy, SEC-008); the socket peer otherwise. */
 export const clientIp = (req: { ip?: string; socket?: { remoteAddress?: string } }): string =>

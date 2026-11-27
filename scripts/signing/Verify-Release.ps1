@@ -130,6 +130,12 @@ if ($Release) {
 
 if ($Tree) {
   $Tree = (Resolve-Path -LiteralPath $Tree).Path.TrimEnd('\')
+  # WP-25: an installed folder keeps each version in versions\<version>\ and names the running one in "current"
+  $cur = Join-Path $Tree 'current'
+  if ((Test-Path -LiteralPath $cur) -and -not (Test-Path -LiteralPath (Join-Path $Tree 'MANIFEST.sha256'))) {
+    $v = (Get-Content -LiteralPath $cur -Raw).Trim()
+    if ($v -match '^\d+\.\d+\.\d+([-+][0-9A-Za-z.-]+)?$' -and (Test-Path -LiteralPath (Join-Path $Tree "versions\$v"))) { $Tree = Join-Path $Tree "versions\$v" }
+  }
   $mf = Join-Path $Tree 'MANIFEST.sha256'
   if (-not (Test-Path -LiteralPath $mf)) { Row 'FAIL' 'manifest' "MANIFEST.sha256 is missing in $Tree" }
   else {

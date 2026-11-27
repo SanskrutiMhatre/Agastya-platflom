@@ -405,7 +405,7 @@ export class App {
       const move = (ev: PointerEvent) => {
         const d = (pane === 'bottom' ? ev.clientY : ev.clientX) - start;
         const v = pane === 'left' ? size + d : size - d;
-        if (pane === 'bottom') el.style.height = Math.max(80, Math.min(window.innerHeight * 0.6, v)) + 'px';
+        if (pane === 'bottom') el.style.height = Math.max(80, Math.min(window.innerHeight * 0.25, v)) + 'px';   // WP-22: a drawer of at most 25% height
         else el.style.width = Math.max(180, Math.min(600, v)) + 'px';
       };
       const up = () => {

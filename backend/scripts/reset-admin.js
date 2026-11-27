@@ -23,6 +23,7 @@ const { open } = require(path.join(root, 'vendor', 'engine', 'db'));
 const { AuthStore } = require(path.join(root, lib, 'core', 'auth', 'store'));
 const { hashPassword } = require(path.join(root, lib, 'core', 'auth', 'crypto'));
 const policy = require(path.join(root, lib, 'core', 'auth', 'policy'));
+const auditChain = require(path.join(root, lib, 'core', 'auth', 'auditChain'));
 
 /** Read one line from a non-interactive standard input (a pipe or a file). */
 function readStdinLine() {
@@ -80,6 +81,8 @@ async function main() {
   const store = new AuthStore(open(workspace));
   const now = new Date().toISOString();
   store.migrate(now);
+  // WP-29: the row this tool writes joins the audit chain like every other (same key file as the server)
+  store.setAuditKey(auditChain.loadOrCreateKey(auditChain.defaultKeyFile(workspace, process.env)));
   const user = store.findUserByUsername(username);
   if (!user) { console.error(`No such user: ${username}`); process.exit(1); }
 

@@ -18,10 +18,12 @@ import {
   type ActivityRepository, type CirLinkRepository, type ExtensionRepository, type LifecycleRepository,
 } from './s1000dRecords';
 import { SqliteRetentionRepository, type RetentionRepository } from './retentionRepository';
+import { SqliteAuditRepository, type AuditRepository } from './auditRepository';
 import { SqliteLeaseRepository, type LeaseRepository, type LeaseRow } from './leaseRepository';
+import { SqliteAccessRepository, type AccessRepository } from './accessRepository';
 import { SqliteJobRepository, type JobRepository, type JobRow, type JobLogRow, type JobState } from './jobRepository';
 
-export type { ProjectRegistry, SnsRepository, ProjectConfigRepository, ReferenceRepository, ActivityRepository, CirLinkRepository, ExtensionRepository, LifecycleRepository, RetentionRepository, UnitOfWork, LeaseRepository, LeaseRow, JobRepository, JobRow, JobLogRow, JobState };
+export type { ProjectRegistry, SnsRepository, ProjectConfigRepository, ReferenceRepository, ActivityRepository, CirLinkRepository, ExtensionRepository, LifecycleRepository, RetentionRepository, AuditRepository, AccessRepository, UnitOfWork, LeaseRepository, LeaseRow, JobRepository, JobRow, JobLogRow, JobState };
 
 export interface Repositories extends UnitOfWork {
   /** The engine behind these repositories ('sqlite'); a contract test and the migration runner use it to pick a dialect. */
@@ -42,6 +44,10 @@ export interface Repositories extends UnitOfWork {
   leases: LeaseRepository;
   /** WP-12 (PLT-007, ENT-015): housekeeping rows past their retention. */
   retention: RetentionRepository;
+  /** WP-29 (ENT-003, ENT-017): the audit chain's reading side, checkpoints, anchor, export pages; waiver history. */
+  audit: AuditRepository;
+  /** WP-27 (PLT-016, ENT-005): groups, group grants, capability rules, the directory group map. */
+  access: AccessRepository;
   /** WP-14 (PUB-004): job records and their progress lines. */
   jobs: JobRepository;
 }
@@ -64,6 +70,8 @@ export function createSqliteRepositories(db: SqlDatabase): Repositories {
     activity: new SqliteActivityRepository(db),
     leases: new SqliteLeaseRepository(db),
     retention: new SqliteRetentionRepository(db),
+    audit: new SqliteAuditRepository(db),
+    access: new SqliteAccessRepository(db),
     jobs: new SqliteJobRepository(db),
   };
 }

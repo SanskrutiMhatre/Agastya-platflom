@@ -38,7 +38,16 @@ export async function verifyRelease({ release, tree, thumbprint, requireSigned =
     else add('FAIL', `${label} signature`, v.reason);
   };
   const trees = [];
-  if (tree) trees.push(path.resolve(tree));
+  if (tree) {
+    // WP-25: an installed folder keeps each version in versions\<version>\ and names the running one in "current"
+    let t = path.resolve(tree);
+    const cur = path.join(t, 'current');
+    if (!fs.existsSync(path.join(t, MANIFEST_NAME)) && fs.existsSync(cur)) {
+      const v = fs.readFileSync(cur, 'utf8').trim();
+      if (/^\d+\.\d+\.\d+([-+][0-9A-Za-z.-]+)?$/.test(v) && fs.existsSync(path.join(t, 'versions', v))) t = path.join(t, 'versions', v);
+    }
+    trees.push(t);
+  }
 
   if (release) {
     const dir = path.resolve(release);

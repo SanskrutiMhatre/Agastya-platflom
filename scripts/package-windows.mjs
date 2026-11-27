@@ -4,7 +4,7 @@
 //
 //   npm run package:win                 package what is built (fails if the build is out of date)
 //   npm run package:win -- --build      build the backend and the frontend first
-//   options: --no-installer   skip Setup.exe          --no-zip   skip the portable ZIP
+//   options: --no-installer   skip Setup.exe          --no-zip   skip the portable ZIP          --no-update   skip the .agupdate package
 //            --out <dir>      output folder (default: release)
 //            --node <node.exe>   the Node.js runtime to ship (default: the one running this script; must be 64-bit Windows and the Node line
 //                                pinned in packaging/product.json runtime.node, Node 24 LTS since WP-13)
@@ -17,6 +17,7 @@
 //   Agastya-Platform-<version>-win-x64/                 the staged product (what both packages contain)
 //   Agastya-Platform-<version>-win-x64-portable.zip     unzip anywhere and run AgastyaPlatform.exe
 //   Agastya-Platform-<version>-win-x64-Setup.exe        the installer
+//   Agastya-Platform-<version>-win-x64-Update.agupdate  the signed offline update (AgastyaCtl.exe --apply-update; WP-25)
 //   Agastya-Platform-<version>-win-x64-SBOM.cdx.json    the software bill of materials (CycloneDX 1.5; also inside the product as SBOM.cdx.json)
 //   Verify-Release.ps1                                  offline verifier for the customer (Windows PowerShell 5.1, no other tool)
 //   SHA256SUMS.txt (+ SHA256SUMS.txt.sig when signed)   checksums of the above; the signature covers them all
@@ -39,6 +40,7 @@ import { signingConfig, releaseSigningRefusals, signFiles, signDetached, describ
 import { writeManifest, authenticode, signedIntact, isPe, listFiles, formatSums, MANIFEST_NAME } from './release/lib.mjs';
 import { buildSbom, checkSbom, sbomStats } from './release/sbom.mjs';
 import { verifyRelease } from './release/verify-release.mjs';
+import { buildUpdatePackage } from './release/update-package.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
@@ -164,7 +166,9 @@ log('copying the backend (compiled), the schemas, templates and the publishing e
 for (const d of ['dist', 'schemas', 'templates', 'templates-optional', 'brex', 'samples', 'reference', 'assets']) copyFiltered(path.join(be, d), path.join(appBe, d));
 fs.copyFileSync(path.join(be, 'package.json'), path.join(appBe, 'package.json'));
 mk('app', 'backend', 'scripts');
-for (const s of ['doctor.js', 'reset-admin.js', 'recover-structure.js']) fs.copyFileSync(path.join(be, 'scripts', s), path.join(appBe, 'scripts', s));
+// WP-25: agastya-backup.js (the verified pre-update backup Setup and AgastyaCtl --apply-update make), first-admin.js (Setup /ADMINUSER),
+// make-tls-cert.js (named by agastya.ini's [tls] notes, WP-26), agastya-audit.js (AgastyaCtl --verify-audit, WP-29)
+for (const s of ['doctor.js', 'reset-admin.js', 'recover-structure.js', 'agastya-backup.js', 'first-admin.js', 'make-tls-cert.js', 'agastya-audit.js']) fs.copyFileSync(path.join(be, 'scripts', s), path.join(appBe, 'scripts', s));
 // vendor: the engine, the pipelines and the tools. Not used at run time and left out: FOP's javadocs (94 MB of HTML) and its examples, two stray test
 // files that were left in FOP's folder (example.fo, output.pdf), and the HTML documentation of libxslt. They also hold the longest paths in the tree.
 copyFiltered(path.join(be, 'vendor'), path.join(appBe, 'vendor'), (src) => {
@@ -241,6 +245,14 @@ for (const [out, extra] of [
   if (warn.length) fail(`the host compiles with warnings, fix them:\n${warn.join('\n')}`);
 }
 fs.rmSync(work, { recursive: true, force: true });
+
+// ---- 6a. the WebView2 runtime's offline installer (WP-25, PRD-005) ------------------------------------------------------------------------
+// Microsoft's standalone ("offline") Evergreen installer is not in the repository and is never downloaded by this script: put the x64 file in
+// packaging/redist/ before a release. Shipped in redist\, Setup runs it when the runtime is missing and every offline update runs it again, so
+// an air-gapped machine's runtime does not silently age. Without it the product still opens (an Edge app window, or the default browser).
+const wv2 = path.join(root, 'packaging', 'redist', 'MicrosoftEdgeWebView2RuntimeInstallerX64.exe');
+if (fs.existsSync(wv2)) { fs.copyFileSync(wv2, path.join(mk('redist'), path.basename(wv2))); log('including the WebView2 runtime offline installer (redist\\)'); }
+else log('NOTE: packaging/redist/MicrosoftEdgeWebView2RuntimeInstallerX64.exe is absent: this build cannot install the WebView2 runtime on a machine without it (PRD-005)');
 
 // ---- 6b. no path may be so long that an ordinary install folder would hit Windows' 260-character limit --------------------------------------
 {
@@ -324,7 +336,7 @@ const gitOut = (...a) => { const r = spawnSync('git', a, { cwd: root, encoding: 
 const buildCommit = gitOut('rev-parse', 'HEAD') || 'unknown';
 const buildDirty = gitOut('status', '--porcelain', '--untracked-files=no') !== '';
 fs.writeFileSync(path.join(stage, 'version.json'), JSON.stringify({
-  product: product.name, version, platform: 'win-x64', builtAt: new Date().toISOString(),
+  product: product.name, appId: product.appId, version, platform: 'win-x64', builtAt: new Date().toISOString(),
   node: nodeVer, java: jreVer, fop: '2.10', packages: npmPackages.length, commit: buildCommit, dirty: buildDirty,
 }, null, 2) + '\n');
 
@@ -402,6 +414,19 @@ if (!flag('--no-installer')) {
   const setup = path.join(outDir, setupName);
   if (!fs.existsSync(setup)) fail(`The installer compiler finished but ${setupName} is not there.`);
   outputs.push(setup);
+}
+
+// ---- 10b. the offline update package (WP-25): the same product tree, applied by AgastyaCtl.exe --apply-update on an installed copy -----------
+if (!flag('--no-update')) {
+  const updateOut = path.join(outDir, `${stageName}-Update.agupdate`);
+  fs.rmSync(updateOut, { force: true });
+  const minFrom = (product.update && product.update.minFromVersion) || '2.0.0';
+  log(`building the offline update package (applies to ${minFrom} or later)`);
+  try {
+    const u = buildUpdatePackage({ stage, out: updateOut, minFromVersion: minFrom, signing: signed && signing.canSignManifest ? signing : null, product: product.name, appId: product.appId });
+    if (releaseMode && !u.signed) fail('a release update package must be signed (update-info.txt.sig)');
+    outputs.push(updateOut);
+  } catch (e) { fail(`update package: ${e.message}`); }
 }
 
 // ---- 11. the SBOM and the verifier beside the artefacts, checksums, their signature (WP-24) --------------------------------------------------

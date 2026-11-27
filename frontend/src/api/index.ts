@@ -7,7 +7,9 @@ import { get, post, put, patch, del, request } from './client';
 
 export type ProjectRole = 'viewer' | 'reviewer' | 'editor' | 'manager' | 'owner';
 export type GlobalRole = 'admin' | 'project_manager' | 'author';
-export interface User { id: string; username: string; fullName: string; role: GlobalRole; createdBy?: string | null; disabled?: boolean; onboardingPending?: boolean; mustChangePassword?: boolean; createdAt?: string }
+export interface User { id: string; username: string; fullName: string; role: GlobalRole; createdBy?: string | null; disabled?: boolean; onboardingPending?: boolean; mustChangePassword?: boolean; createdAt?: string;
+  /** WP-27: where the account signs in, why it is disabled ('directory' = offboarded by the directory), the read-only auditor flag. */
+  authSource?: 'local' | 'directory'; disabledReason?: string | null; auditor?: boolean }
 export interface Gates { onboarding: boolean; mustChangePassword: boolean }
 export interface AdminQueues { approvals: number; changes: number; folderRequests: number; resets: number; ownerless: number; releases: number }
 
@@ -19,7 +21,7 @@ export interface PackageDetection { token: string; name: string; format: 's1000d
 export interface ProjectCard {
   id: string; name: string; type: string; pipeline: 's1000dtofo' | 's1000dtojss'; templateRef: string; folder: string; status: string;
   format: 's1000d' | 'jss' | 'jsg'; domain: string | null; manualType: string | null; authoring: 'jss-xml' | null; jssDocType: string | null; autoAddToPublication: boolean; sideText: { enabled: boolean; publisher: string; draftNote: boolean }; headerLogo: boolean;
-  role: ProjectRole; accessVia: 'project' | 'folder' | 'admin'; dmCount: number; hasPdf: boolean;
+  role: ProjectRole; accessVia: 'project' | 'folder' | 'admin' | 'group' | 'auditor'; dmCount: number; hasPdf: boolean;
   /** WP-13 (FE-019): what the signed-in person may do here, computed by the server from its route guards (lib/roles.ts may()). */
   can?: Partial<Record<string, boolean>>;
   createdAt: string; updatedAt: string; lastOpened: string | null; owners: string[];
@@ -85,6 +87,9 @@ export interface Summary {
   release: { released: boolean; stale: boolean; number: number | null; pending: boolean; scheduledAt: string | null } | null;
   build: { builtAt: string; size: number } | null;
   members: number;
+  /** WP-22: the review loop (state, round, open comments) and how many findings of the last check the team marked reviewed; null when unknown */
+  review?: { state: ReviewState; round: number; open: number } | null;
+  problems?: { reviewed: number } | null;
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────
@@ -220,6 +225,19 @@ export const notifyApi = {
 };
 export const BACKUP_URL = '/api/backup';
 
+// WP-22 (UX-008, FE-015): the one problems model of a project and the team's "reviewed" marks (backend services/problems.ts)
+export type ProblemState = 'open' | 'reviewed' | 'waived';
+export interface ReviewMark { key: string; by: string; byName: string | null; at: string }
+export interface ProblemRow {
+  key: string; id: string; source: ValidationIssue['source'] | 'applic'; severity: ValidationIssue['sev']; file: string; line: number; rule: string; message: string; detail: string;
+  location: string; state: ProblemState; reviewedBy: string | null; reviewedAt: string | null; waivedBy: string | null;
+}
+export const problemsApi = {
+  list: (id: string) => get<{ ranAt: string | null; problems: ProblemRow[]; summary: Record<ProblemState | 'error' | 'warn' | 'info', number> }>(`${P(id)}/problems`),
+  marks: (id: string) => get<{ marks: ReviewMark[] }>(`${P(id)}/problems/reviewed`).then((r) => r.marks),
+  setReviewed: (id: string, keys: string[], reviewed: boolean) => put<{ marks: ReviewMark[] }>(`${P(id)}/problems/reviewed`, { keys, reviewed }).then((r) => r.marks),
+};
+
 export const graphicsApi = {
   all: () => get<{ projects: Array<{ id: string; name: string; role: ProjectRole; graphics: Graphic[] }> }>('/api/graphics').then((r) => r.projects),
   list: (id: string) => get<{ graphics: Graphic[] }>(`${P(id)}/graphics`).then((r) => r.graphics),
@@ -246,7 +264,7 @@ export const configApi = {
   create: (c: string, b: Record<string, unknown>) => post<{ item: ConfigItem }>(`/api/admin/config/${c}`, b).then((r) => r.item),
   update: (c: string, id: string, b: Record<string, unknown>) => put<{ item: ConfigItem }>(`/api/admin/config/${c}/${id}`, b).then((r) => r.item),
   remove: (c: string, id: string) => del(`/api/admin/config/${c}/${id}`),
-  roles: () => get<{ roles: Array<{ name: string; description: string; system: boolean }>; projectRoles: Array<{ name: string; description: string }> }>('/api/admin/roles'),
+  roles: () => get<{ roles: Array<{ name: string; description: string; system: boolean }>; projectRoles: Array<{ name: string; description: string }>; capabilities?: Array<{ capability: string; minRole: ProjectRole; readable: boolean }> }>('/api/admin/roles'),
 };
 
 export interface ReferenceLists {
@@ -266,7 +284,32 @@ export const platformApi = {
   AUDIT_CSV: '/api/admin/maintenance/audit.csv',
   securityPolicy: () => get<{ policy: SecurityPolicy; defaults: SecurityPolicy }>('/api/admin/security-policy'),
   saveSecurityPolicy: (b: Partial<SecurityPolicy>) => put<{ policy: SecurityPolicy }>('/api/admin/security-policy', b).then((r) => r.policy),
-  health: () => get<{ audit: { failures: number; last: { at: string; action: string; error: string } | null } | null }>('/api/admin/health'),
+  health: () => get<{ audit: { failures: number; last: { at: string; action: string; error: string } | null; lastVerification?: { at: string; ok: boolean; summary: string } | null } | null }>('/api/admin/health'),
+};
+
+/** WP-29: the audit viewer's and the export's filters (backend/src/routes/audit.ts auditFilterOf). */
+export interface AuditQuery { action?: string; actor?: string; project?: string; from?: string; to?: string }
+/** The query string of the filters that are set ("" when none), values encoded, in a fixed order. */
+export function auditQueryString(q: AuditQuery): string {
+  const parts = (['action', 'actor', 'project', 'from', 'to'] as const)
+    .filter((k) => (q[k] ?? '').trim() !== '')
+    // a date alone as "to" means up to the end of that day (a date input gives 2026-11-27, which would otherwise mean its first instant)
+    .map((k) => { const v = (q[k] as string).trim(); return `${k}=${encodeURIComponent(k === 'to' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? `${v}T23:59:59.999Z` : v)}`; });
+  return parts.join('&');
+}
+export interface AuditVerifyReport {
+  ok: boolean; at: string; keyId: string; chained: number; beforeChain: number; summary: string; problemCount: number;
+  head: { seq: number; hash: string };
+  anchor: { seq: number; archive: string | null } | null;
+  checkpoints: { checked: number; newest: { at: string; seq: number } | null };
+  problems: Array<{ kind: string; id?: number; seq?: number; message: string }>;
+}
+export const auditApi = {
+  /** A GET (an auditor, who may not POST, verifies too); `fresh`: every press walks the chain again. */
+  verify: () => get<{ report: AuditVerifyReport }>('/api/admin/audit/verify', { fresh: true }).then((r) => r.report),
+  checkpoint: () => post<{ checkpoint: { id: number; at: string; seq: number; row_hash: string } }>('/api/admin/audit/checkpoint').then((r) => r.checkpoint),
+  /** The streamed export of every row matching the filters (a download link; the export is itself audited). */
+  exportUrl: (format: 'csv' | 'jsonl', q: AuditQuery) => { const s = auditQueryString(q); return `/api/admin/audit/export?format=${format}${s ? `&${s}` : ''}`; },
 };
 /** WP-12: platform backups (backend/src/routes/backups.ts, services/dataProtection.ts). Administrators only. */
 export interface BackupItem { name: string; bytes: number; createdAt: string; kind: 'manual' | 'scheduled' | 'pre-update' | 'cli' }
@@ -308,7 +351,7 @@ export const teamApi = {
 export const adminApi = {
   users: () => get<{ users: User[] }>('/api/admin/users').then((r) => r.users),
   createUser: (b: { username: string; fullName: string; role: GlobalRole }) => post<{ user: User; tempPassword: string }>('/api/admin/users', b),
-  updateUser: (id: string, b: { role?: string; fullName?: string }) => patch<{ user: User }>(`/api/admin/users/${id}`, b),
+  updateUser: (id: string, b: { role?: string; fullName?: string; auditor?: boolean; authSource?: 'local' | 'directory' }) => patch<{ user: User }>(`/api/admin/users/${id}`, b),
   disable: (id: string) => post(`/api/admin/users/${id}/disable`),
   enable: (id: string) => post(`/api/admin/users/${id}/enable`),
   reset: (id: string) => post<{ tempPassword: string }>(`/api/admin/users/${id}/reset`),
@@ -320,6 +363,48 @@ export const adminApi = {
   rejectRelease: (id: string) => post(`/api/admin/releases/${id}/reject`),
   sessions: () => get<{ sessions: Array<{ id: string; username: string; fullName: string; role: string; createdAt: string; lastSeenAt: string | null; ip: string | null; userAgent: string | null }> }>('/api/admin/sessions').then((r) => r.sessions),
   revokeSession: (id: string) => post(`/api/admin/sessions/${id}/revoke`),
-  audit: (limit = 200, action?: string) => get<{ entries: Array<{ id: number; at: string; actor: string | null; action: string; targetType: string | null; projectId: string | null; ip: string | null; meta: unknown }> }>(`/api/admin/audit?limit=${limit}${action ? `&action=${encodeURIComponent(action)}` : ''}`).then((r) => r.entries),
+  /** WP-29: `filter` is an action prefix (as before) or the full set of filters. */
+  audit: (limit = 200, filter?: string | AuditQuery) => {
+    const s = auditQueryString(typeof filter === 'string' ? { action: filter } : (filter ?? {}));
+    return get<{ entries: Array<{ id: number; at: string; actor: string | null; action: string; targetType: string | null; projectId: string | null; ip: string | null; meta: unknown; seq?: number | null }> }>(`/api/admin/audit?limit=${limit}${s ? `&${s}` : ''}`).then((r) => r.entries);
+  },
+};
+
+// ── Access: directory sign-on, groups, a project's group grants and capability rules (WP-27, backend/src/routes/access.ts) ──
+export interface AccessGroup { id: string; name: string; description: string; members?: number }
+export interface GroupMember { user_id: string; username: string; full_name: string; source: 'local' | 'directory'; disabled_at: string | null }
+export interface DirectoryMapping { id: string; group_dn: string; global_role: string | null; group_id: string | null; group_name?: string | null }
+export interface DirectoryStatus {
+  configured: boolean; mode: 'local' | 'server'; directoryUsers: number; mappings: DirectoryMapping[];
+  settings: null | { urls: string[]; baseDn: string; groupBaseDn: string; bindDn: string; loginAttribute: string; userObjectClass: string; nestedGroups: boolean; caFile: string | null; caFileReadable: boolean | null; bindPasswordFileReadable: boolean; syncHours: number; timeoutMs: number };
+  lastSync: null | { at: string; checked: number; offboarded: number; updated: number; failed?: string; by: string | null };
+}
+export interface ProjectAccess {
+  groupGrants: Array<{ groupId: string; name: string; role: ProjectRole; grantedAt: string }>;
+  rules: Array<{ id: string; subjectType: 'user' | 'group'; subjectId: string; subject: string; capability: string; effect: 'allow' | 'deny'; createdAt: string }>;
+  groups: Array<{ id: string; name: string; members: number }>;
+  capabilities: Array<{ capability: string; minRole: ProjectRole }>;
+  yourRole?: ProjectRole;
+}
+const GR = (id: string): string => `/api/admin/groups/${encodeURIComponent(id)}`;
+const PA = (pid: string): string => `/api/projects/${encodeURIComponent(pid)}/access`;
+export const accessApi = {
+  directory: () => get<DirectoryStatus>('/api/admin/directory'),
+  testDirectory: (username?: string) => post<{ ok: boolean; url: string; ms: number; found: null | { dn: string | null; groups?: string[]; ambiguous?: boolean } }>('/api/admin/directory/test', { username }),
+  syncDirectory: () => post<{ checked: number; offboarded: number; updated: number; failed?: string }>('/api/admin/directory/sync'),
+  addMapping: (b: { groupDn: string; globalRole?: string | null; groupId?: string | null }) => post<{ mapping: DirectoryMapping }>('/api/admin/directory/mappings', b),
+  removeMapping: (id: string) => del(`/api/admin/directory/mappings/${encodeURIComponent(id)}`),
+  groups: () => get<{ groups: AccessGroup[] }>('/api/admin/groups').then((r) => r.groups),
+  createGroup: (b: { name: string; description?: string }) => post<{ group: AccessGroup }>('/api/admin/groups', b),
+  updateGroup: (id: string, b: { name?: string; description?: string }) => patch<{ group: AccessGroup }>(GR(id), b),
+  removeGroup: (id: string) => del(GR(id)),
+  members: (id: string) => get<{ members: GroupMember[] }>(`${GR(id)}/members`).then((r) => r.members),
+  addMember: (id: string, username: string) => post<{ members: GroupMember[] }>(`${GR(id)}/members`, { username }),
+  removeMember: (id: string, userId: string) => del(`${GR(id)}/members/${encodeURIComponent(userId)}`),
+  project: (pid: string) => get<ProjectAccess>(PA(pid)),
+  grantGroup: (pid: string, groupId: string, role: ProjectRole) => put<ProjectAccess>(`${PA(pid)}/groups/${encodeURIComponent(groupId)}`, { role }),
+  revokeGroup: (pid: string, groupId: string) => del<ProjectAccess>(`${PA(pid)}/groups/${encodeURIComponent(groupId)}`),
+  addRule: (pid: string, b: { subjectType: 'user' | 'group'; subject: string; capability: string; effect: 'allow' | 'deny' }) => post<ProjectAccess>(`${PA(pid)}/rules`, b),
+  removeRule: (pid: string, ruleId: string) => del<ProjectAccess>(`${PA(pid)}/rules/${encodeURIComponent(ruleId)}`),
 };
 export * from './s1000d';

@@ -32,10 +32,15 @@ gate('G-SEC-5', 'every route is guarded (static route-guard test)', () => {
   return { status: r.status === 0 ? 'PASS' : 'FAIL', detail: `routes-guarded.test.js: ${pass ?? '?'} pass, ${fail ?? '?'} fail` };
 });
 gate('G-SEC-5b', 'every state-changing route writes an audit record (static audit-coverage test)', () => {
-  const f = path.join(ROOT, 'backend', 'test', 'audit-coverage.test.js');
-  if (!fs.existsSync(f)) return { status: 'NOT RUN', detail: 'backend/test/audit-coverage.test.js does not exist yet (WP-09 / G-SEC-5)' };
-  const r = spawnSync(process.execPath, ['--test', 'test/audit-coverage.test.js'], { cwd: path.join(ROOT, 'backend'), encoding: 'utf8' });
-  return { status: r.status === 0 ? 'PASS' : 'FAIL', detail: 'audit-coverage.test.js' };
+  const f = path.join(ROOT, 'backend', 'test', 'wp29-audit-coverage.test.js');
+  if (!fs.existsSync(f)) return { status: 'NOT RUN', detail: 'backend/test/wp29-audit-coverage.test.js does not exist yet (WP-29 / G-SEC-5)' };
+  const r = spawnSync(process.execPath, ['--test', '--test-concurrency=1', 'test/wp29-audit-coverage.test.js'], { cwd: path.join(ROOT, 'backend'), encoding: 'utf8' });
+  return { status: r.status === 0 ? 'PASS' : 'FAIL', detail: 'wp29-audit-coverage.test.js' };
+});
+gate('G-SEC-4', 'audit integrity: seeded tampering (edit, delete middle, forge, cut the end) is detected; G-REL-8 fault-injected audit writes', () => {
+  const r = spawnSync(process.execPath, ['--test', '--test-concurrency=1', 'test/wp29-audit-trail.test.js'], { cwd: path.join(ROOT, 'backend'), encoding: 'utf8' });
+  const pass = /# pass (\d+)/.exec(r.stdout)?.[1]; const fail = /# fail (\d+)/.exec(r.stdout)?.[1];
+  return { status: r.status === 0 ? 'PASS' : 'FAIL', detail: `wp29-audit-trail.test.js: ${pass ?? '?'} pass, ${fail ?? '?'} fail (also covers G-REL-8)` };
 });
 gate('QA-001', 'the release artefacts were built from this commit, from a clean tree', () => {
   const f = path.join(RELEASE, 'BUILD-INFO.json');

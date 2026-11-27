@@ -7,7 +7,11 @@ import fs from 'fs';
 import path from 'path';
 import { config, nowIso } from './config';
 import { dbBusy, diskFull } from './services/http';
-import { store, sessionsSvc, authz, audit, limiter, docIndex, projectDirFor, publicRoute, clientIp, securityPolicy, auditHealth, authProvider, defaultContext } from './context';
+import { store, sessionsSvc, authz, audit, auditedTx, limiter, docIndex, projectDirFor, publicRoute, clientIp, securityPolicy, auditHealth, authProvider, defaultContext } from './context';
+import { signInThrottled } from './services/securityEvents';
+import { accessLog } from './services/log';
+import { HttpError } from './services/http';
+import { registerAuditRoutes } from './routes/audit';
 import { readiness } from './services/readiness';
 import { requestContextMiddleware } from './services/requestContext';
 import { securityHeaders } from './services/securityHeaders';
@@ -36,13 +40,17 @@ import { registerJssRwiRoutes } from './routes/jss-rwi';
 import { registerIdentityRoutes } from './routes/identity';
 import { registerXengineRoutes } from './routes/xengine';
 import { registerWaiverRoutes } from './routes/waivers';
+import { registerProblemRoutes } from './routes/problems';
 import { registerBrandRoutes } from './routes/brand';
 import { registerBackupRoutes } from './routes/backups';
 import { registerJobRoutes } from './routes/jobs';
 import { notifyAccess } from './services/access-notify';
 import { API_VERSION, MIN_CLIENT_VERSION, CLIENT_VERSION_HEADER, buildInfo, clientAccepted, schemaLevel } from './services/version';
 import { hostAllowed, MISDIRECTED } from './services/network';
-import { capabilityTableFrom, setCapabilityTable } from './services/permissions';
+import { capabilityTableFrom, readableCapabilitiesFrom, setCapabilityTable } from './services/permissions';
+import { registerAccessRoutes } from './routes/access';
+import { requestMetrics } from './services/metrics';
+import { registerTeamServerRoutes } from './routes/teamServer';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { registerAuthRoutes } = require('./core/auth/routes');
@@ -57,7 +65,9 @@ export function createApp(): express.Express {
   // (the Secure cookie flag) is right behind a local TLS-terminating proxy and no client can choose its own address.
   app.set('trust proxy', config.trustProxy);
   app.disable('x-powered-by');
+  app.use(requestMetrics);                        // WP-28: request time, in-flight and 5xx counts for /api/admin/metrics
   app.use(requestContextMiddleware(clientIp));   // every audit row gets the client address; a 500 answers with this request's id (WP-03)
+  if (config.log.access) app.use(accessLog());   // WP-29: one structured line per request (method, route template, status, ms, user id)
   app.use(securityHeaders);                      // CSP, nosniff, framing, referrer (ENT-012, FE-017); HSTS on TLS in Mode B (WP-26)
   // WP-26: the Host must name this server (DNS rebinding); the same rule guards the WebSocket upgrade (services/broadcast.ts).
   app.use((req, res, next) => {
@@ -99,6 +109,8 @@ export function createApp(): express.Express {
       product: 'Agastya Platform', version: b.version, apiVersion: API_VERSION, minClientVersion: MIN_CLIENT_VERSION,
       schema: { level: schema.level, latest: schema.latest, applied: schema.applied, compatible: schema.unknown.length === 0 },
       build: { commit: b.commit, builtAt: b.builtAt, packaged: b.packaged },
+      // WP-25 (PRD-005): the WebView2 runtime the Windows host found, and whether the interface opened in an app window or the browser
+      shell: { webview2: config.shell.webview2, window: config.shell.window },
     });
   });
 
@@ -109,6 +121,7 @@ export function createApp(): express.Express {
     onProjectDecided: () => undefined,
     onAccess: notifyAccess,
     securityPolicy, auditHealth, authProvider,
+    auditedTx, onSignInThrottled: signInThrottled,       // WP-29: critical actions in one transaction with their audit row; event 4111
   });
   registerJssGuard(app);                 // before every S1000D-side writer: a JSS document project's publication.xml is never replaced by them
   registerWorkspaceRoutes(app);
@@ -131,10 +144,14 @@ export function createApp(): express.Express {
   registerIdentityRoutes(app);
   registerXengineRoutes(app);
   registerWaiverRoutes(app);
+  registerProblemRoutes(app);            // WP-22: the one problems model and the team's reviewed marks
   registerBrandRoutes(app);
   registerBackupRoutes(app);             // WP-12: platform backup, verify, copy, restore into a new folder (administrators)
+  registerAuditRoutes(app);              // WP-29: audit chain verification, checkpoints, streamed export, event catalogue (administrators)
+  registerAccessRoutes(app);             // WP-27: directory sign-on administration, groups, project group grants and capability rules
+  registerTeamServerRoutes(app);         // WP-28: who is working where (presence), server load figures (administrators)
   // The client's `can` map is read from the guards just registered (WP-13, FE-019): one rule, stated once, on the server.
-  setCapabilityTable(capabilityTableFrom(app));
+  setCapabilityTable(capabilityTableFrom(app), readableCapabilitiesFrom(app));
 
   // Unknown API paths are JSON 404s, never the SPA shell.
   app.use('/api', (_req, res) => { res.status(404).json({ error: 'Not found' }); });
@@ -153,6 +170,8 @@ export function createApp(): express.Express {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    // a handler outside wrap() that throws an HttpError (WP-29: AUDIT_UNAVAILABLE from a critical action) answers with its own status
+    if (err instanceof HttpError && !res.headersSent) return void res.status(err.status).json({ error: err.message, code: err.code, ...(err.extra ?? {}) });
     const full = diskFull(err);
     if (full) { console.error('[api] disk full:', err.message); return void res.status(full.status).json({ error: full.message, code: full.code }); }
     const busy = dbBusy(err);

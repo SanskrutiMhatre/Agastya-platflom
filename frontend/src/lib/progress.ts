@@ -10,13 +10,25 @@ import { CLIENT_VERSION } from './handshake';
 /** The server closes a socket whose session ended (sign-out, a newer sign-in, idle or time limit, account disabled) with this code. */
 const SESSION_ENDED = 4401;
 
-export interface ProgressMsg { type: 'progress' | 'reload'; projectId: string; message?: string; done?: boolean; error?: boolean; file?: string; line?: number; hint?: string; preview?: boolean; kind?: string }
+export interface ProgressMsg {
+  type: 'progress' | 'reload' | 'presence' | 'leases'; projectId: string; message?: string; done?: boolean; error?: boolean; file?: string; line?: number; hint?: string; preview?: boolean; kind?: string;
+  /** WP-28 'leases': the document (path in the project), the part, who held / holds it, and whether it was given back (or broken) */
+  path?: string; part?: string; holder?: string | null; released?: boolean; broken?: boolean;
+}
 
 type Listener = (m: ProgressMsg) => void;
 const listeners = new Set<Listener>();
 let socket: WebSocket | null = null;
 let retry = 0;
 let wanted = 0;
+// WP-28: the last presence this page announced, sent again after a reconnect (the server forgets a connection that closed)
+let lastPresence: string | null = null;
+
+/** Send a message over the shared socket (WP-28: presence). Kept and sent again when the socket (re)opens. */
+export function sendPresence(msg: Record<string, unknown>): void {
+  lastPresence = JSON.stringify({ type: 'presence', ...msg });
+  if (socket && socket.readyState === WebSocket.OPEN) { try { socket.send(lastPresence); } catch { /* closing */ } }
+}
 
 function connect() {
   if (socket || wanted === 0) return;
@@ -24,7 +36,7 @@ function connect() {
   // WP-26: the page's version rides on the upgrade (a browser cannot set headers there); a server that no longer accepts it refuses with 426.
   const ws = new WebSocket(`${proto}://${location.host}/ws?client=${encodeURIComponent(CLIENT_VERSION)}`);
   socket = ws;
-  ws.onopen = () => { retry = 0; };
+  ws.onopen = () => { retry = 0; if (lastPresence) { try { ws.send(lastPresence); } catch { /* closing */ } } };
   ws.onmessage = (ev) => { try { const m = JSON.parse(ev.data) as ProgressMsg; listeners.forEach((l) => l(m)); } catch { /* ignore malformed */ } };
   ws.onclose = (ev) => {
     socket = null;
@@ -49,7 +61,7 @@ export function useProgress(projectId: string): ProgressState {
   const [failed, setFailed] = useState<ProgressMsg | null>(null);
   const [reloadTick, setTick] = useState(0);
   useEffect(() => subscribe((m) => {
-    if (m.projectId !== projectId || m.preview) return;
+    if (m.projectId !== projectId || m.preview || m.type === 'presence' || m.type === 'leases') return;
     if (m.type === 'reload') { setTick((t) => t + 1); return; }
     if (m.message) setLines((l) => [...l.slice(-199), m.message!]);
     if (m.error) setFailed(m);

@@ -175,6 +175,7 @@ test('G-REL-3 migration matrix: a database stopped after any earlier step upgrad
       if (m.fkOff) db.exec('PRAGMA foreign_keys = OFF');
       if (m.sql) db.exec(m.sql);
       for (const [table, col, def] of m.columns || []) if (!db.prepare('SELECT 1 FROM pragma_table_info(?) WHERE name = ?').get(table, col)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def};`);
+      if (m.postSql) db.exec(m.postSql);   // as AuthStore.migrate: after the columns (WP-29's 025 indexes a column it adds)
       db.prepare('INSERT INTO schema_migrations (name, applied_at) VALUES (?, ?)').run(m.name, '2026-01-01T00:00:00Z');
       if (m.fkOff) db.exec('PRAGMA foreign_keys = ON');
     }

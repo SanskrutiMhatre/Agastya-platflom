@@ -750,6 +750,8 @@ export class ProblemsPanel {
       h('button', { class: 'icon-btn', title: 'Hide problems pane', on: { click: () => this.app.togglePane('bottom') } }, icon('close', 14)),
     );
     this.el = h('section', { class: 'panel problems-panel', 'aria-label': 'Problems' }, bar, this.list);
+    // WP-22 (06 section 7.2): the drawer closes with Escape while the keyboard is in it
+    this.el.addEventListener('keydown', (e) => { if (e.key === 'Escape' && this.app.layout.bottom) { e.preventDefault(); e.stopPropagation(); this.app.togglePane('bottom'); } });
   }
 
   setEditor(ed: DocumentEditor | null) {

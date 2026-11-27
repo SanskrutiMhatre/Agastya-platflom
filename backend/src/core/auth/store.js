@@ -13,6 +13,7 @@
 
 // WP-10 (PRD-002): the migrations live in storage/migrations/, one engine-neutral file per step; this store runs the SQLite bodies.
 const MIGRATIONS = require('../../storage/migrations').forDialect('sqlite');
+const auditChain = require('./auditChain');
 const STMT_CACHE_MAX = 500;
 
 /*
@@ -28,6 +29,8 @@ class AuthStore {
   constructor(db) {
     this.db = db;
     this._stmts = new Map();
+    this._txDepth = 0;
+    this.auditKey = null;
   }
 
   stmt(sql) {
@@ -57,6 +60,7 @@ class AuthStore {
             if (!has) this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def};`);
           }
         }
+        if (m.postSql) this.db.exec(m.postSql);   // WP-29: after the columns, so a step can index a column it adds
         this.db.prepare('INSERT INTO schema_migrations (name, applied_at) VALUES (?, ?)').run(m.name, nowIso);
         this.db.exec('COMMIT');
       } catch (e) {
@@ -73,7 +77,18 @@ class AuthStore {
   }
 
   tx(fn) {
+    // WP-29: re-entrant. A critical action (context.auditedTx) runs the change and its audit row in one transaction, and the change may
+    // itself use tx(): the inner one is a savepoint, so a failure inside still undoes only what it wrote and the outer decides the rest.
+    if (this._txDepth > 0 || this.db.isTransaction === true) {
+      const sp = `sp_${this._txDepth}`;
+      this._txDepth++;
+      this.db.exec(`SAVEPOINT ${sp}`);
+      try { const out = fn(); this.db.exec(`RELEASE ${sp}`); return out; }
+      catch (e) { this.db.exec(`ROLLBACK TO ${sp}`); this.db.exec(`RELEASE ${sp}`); throw e; }
+      finally { this._txDepth--; }
+    }
     this.db.exec('BEGIN IMMEDIATE');
+    this._txDepth = 1;
     try {
       const out = fn();
       this.db.exec('COMMIT');
@@ -81,6 +96,8 @@ class AuthStore {
     } catch (e) {
       this.db.exec('ROLLBACK');
       throw e;
+    } finally {
+      this._txDepth = 0;
     }
   }
 
@@ -133,14 +150,27 @@ class AuthStore {
   anyAdminExists() { return this.countAdmins() > 0; }
 
   updateUser(id, fields, now) {
-    const allowed = ['full_name', 'role', 'password_hash', 'must_change_password', 'onboarding_pending', 'username_locked', 'disabled_at', 'active_project_id', 'username'];
+    const allowed = ['full_name', 'role', 'password_hash', 'must_change_password', 'onboarding_pending', 'username_locked', 'disabled_at', 'active_project_id', 'username',
+      // WP-27 (migration 024): directory link, why an account is disabled, the read-only auditor flag
+      'auth_source', 'external_id', 'directory_dn', 'directory_checked_at', 'disabled_reason', 'auditor'];
     const keys = Object.keys(fields).filter((k) => allowed.includes(k));
     if (!keys.length) return this.getUser(id);
     const sets = keys.map((k) => `${k} = ?`).join(', ');
     this.stmt(`UPDATE users SET ${sets}, updated_at = ? WHERE id = ?`)
       .run(...keys.map((k) => fields[k]), now, id);
-    if (keys.includes('disabled_at') || keys.includes('role')) this.emitAccessChanged(id);
+    if (keys.includes('disabled_at') || keys.includes('role') || keys.includes('auditor')) this.emitAccessChanged(id);
     return this.getUser(id);
+  }
+
+  /** WP-27: the accounts that sign in against the directory (the sync job checks each of them). */
+  listDirectoryUsers() {
+    return this.stmt("SELECT * FROM users WHERE auth_source = 'directory' ORDER BY username").all();
+  }
+
+  /** WP-27: the account a directory entry was provisioned as (by its stable id), or null. */
+  findUserByExternalId(externalId) {
+    if (!externalId) return null;
+    return this.stmt("SELECT * FROM users WHERE auth_source = 'directory' AND external_id = ?").get(String(externalId)) || null;
   }
 
   /*
@@ -293,21 +323,67 @@ class AuthStore {
 
   // ---- audit --------------------------------------------------------------
 
+  /**
+   * WP-29 (ENT-003): the key of the audit chain (core/auth/auditChain.js), set by the application context and the offline tools.
+   * Without it rows are written as before (seq NULL) - only a store built by hand in a test does that.
+   */
+  setAuditKey(k) { this.auditKey = k || null; }
+
   appendAudit({ at, actorId, actorUsername, ip, action, targetType, targetId, projectId, meta }) {
-    this.stmt(`INSERT INTO audit_log (at, actor_id, actor_username, ip, action, target_type, target_id, project_id, meta)
-               VALUES (?,?,?,?,?,?,?,?,?)`)
-      .run(at, actorId || null, actorUsername || null, ip || null, action,
-        targetType || null, targetId || null, projectId || null,
-        meta ? JSON.stringify(meta) : null);
+    const row = {
+      at, actor_id: actorId || null, actor_username: actorUsername || null, ip: ip || null, action,
+      target_type: targetType || null, target_id: targetId || null, project_id: projectId || null,
+      meta: meta ? JSON.stringify(meta) : null,
+    };
+    if (!this.auditKey) {
+      this.stmt(`INSERT INTO audit_log (at, actor_id, actor_username, ip, action, target_type, target_id, project_id, meta)
+                 VALUES (?,?,?,?,?,?,?,?,?)`)
+        .run(row.at, row.actor_id, row.actor_username, row.ip, row.action, row.target_type, row.target_id, row.project_id, row.meta);
+      return null;
+    }
+    // Reading the head and writing the next row is one write transaction (another process - a console tool - cannot fork the chain;
+    // the unique index on seq would refuse it anyway). Inside a caller's transaction (a critical action) a savepoint does the same.
+    const nested = this.db.isTransaction === undefined ? true : !!this.db.isTransaction;
+    this.db.exec(nested ? 'SAVEPOINT audit_append' : 'BEGIN IMMEDIATE');
+    try {
+      const head = this.auditChainHead();
+      row.seq = head.seq + 1; row.prev_hash = head.hash; row.chain_key = this.auditKey.id;
+      row.row_hash = auditChain.rowHash(this.auditKey.key, row);
+      this.stmt(`INSERT INTO audit_log (at, actor_id, actor_username, ip, action, target_type, target_id, project_id, meta, seq, prev_hash, row_hash, chain_key)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+        .run(row.at, row.actor_id, row.actor_username, row.ip, row.action, row.target_type, row.target_id, row.project_id, row.meta,
+          row.seq, row.prev_hash, row.row_hash, row.chain_key);
+      this.db.exec(nested ? 'RELEASE audit_append' : 'COMMIT');
+    } catch (e) {
+      if (nested) { this.db.exec('ROLLBACK TO audit_append'); this.db.exec('RELEASE audit_append'); } else this.db.exec('ROLLBACK');
+      throw e;
+    }
+    return { seq: row.seq, hash: row.row_hash };
   }
 
-  listAudit({ limit = 200, before = null, action = null } = {}) {
-    if (before && action) {
-      return this.stmt('SELECT * FROM audit_log WHERE id < ? AND action LIKE ? ORDER BY id DESC LIMIT ?').all(before, action + '%', limit);
-    }
-    if (before) return this.stmt('SELECT * FROM audit_log WHERE id < ? ORDER BY id DESC LIMIT ?').all(before, limit);
-    if (action) return this.stmt('SELECT * FROM audit_log WHERE action LIKE ? ORDER BY id DESC LIMIT ?').all(action + '%', limit);
-    return this.stmt('SELECT * FROM audit_log ORDER BY id DESC LIMIT ?').all(limit);
+  /** The last chained row ({seq, hash}); the retention anchor when every chained row was archived; {0, GENESIS} for a new chain. */
+  auditChainHead() {
+    const last = this.stmt('SELECT seq, row_hash FROM audit_log WHERE seq IS NOT NULL ORDER BY seq DESC LIMIT 1').get();
+    if (last) return { seq: Number(last.seq), hash: String(last.row_hash) };
+    const anchor = this.stmt('SELECT seq, row_hash FROM audit_chain_anchor WHERE id = 1').get();
+    if (anchor) return { seq: Number(anchor.seq), hash: String(anchor.row_hash) };
+    return { seq: 0, hash: auditChain.GENESIS };
+  }
+
+  /**
+   * The audit viewer and the export (WP-29): newest first, optional filters. `action` is a prefix; `actor` the username (exact,
+   * case-insensitive); `project` the project id; `from`/`to` ISO times (from inclusive, to exclusive); `before` an id for paging.
+   */
+  listAudit({ limit = 200, before = null, action = null, actor = null, project = null, from = null, to = null } = {}) {
+    const where = []; const args = [];
+    if (before) { where.push('id < ?'); args.push(Number(before)); }
+    if (action) { where.push("action LIKE ? ESCAPE '\\'"); args.push(String(action).replace(/[%_\\]/g, '\\$&') + '%'); }
+    if (actor) { where.push('actor_username = ? COLLATE NOCASE'); args.push(String(actor)); }
+    if (project) { where.push('project_id = ?'); args.push(String(project)); }
+    if (from) { where.push('at >= ?'); args.push(String(from)); }
+    if (to) { where.push('at <= ?'); args.push(String(to)); }
+    const sql = `SELECT * FROM audit_log${where.length ? ` WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT ?`;
+    return this.stmt(sql).all(...args, Number(limit));
   }
 
   // ---- password reset queue ----------------------------------------------

@@ -177,6 +177,8 @@ export const KEY_HANDLER_FILES = [
   'jss/editor.ts', 'jss/dom.ts', 'jsg/editor.ts', 'jsg/ispl-editor.ts', 'jsg/shared.ts', 'studio/ui/app.ts', 'pages/project/EditorPage.tsx',
   // WP-21: the editor host (the keys the three editor pages share)
   'editors/host/useHostKeys.ts', 'editors/host/CommandPalette.tsx', 'editors/host/FindBar.tsx',
+  // WP-22: the platform's quick switcher
+  'components/QuickSwitcher.tsx',
 ];
 
 // A compared value is taken as a key only when it looks like one (a variable such as `k` is also used for other things in these files).

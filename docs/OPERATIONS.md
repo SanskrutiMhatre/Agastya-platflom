@@ -6,7 +6,7 @@ For the person who installs, runs and looks after the server. Nothing here needs
 
 | What | Where (installed for all users) | Where (portable ZIP) |
 | --- | --- | --- |
-| The program | `C:\Program Files\Agastya Platform\` (never written to at run time) | the unzipped folder |
+| The program | `C:\Program Files\Agastya Platform\` (never written to at run time): the launcher, and `versions\<version>\` per version (section 8) | the unzipped folder |
 | Configuration `agastya.ini` | `C:\ProgramData\Agastya Platform\agastya.ini` | `config\agastya.ini` |
 | **Your data** (projects, templates, `publisher.db`) | `C:\ProgramData\Agastya Platform\workspace\` (or the folder chosen at install) | `data\workspace\` |
 | Logs | `C:\ProgramData\Agastya Platform\logs\` | `data\logs\` |
@@ -16,9 +16,11 @@ Upgrading and uninstalling never touch the data folder. **Back it up** (section 
 
 ## 2. Starting it
 
-* **Tray application** (default): Start menu → *Agastya Platform*. A tray icon appears, the server starts, and the browser opens at
-  `http://localhost:4040/`. Right-click the icon for *Open*, *Open data folder*, *Open log folder*, *Restart server*, *Exit*. It runs while the
-  user is signed in. The installer can start it at sign-in (*Start Agastya Platform when I sign in*).
+* **Tray application** (default): Start menu → *Agastya Platform*. A tray icon appears, the server starts, and the application opens at
+  `http://localhost:4040/` in its own window (an app window of Microsoft Edge, which shares the WebView2 engine) or - when Edge is not on the
+  computer, or `[app] Window=browser` - in the default browser, with a notice saying why. Right-click the icon for *Open*, *Open data folder*,
+  *Open log folder*, *Restart server*, *Exit*. It runs while the user is signed in. The installer can start it at sign-in (*Start Agastya
+  Platform when I sign in*).
 * **Windows service** (servers): starts with Windows whether or not anyone is signed in. Chosen in the installer (*Run as a Windows service*), or
   later from an elevated prompt:
 
@@ -110,11 +112,15 @@ By default the server answers on this computer only (`Bind=loopback`). To serve 
 
 1. Set `Bind=lan` (or choose *Allow other computers on the network* in the installer, or `AgastyaCtl.exe --install-service --lan`).
 2. Allow the port through the Windows Firewall. The installer option does it for you (an inbound rule named *Agastya Platform (LAN access)* for
-   `runtime\node.exe`, TCP, **private and domain networks only**). By hand:
-   `netsh advfirewall firewall add rule name="Agastya Platform" dir=in action=allow protocol=TCP localport=4040 program="C:\Program Files\Agastya Platform\runtime\node.exe" profile=private,domain`
+   the port, TCP, **private and domain networks only**; bound to the port because the program folder changes with every update). By hand:
+   `AgastyaCtl.exe --configure-server --firewall` (elevated), or
+   `netsh advfirewall firewall add rule name="Agastya Platform (LAN access)" dir=in action=allow protocol=TCP localport=4040 profile=private,domain`
 3. Give the server a certificate (below, "Mode B: TLS"). Without one the server does **not** start on a network address; the server log and
    `AgastyaCtl.exe --doctor` name the missing setting.
 4. People open `https://<server name>:4040/`.
+
+The whole team-server set-up - certificate, configuration, service, backup with a standby copy, clients, load and capacity - is the runbook in
+section 14.
 
 Every action needs a signed-in account; there is no anonymous access.
 
@@ -148,10 +154,14 @@ on `127.0.0.1` / `::1` and never listens on a network interface.
 | File | Content |
 | --- | --- |
 | `logs\agastya-host.log` | start, stop, restart and failure of the server by the host program; the program-file check at each start (`integrity:`) |
-| `logs\agastya-server.log` | everything the server prints, including errors (`[stderr]` lines) |
-| Windows Event Log → Application → *Agastya Platform* | service start/stop, restarts, "server keeps stopping" |
+| `logs\agastya-server.log` | everything the server prints, including errors (`[stderr]` lines); in the installed product one JSON object per line (`{"t":..., "level":..., "msg":..., "req":...}`) |
+| `<data folder>\logs\agastya-server.jsonl` (+ `.1` ... `.5`) | the same records, always JSON, written by the server itself and rotated at 10 MB (`AGASTYA_LOG_DIR`, `AGASTYA_LOG_MAX_MB`, `AGASTYA_LOG_KEEP`); with JSON on, one access line per request: method, route template, status, milliseconds, user id - never a body, query string or cookie (`AGASTYA_ACCESS_LOG=0` turns the access lines off) |
+| `<data folder>\logs\audit-failures.log` | every action whose audit row could not be written (section 13) |
+| Windows Event Log → Application → *Agastya Platform* | service start/stop, restarts, "server keeps stopping", and the **security events** of section 13 with fixed ids |
 
-The *Audit log* inside the application (Administrator) records who did what; it is part of the database, not these files.
+Passwords, password hashes, session cookies and Bearer/Basic credentials are replaced by `[redacted]` before any line is written.
+`AGASTYA_LOG_FORMAT=text` gives readable lines on standard output (the default when the server is run from source).
+The *Audit log* inside the application (Administrator) records who did what; it is part of the database, not these files (section 13).
 
 ## 7. Backups
 
@@ -231,17 +241,58 @@ the new data folder, start. Keep the installer of the version you run with your 
 * The *Backup* page and *Project files export* (Administrator) make an **export** of project files for reading or handing on - not a backup:
   no passwords, settings, history or release records, and it cannot be restored.
 
-## 8. Upgrading
+## 8. Upgrading, offline updates and rollback
 
-Run the new `Setup.exe` over the old one (same install folder is offered). It closes the running copy, backs up the database (section 7), replaces the
-program, keeps `agastya.ini` and the data, and starts the service again if one was installed. At its first start the new version takes a verified copy
-of the database before it changes anything (section 7). Migrations only ever add tables, columns and indexes; there are no "down" migrations - **the way
-back is a copy taken before the upgrade**.
+The program folder keeps **one folder per version** (WP-25): `versions\<version>\` holds that version's runtime and application, the launcher
+`AgastyaPlatform.exe` / `AgastyaCtl.exe` beside it is a copy of the current version's, and the files `current` and `previous` name the folders.
+An upgrade adds a folder and keeps the one it replaces (and up to `[update] KeepVersions` earlier ones, default 2), so going back needs no old
+Setup. `AgastyaCtl.exe --versions` lists them; an installation made before this layout is moved into it by its first upgrade.
 
-**To go back:** uninstall, install the older version, and restore the platform backup made before the upgrade (section 7), or put the `publisher.db`
-from `backups\publisher-before-...db` (or `backups\pre-upgrade-...`) back into the data folder. An older version **refuses to start** on a database a
-newer version has migrated ("This database was written by a newer version of Agastya Platform ...") instead of damaging it; it also refuses to restore
-a backup made by a newer version. Either install the newer version again or restore a copy taken with the older one.
+**With Setup.** Run the new `Setup.exe` over the old one. Before it copies anything it stops the service and the tray application (it waits until
+the server has really released the data folder - no fixed pause), makes a **platform backup** (section 7, kind `pre-update`) with the installed
+version's own tool and **verifies it by restoring it into a scratch folder**. If the server cannot be stopped or the backup fails, Setup stops
+there and nothing is changed (silent exit code 7; the reason is in `logs\setup-upgrade-*.log`). An installed 2.0.0, which predates the backup tool,
+gets a copy of the stopped database instead - make a platform backup after that upgrade. `agastya.ini` and the data are kept.
+
+**With an offline update package** (`Agastya-Platform-<version>-win-x64-Update.agupdate`, carried on removable media):
+
+```
+AgastyaCtl.exe --verify-update  E:\Agastya-Platform-2.1.0-win-x64-Update.agupdate     (checks only; changes nothing)
+AgastyaCtl.exe --apply-update   E:\Agastya-Platform-2.1.0-win-x64-Update.agupdate     (elevated for a per-machine installation)
+```
+
+`--apply-update` (1) checks the package before writing a byte: its signature, that the signer is the certificate that signed the installed
+program (or one listed in `[update] TrustedThumbprints`, for a certificate renewal), that it is for this product, **newer** than the installed
+version (an update never goes back) and allowed to update it (`min-from-version`), and the SHA-256 of every file against the signed manifest;
+(2) writes the new `versions\<version>\` and checks it again on disk, and the Authenticode signature of its `AgastyaCtl.exe`; (3) stops the server,
+makes and verifies the pre-update platform backup (refused = nothing changed), and copies the stopped database for a fast rollback
+(`backups\update-<from>-to-<to>-<time>\`); (4) switches `current`; (5) starts the new version and waits up to `[update] HealthSeconds` (default 60)
+for `/api/version` to report it with a compatible schema and `/api/ready` to answer 200. If it does not, it **rolls back by itself**: the previous
+version becomes current again, the database copy is put back (the database the failed version left is kept in `backups\failed-update-...`, never
+deleted), the failed version's folder is removed and the previous version is started and checked. Then whatever ran before (the service, the tray
+application) is started again. Every run writes `logs\update-<time>.log`; `update-history.txt` in the program folder lists them.
+
+| Exit code | Meaning |
+| --- | --- |
+| 0 | updated and healthy (`--verify-update`: the package would be applied) |
+| 1 | failed before anything changed (program folder not writable, portable copy) |
+| 2 | wrong arguments, or no such file |
+| 10 | package refused: signature, signer, integrity or format |
+| 11 | version refused: already installed, older, another product, or outside its `min-from-version` |
+| 12 | not enough disk space (program drive: the package; data drive: the pre-update backup) |
+| 13 | the running server could not be stopped |
+| 14 | the pre-update backup failed or did not verify; nothing changed |
+| 20 | the new version failed its health check; the previous one runs again with the database as it was |
+| 21 | the rollback itself failed: the log names the backup and the database copy; run `--doctor` |
+| 22 | (`--rollback`) the previous version cannot use this database: see below |
+
+An unsigned package (a development build) is refused unless `--allow-unsigned` is given; use that on test machines only.
+
+**To go back by hand:** `AgastyaCtl.exe --rollback` makes the previous version current again (and `--rollback` once more returns). Migrations only
+ever add tables, columns and indexes, and an older version **refuses to start** on a database a newer version has migrated, instead of damaging it;
+`--rollback` then returns to the newer version and says so (exit 22). `AgastyaCtl.exe --rollback --restore-db` goes back to the database copy taken
+before the update to the current version; the newer database is kept in `backups\rolled-back-from-<version>-...`, never deleted, so nothing
+written since the update is lost - it is only set aside. The platform backups (section 7) remain the complete way back for the project files too.
 
 The database is checked (`quick_check`) at every start. A damaged file stops the start with "The database failed its integrity check"; stop there,
 restore the newest backup into a new folder (section 7) and point the server at it.
@@ -273,13 +324,86 @@ Agastya-Platform-<version>-win-x64-Setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORE
 | `/TASKS=` | comma list from `service`, `lan`, `autostart`, `desktopicon` |
 | `/CURRENTUSER` | install for the signed-in user only, no administrator rights (no service, no firewall rule) |
 | `/ALLUSERS` | per-machine install (the default; needs an elevated prompt) |
+| `/ADMINUSER=` `/ADMINPASSWORDFILE=` | create the first administrator without anyone at the first screen. The file's first line is a **temporary** password (it must meet the password policy); it is read by `AgastyaCtl.exe` and handed to the server's tool on standard input, never on a command line; the administrator chooses their own password at the first sign-in. Delete the file afterwards. Ignored once an administrator exists. |
 
-The exit code is the standard Inno Setup one (0 = success; anything else is a failure or a cancellation); `/LOG=` has the details. Uninstall silently with `"<install folder>\unins000.exe" /VERYSILENT`. Data is kept.
+The exit code is the standard Inno Setup one (0 = success; 7 = the upgrade could not be prepared - the server did not stop or the pre-update backup
+failed, nothing changed; anything else is a failure or a cancellation); `/LOG=` has the details. A fresh installation asks one question (the licence,
+when the release carries one); an upgrade asks none of the data-folder and port questions. Uninstall silently with
+`"<install folder>\unins000.exe" /VERYSILENT` (data kept) or add `/PURGEDATA` to delete the data too.
+
+To check the WebView2 runtime the product's window relies on: `AgastyaCtl.exe --doctor` shows its version (or a warning), and `GET /api/version`
+reports it under `shell`. When a release carries Microsoft's offline runtime installer (`redist\`), Setup runs it on a machine without the runtime and
+every offline update runs it again; sites that block Windows Update patch the runtime that way.
 
 ## 10. Uninstalling
 
-*Settings → Apps → Agastya Platform → Uninstall.* It stops and removes the service and the firewall rule and deletes the program. **The data folder and
-`agastya.ini` stay.** Delete them yourself to remove everything.
+*Settings → Apps → Agastya Platform → Uninstall.* It stops and removes the service and the firewall rule and deletes the program, including every
+version folder an offline update added. It then asks whether to delete the projects and the database too - **the answer is No unless you choose Yes**;
+a silent uninstall keeps them unless `/PURGEDATA` is given. Before deleting, `AgastyaCtl.exe --remove-data` checks that the folders are this
+product's (never a drive root, a profile or system folder, or the program's own folder). Kept data is found again by a later installation.
+
+### Mode B: directory sign-on (Active Directory / LDAP)
+
+On a network server (Mode B) people can sign in with their domain account (WP-27). The server checks the password against the directory over
+**LDAPS only** (TLS 1.2 or later, the certificate verified, no plain LDAP, no StartTLS), and the directory groups the person is in decide their
+role. On this computer only (Mode A) the setting is refused at start: a desktop installation keeps local accounts.
+
+Set them in the `[directory]` section of `agastya.ini` (WP-28: `Url`, `BaseDn`, `BindDn`, `BindPasswordFile`, `CaFile`, `GroupBaseDn`,
+`LoginAttribute`, `UserClass`, `NestedGroups`, `TimeoutMs`, `SyncHours` - a relative file path is relative to `agastya.ini`), or as system
+environment variables for the service; then restart. The ini key and the variable are the same setting:
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `AGASTYA_DIRECTORY_URL` | (none = off) | `ldaps://dc1.corp.local:636`, several comma-separated (tried in order). |
+| `AGASTYA_DIRECTORY_BASE_DN` | required | Where people are searched, e.g. `DC=corp,DC=local`. |
+| `AGASTYA_DIRECTORY_BIND_DN` | required | A read-only service account, e.g. `CN=svc-agastya,OU=Service,DC=corp,DC=local`. |
+| `AGASTYA_DIRECTORY_BIND_PASSWORD_FILE` | required | A file holding its password (open only to the service identity). The password is never in an environment variable. |
+| `AGASTYA_DIRECTORY_CA_FILE` | (system trust) | PEM of the CA that signed the domain controllers' certificates. |
+| `AGASTYA_DIRECTORY_GROUP_BASE_DN` | the base DN | Where nested groups are searched. |
+| `AGASTYA_DIRECTORY_LOGIN_ATTRIBUTE` | `sAMAccountName` | The attribute people's user name is matched against (`uid` on OpenLDAP). |
+| `AGASTYA_DIRECTORY_USER_CLASS` | `user` | Object class of a person (`inetOrgPerson` on OpenLDAP). |
+| `AGASTYA_DIRECTORY_NESTED_GROUPS` | `0` | `1` = follow nested groups (Active Directory's in-chain rule). |
+| `AGASTYA_DIRECTORY_TIMEOUT_MS` | `10000` | Per-operation time limit. |
+| `AGASTYA_DIRECTORY_SYNC_HOURS` | `24` | How often every directory account is re-checked (offboarding); `0` = only *Sync now*. |
+
+Then, in **Administrator > Directory sign-on**:
+
+1. *Test connection* (optionally with a user name: it shows the DN and the groups found; no password is sent).
+2. Map directory groups (full DN) to a role: Software administrator, Project Manager, Author, or Auditor (read-only). A person in several
+   mapped groups gets the strongest role. A mapping can also feed a local **group** (Administrator > Groups), which projects can give a role to
+   (Project settings > Access). Nobody can sign in with a domain account until at least one group is mapped.
+
+What happens:
+
+* **First sign-in** creates the account (just in time); later sign-ins update the name, the role and the directory-fed group memberships.
+  Directory accounts have no local password: *Reset password*, *Change password* and *Forgot password* do not apply to them.
+* **Offboarding.** A person disabled in the directory, deleted, or removed from every mapped group is disabled here at their next sign-in or
+  at the next periodic check (*Sync now* runs it at once); their sessions end. They come back by themselves if the directory lets them in
+  again. An account an administrator disabled stays disabled. A check that would disable *every* directory account at once (a wrong base
+  DN, an empty group) changes nothing and is logged as `directory.sync.failed`.
+* **Break-glass.** Local accounts keep signing in with their local password, and the directory is never asked about a local account name.
+  Keep at least one local software administrator (the server refuses to switch the last one to the directory). When no directory server
+  answers, domain sign-ins get *503 directory unavailable*; local sign-ins work.
+* **Audit.** `auth.login` (with `source: directory`), `auth.login.failed` (with the reason), `directory.user.provisioned`, `.role-changed`,
+  `.groups-changed`, `.offboarded`, `.reinstated`, `directory.sync`, and every mapping and group change.
+
+Notes for the domain administrator: the service account needs read access to the people and groups only. Active Directory's *LDAP channel
+binding* and *signing* requirements are met by LDAPS. Kerberos / Windows integrated sign-on (no password prompt) is not provided: people type
+their domain password into the sign-in page, which goes to the server over HTTPS and to the domain controller over LDAPS.
+
+**Verify against your real directory** (the product's tests use a simulated LDAPS server): set the variables on a test server, *Test
+connection* with a known user name, map one test group, sign in as a member, check the role, remove the member from the group in AD, run
+*Sync now* and check the account shows *Offboarded by the directory*.
+
+### Auditors and fine-grained permissions
+
+* **Auditor (read-only).** Administrator > Users > *Make auditor* (or a directory group mapped to Auditor): reads every project, the user list
+  and the audit log, and is refused every change (`403 READ_ONLY_ACCOUNT`).
+* **Groups.** Administrator > Groups. A project's owner or Project Manager gives a group a role in Project settings > **Access**; a member's role
+  is the strongest of their own, their folder's and their groups'.
+* **Single-action exceptions.** In the same tab, allow one action (for example `release.submit`) to a person or group below the role that
+  normally has it, or deny it to someone whose role has it. A denial wins over every grant except an owner's and a software administrator's.
+  Administrator > Roles lists every action and the role it normally needs. Nobody can give more than their own role.
 
 ## 11. Security notes
 
@@ -320,3 +444,222 @@ The exit code is the standard Inno Setup one (0 = success; anything else is a fa
 
 A clean stop (the tray's Stop, `net stop`, closing the console) lets requests that are running finish for up to 15 seconds, then writes
 the database's journal back into `publisher.db` and gives the data folder back. A copy of the data folder taken after a clean stop is complete.
+
+## 13. Audit trail and security events
+
+### What is recorded
+
+Every change of state is written to the audit log with who, what, when, the project and the client address (sign-in and sign-out,
+accounts and roles, project membership and folder access, releases and their fingerprint, content changes, settings, backups and
+restores, waivers with their reasons). A static test (`backend/test/wp29-audit-coverage.test.js`) fails when a new state-changing route
+neither audits nor is listed with a reason. *Administrator > Audit logs* shows it newest first, filtered by action, person, project and
+time, and exports **every** matching row as CSV or JSON Lines (the export itself is recorded). A read-only **auditor** account reads,
+exports and verifies too (each use recorded); only an administrator takes a checkpoint.
+
+### Tamper evidence
+
+Each row carries its place in a chain (`seq`), the hash of the row before it, and its own HMAC-SHA-256 over its content, made with a key
+kept **outside the database**: `AGASTYA_AUDIT_KEY_FILE`, default `<data folder>\audit-key\audit-hmac.key` (the installed product keeps it
+in its state folder). The key is made on the first start. **Back the key up separately from the database** (with the checkpoints,
+below): without it the chain cannot be verified, and the server refuses to start with a damaged key file rather than make a new one.
+
+A **checkpoint** - "the chain had N rows ending in hash H", signed with the key - is taken with every platform backup and once a day
+(`AGASTYA_AUDIT_CHECKPOINT_HOURS`, default 24). It is stored in the database, appended to `<backup folder>\audit-checkpoints.jsonl`
+and written to the Application log (event 4102), so it also exists off the machine when Windows Event Forwarding collects that log.
+
+Verification - *Audit logs > Verify*, the daily housekeeping job (a failure notifies every administrator and raises event 4101), or offline:
+
+    node backend\scripts\agastya-audit.js verify --workspace <data folder> [--checkpoints <file kept elsewhere>]
+    AgastyaCtl.exe --verify-audit
+
+It names an edited row, a deleted row in the middle, a forged or inserted row, rows signed with another key, and - compared with a
+checkpoint - rows cut off at the end or a rebuilt chain. Exit code 0 = intact, 1 = problems found, 2 = cannot check (no key, no database).
+`--doctor` shows the result as the row *Audit chain intact*.
+
+Limits, stated plainly: someone who holds both the database and the key can rebuild the whole chain, and a cut at the end is only visible
+against a checkpoint taken after the removed rows were written. Keep the key readable by the service only (the installer's folder
+permissions), and keep checkpoints somewhere the server's administrators cannot change (Event Forwarding to a collector, a copy of
+`audit-checkpoints.jsonl` on another system). Retention (section 7) archives the oldest rows to `audit-archive\` and records the last
+archived row as the chain's anchor, so the remaining rows still verify. Rows written before this version have no chain position; the
+verifier counts them as "before the chain". A restore of a platform backup keeps the chain; the key must be the one in use when it was made.
+
+### Failure of the audit log itself
+
+If a row cannot be written, the failure is counted on the *Security* page, written to `<data folder>\logs\audit-failures.log` and raised
+as event 4100. **Critical actions** - sign-in, platform role and account changes, project membership, release approval and rejection,
+restore of a backup - are written in the same database transaction as the change: when their row cannot be written the change does not
+happen and the user sees *"The action was not carried out because the audit log could not record it"* (HTTP 503, `AUDIT_UNAVAILABLE`).
+Other actions go ahead and are flagged.
+
+### Security events (Windows Application log, source *Agastya Platform*)
+
+The server raises these; the Windows host writes them with the ids below (the ids never change; new ones are added). The source is
+registered by the installer or `--install-service` (registering needs administrator rights; without it the events are only in the
+server log). `node backend\scripts\agastya-audit.js events` prints the same list.
+
+| Id | Level | Name | Meaning |
+| --- | --- | --- | --- |
+| 4100 | Error | audit.write_failed | an action could not be written to the audit log |
+| 4101 | Error | audit.verify_failed | the audit chain verification found a problem |
+| 4102 | Information | audit.checkpoint | a checkpoint: chain length, last hash, key id, signature |
+| 4103 | Information | audit.verified | the audit chain verification passed |
+| 4110 | Warning | auth.failed_burst | 5 or more failed sign-ins for one account or from one address within 15 minutes |
+| 4111 | Warning | auth.throttled | sign-ins for an account are being refused by the throttle |
+| 4112 | Warning | auth.login.master | a sign-in used the vendor master credential |
+| 4113 | Warning | auth.password_reset | a password was reset by an administrator or from the console |
+| 4114 | Information | auth.session_revoked | an administrator ended a session |
+| 4120 | Warning | account.role_changed | a platform role changed; an account was created, disabled or enabled |
+| 4121 | Information | project.membership_changed | a project membership or folder access changed |
+| 4130 | Information | release.requested | a release was requested (with the fingerprint) |
+| 4131 | Information | release.decided | a release was approved or rejected |
+| 4140 | Information | backup.created | a platform backup was made |
+| 4141 | Error | backup.failed | a backup failed, or a backup failed its restore test |
+| 4142 | Warning | backup.restored | a backup was restored into a new folder |
+| 4150 | Warning | lock.broken | a document lock or editing lease held by someone else was broken |
+| 4160 | Warning | settings.changed | security or platform settings, or the asset policy, changed |
+| 4161 | Information | audit.exported | the audit log was exported |
+
+To collect them centrally, subscribe a Windows Event Forwarding collector to the Application log with
+`*[System[Provider[@Name='Agastya Platform'] and (EventID>=4100 and EventID<=4199)]]`.
+## 14. Team server runbook (Mode B)
+
+One Windows server runs the platform as a service; people use it from their own computers through a browser (or the Edge app window a client
+installation opens). This section is the whole procedure. Sizing assumption (audit PRD-007): up to **25 people working at once out of 100
+named accounts, and 100 projects**.
+
+### 14.1 Install the server
+
+1. **Machine.** Windows Server 2019 or later (or Windows 10/11 Pro), 64-bit, 4 cores or more, 8 GB of memory, an SSD with room for the
+   projects plus at least three backups. A fixed DNS name (for example `docs.example.local`) that every client resolves.
+2. **Setup**, elevated, with *Run as a Windows service* and *Allow other computers on the network*. Unattended:
+   `Agastya-Platform-<ver>-win-x64-Setup.exe /VERYSILENT /LAN /SERVERNAMES=docs.example.local,docs /ADMINUSER=admin /ADMINPASSWORDFILE=C:\temp\pw.txt`
+   adds a certificate (next step) before the service starts. With your organisation's certificate add `/TLSPFX=<file> /TLSPASSFILE=<file>`
+   or `/TLSCERT=<pem> /TLSKEY=<pem>`; with neither, Setup makes a private CA and a server certificate for `SERVERNAMES` (default: the
+   computer's name).
+3. **Certificate by hand** (or to change it later), elevated, from the program folder:
+
+   ```
+   AgastyaCtl.exe --configure-server --name docs.example.local --name docs --make-cert            (a private CA, 397 days)
+   AgastyaCtl.exe --configure-server --name docs.example.local --pfx D:\certs\docs.pfx --passphrase-file D:\certs\pass.txt
+   AgastyaCtl.exe --configure-server --name docs.example.local --cert server.pem --key server-key.pem
+   ```
+
+   The material is copied to `<state>\tls\` (an earlier file is kept as `*.old-<time>`), `[server] Bind=lan`, `Mode=server`, `ServerNames` and
+   `[tls]` are written to `agastya.ini`, and `tls\` is limited to SYSTEM, the Administrators and LOCAL SERVICE (read). With `--make-cert` the
+   CA's private key goes to `tls\ca\`, which the service cannot read: **move `tls\ca\ca-key.pem` to offline storage**; it is needed only to
+   renew. `--bind <address>` serves one address instead of all; `--port` changes the port; `--firewall` adds the port rule.
+4. **Check**: `AgastyaCtl.exe --doctor` (TLS certificate, days left, port, data folder), then `--install-service` and `--start` if Setup did not.
+5. **First sign-in** at `https://docs.example.local:4040/` from another computer; create the project managers; optionally connect the
+   directory (section 10, *Mode B: directory sign-on*, `[directory]` in `agastya.ini`).
+
+`agastya.ini` on a team server (everything else as in section 4):
+
+| Section / key | Meaning |
+| --- | --- |
+| `[server] Bind`, `Mode`, `ServerNames`, `Port` | written by `--configure-server` |
+| `[server] MaxConnections` | live connections (open browser tabs) at most, default 1000; one more gets `503`. One person may hold 8 at once |
+| `[server] LeaseMinutes` | how long a check-out lasts without activity, default 30 |
+| `[tls] Certificate`, `Key` or `Pfx`, `PassphraseFile` | written by `--configure-server` |
+| `[directory] ...` | directory sign-on (section 10) |
+| `[backup] Dir`, `IntervalHours`, `Keep`, `RestoreTestDays` | the platform backup (section 7) |
+| `[backup] CopyTo` | warm standby: an absolute folder (another disk or `\\host\share`) that receives a copy of every scheduled backup |
+
+A wrong value (`IntervalHours=often`, a relative `CopyTo`) stops the server at start with the setting named in `logs\agastya-server.log`;
+`--doctor` lists an unknown key as a warning.
+
+### 14.2 Clients
+
+* **Browser (the default).** Nothing to install: open `https://docs.example.local:4040/`. With the private CA, distribute `<state>\tls\ca.pem`
+  once as a trusted root (Group Policy: *Computer Configuration > Windows Settings > Security Settings > Public Key Policies > Trusted Root
+  Certification Authorities*).
+* **Client installation** (a Start-menu shortcut that opens the server's address the way section 2 opens the local one; no server runs on
+  the client):
+  `Setup.exe /VERYSILENT /CURRENTUSER /CLIENTOF=https://docs.example.local:4040/`, or `[client] Server=` in that computer's `agastya.ini`.
+  `AgastyaCtl.exe --check-server` (and `--doctor`) checks from that computer that the certificate is trusted - or equals a pinned
+  `[client] Thumbprint=` (SHA-256) - and that the server accepts this client's version.
+
+### 14.3 Working together
+
+* **Who is here.** Each editor shows the faces of the other people in the same project and what they have open; Home has a *Working now*
+  card. Presence lives only in the server's memory (never on disk) and disappears within 75 seconds of a closed tab, at once at sign-out, and
+  when the person loses access to the project.
+* **Check-out.** A module opened for editing can be checked out; everyone else sees *Checked out by ...* within seconds (measured below:
+  95% within 0.08 s at the normal load, all within 5 s at every load measured) and cannot save it (`423`). Check-in or the end of `LeaseMinutes`
+  releases it, and the others get a notice. The owner, a project manager or an administrator can **break** a check-out (audited
+  `lease.broken`); the holder is told.
+* **Without a check-out**, two people saving the same file are protected by the version check: the second save is refused (`409`) and shows
+  the other version; nothing is overwritten silently (verified in the load test: 0 silent overwrites in 3,863 accepted saves over five runs).
+
+### 14.4 Backup, standby and recovery (availability position)
+
+**Position (PRD-007): one server, no automatic failover.** Availability comes from a scheduled backup, a copy on a second machine, and a
+practised restore.
+
+* **Backup.** `[backup] IntervalHours=24` (default; `1`-`6` for a team that cannot lose a day); `Keep` archives, pruned grandfather-father-son.
+  *Administrator > Platform backup* shows the last backup and the restore test; the backup status (`lastCopy`) also records the last copy.
+* **Warm standby.** `[backup] CopyTo=\\standby\agastya-backups` (or another disk): after every scheduled backup the archive is copied there and
+  checked; a failed copy is audited (`backup.copy_failed`) and every administrator gets a notification. The standby machine has the **same
+  version** installed with the service stopped. The service account (LOCAL SERVICE) reaches a share as the computer account
+  (`DOMAIN\SERVER$`): give that account write access on the share.
+* **RPO** = the backup interval (24 h by default; 1 h at `IntervalHours=1`).
+* **RTO** = time to notice + restore + start. Measured by the load harness's drill (`--drill`) on a 1 MB data set (10 projects, 50 authors'
+  modules) on the shared test computer: backup 3.7 s, restore 2.6 s, start to ready 1.8 s, first read 2.2 s - **8.5 s of machine time**.
+  Restore scales with the archive size and the disk; **measure yours at the first drill** with your data (*Verify* a backup, or the harness
+  against a copy) and write the number here: \_\_\_\_\_.
+* **Failover procedure (manual).** On the standby: restore the newest archive of the copy folder into a new folder (section 7, *Restore*:
+  `agastya-backup.js restore <archive> <new folder>`), point `[storage] DataDir` at it, `AgastyaCtl.exe --doctor`, `--start`; point the DNS name (`docs.example.local`) at the standby, or give it the server's certificate and names.
+  Tell people to sign in again (sessions are in the restored database; check-outs older than the backup are gone). Work saved after the last
+  backup is lost (RPO).
+* **Drill.** Do it once after installation and then every quarter (`RestoreTestDays` checks restorability automatically; the drill checks
+  the procedure and the people).
+
+### 14.5 Upgrades
+
+**Server first, then clients.** The server accepts clients down to its `minClientVersion` (`/api/version`); an older page is answered `426`
+and offers *Reload*; a client installation's `--check-server` says "older than the server accepts". A server older than a client says the server
+needs the update. Upgrade the server out of hours (section 8: a verified backup is made first, `--rollback` goes back); browser clients
+pick up the new pages at their next reload; client installations are updated afterwards.
+
+| Server \ client | same version | older client, at least `minClientVersion` | older than `minClientVersion` | newer client |
+| --- | --- | --- | --- | --- |
+| Behaviour | works | works | `426`, *Reload* (browser) / `--check-server` fails | "the server needs an update" |
+
+### 14.6 Capacity and monitoring
+
+`GET /api/admin/metrics` (administrators only; there is no screen for it yet) shows the request times (p50/p95/p99, writes separately), the
+event-loop delay, the database statement times and slow statements, live connections and presence entries, memory, and the two **D21
+triggers**: write p95 above 200 ms, event-loop p99 above 100 ms. `POST /api/admin/metrics/reset` (audited) starts a new measurement window.
+A trigger that stays on at normal load is the signal of section 8, *Why SQLite, and when that changes*.
+
+**Measured (WP-28, 2026-11-27)** with `backend\scripts\load-test.js`: 50 scripted authors (2x the assumption) over WebSockets with presence,
+10 projects (100 in the last row), check-out / edit / save / check-in, contended saves on a shared module, lists and the dashboard; own server on loopback HTTP, on
+a **shared 8-core laptop CPU (i7-6820HQ) with other work running**, runs of 1-2 minutes:
+
+| Run | Requests/s | p50 / p95 (client) | Errors | Check-out notice p95 | Server event loop p99 | D21 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Normal pace (1-3 s think), no project validation | 52 | 20 / 79 ms | 0 | 75 ms | 69 ms | none |
+| Normal pace, with project validation | 27 | 639 / 1,957 ms | 0 | 1,710 ms | 1,874 ms | event loop |
+| Stress (0.1-0.5 s think, ~4x the pace) | 86 | 363 / 653 ms | 0 | 636 ms | 826 ms | event loop |
+| Normal pace, **100 projects**, no project validation | 52 | 17 / 46 ms | 0 | 43 ms | 40 ms | none |
+
+* At the assumed load and 2x the people the server meets the targets with room to spare, **except while someone runs a whole-project
+  validation**: that work runs on the server's main thread (18 s median at 50 authors) and every other request waits behind it. Until the job
+  service (audit WP-14) moves validation and publishing off the main thread, ask people to validate single modules while others work, and run
+  whole-project validation and publishing out of busy hours.
+* The **ceiling** on this computer is one CPU core: about 85-105 requests per second (86 and 106 in two stress runs), reached at roughly 4x the normal pace of 50 people;
+  beyond it every request waits in line (server-side handling stays at p95 25-35 ms, the waiting grows). A CPU profile at the ceiling shows
+  about a quarter of the busy time in SQLite statements and a tenth in file reads and `fsync`. Database lock waits: **none** in any run.
+* Not measured here: real separate client machines and networks, a domain, TLS on the wire, more than 50 users. Repeat on your server
+  (below) before go-live.
+
+**Run it against your server** (another computer, a test copy, never the production data):
+
+```
+cd <program folder>\app\backend
+..\..\runtime\node.exe scripts\load-test.js --base https://docs-test.example.local:4040 --admin admin --admin-password-file pw.txt --authors 50 --duration 300
+```
+
+(`NODE_EXTRA_CA_CERTS=<ca.pem>` for a private CA.) It creates its own `load-...` project manager, projects and authors, prints the table above
+and `ACCEPTANCE: PASS/FAIL` (no errors, no silent overwrite, every check-out notice within 5 s), and exits 0, 1 or 2 (could not run). Without
+`--base` it starts its own server in a temporary folder. `--drill` adds the backup / restore / start timing; `--no-validate` leaves project
+validation out; `--profile <dir>` writes a CPU profile of its own server.

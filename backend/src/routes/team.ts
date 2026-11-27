@@ -10,7 +10,7 @@
 
 import type { Express } from 'express';
 import { nowIso } from '../config';
-import { requireRoles, requireProject, store, audit, clientIp } from '../context';
+import { requireRoles, requireProject, store, audit, auditedTx, clientIp } from '../context';
 import { wrap, param, bad, notFound, conflict, forbidden } from '../services/http';
 import { activityFor, monitoredProjects, pendingApprovals } from '../services/activity';
 import { notify, adminIds, list as listNotifications } from '../services/notifications';
@@ -96,8 +96,9 @@ export function registerTeamRoutes(app: Express): void {
     if (existing && existing.role === 'owner' && role !== 'owner' && store.countOwners(req.project.id) <= 1) {
       throw conflict("This is the project's last owner. Make someone else an owner first.", 'LAST_OWNER');
     }
-    store.upsertMember(req.project.id, target.id, role, actor.id, nowIso());
-    audit({ actorId: actor.id, actorUsername: actor.username, action: 'member.assigned', projectId: req.project.id, targetType: 'user', targetId: target.id, meta: { role, from: existing?.role ?? null } });
+    // WP-29: a membership change and its audit row are one transaction (503 AUDIT_UNAVAILABLE, nothing changed, when the row cannot be written)
+    auditedTx({ actorId: actor.id, actorUsername: actor.username, action: 'member.assigned', projectId: req.project.id, targetType: 'user', targetId: target.id, meta: { role, from: existing?.role ?? null } },
+      () => store.upsertMember(req.project.id, target.id, role, actor.id, nowIso()));
     notifyAccess(existing ? 'changed' : 'granted', { actor, projectId: req.project.id, userId: target.id, role });
     res.json({ ok: true, member: { userId: target.id, username: target.username, fullName: target.full_name, role } });
   }));

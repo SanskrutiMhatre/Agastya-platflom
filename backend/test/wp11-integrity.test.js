@@ -112,6 +112,8 @@ test('every content-write route carries the version guard (found from the live r
     'PUT /api/projects/:id/extensions/:profileId': 'enables an extension profile (a database row)',
     'PUT /api/projects/:id/validation/issue': 'one setting (the S1000D issue)',
     'PUT /api/projects/:id/watermark': 'one setting (the watermark text)',
+    'PUT /api/projects/:id/access/groups/:groupId': 'grants a group a role on the project (a database row, not document content; WP-27)',
+    'PUT /api/projects/:id/problems/reviewed': 'a delta (these finding keys reviewed / not reviewed) applied in one synchronous read-modify-write, so two reviewers cannot overwrite each other (WP-22)',
     'PUT /api/projects/:id/s1000d': 'S1000D configuration (database rows, manager only)',
     'PUT /api/projects/:id/s1000d/codes': 'S1000D configuration (database rows, manager only)',
     'PUT /api/projects/:id/s1000d/dm-types': 'S1000D configuration (database rows, manager only)',

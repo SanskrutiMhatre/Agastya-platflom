@@ -2,9 +2,9 @@
 // management, the approval queues (password resets, release requests), active
 // sessions and the audit log - all backed by the JSS Publisher admin routes.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
-import { adminApi, authApi, teamApi, type GlobalRole, type User } from '../api';
+import { adminApi, auditApi, auditQueryString, authApi, teamApi, type AuditQuery, type AuditVerifyReport, type GlobalRole, type User } from '../api';
 import { globalLabel } from '../lib/roles';
 import { Icon } from '../components/Icon';
 import { ThemeChoiceControl } from '../components/ThemeToggle';
@@ -15,16 +15,20 @@ import { BackupButton } from '../components/Oversight';
 import { actionLabel } from '../lib/activity';
 import { MoreRows, useProgressive } from '../components/windowing';
 import { tablistKeys } from '../components/a11y';
+import { PasswordInput } from '../components/PasswordInput';
 
 function Account() {
   const { user, logout } = useSession();
   const toast = useUi((s) => s.toast);
   const [cur, setCur] = useState(''); const [p, setP] = useState(''); const [p2, setP2] = useState('');
   const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
+  const [mismatch, setMismatch] = useState(false); const repeatId = useId();
 
   const change = async () => {
     setErr('');
-    if (p !== p2) return setErr('The new passwords do not match.');
+    // WP-35 (UID-002): the mismatch is the repeat field's own message, with the focus on it
+    if (p !== p2) { setMismatch(true); document.getElementById(repeatId)?.focus(); return; }
+    setMismatch(false);
     setBusy(true);
     try { await authApi.changePassword(cur, p); toast('Password changed. Other sessions were signed out.', 'success'); setCur(''); setP(''); setP2(''); }
     catch (e) { setErr(errText(e)); } finally { setBusy(false); }
@@ -43,9 +47,9 @@ function Account() {
       <div className="v2-card v2-card-pad">
         <h3 style={{ marginTop: 0 }}>Change password</h3>
         <form className="v2-stack" onSubmit={(e) => { e.preventDefault(); void change(); }}>
-          <Field label="Current password"><input className="v2-input" type="password" value={cur} onChange={(e) => setCur(e.target.value)} autoComplete="current-password" /></Field>
-          <Field label="New password" hint="At least 15 characters (a few words make a good one), and not a common password or your name."><input className="v2-input" type="password" value={p} onChange={(e) => setP(e.target.value)} autoComplete="new-password" /></Field>
-          <Field label="Repeat new password"><input className="v2-input" type="password" value={p2} onChange={(e) => setP2(e.target.value)} autoComplete="new-password" /></Field>
+          <Field label="Current password"><PasswordInput value={cur} onChange={(e) => setCur(e.target.value)} autoComplete="current-password" /></Field>
+          <Field label="New password" hint="At least 15 characters (a few words make a good one), and not a common password or your name."><PasswordInput value={p} onChange={(e) => setP(e.target.value)} autoComplete="new-password" /></Field>
+          <Field label="Repeat new password" error={mismatch && p !== p2 ? 'The new passwords do not match.' : undefined}><PasswordInput id={repeatId} value={p2} onChange={(e) => setP2(e.target.value)} autoComplete="new-password" /></Field>
           {err ? <Alert tone="bad">{err}</Alert> : null}
           <div><button className="btn btn-primary" disabled={busy || !cur || !p}>Change password</button></div>
         </form>
@@ -112,9 +116,11 @@ export function Users() {
                     <option value="author">Author</option><option value="project_manager">Project Manager</option><option value="admin">Software administrator</option>
                   </select>
                 </td>
-                <td>{u.disabled ? <Badge tone="bad">Disabled</Badge> : u.onboardingPending ? <Badge tone="warn">Awaiting first sign-in</Badge> : u.mustChangePassword ? <Badge tone="warn">Must change password</Badge> : <Badge tone="ok">Active</Badge>}</td>
+                <td>{u.disabled ? <Badge tone="bad" title={u.disabledReason === 'directory' ? 'Disabled by the directory (removed from its groups or disabled there)' : undefined}>{u.disabledReason === 'directory' ? 'Offboarded by the directory' : 'Disabled'}</Badge> : u.onboardingPending ? <Badge tone="warn">Awaiting first sign-in</Badge> : u.mustChangePassword ? <Badge tone="warn">Must change password</Badge> : <Badge tone="ok">Active</Badge>}
+                  {u.authSource === 'directory' ? <> <Badge title="Signs in with the domain password">Directory</Badge></> : null}{u.auditor ? <> <Badge tone="accent" title="Reads every project and the audit log, changes nothing">Auditor</Badge></> : null}</td>
                 <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                  <button className="btn btn-sm" onClick={() => setConfirm({ user: u, action: 'reset' })}><Icon name="key" size={13} />Reset password</button>{' '}
+                  {u.role !== 'admin' ? <><button className="btn btn-sm" data-testid={`auditor-${u.username}`} onClick={() => act(() => adminApi.updateUser(u.id, { auditor: !u.auditor }), u.auditor ? 'No longer read-only' : 'Now a read-only auditor')}>{u.auditor ? 'End auditor' : 'Make auditor'}</button>{' '}</> : null}
+                  {u.authSource !== 'directory' ? <><button className="btn btn-sm" onClick={() => setConfirm({ user: u, action: 'reset' })}><Icon name="key" size={13} />Reset password</button>{' '}</> : null}
                   {u.disabled
                     ? <button className="btn btn-sm" onClick={() => act(() => adminApi.enable(u.id), 'Account enabled')}>Enable</button>
                     : <button className="btn btn-sm" disabled={u.id === me?.id} onClick={() => setConfirm({ user: u, action: 'disable' })}>Disable</button>}
@@ -244,21 +250,58 @@ function Sessions() {
   );
 }
 
+/** "::ffff:127.0.0.1" is an IPv4 address written as IPv6; the log shows it as 127.0.0.1 (WP-22, UX-025). */
+export const plainIp = (ip: string | null): string => (ip ?? '').replace(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i, '$1');
+
 export function Audit() {
-  const [typed, setTyped] = useState('');
-  const [filter, setFilter] = useState('');
+  const [typed, setTyped] = useState<AuditQuery>({});
+  const [filter, setFilter] = useState<AuditQuery>({});
   // WP-18 (FE-020): the filter asks the server once the typing pauses, not once per key
   useEffect(() => { const t = setTimeout(() => setFilter(typed), 300); return () => clearTimeout(t); }, [typed]);
-  const a = useAsync(() => adminApi.audit(300, filter || undefined), [filter]);
-  const drawn = useProgressive(a.data?.length ?? 0, filter);     // WP-18 (FE-030): first rows now, more on scroll
+  const key = auditQueryString(filter);
+  const a = useAsync(() => adminApi.audit(300, filter), [key]);
+  // WP-29 supersedes WP-22's client-side who/day narrowing: person, project and dates are asked of the server (and reach the export);
+  // WP-22's plainIp display is kept below
+  const rows = a.data ?? [];
+  const drawn = useProgressive(rows.length, key);     // WP-18 (FE-030): first rows now, more on scroll
+  // WP-29: verify the chain, and export every row matching the filters (not only the 300 shown)
+  const [verifying, setVerifying] = useState(false);
+  const [report, setReport] = useState<AuditVerifyReport | null>(null);
+  const [verr, setVerr] = useState('');
+  const verify = async () => {
+    setVerifying(true); setVerr('');
+    try { setReport(await auditApi.verify()); } catch (e) { setVerr(errText(e)); } finally { setVerifying(false); }
+  };
+  const set = (k: keyof AuditQuery) => (e: React.ChangeEvent<HTMLInputElement>) => setTyped({ ...typed, [k]: e.target.value });
+  const enter = (e: React.KeyboardEvent) => { if (e.key === 'Enter') setFilter(typed); };
   return (
     <div className="v2-stack">
-      <div className="v2-row"><input className="v2-input" style={{ width: 280 }} placeholder="Filter by action, e.g. release.approved" value={typed} onChange={(e) => setTyped(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') setFilter(typed); }} aria-label="Filter audit log by action" /><button className="btn" onClick={a.reload}><Icon name="refresh" />Refresh</button></div>
+      <div className="v2-row" style={{ flexWrap: 'wrap', gap: 8 }}>
+        <input className="v2-input" style={{ width: 220 }} placeholder="Action, e.g. release.approved" value={typed.action ?? ''} onChange={set('action')} onKeyDown={enter} aria-label="Filter audit log by action" />
+        <input className="v2-input" style={{ width: 140 }} placeholder="Person" value={typed.actor ?? ''} onChange={set('actor')} onKeyDown={enter} aria-label="Filter audit log by person" data-testid="audit-actor" />
+        <input className="v2-input" style={{ width: 180 }} placeholder="Project id" value={typed.project ?? ''} onChange={set('project')} onKeyDown={enter} aria-label="Filter audit log by project" data-testid="audit-project" />
+        <label className="v2-row" style={{ gap: 4 }}>From <input className="v2-input" type="date" value={typed.from ?? ''} onChange={set('from')} aria-label="Entries from this date" data-testid="audit-from" /></label>
+        <label className="v2-row" style={{ gap: 4 }}>To <input className="v2-input" type="date" value={typed.to ?? ''} onChange={set('to')} aria-label="Entries up to this date" data-testid="audit-to" /></label>
+        <button className="btn" onClick={a.reload}><Icon name="refresh" />Refresh</button>
+      </div>
+      <div className="v2-row" style={{ flexWrap: 'wrap', gap: 8 }}>
+        <a className="btn" href={auditApi.exportUrl('csv', filter)} download data-testid="audit-export-csv"><Icon name="download" />Export CSV</a>
+        <a className="btn" href={auditApi.exportUrl('jsonl', filter)} download data-testid="audit-export-jsonl"><Icon name="download" />Export JSON Lines</a>
+        <button className="btn" onClick={verify} disabled={verifying} data-testid="audit-verify"><Icon name="check" />{verifying ? 'Verifying…' : 'Verify chain'}</button>
+        <span className="v2-hint">The export holds every matching entry, not only those shown.</span>
+      </div>
+      {verr ? <Alert tone="bad">{verr}</Alert> : null}
+      {report ? (
+        <Alert tone={report.ok ? 'ok' : 'bad'}>
+          <span data-testid="audit-verify-result">{report.ok ? 'Intact' : 'Problems found'}: {report.summary}.</span>
+          {!report.ok ? <ul style={{ margin: '6px 0 0' }}>{report.problems.slice(0, 20).map((p, i) => <li key={i}>{p.message}</li>)}{report.problemCount > 20 ? <li>… and {report.problemCount - 20} more (run AgastyaCtl --verify-audit for the full list)</li> : null}</ul> : null}
+        </Alert>
+      ) : null}
       <div className="v2-card">
-        {a.loading && !a.data ? <Loading /> : !a.data?.length ? <Empty title="No entries" /> : (
+        {a.loading && !a.data ? <Loading /> : !rows.length ? <Empty title="No entries" /> : (
           <table className="v2-table"><thead><tr><th>When</th><th>Who</th><th>Action</th><th>Project</th><th>From</th></tr></thead>
-            <tbody>{a.data.slice(0, drawn.limit).map((e) => <tr key={e.id}><td title={fmtDate(e.at)}>{ago(e.at)}</td><td>{e.actor ?? '—'}</td><td title={e.action}>{actionLabel(e.action)} <span className="v2-hint v2-mono">{e.action}</span></td><td className="v2-mono">{e.projectId ?? ''}</td><td className="v2-mono">{e.ip ?? ''}</td></tr>)}
-              <MoreRows as="tr" colSpan={5} shown={drawn.limit} total={a.data.length} onMore={drawn.more} onAll={drawn.all} /></tbody></table>
+            <tbody>{rows.slice(0, drawn.limit).map((e) => <tr key={e.id}><td title={fmtDate(e.at)}>{ago(e.at)}</td><td>{e.actor ?? '—'}</td><td title={e.action}>{actionLabel(e.action)} <span className="v2-hint v2-mono">{e.action}</span></td><td className="v2-mono">{e.projectId ?? ''}</td><td className="v2-mono">{plainIp(e.ip)}</td></tr>)}
+              <MoreRows as="tr" colSpan={5} shown={drawn.limit} total={rows.length} onMore={drawn.more} onAll={drawn.all} /></tbody></table>
         )}
       </div>
     </div>

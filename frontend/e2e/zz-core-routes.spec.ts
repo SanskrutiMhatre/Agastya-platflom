@@ -97,10 +97,10 @@ test('the sign-in screen: the tagline names all three formats, and an error does
     await expect(page.getByText(/S1000D, JSS and JSG/)).toBeVisible();
     await page.getByLabel('Username').fill('nobody'); await page.getByLabel('Password').fill('wrong-password-123'); await page.getByRole('button', { name: 'Sign in' }).click();
     await expect(page.getByText(/Invalid username or password/i)).toBeVisible();
-    await page.getByRole('link', { name: 'Forgot your password?' }).click();
+    await page.getByRole('button', { name: 'Forgot your password?' }).click();
     await expect(page.getByRole('heading', { name: 'Reset your password' })).toBeVisible();
     await expect(page.getByText(/Invalid username or password/i)).toHaveCount(0);
-    await page.getByRole('link', { name: 'Back to sign in' }).click();
+    await page.getByRole('button', { name: 'Back to sign in' }).click();
     await expect(page.getByText(/Invalid username or password/i)).toHaveCount(0);
   } finally { await ctx.close(); }
 });

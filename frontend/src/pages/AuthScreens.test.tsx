@@ -8,7 +8,8 @@ import { cleanup, click, render, settle, type } from '../testing/render';
 
 const NO_GATES = { onboarding: false, mustChangePassword: false };
 const asSession = (o: Record<string, unknown>) => useSession.setState({ status: 'anon', user: null, gates: NO_GATES, signedOutReason: null, reauth: null, unreachable: false, ...o } as never);
-const submit = (r: ReturnType<typeof render>) => { const f = r.$('form'); click(f.querySelector('button')!); };
+// WP-35: the form's submit button (a password field now has its own Show button, type="button", before it)
+const submit = (r: ReturnType<typeof render>) => { const f = r.$('form'); click(f.querySelector('button:not([type="button"])')!); };
 
 beforeEach(() => { asSession({}); });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });

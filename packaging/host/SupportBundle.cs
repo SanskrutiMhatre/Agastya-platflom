@@ -156,13 +156,23 @@ namespace Agastya
 
                 if (File.Exists(Layout.ConfigFile)) { Add(zip, "agastya.ini", MaskIni(File.ReadAllText(Layout.ConfigFile))); items.Add("agastya.ini"); }
 
-                foreach (string name in new string[] { "agastya-host.log", "agastya-host.log.1", "agastya-server.log", "agastya-server.log.1" })
+                foreach (string name in new string[] { "agastya-host.log", "agastya-host.log.1", "agastya-server.log", "agastya-server.log.1", "agastya-server.jsonl" })
                 {
                     string f = Path.Combine(Layout.LogDir, name);
                     if (!File.Exists(f)) continue;
                     try { Add(zip, "logs/" + name, Tail(f, LogTailBytes)); items.Add("logs/" + name); } catch (Exception e) { Add(zip, "logs/" + name + ".error.txt", e.Message); }
                 }
 
+                // WP-25: the two newest update / rollback / Setup logs (they hold paths and versions, no secrets; redacted like the others)
+                try
+                {
+                    List<string> ul = new List<string>();
+                    if (Directory.Exists(Layout.LogDir))
+                        foreach (string pat in new string[] { "update-*.log", "rollback-*.log", "setup-*.log" }) ul.AddRange(Directory.GetFiles(Layout.LogDir, pat));
+                    ul.Sort(delegate (string a, string b) { return File.GetLastWriteTimeUtc(b).CompareTo(File.GetLastWriteTimeUtc(a)); });
+                    for (int k = 0; k < Math.Min(2, ul.Count); k++) { string n = Path.GetFileName(ul[k]); Add(zip, "logs/" + n, Tail(ul[k], LogTailBytes)); items.Add("logs/" + n); }
+                }
+                catch (Exception e) { Add(zip, "logs/update-logs.error.txt", e.Message); }
                 StringBuilder sys = new StringBuilder();
                 sys.AppendLine("Windows " + Environment.OSVersion.VersionString + (Environment.Is64BitOperatingSystem ? " 64-bit" : " 32-bit"));
                 sys.AppendLine("processors " + Environment.ProcessorCount);

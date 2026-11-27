@@ -10,6 +10,8 @@ For the person who produces the installer. (To install and run the product, read
 | --- | --- |
 | `Agastya-Platform-<version>-win-x64-Setup.exe` | the installer (Inno Setup): per-machine or per-user, optional Windows service, optional LAN firewall rule, upgrade in place, uninstall that keeps data |
 | `Agastya-Platform-<version>-win-x64-portable.zip` | unzip anywhere and run `AgastyaPlatform.exe`; data goes in `data\` beside it |
+| `Agastya-Platform-<version>-win-x64-Update.agupdate` | the offline update (WP-25): the whole product tree with its manifest, `update-info.txt` signed with the release certificate; applied with `AgastyaCtl.exe --apply-update` (verified backup, health check, automatic rollback; `OPERATIONS.md` section 8). `product.json` `update.minFromVersion` is the oldest version it may update. `--no-update` skips it |
+| `redist\MicrosoftEdgeWebView2RuntimeInstallerX64.exe` (inside the product) | only when `packaging/redist/` holds Microsoft's offline WebView2 installer (never downloaded by the build): Setup and every offline update run it so an air-gapped machine gets and keeps the runtime (PRD-005) |
 | `Agastya-Platform-<version>-win-x64\` | the staged folder both of them are made from; it holds `MANIFEST.sha256` (SHA-256 of every shipped file, `.sig` when signed) and `SBOM.cdx.json` |
 | `Agastya-Platform-<version>-win-x64-SBOM.cdx.json` | the software bill of materials, CycloneDX 1.5 (WP-24) |
 | `Verify-Release.ps1`, `Detect-AgastyaPlatform.ps1` | the customer's offline verifier and the deployment detection rule (`DEPLOYMENT-KIT.md`) |

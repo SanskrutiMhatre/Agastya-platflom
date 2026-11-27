@@ -247,6 +247,16 @@ describe('undo and redo', () => {
     key(paraEls(h.root)[0], 'y', { ctrlKey: true }); expect(h.ed.getXml()).toBe(added);
     key(paraEls(h.root)[0], 's', { ctrlKey: true }); expect(h.saves).toBe(1);
   });
+
+  it('WP-22: Ctrl+S saves with the focus on the page body (after the find bar closed), once; not while a dialog is open; not after destroy', () => {
+    const h = mount();
+    key(document.body, 's', { ctrlKey: true }); expect(h.saves).toBe(1);
+    key(paraEls(h.root)[0], 's', { ctrlKey: true }); expect(h.saves).toBe(2);          // the editor's own handler: still one save per key
+    const dlg = document.createElement('div'); dlg.className = 'modal-backdrop'; document.body.appendChild(dlg);
+    key(document.body, 's', { ctrlKey: true }); expect(h.saves).toBe(2);
+    dlg.remove(); h.ed.destroy();
+    key(document.body, 's', { ctrlKey: true }); expect(h.saves).toBe(2);
+  });
 });
 
 describe('problems from the server', () => {

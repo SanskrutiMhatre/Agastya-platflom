@@ -2,6 +2,7 @@
 // The list comes from lib/editorShortcuts.ts, which a test holds to the key handlers, so the dialog cannot drift from what the keys do.
 
 import { Modal } from '../../components/ui';
+import '../../styles/pages/editor-host.css';   // WP-35: loads with the editor chunks
 import { shortcutsFor, type EditorShortcut } from '../../lib/editorShortcuts';
 
 const label = (k: string): string => k.replace(/Mod\+/g, 'Ctrl+').replace(/Arrow(Up|Down|Left|Right)/g, (_, d: string) => ({ Up: '↑', Down: '↓', Left: '←', Right: '→' })[d] ?? d);

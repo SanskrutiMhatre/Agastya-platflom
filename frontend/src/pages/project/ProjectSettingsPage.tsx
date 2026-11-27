@@ -18,6 +18,7 @@ import { useUi } from '../../store/ui';
 import { PublishSettings } from './reused/PublishSettings';
 import { S1000dConfig } from './S1000dConfig';
 import { tablistKeys } from '../../components/a11y';
+import { ProjectAccessPanel } from '../AccessAdmin';
 
 const SHARE_ROLES: ProjectRole[] = ['viewer', 'reviewer', 'editor'];
 const ROLE_HELP: Record<ProjectRole, string> = {
@@ -222,7 +223,7 @@ export function ProjectSettingsPage() {
   const manages = may(can, 'members.manage');
   const tabs = [
     { to: 'general', label: 'General' }, ...(summary.project.format === 's1000d' ? [{ to: 's1000d', label: 'S1000D' }] : []), { to: 'publishing', label: 'Publishing' }, { to: 'team', label: 'Team' },
-    ...(manages ? [{ to: 'activity', label: 'Activity' }] : []), { to: 'danger', label: 'Danger zone' },
+    ...(manages ? [{ to: 'activity', label: 'Activity' }] : []), ...(may(can, 'access.manage') ? [{ to: 'access', label: 'Access' }] : []), { to: 'danger', label: 'Danger zone' },
   ];
   return (
     <div className="v2-page">
@@ -239,6 +240,7 @@ export function ProjectSettingsPage() {
         <Route path="sns/*" element={<Navigate to="../s1000d" replace />} />
         <Route path="team" element={<Team />} />
         {manages ? <Route path="activity" element={<ProjectActivity />} /> : null}
+        {may(can, 'access.manage') ? <Route path="access" element={<ProjectAccessPanel projectId={summary.project.id} />} /> : null}
         <Route path="members" element={<Navigate to="../team" replace />} />
         <Route path="danger" element={<Danger />} />
         <Route path="*" element={<Navigate to="general" replace />} />

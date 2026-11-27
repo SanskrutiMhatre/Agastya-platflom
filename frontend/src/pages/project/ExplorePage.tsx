@@ -4,6 +4,7 @@
 // Publication screen's job; this is for finding things and seeing the shape.
 
 import { useMemo, useState } from 'react';
+import '../../styles/pages/structure.css';   // WP-35: this page's styles load with its chunk
 import { useNavigate } from 'react-router-dom';
 import { contentApi, type DmSummary, type ExploreNode } from '../../api';
 import { Icon } from '../../components/Icon';

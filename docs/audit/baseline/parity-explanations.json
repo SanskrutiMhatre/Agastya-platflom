@@ -1,4 +1,25 @@
 {
   "_comment": "One row per item removed from the parity baseline: { category, key, reason, newHome, checklistRow, decision, batch, date }.",
-  "explanations": []
+  "explanations": [
+    {
+      "category": "testids",
+      "key": "audit-who",
+      "reason": "WP-22's in-browser filter of the loaded audit page was replaced by WP-29's server-side filter, which covers every row (not just the loaded page) and also applies to the CSV/JSON Lines export",
+      "newHome": "Settings > Audit: Person filter (data-testid audit-actor)",
+      "checklistRow": "Users, approvals, sessions, audit",
+      "decision": "D19/D20 (audit recommendation); lead merge of WP-29 with WP-22/WP-35",
+      "batch": "WP-29 + WP-35 merge",
+      "date": "2026-11-27"
+    },
+    {
+      "category": "testids",
+      "key": "audit-day",
+      "reason": "WP-22's in-browser filter of the loaded audit page was replaced by WP-29's server-side filter, which covers every row (not just the loaded page) and also applies to the CSV/JSON Lines export",
+      "newHome": "Settings > Audit: From / To date filters",
+      "checklistRow": "Users, approvals, sessions, audit",
+      "decision": "D19/D20 (audit recommendation); lead merge of WP-29 with WP-22/WP-35",
+      "batch": "WP-29 + WP-35 merge",
+      "date": "2026-11-27"
+    }
+  ]
 }

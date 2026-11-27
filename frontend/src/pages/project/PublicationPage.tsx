@@ -6,9 +6,11 @@
 // buttons for keyboard users), and one clear place to save and build.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import '../../styles/pages/structure.css';   // WP-35: this page's styles load with its chunk
 import { useNavigate } from 'react-router-dom';
 import { contentApi, type DmSummary } from '../../api';
 import { onlyRuleBreaks } from '../../lib/ruleBreaks';
+import { confirmDialog } from '../../lib/dialogs';
 import { Icon } from '../../components/Icon';
 import { PageHeader } from '../../components/PageHeader';
 import { PublishRefusal } from '../../components/PublishRefusal';
@@ -117,7 +119,7 @@ export function PublicationPage() {
   const save = async (): Promise<boolean> => {
     setBusy('save'); setError('');
     try {
-      const allowEmpty = counts.total === 0 && window.confirm('This saves a publication with no content. Continue?');
+      const allowEmpty = counts.total === 0 && await confirmDialog({ title: 'Save an empty publication?', message: 'This saves a publication with no content. Continue?', confirmLabel: 'Save' });
       const r = await pmcApi.save(id, { meta: data.data!.pm.meta, entries }, allowEmpty, data.data!.pm.hash ?? 'new');      // WP-11: the version this screen loaded
       setDirty(false); setUndo(null);
       toast(`Saved: ${r.counts.dms} data module${r.counts.dms === 1 ? '' : 's'} in ${r.counts.folders} chapter${r.counts.folders === 1 ? '' : 's'}`, 'success');
@@ -139,7 +141,7 @@ export function PublicationPage() {
   };
   const importPm = async (file: File | undefined) => {
     if (!file) return;
-    if (!window.confirm(`Replace this project's publication with "${file.name}"? The current one is kept as publication.xml.bak.`)) return;
+    if (!(await confirmDialog({ title: 'Replace the publication?', message: `Replace this project's publication with "${file.name}"? The current one is kept as publication.xml.bak.`, confirmLabel: 'Replace', danger: true }))) { if (importRef.current) importRef.current.value = ''; return; }
     try { const r = await pmcApi.import(id, file); toast(`Imported ${r.counts.dms} modules in ${r.counts.folders} chapters${r.missingModules.length ? `; ${r.missingModules.length} not in this project` : ''}`, r.missingModules.length ? 'info' : 'success'); data.reload(); reload(); }
     catch (e) { setError(errText(e)); }
     if (importRef.current) importRef.current.value = '';

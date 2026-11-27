@@ -14,13 +14,14 @@ import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import { configApi, platformApi, workspaceApi, type AppSettings, type ConfigItem, type ConfigSpec, type SecurityPolicy } from '../api';
 import { Icon } from '../components/Icon';
 import { PageHeader } from '../components/PageHeader';
-import { Alert, Badge, ConfirmModal, Empty, Field, Loading, Modal, errText, useAsync } from '../components/ui';
+import { Alert, Badge, ConfirmModal, Empty, Field, Loading, Modal, errText, fmtDate, useAsync } from '../components/ui';
 import { useApp } from '../store/appSettings';
 import { DEFAULT_ACCENT, deriveAccent } from '../lib/accent';
 import { useUi } from '../store/ui';
 import { Audit, Users } from './Settings';
 import { CatalogueSection, SnsPresetsSection, ExtensionsSection, CoverageSection } from './AdminS1000d';
 import { PlatformBackups } from './PlatformBackups';
+import { DirectorySection, GroupsSection } from './AccessAdmin';
 
 const REFERENCE: Array<[string, string]> = [
   ['country-codes', 'Country codes'], ['language-codes', 'Language codes'], ['dm-types', 'DM types'],
@@ -34,7 +35,7 @@ const SHARED: Array<[string, string]> = [['language-codes', 'Language codes'], [
 const S1000D_ITEMS: Array<[string, string]> = [['s1000d-catalogue', 'Information codes'], ['sns-presets', 'Numbering (SNS)'], ['dm-types', 'Data module types'], ['pm-templates', 'Publication templates'], ['rpc-cages', 'Responsible partner companies'], ['originator-cages', 'Originator companies'], ['ddn', 'Data dispatch notes'], ['ddn-metadata', 'DDN metadata']];
 const S1000D_ADVANCED: Array<[string, string]> = [['extensions', 'Extension profiles'], ['coverage', 'Standards coverage']];
 const GROUPS: Array<{ title: string; items: Array<[string, string]>; advanced?: Array<[string, string]> }> = [
-  { title: 'People and access', items: [['roles', 'Roles'], ['users', 'Users']] },
+  { title: 'People and access', items: [['roles', 'Roles'], ['users', 'Users'], ['groups', 'Groups'], ['directory', 'Directory sign-on']] },
   { title: 'All manual types', items: SHARED },
   { title: 'S1000D', items: S1000D_ITEMS, advanced: S1000D_ADVANCED },
   { title: 'JSS', items: [['format-jss', 'Manual types and stencils']] },
@@ -87,6 +88,8 @@ export function AdministratorPage() {
             <Route path="format-jsg" element={<FormatSection format="jsg" />} />
             <Route path="coverage" element={<CoverageSection />} />
             <Route path="users" element={<Users />} />
+            <Route path="groups" element={<GroupsSection />} />
+            <Route path="directory" element={<DirectorySection />} />
             {REFERENCE.map(([id]) => <Route key={id} path={id} element={<ConfigTable key={id} collection={id} />} />)}
             <Route path="sns-defaults" element={<Navigate to="../sns-presets" replace />} />   {/* the second SNS screen was removed (2026-11-26): Numbering (SNS) is the one */}
             <Route path="audit-logs" element={<AuditSection />} />
@@ -187,6 +190,11 @@ function RolesSection() {
       <div><h3 style={{ margin: 0 }}>Roles</h3><p className="v2-sub" style={{ margin: '2px 0 0' }}>The platform's roles are fixed by the code that enforces them, so they are shown here, not edited.</p></div>
       <h4 style={{ margin: 0 }}>Platform roles</h4>{table(r.data.roles)}
       <h4 style={{ margin: 0 }}>Roles inside a project</h4>{table(r.data.projectRoles)}
+      {r.data.capabilities?.length ? <>
+        <h4 style={{ margin: 0 }}>Actions inside a project</h4>
+        <p className="v2-sub" style={{ margin: 0 }}>The lowest project role that may do each action. A project's managers can allow one action to a person or group below that role, or deny it (Project settings &gt; Access).</p>
+        <div className="v2-card" data-testid="capabilities"><table className="v2-table"><thead><tr><th>Action</th><th>From role</th></tr></thead><tbody>{r.data.capabilities.map((c) => <tr key={c.capability}><td className="v2-mono">{c.capability}</td><td>{c.minRole}</td></tr>)}</tbody></table></div>
+      </> : null}
     </div>
   );
 }
@@ -195,8 +203,8 @@ function AuditSection() {
   return (
     <div className="v2-stack">
       <div className="v2-row v2-spread">
-        <div><h3 style={{ margin: 0 }}>Audit logs</h3><p className="v2-sub" style={{ margin: '2px 0 0' }}>Who did what, newest first.</p></div>
-        <a className="btn" href={platformApi.AUDIT_CSV} download data-testid="audit-export"><Icon name="download" />Export CSV</a>
+        <div><h3 style={{ margin: 0 }}>Audit logs</h3><p className="v2-sub" style={{ margin: '2px 0 0' }}>Who did what, newest first. Every row is chained and signed; Verify chain shows whether any was changed, removed or inserted.</p></div>
+        <a className="btn" href={platformApi.AUDIT_CSV} download data-testid="audit-export"><Icon name="download" />Export all (CSV)</a>
       </div>
       <Audit />
     </div>
@@ -226,6 +234,7 @@ function SecuritySection() {
     <div className="v2-stack" style={{ maxWidth: 560 }} data-testid="security-policy">
       <div><h3 style={{ margin: 0 }}>Security</h3><p className="v2-sub" style={{ margin: '2px 0 0' }}>How long people stay signed in, and who may approve a release.</p></div>
       {audit && audit.failures > 0 ? <Alert tone="bad">The audit log could not record {audit.failures} action{audit.failures === 1 ? '' : 's'} since the server started (last: {audit.last?.action} at {audit.last?.at}: {audit.last?.error}). The details are in workspace\logs\audit-failures.log.</Alert> : null}
+      {audit?.lastVerification ? <Alert tone={audit.lastVerification.ok ? 'ok' : 'bad'}><span data-testid="sec-audit-verify">Audit chain, last checked {fmtDate(audit.lastVerification.at)}: {audit.lastVerification.summary}.</span>{audit.lastVerification.ok ? null : ' See Audit logs > Verify chain, and docs/OPERATIONS.md section 13.'}</Alert> : null}
       <Field label="Sign out after this many minutes without activity" hint="0 means no idle limit. Typing in an editor counts as activity."><input className="v2-input" type="number" min={0} max={1440} value={form.idleMinutes} onChange={num('idleMinutes')} data-testid="sec-idle" /></Field>
       <Field label="Sign out this many hours after signing in" hint="Whatever happens; one working day is usual."><input className="v2-input" type="number" min={1} max={720} value={form.absoluteHours} onChange={num('absoluteHours')} data-testid="sec-absolute" /></Field>
       <Field label="Shortest password a person may choose" hint="15 or more when there is no second sign-in factor. Existing passwords keep working."><input className="v2-input" type="number" min={8} max={64} value={form.passwordMinLength} onChange={num('passwordMinLength')} data-testid="sec-pwmin" /></Field>
