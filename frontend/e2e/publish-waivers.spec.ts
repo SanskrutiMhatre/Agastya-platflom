@@ -38,7 +38,7 @@ async function missingBrexProject(a: APIRequestContext, name: string): Promise<{
   const pmc = await (await a.get(`${base}/pmc`)).json();
   const dms = ((await (await a.get(`${base}/dms`)).json()).dms as Array<Record<string, unknown>>).filter((d) => d.file === f);
   const entries = [{ type: 'folder', title: 'All', children: dms.map((d) => ({ type: 'dm', dmCode: d.dmCodeAttrs, issueInfo: d.issueInfoAttrs, language: d.languageAttrs, techName: d.techName, infoName: d.infoName })) }];
-  expect((await a.put(`${base}/pmc`, { data: { meta: pmc.meta, entries } })).status()).toBe(200);
+  expect((await a.put(`${base}/pmc`, { data: { meta: pmc.meta, entries, baseHash: pmc.hash } })).status()).toBe(200);
   return { id, file: f };
 }
 
@@ -164,7 +164,7 @@ test('another kind of refusal (a schema error) never offers a waiver', async () 
   const sid = (await sample.json()).project.id as string;
   const dm = ((await (await api.get(`/api/projects/${sid}/dms`)).json()).dms as Array<{ file: string }>)[0].file;
   const cur = await (await api.get(`/api/projects/${sid}/dms/${dm}`)).json();
-  expect((await api.put(`/api/projects/${sid}/dms/${dm}`, { data: { xml: cur.xml.replace('<content>', '<content><zzNope/>') } })).ok()).toBeTruthy();
+  expect((await api.put(`/api/projects/${sid}/dms/${dm}`, { data: { xml: cur.xml.replace('<content>', '<content><zzNope/>'), baseHash: cur.hash } })).ok()).toBeTruthy();
   await page.goto(`/projects/${sid}/editor`);
   await expect(page.getByTestId('studio-host')).toBeVisible();
   await page.getByTestId('generate-btn').click();

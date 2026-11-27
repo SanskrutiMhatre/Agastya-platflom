@@ -356,7 +356,7 @@ test('ancillary pages: choose which are printed, edit one by hand, keep the edit
   // edit one page by hand
   const page = (await w.get(`${A}/foreword`)).json; assert.match(page.xml, /<foreword>/);
   const edited = page.xml.replace('Every care has been taken', 'ANCILLARYEDIT care has been taken');
-  assert.equal((await w.put(`${A}/foreword`, { xml: edited })).status, 200);
+  assert.equal((await w.put(`${A}/foreword`, { xml: edited, baseHash: (await w.get(`${A}/foreword`)).json.hash })).status, 200);
   assert.equal((await w.get(A)).json.pages.find((x) => x.id === 'foreword').edited, true);
   flat = (await text(await build(p.U))).replace(/\s+/g, ' '); assert.match(flat, /ANCILLARYEDIT care has been taken/, 'the edit is printed');
   // a change to Settings must not overwrite a page that was edited by hand
@@ -368,9 +368,9 @@ test('ancillary pages: choose which are printed, edit one by hand, keep the edit
   flat = (await text(await build(p.U))).replace(/\s+/g, ' '); assert.match(flat, /SETTINGSTEXT/); assert.ok(!/ANCILLARYEDIT/.test(flat));
 
   // what a page may not be
-  assert.equal((await w.put(`${A}/foreword`, { xml: '<foreword><para>unclosed</foreword>' })).status, 400, 'malformed XML is refused');
-  assert.equal((await w.put(`${A}/foreword`, { xml: '<other><para>x</para></other>' })).json.code, 'BAD_ROOT');
-  assert.equal((await w.put(`${A}/foreword`, { xml: '<!DOCTYPE foreword [<!ENTITY x "y">]><foreword/>' })).status, 400, 'no DOCTYPE or entities');
+  assert.equal((await w.put(`${A}/foreword`, { xml: '<foreword><para>unclosed</foreword>', baseHash: (await w.get(`${A}/foreword`)).json.hash })).status, 400, 'malformed XML is refused');
+  assert.equal((await w.put(`${A}/foreword`, { xml: '<other><para>x</para></other>', baseHash: (await w.get(`${A}/foreword`)).json.hash })).json.code, 'BAD_ROOT');
+  assert.equal((await w.put(`${A}/foreword`, { xml: '<!DOCTYPE foreword [<!ENTITY x "y">]><foreword/>', baseHash: (await w.get(`${A}/foreword`)).json.hash })).status, 400, 'no DOCTYPE or entities');
   assert.equal((await w.get(`${A}/listOfContents`)).json.code, 'NOT_EDITABLE');
   assert.equal((await w.get(`${A}/nope`)).status, 404);
 });

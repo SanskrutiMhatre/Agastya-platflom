@@ -45,7 +45,10 @@ export async function saveOneFileDocument(s: OneFileSave): Promise<{ xml: string
     let out = s.xml; let merged = false; let base = current;
     if (current !== null && s.baseHash !== undefined && shaOf(current) !== s.baseHash) {
       const older = s.baseHash ? revisionByHash(s.projectId, s.at, s.baseHash) : null;
-      const m = older !== null ? mergeByParts(older, s.xml, current, s.partNames) : { conflicts: ['(unknown base version)'] };
+      // A stale save that changes nothing of its own has nothing to merge: the author is looking at an older version (a conflict, as before WP-11).
+      const m = older === null ? { conflicts: ['(unknown base version)'] }
+        : older === s.xml ? { conflicts: ['(no changes of your own)'] }
+          : mergeByParts(older, s.xml, current, s.partNames);
       if ('conflicts' in m) {
         throw conflict('The document was saved by someone else since you opened it, and your changes overlap theirs (' + m.conflicts.join(', ') + '). Reload to see their changes.', 'STALE_DOCUMENT',
           { currentHash: shaOf(current), conflicts: m.conflicts, xml: current });

@@ -92,7 +92,7 @@ test('UHB: a problem is shown, not hidden - a draft that breaks the schema is sa
   const res = await api.put(`/api/projects/${uhb}/jsg`, { data: { xml: d.xml.replace('<meta>', '<meta><bogus/>'), baseHash: d.hash } });
   expect(res.ok()).toBeTruthy(); expect((await res.json()).report.errors).toBeGreaterThan(0);
   expect((await api.post(`/api/projects/${uhb}/jsg/build`)).status()).toBe(422);
-  await api.put(`/api/projects/${uhb}/jsg`, { data: { xml: d.xml } });
+  await api.put(`/api/projects/${uhb}/jsg`, { data: { xml: d.xml, baseHash: (await (await api.get(`/api/projects/${uhb}/jsg`)).json()).hash } });
 });
 
 // ── Illustrated Spare Parts List ─────────────────────────────────────────────────────────────────────────────────────────────

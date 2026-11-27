@@ -13,7 +13,8 @@ const P = (id: string) => `/api/projects/${id}/jsg`;
 
 export const jsgApi = {
   read: (id: string) => get<JsgDocument>(P(id)),
-  save: (id: string, xml: string, baseHash?: string) => put<{ hash: string; report: JsgReport }>(P(id), { xml, baseHash }),
+  /** WP-11: `merged` = someone else had saved other sections meanwhile; `xml` is then the merged document now on the server. */
+  save: (id: string, xml: string, baseHash?: string) => put<{ hash: string; report: JsgReport; merged?: boolean; xml?: string }>(P(id), { xml, baseHash }),
   validate: (id: string, xml?: string) => post<JsgReport>(`${P(id)}/validate`, xml === undefined ? {} : { xml }),
   build: (id: string) => post<JsgBuild>(`${P(id)}/build`, {}),
   /** Replace the document with a Word file written in the JSG User Handbook styles; its pictures go to the project. */

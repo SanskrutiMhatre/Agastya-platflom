@@ -282,7 +282,7 @@ class StudioSession {
       }
       ed = restore && draft ? await app.openText(draft.text, file, null, { draftId: draft.id }) : await app.openText(doc.xml, file, null);
       if (!ed) return;
-      this.refs.set(ed.doc, object ? { file, hash: '', object: true } : { file, hash: doc.hash ?? '' });
+      this.refs.set(ed.doc, object ? { file, hash: doc.hash ?? '', object: true } : { file, hash: doc.hash ?? '' });
       if (!restore) ed.doc.markSaved();
       else this.notify('Your unsaved changes are back. Save to keep them.', 'info');
       if (!object) await this.linkArtwork(doc.xml);
@@ -334,7 +334,8 @@ class StudioSession {
     const ref = this.refs.get(ed.doc);
     try {
       if (ref?.object) {
-        await csdbApi.saveObject(id, ref.file, text);
+        const out = await csdbApi.saveObject(id, ref.file, text, ref.hash);       // WP-11: saved over the version that was opened
+        this.refs.set(ed.doc, { ...ref, hash: out.hash });
       } else if (ref) {
         const out = await contentApi.saveDm(id, ref.file, text, ref.hash);
         this.refs.set(ed.doc, { file: ref.file, hash: out.hash });

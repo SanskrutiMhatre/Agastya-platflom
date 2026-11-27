@@ -88,6 +88,8 @@ export function JsgEditorPage() {
     try {
       const out = await jsgApi.save(id, ed.getXml(), hashRef.current);
       hashRef.current = out.hash; ed.markSaved(); void draft.clear(); setSavedAt(new Date()); applyFindings(out.report.findings);
+      // WP-11 (decision D22): the save was merged with another author's changes to other parts; show the merged document
+      if (out.merged) { toast('Saved. Another author had changed other parts meanwhile; their changes are kept and shown now.', 'info'); void load(); }
       if (out.report.errors) toast(`Saved as a draft: ${out.report.errors} error${out.report.errors === 1 ? '' : 's'} to fix before a PDF can be built.`, 'info');
       return true;
     } catch (e) {

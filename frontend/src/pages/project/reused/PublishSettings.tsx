@@ -250,7 +250,9 @@ export const PublishSettings: React.FC = () => {
     setSaving(true);
     setError(null);
     try {
-      await settingsApi.save(activeProjectId, { house, project });
+      // WP-11: the save names the version of the settings that was loaded; the answer carries the new one for the next save
+      const r = await settingsApi.save(activeProjectId, { house, project, baseHash: data?.version ?? '' });
+      setData((d) => (d ? { ...d, version: r.version } : d));
       setDirty(false);
       setNote('Saved. The next build will use these settings.');
     } catch (e) {

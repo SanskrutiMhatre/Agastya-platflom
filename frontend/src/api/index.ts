@@ -160,8 +160,9 @@ export const contentApi = {
   uploadMedia: (id: string, file: File, dir: 'csdb' | 'Media' = 'Media') => { const fd = new FormData(); fd.append('dir', dir); fd.append('file', file); return request<{ name: string; path: string }>('POST', `${P(id)}/media`, fd); },
 
   explore: (id: string) => get<Explore>(`${P(id)}/explore`),
-  pmc: (id: string) => get<{ meta: any; entries: any[]; warnings: string[]; counts: { folders: number; dms: number; total: number }; pool: DmSummary[] }>(`${P(id)}/pmc`),
-  savePmc: (id: string, body: { meta: unknown; entries: unknown[] }, allowEmpty = false) => put<{ counts: Explore['counts']; backup: string }>(`${P(id)}/pmc${allowEmpty ? '?allowEmpty=1' : ''}`, body),
+  pmc: (id: string) => get<{ meta: any; entries: any[]; warnings: string[]; counts: { folders: number; dms: number; total: number }; pool: DmSummary[]; hash: string | null }>(`${P(id)}/pmc`),
+  // WP-11: every save names the version it was made from (baseHash); the server refuses one that names none (428) or an older one (409)
+  savePmc: (id: string, body: { meta: unknown; entries: unknown[]; baseHash: string }, allowEmpty = false) => put<{ counts: Explore['counts']; backup: string; hash: string }>(`${P(id)}/pmc${allowEmpty ? '?allowEmpty=1' : ''}`, body),
 
   validation: (id: string) => get<{ run: ValidationRun | null; schemaIssues: string[]; issue?: string }>(`${P(id)}/validation`),
   /** Fix the S1000D issue the project's checks use ('auto' = each module's own). Applies to the page AND the build / release checks. */
@@ -188,7 +189,7 @@ export const contentApi = {
   pdfUrl: (id: string, download = false) => `${P(id)}/publish/pdf${download ? '?download=1' : ''}`,
 
   settings: (id: string) => get<any>(`${P(id)}/settings`),
-  saveSettings: (id: string, body: { house?: unknown; project?: unknown }) => put(`${P(id)}/settings`, body),
+  saveSettings: (id: string, body: { house?: unknown; project?: unknown; baseHash: string }) => put<{ ok: boolean; templateRef: string; version: string }>(`${P(id)}/settings`, body),
 };
 
 // ── Team: accounts, assignment, oversight ─────────────────────────────────
@@ -234,7 +235,8 @@ export const cirApi = {
   /** The modules, and the id of the shared workspace that opens in the editor. */
   list: () => get<{ modules: CirModule[]; workspace: string }>('/api/cir'),
   read: (id: string) => get<{ file: string; xml: string }>(`/api/cir/${encodeURIComponent(id)}`),
-  add: (files: File[], note: string) => { const fd = new FormData(); files.forEach((f) => fd.append('files', f)); fd.append('note', note); return request<{ added: CirModule[] }>('POST', '/api/cir', fd); },
+  /** WP-11: replacing a module already in the repository names its current version (`baseHashes`: file name -> hash); without it the answer is CIR_EXISTS listing them. */
+  add: (files: File[], note: string, baseHashes: Record<string, string> = {}) => { const fd = new FormData(); files.forEach((f) => fd.append('files', f)); fd.append('note', note); if (Object.keys(baseHashes).length) fd.append('baseHashes', JSON.stringify(baseHashes)); return request<{ added: CirModule[] }>('POST', '/api/cir', fd); },
   remove: (id: string) => del(`/api/cir/${encodeURIComponent(id)}`),
   copy: (id: string, projectId: string) => post<{ file: string }>(`/api/cir/${encodeURIComponent(id)}/copy`, { projectId }),
 };

@@ -5,11 +5,12 @@ import { contentApi } from './index';
 import { request } from './client';
 
 export interface CataloguePage { id: string; label: string; title: string | null; generated: boolean; required: boolean }
-export interface SettingsPayload { projectId: string; templateRef: string; house: any; project: any; frontMatterCatalogue: CataloguePage[]; templates?: string[]; canEditHouse?: boolean }
+export interface SettingsPayload { projectId: string; templateRef: string; house: any; project: any; frontMatterCatalogue: CataloguePage[]; templates?: string[]; canEditHouse?: boolean; /** WP-11: the version a save names */ version: string }
 
 export const settingsApi = {
   get: (projectId: string): Promise<SettingsPayload> => contentApi.settings(projectId),
-  save: (projectId: string, body: { house?: any; project?: any }) => contentApi.saveSettings(projectId, body),
+  /** `baseHash`: the `version` of the settings the screen loaded; the answer carries the new one. */
+  save: (projectId: string, body: { house?: any; project?: any; baseHash: string }) => contentApi.saveSettings(projectId, body),
   media: async (projectId: string): Promise<string[]> => (await contentApi.media(projectId)).filter((m) => m.dir === 'Media').map((m) => `Media/${m.name}`),
   /** Browser-loadable URL for a stored `Media/x.png` path. */
   mediaUrl: (projectId: string, mediaPath: string) => contentApi.mediaUrl(projectId, mediaPath.replace(/^Media\//, '')),

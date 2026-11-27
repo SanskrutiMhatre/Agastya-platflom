@@ -58,7 +58,7 @@ test('atomic write: a failure before the rename leaves the old file whole and no
   assert.equal(fs.readFileSync(f, 'utf8'), 'new');
   // a temporary file left by a killed process is swept at start
   fs.writeFileSync(path.join(dir, `.doc.xml.tmp-123-${'a'.repeat(12)}`), 'half');
-  assert.equal(sweepTempFiles(dir, 0), 1);
+  assert.equal(sweepTempFiles(dir, 0, Date.now() + 5000), 1);
   assert.deepEqual(fs.readdirSync(dir), ['doc.xml']);
 });
 
@@ -117,9 +117,10 @@ test('every content-write route carries the version guard (found from the live r
     'PUT /api/projects/:id/s1000d/dm-types': 'S1000D configuration (database rows, manager only)',
     'PATCH /api/projects/:id/sns': 'SNS configuration (database rows, manager only)',
     'PUT /api/projects/:id/applicability': 'S1000D configuration (database rows, manager only)',
-    'PUT /api/projects/:id/sns/ordering': 'SNS ordering (database rows)',
-    'PUT /api/projects/:id/sns/:rowId': 'one SNS row (database row)',
+    'PUT /api/projects/:id/sns-rows/ordering': 'SNS ordering (database rows)',
+    'PUT /api/projects/:id/sns-rows/:rowId': 'one SNS row (database row)',
     'PATCH /api/projects/:id': 'rename (one field, owner only)',
+    'PATCH /api/projects/:id/members/:userId': 'the role of a member (a database row)',
   };
   const unguarded = routes.filter((r) => /^(PUT|PATCH) \/api\/projects\/:id/.test(r.label) && !guardedLabels.has(r.label)).map((r) => r.label);
   assert.deepEqual(unguarded.filter((r) => !EXEMPT[r]), [], 'a project PUT/PATCH with neither the guard nor a stated reason');
