@@ -27,7 +27,7 @@ Source files: `pages/AuthScreens.tsx`, `components/SessionDialogs.tsx`, `App.tsx
 | Forgot password (reset by administrator approval) | | backend `wp04-reset-admin` | |
 | Onboarding of an invited person, forced password change | | `00-platform.spec` "a second person" | |
 | Re-login dialog over the page (`reauth-dialog`, `reauth-password`, `reauth-submit`, `reauth-signout`) | | `wp05-dataloss.spec` | |
-| Server-unreachable banner (`server-unreachable`) | | none: no test uses the id (gap) | |
+| Server-unreachable banner (`server-unreachable`) | WP-22: unchanged id and place; it now also appears when a request fails to connect or gets 502/503/504 while signed in, clears on the next good answer, polls every 5 s and follows the browser offline/online events (UX-025) | none: no test uses the id (gap) | |
 | Activity heartbeat and idle sign-out (no visible control) | | backend `wp03-auth` | |
 
 ## 2. Platform shell: overview, workspace, projects, activity, notifications
@@ -36,7 +36,7 @@ Source files: `layouts/AppShell.tsx`, `pages/Overview.tsx`, `pages/Workspace.tsx
 
 | Old control | New home | Guarding test | Sign-off |
 |---|---|---|---|
-| Dashboard per role (overview) | | `00-platform.spec` roles block | |
+| Dashboard per role (overview) | WP-22: unchanged. The top bar gains "Jump to… Ctrl K" (`jump-open`, the quick switcher: pages, projects, data modules); an error inside a page is caught by an error panel (`error-boundary`, `error-retry`, `error-reload`, `error-copy`) instead of a blank screen. Sample buttons and the Overview/Workspace/Projects merge are NOT done (see the WP-22 log) | `00-platform.spec` roles block | |
 | Workspace and project lists, search and filters (`project-card`, `project-row`, `list-all`, `list-more`, `virtual-rows`) | | `00-platform.spec`, `wp18-performance.spec` | |
 | Activity page for monitors only (`activity-feed`, `activity-people`, `activity-project(s)`, `approvals-queue`) | | `00-platform.spec` roles | |
 | Team and status oversight (`team-table`, `team-row`, `status-row`, `project-status`, `backup`) | | `00-platform.spec` | |
@@ -50,7 +50,7 @@ Source files: `components/project.tsx` (wizard), `pages/Projects.tsx`, `componen
 
 | Old control | New home | Guarding test | Sign-off |
 |---|---|---|---|
-| New project wizard: start create / import, name, domain, manual type, source, MIC, issue, preset, codes, review, done (`wiz-*`, 25 ids) | | `s1000d-config.spec` (wizard), `jsg-editor.spec` (JSG offered), `zz-verify-wizard.spec` | |
+| New project wizard: start create / import, name, domain, manual type, source, MIC, issue, preset, codes, review, done (`wiz-*`, 25 ids) | WP-22: all ids kept; the model code and enterprise code fields show an example and the rule before input, and the wizard offers the model code last used in this browser (`wiz-mic-last`) (UX-024) | `s1000d-config.spec` (wizard), `jsg-editor.spec` (JSG offered), `zz-verify-wizard.spec` | |
 | Import as a project with findings (`import-as-findings`, `import-as-open`, `wiz-import-file`, `wiz-import-reasons`, `wiz-detected`) | | `project-import-package.spec`, `zz-import-refusal.spec` | |
 | Import a package into a project: files / folder / ZIP, scan, options, report, apply, place, assign (`import-*`, `pick-*`, `opt-*`, `selection*`, `tab-*`, `assign-*`, `pool-*`, `res-*`, `report-*`, `finding-group`, `repair-rule`, `tile-files`) | | `project-import-package.spec` | |
 | Export project archive (`export-project-archive`, `export-card`) and archive import | | backend `project-archive`; no browser test uses the ids (gap) | |
@@ -63,7 +63,7 @@ Source files: `layouts/ProjectShell.tsx`, `layouts/projectRail.ts`. Baseline cat
 
 | Old control | New home | Guarding test | Sign-off |
 |---|---|---|---|
-| Editor, Explore, Publication, Graphics, Release, Settings (S1000D, JSS, JSG) | | `doc-pages.spec` (JSS/JSG rail), `00-platform.spec` (S1000D); `parity-dump.test.ts` per kind | |
+| Editor, Explore, Publication, Graphics, Release, Settings (S1000D, JSS, JSG) | WP-22: all kept, same labels and order; a new first item Home (`/projects/:id/home`, not CIR); opening a project still lands in the Editor (owner rule, `00-platform.spec`). A pin at the foot of the rail (`rail-pin`) writes the labels out, remembered per browser. Every project page except the editor has a breadcrumb bar (`project-bar`, `project-bar-name`) with the project name and Jump to. Merging Explore/Publication into Structure and renaming Validation are deferred to WP-35 | `doc-pages.spec` (JSS/JSG rail), `00-platform.spec` (S1000D); `parity-dump.test.ts` per kind | |
 | Ancillary pages (JSS, JSG only) | | `jss-editor.spec`, `jsg-editor.spec` | |
 | Validation with error badge (S1000D only) | | `00-platform.spec` validation | |
 | Release badge (`!` pending, `R<n>` released) | | `00-platform.spec` release | |
@@ -80,7 +80,7 @@ Source files: `studio/**`, `pages/project/EditorPage.tsx`, `pages/project/editor
 | Every accelerator (`studio <key> -> <command>`) | WP-21: all kept; added Mod+K (palette), Mod+. (`view.focus`, the platform's focus mode), Mod+F1 (`view.ribbon`). F1 is also the header's shortcuts button | `parity-dump.test.ts`; walk-through item 7; `wp21-editor-chrome.spec` | |
 | XML / Tags / Design / Split views, synchronised selection | | `zz-dmtypes.spec`, studio unit tests | |
 | Find and replace, go to ID | | studio unit tests | |
-| Validation (schema, BREX), live validation, problems pane, next/previous problem | | `zz-dmtypes.spec`, `publish-gate.spec` | |
+| Validation (schema, BREX), live validation, problems pane, next/previous problem | WP-22: unchanged; the bottom problems pane is at most 25% of the window high (drag clamp 60% to 25%) and Escape inside it hides it | `zz-dmtypes.spec`, `publish-gate.spec` | |
 | Drafts, recovery, conflict dialog | WP-21: unchanged; the refused-save dialog gains "Compare and merge…" (the host's ConflictDialog: per-change choice, schema+BREX check before the save) | `wp05-dataloss.spec`; `editors/host/merge.test.ts` | |
 | Module list and tree, new module, CIR pick, side collapse (`dm-list`, `dm-row`, `chapter-node`, `new-dm`, `view-all`, `view-tree`, `toggle-side`, `collapse-side`, `cir-pick`) | WP-21: unchanged; `toggle-side` is the lead button of the shared editor header; the panel steps aside in focus mode | `00-platform.spec` | |
 | Save state and Save now (`save-state`, `save-now`), split (`editor-split`) | WP-21: the shared header (`editor-header`); `save-state` is always shown (the host's words: All changes saved / Unsaved changes (n documents) / Saving… / Saved HH:MM), `save-now` beside it while something is unsaved; `editor-split` unchanged, Split/PDF in the shared "Editor layout" group (Editor = Write is the new default) | `wp05-dataloss.spec`, `wp21-editor-chrome.spec` | |
@@ -104,7 +104,7 @@ Source files: `pages/project/DocExplorePage.tsx`, `pages/project/DocPublicationP
 | Old control | New home | Guarding test | Sign-off |
 |---|---|---|---|
 | Explore: hierarchy, table and pictures views, search, detail with code, open in editor (`explore-*`) | | `doc-pages.spec` 9, 10 | |
-| Publication: arrange, rename, add and delete chapter, delete section, undo, save, identity, ICN names, appendices, plates, build, download (`pub-*`, `add-chapter`, `undo-arrangement`, `identity-save`, `appendices`, `plates`, `build-publication`, `download-pdf`) | | `doc-pages.spec` 3-8, 12; `docPublication.test.ts` | |
+| Publication: arrange, rename, add and delete chapter, delete section, undo, save, identity, ICN names, appendices, plates, build, download (`pub-*`, `add-chapter`, `undo-arrangement`, `identity-save`, `appendices`, `plates`, `build-publication`, `download-pdf`) | WP-22: all kept; added: add a section to a chapter where the stencil allows it (`add-section`), add an appendix and delete one in a JSG handbook (`add-appendix`, `delete-appendix`), Redo beside Undo (`redo-arrangement`) (GAP-003) | `doc-pages.spec` 3-8, 12; `docPublication.test.ts` | |
 | Code badge switches (`doc-codes-show-dmc`, `doc-codes-pmc`) | | `doc-pages.spec` 2 | |
 | Leave guard | | `doc-pages.spec` 13, 14 | |
 
@@ -115,7 +115,7 @@ Source files: `pages/project/ValidationPage.tsx`, `components/PublishRefusal.tsx
 | Old control | New home | Guarding test | Sign-off |
 |---|---|---|---|
 | Run validation, findings by severity, detail, jump to the editor (`run-validation`, `issue-list`, `issue`, `issue-detail`, `validation-issue`) | | `00-platform.spec` validation | |
-| Mark reviewed, CSV export | | `00-platform.spec` (reviewed marks are browser-only, FE-015) | |
+| Mark reviewed, CSV export | WP-22: same button (`issue-mark-reviewed`); the mark is now the team's, on the server (`/api/projects/:id/problems/reviewed`), shows who and when (`issue-reviewed-by`); reviewers and up may mark (`problems.review`), a viewer sees the button disabled; old browser marks are moved to the server once. CSV unchanged | `00-platform.spec`; `wp22-navigation.spec` (team marks seen by a second person); backend `wp22-problems` | |
 | Publish refusal and waiver offer (`publish-refusal`, `refusal-*`, `waiver-offer`, `waiver-reason`, `waiver-record`, `waiver-subjects`) | | `publish-gate.spec`, `publish-waivers.spec` | |
 
 ## 9. Release and review
@@ -125,7 +125,7 @@ Source files: `pages/project/ReleasePage.tsx`, `components/ReviewReader.tsx`.
 | Old control | New home | Guarding test | Sign-off |
 |---|---|---|---|
 | Request, approve, send back with reason, resubmit (`request-release`, `pending-request`, `approve`, `send-back`, `send-back-reason`, `submit-card`) | | `00-platform.spec` release; backend `release-issue`, `rbac` (separation of duties) | |
-| Review comments and threads (`review-*`, `comment-add`, `comment-text`) | | `00-platform.spec` review | |
+| Review comments and threads (`review-*`, `comment-add`, `comment-text`) | WP-22: unchanged on the Release page; also in every editor: a Comments button in the editor header (`editor-comments`, count `editor-comments-open`), a side panel (`comments-panel`, `editor-comment`, `comment-prev`, `comment-next`, `comments-close`, `editor-comment-open`, `editor-comment-done`), Alt+Shift+N / Alt+Shift+P step through the open comments | `00-platform.spec` review | |
 | Read-only reviewer reader with pinned comments (`review-reader`, `reader-block`, `pin-add`, `pin-text`, `pinned-comment`, `moved-comments`) | | `00-platform.spec` review | |
 | Download released PDF (`download-pdf`), watermark | | `00-platform.spec` | |
 
@@ -163,11 +163,11 @@ Source files: `jss/**`, `pages/project/JssEditorPage.tsx`. Baseline keys `jss ..
 
 | Old control | New home | Guarding test | Sign-off |
 |---|---|---|---|
-| Stencil outline, add chapter, paper, source view, problems (`jss-editor`, `jss-paper`, `jss-source`, `jss-problems`, `jss-add-chapter`) | | `jss-editor.spec` (12), `jss/*.test.ts` | |
+| Stencil outline, add chapter, paper, source view, problems (`jss-editor`, `jss-paper`, `jss-source`, `jss-problems`, `jss-add-chapter`) | WP-22: unchanged; the problems list is at most 25% of the window high and closes with Escape | `jss-editor.spec` (12), `jss/*.test.ts` | |
 | Save, check, generate PDF, download, split, state (`jss-save`, `jss-check`, `jss-generate`, `jss-download`, `jss-split`, `jss-state`, `jss-note`) | WP-21: the shared editor header (`editor-header`, DocEditorShell) carries Check, Save, packages, Convert, Export project and Generate PDF with the same ids; `jss-state` uses the host's words; `jss-split`, `jss-host`, `jss-download`, `jss-note` are drawn by the host (`editors/host/testIds.ts`); Generate opens the PDF pane | `jss-editor.spec`, `wp21-editor-chrome.spec` | |
 | Package import and export (`jss-import`, `jss-import-file`, `jss-import-confirm`, `jss-export`, `jss-package-findings`) | | backend `jssdm`, `jssdm-http`; no browser test uses the ids (gap) | |
 | Drafts and conflict (`draft-*`, `conflict-*`, `jss-conflict`) | WP-21: the host's banners (useDocEditor), same ids; the conflict banner adds `conflict-compare` (Compare and merge…) | `wp05-dataloss.spec`, `wp21-editor-chrome.spec` | |
-| Every key of the JSS registry (Mod+S/Z/Y, Tab, Shift+Tab, Enter, Shift+Enter, Backspace, arrows, dialog Enter/Escape) | WP-21: all kept in `jss/editor.ts`; the host adds Ctrl+K / Ctrl+Shift+P (palette), F1 (shortcuts dialog), Ctrl+. (focus), Ctrl+F / Ctrl+H (find), Esc (`host.*` in the registry) | `editorShortcuts.test.ts`, `jss/editor.test.ts`, `wp21-editor-chrome.spec` | |
+| Every key of the JSS registry (Mod+S/Z/Y, Tab, Shift+Tab, Enter, Shift+Enter, Backspace, arrows, dialog Enter/Escape) | WP-21: all kept in `jss/editor.ts`; the host adds Ctrl+K / Ctrl+Shift+P (palette), F1 (shortcuts dialog), Ctrl+. (focus), Ctrl+F / Ctrl+H (find), Esc (`host.*` in the registry). WP-22: Mod+S saves wherever the focus is on the page (it used to need the focus inside the paper: Esc then Ctrl+S did nothing); Escape in the problems list; host Alt+Shift+N/P (comments) | `editorShortcuts.test.ts`, `jss/editor.test.ts`, `wp21-editor-chrome.spec` | |
 | No find or replace exists (UX-017): not a feature to preserve, a gap | WP-21: closed. The host's find bar (`host-find`, `find-input`, `replace-input`, `replace-one`, `replace-all`) over the paper's editable text, one undo step per replace | `wp21-editor-chrome.spec` | |
 
 ## 14. JSG editors
@@ -180,7 +180,7 @@ Source files: `jsg/**`, `pages/project/JsgEditorPage.tsx`. Baseline keys `jsg ..
 | ISPL plates and parts, preview toggle (`jsg-preview`, `jsg-preview-toggle`) | | `jsg-editor.spec` | |
 | Save, autosave, check, generate, download, Word import, split (`jsg-save`, `jsg-autosave`, `jsg-check`, `jsg-generate`, `jsg-download`, `jsg-import-word`, `jsg-word-input`, `jsg-split`, `jsg-state`, `jsg-note`) | WP-21: the shared editor header (DocEditorShell) with the same ids; the Word import's browser confirm became a ConfirmModal "Replace this handbook?" (GAP-002 in passing); `jsg-state` uses the host's words; Generate opens the PDF pane | `jsg-editor.spec`, `wp21-editor-chrome.spec`; backend `jsg-word`, `jsg-engine` | |
 | Drafts and conflict (`draft-*`, `conflict-*`, `jsg-conflict`) | WP-21: the host's banners, same ids, plus `conflict-compare` | `wp05-dataloss.spec` | |
-| Every key of the JSG registry (Mod+S/F/H/Z/Y, Escape, Enter/Shift+Enter in the find box and in text) | WP-21: all kept (Ctrl+F/H stay the JSG editor's own find bar); the host adds Ctrl+K / Ctrl+Shift+P, F1, Ctrl+., Esc | `editorShortcuts.test.ts`, `wp21-editor-chrome.spec` | |
+| Every key of the JSG registry (Mod+S/F/H/Z/Y, Escape, Enter/Shift+Enter in the find box and in text) | WP-21: all kept (Ctrl+F/H stay the JSG editor's own find bar); the host adds Ctrl+K / Ctrl+Shift+P, F1, Ctrl+., Esc. WP-22: host Alt+Shift+N/P (comments) | `editorShortcuts.test.ts`, `wp21-editor-chrome.spec` | |
 
 ## 15. Project settings and S1000D settings
 
@@ -204,7 +204,7 @@ Source files: `pages/Settings.tsx`, `pages/BackupPage.tsx`. Routes `/settings/*`
 | Account, password, appearance/theme (`appearance`) | | `00-platform.spec`, `zz-theme-states.spec` | |
 | Backup of own projects (`backup-scope`) | | none by id (gap); backend backup tests | |
 | Authors (managers: `/settings/authors [if isManager]`, `new-author`) | | `00-platform.spec` roles | |
-| Users, approvals, sessions, audit (administrators: `/settings/users|approvals|sessions|audit [if isAdmin]`) | | `00-platform.spec` administrator; backend `wp03-auth` | |
+| Users, approvals, sessions, audit (administrators: `/settings/users|approvals|sessions|audit [if isAdmin]`) | WP-22: unchanged; the audit log adds filters by user (`audit-who`) and day (`audit-day`) and shows an IPv4 address without its `::ffff:` wrapper (UX-025) | `00-platform.spec` administrator; backend `wp03-auth` | |
 
 ## 17. Administrator
 
@@ -237,4 +237,5 @@ One line per redesign batch: which groups, the parity report (`verification-resu
 
 | Batch | Groups | Parity report | Before / after tests | Owner sign-off |
 |---|---|---|---|---|
+| WP-22 (2026-11-27) | 1, 2, 3, 4, 5, 7, 8, 9, 13, 14, 16 | `check:parity` PASS, nothing removed | e2e `wp22-navigation.spec` 7/7; visual/a11y suite (6 baselines updated: light+dark publication, validation, release) | |
 | | | | | |
