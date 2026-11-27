@@ -1,0 +1,39 @@
+/* =========================================================================
+   WP-35 second pass: the Validation report on the design system (mockup docs/audit/mockups/validation.html): a filter bar on a card,
+   the finding list beside a sticky detail panel, file groups with their counts, a reviewed badge on each reviewed finding and the detail
+   as a term/description list. Loaded only with ValidationPage's chunk. Colours are tokens only.
+   ========================================================================= */
+.v2-val-notes { margin-bottom: 12px; }
+.v2-val-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 12px; margin-bottom: 12px;
+  background: var(--bg-elev); border: 1px solid var(--border); border-radius: 10px; }
+.v2-val-sev { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 999px;
+  font-size: 12.5px; color: var(--text-muted); cursor: pointer; user-select: none; }
+.v2-val-sev:has(input:checked) { background: var(--accent-soft); border-color: var(--accent); color: var(--text); }
+.v2-val-sev input { margin: 0; }
+.v2-val-sev .v2-sev { margin-top: 0; }
+.v2-val-sev .n { font-variant-numeric: tabular-nums; color: var(--text-faint); }
+.v2-val-sev:has(input:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.v2-val-bar .v2-select { width: 200px; height: 30px; }
+.v2-val-bar .v2-input { width: 220px; height: 30px; }
+.v2-val-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; }
+.v2-val-issue-sel { width: 210px; }
+
+.v2-val-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: 16px; align-items: start; }
+@media (max-width: 1100px) { .v2-val-layout { grid-template-columns: minmax(0, 1fr); } }
+.v2-val-list { overflow: hidden; }
+.v2-val-group { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--border); font-weight: 600; }
+.v2-val-group .v2-trunc { flex: 1; }
+.v2-issue.sel { box-shadow: inset 3px 0 0 var(--accent); }
+.v2-issue:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.v2-issue-body { min-width: 0; flex: 1; }
+.v2-issue-body.done { opacity: .55; }
+.v2-issue-title { font-weight: 600; }
+.v2-issue-detail { white-space: normal; }
+.v2-issue-tags { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: none; }
+
+.v2-val-detail { position: sticky; top: 0; }
+.v2-val-detail h3 { margin: 0; }
+.v2-val-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.v2-kv { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 6px 12px; margin: 0; font-size: 12.5px; }
+.v2-kv dt { color: var(--text-faint); }
+.v2-kv dd { margin: 0; overflow-wrap: anywhere; }
