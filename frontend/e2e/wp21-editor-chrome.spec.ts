@@ -182,8 +182,8 @@ test('JSS find and replace (UX-017): counts the matches, replaces one and all, a
     await expect(page.getByTestId('find-count')).toHaveText('No matches');
     await expect(page.getByTestId('jss-paper')).toContainText('OMEGA one OMEGA two OMEGA');
     await expect(page.getByTestId('jss-state')).toHaveText(/Unsaved changes/);
-    await page.keyboard.press('Escape');
-    await page.keyboard.press('Control+s');
+    await page.keyboard.press('Escape'); await expect(page.getByTestId('host-find')).toHaveCount(0);
+    await page.getByTestId('jss-save').click();
     await expect(page.getByTestId('jss-state')).toHaveText(/Saved/, { timeout: 15_000 });
     expect((await (await author.api.get(`/api/projects/${ids.jss}/jss`)).json()).xml).toContain('OMEGA one OMEGA two OMEGA');
   } finally { await page.context().close(); }
