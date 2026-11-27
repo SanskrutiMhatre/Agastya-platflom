@@ -18,7 +18,7 @@ import { FileMemo } from './fileMemo';
 import { wellFormedError } from './wellFormed';
 import { readProjectJson, csdbRel, mediaRel } from './projectRecord';
 import { assertNewDmAllowed } from './projectConfig';
-import { saveRevisioned, withDocumentLock } from './projectFiles';
+import { saveRevisioned, withDocumentLock, recordBeforeDelete } from './projectFiles';
 import { assertNotLeasedByOther } from './leases';
 
 const { checkXmlSafety } = require('../core/auth/xmlGuard');
@@ -141,8 +141,8 @@ export async function deleteDm(projectId: string, file: string, actor: Actor, pr
   if (!content.exists(projectId, at)) throw notFound('No such data module.');
   if (lockedFor(projectId, rel, actor, projectRole)) throw forbidden('This data module is locked. Only a project owner can delete it.', 'DOCUMENT_LOCKED');
   await assertNotLeasedByOther(projectId, rel, actor);                  // WP-11: a module checked out by someone else is not deleted under them
-  // Keep the last content in history so a deletion can be undone by hand.
-  await cut(projectId, rel, content.readText(projectId, at), actor, 'before-delete');
+  // Keep the last content in history so a deletion can be undone by hand; when that cannot be recorded the module is not deleted (WP-11).
+  await recordBeforeDelete(projectId, rel, actor);
   content.remove(projectId, at);
   await docIndex.syncProject(projectId, projectDirFor(projectId), nowIso());
 }

@@ -161,6 +161,12 @@ test('a revision that cannot be recorded refuses the save (500 REVISION_FAILED) 
   try { r = await owner.put(url, { xml: cur.xml.replace('Hydraulic pump', 'Hydraulic pump (never saved)'), baseHash: cur.hash }); } finally { revisionFaults.beforeCut = null; }
   assert.equal(r.status, 500); assert.equal(r.json.code, 'REVISION_FAILED');
   assert.equal((await owner.get(url)).json.hash, cur.hash, 'the file is unchanged');
+  // nor is a module deleted when its last content cannot be kept in the history
+  revisionFaults.beforeCut = () => { throw new Error('injected: database unavailable'); };
+  let d;
+  try { d = await owner.del(url); } finally { revisionFaults.beforeCut = null; }
+  assert.equal(d.status, 500); assert.equal(d.json.code, 'REVISION_FAILED');
+  assert.equal((await owner.get(url)).status, 200, 'still there');
 });
 
 test('a file changed on disk outside the platform is recorded in the history before it is overwritten', async () => {

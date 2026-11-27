@@ -71,6 +71,15 @@ export async function saveRevisioned(projectId: string, relOrAbs: string, text: 
   return { created: true };
 }
 
+/** Before a file is deleted: record its last content in the history, or throw REVISION_FAILED so the caller does not delete it. */
+export async function recordBeforeDelete(projectId: string, relOrAbs: string, actor: RevisionActor): Promise<void> {
+  const rel = posix(projectId, relOrAbs);
+  try {
+    const doc = docIndex.resolve(projectId, rel) ?? await documentOf(projectId, rel);
+    if (doc) record(projectId, rel, doc.id, null, content.readText(projectId, rel), actor, 'before-delete');
+  } catch (e) { throw revisionFailed(e); }
+}
+
 interface RevisionRow { id: number | bigint; reason: string; created_at: string; created_by: string | null; size: number; hash: string }
 
 export interface RevisionSummary { id: number; reason: string; at: string; by: string | null; size: number; hash: string }
