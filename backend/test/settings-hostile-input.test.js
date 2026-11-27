@@ -46,10 +46,10 @@ test('the unit rule: only a plain relative path inside the project is honoured; 
 test('the settings route refuses every hostile file location (400) and leaves project.json as it was', async () => {
   const U = `/api/projects/${own}/settings`;
   const before = fs.readFileSync(P.projectJsonPath(own), 'utf8');
-  const { project } = (await bob.get(U)).json;
+  const { project, version } = (await bob.get(U)).json;
   for (const key of ['csdbDir', 'mediaDir', 'pm']) {
     for (const v of HOSTILE) {
-      const r = await bob.put(U, { project: { ...project, input: { ...(project.input || {}), [key]: v } } });
+      const r = await bob.put(U, { project: { ...project, input: { ...(project.input || {}), [key]: v } }, baseHash: version });
       assert.equal(r.status, 400, `${key}=${JSON.stringify(v).slice(0, 40)} -> ${r.status}`);
       assert.equal(r.json.code, 'UNSAFE_PATH');
     }
@@ -59,19 +59,19 @@ test('the settings route refuses every hostile file location (400) and leaves pr
 
 test('the settings route keeps the project\'s kind: format, authoring, type and id cannot be changed (400); name, folder and input keep the value on disk', async () => {
   const U = `/api/projects/${own}/settings`;
-  const { project } = (await bob.get(U)).json;
+  const { project, version } = (await bob.get(U)).json;
   for (const [k, v] of [['format', 'jss'], ['authoring', 'jss-xml'], ['type', 'JSS'], ['id', 'carol-pump']]) {
-    const r = await bob.put(U, { project: { ...project, [k]: v } });
+    const r = await bob.put(U, { project: { ...project, [k]: v }, baseHash: version });
     assert.equal(r.status, 400, `${k} -> ${r.status}`); assert.equal(r.json.code, 'PROTECTED_SETTING');
   }
-  const ok = await bob.put(U, { project: { ...project, name: 'Renamed Behind Your Back', group: 'Elsewhere', input: { csdbDir: 'other' }, sideText: { enabled: false } } });
+  const ok = await bob.put(U, { project: { ...project, name: 'Renamed Behind Your Back', group: 'Elsewhere', input: { csdbDir: 'other' }, sideText: { enabled: false } }, baseHash: version });
   assert.equal(ok.status, 200, JSON.stringify(ok.json));
   const pj = JSON.parse(fs.readFileSync(P.projectJsonPath(own), 'utf8'));
   assert.equal(pj.name, project.name, 'the name has its own route');
   assert.equal(pj.group ?? null, project.group ?? null, 'so has the folder');
   assert.deepEqual(pj.input ?? null, project.input ?? null, 'and the file layout is not a setting');
   assert.equal(pj.sideText.enabled, false, 'an ordinary setting is saved');
-  assert.equal((await bob.put(U, { project: { ...pj, sideText: { enabled: true } } })).status, 200, 'saving what the screen loaded works');
+  assert.equal((await bob.put(U, { project: { ...pj, sideText: { enabled: true } }, baseHash: (await bob.get(U)).json.version })).status, 200, 'saving what the screen loaded works');
 });
 
 test('a project.json already poisoned on disk cannot reach another project: the read sites use the standard folders and the start-up scan reports it', async () => {

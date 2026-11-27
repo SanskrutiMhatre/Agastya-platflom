@@ -73,7 +73,7 @@ async function project(issue, name, { rules = GOOD_RULES, refBrex = true } = {})
   const pmc = (await w.get(`/api/projects/${id}/pmc`)).json;
   const list = (await w.get(`/api/projects/${id}/dms`)).json.dms.filter((d) => names.includes(d.file));
   const entries = [{ type: 'folder', title: 'All', children: list.map((d) => ({ type: 'dm', dmCode: d.dmCodeAttrs, issueInfo: d.issueInfoAttrs, language: d.languageAttrs, techName: d.techName, infoName: d.infoName })) }];
-  assert.equal((await w.put(`/api/projects/${id}/pmc`, { meta: pmc.meta, entries })).status, 200);
+  assert.equal((await w.put(`/api/projects/${id}/pmc`, { meta: pmc.meta, entries, baseHash: (await w.get(`/api/projects/${id}/pmc`)).json.hash })).status, 200);
   return { id, names };
 }
 const put = async (id, f, fn) => { const cur = (await w.get(`/api/projects/${id}/dms/${f}`)).json; const r = await w.put(`/api/projects/${id}/dms/${f}`, { xml: fn(cur.xml), baseHash: cur.hash }); assert.equal(r.status, 200, `${f} saved as a draft: ${JSON.stringify(r.json).slice(0, 200)}`); return cur.xml; };

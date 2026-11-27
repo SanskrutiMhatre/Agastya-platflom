@@ -57,7 +57,7 @@ async function place(id, files) {
   const pmc = (await w.get(`/api/projects/${id}/pmc`)).json;
   const list = (await w.get(`/api/projects/${id}/dms`)).json.dms.filter((d) => files.includes(d.file));
   const entries = [{ type: 'folder', title: 'All', children: list.map((d) => ({ type: 'dm', dmCode: d.dmCodeAttrs, issueInfo: d.issueInfoAttrs, language: d.languageAttrs, techName: d.techName, infoName: d.infoName })) }];
-  assert.equal((await w.put(`/api/projects/${id}/pmc`, { meta: pmc.meta, entries })).status, 200);
+  assert.equal((await w.put(`/api/projects/${id}/pmc`, { meta: pmc.meta, entries, baseHash: (await w.get(`/api/projects/${id}/pmc`)).json.hash })).status, 200);
 }
 const breakSchema = (xml) => xml.replace('<content>', '<content><zzNope/>');
 const pdfMtime = (id) => { const f = path.join(process.env.AGASTYA_WORKSPACE_DIR, 'projects', id, 'jss-output.pdf'); return fs.existsSync(f) ? fs.statSync(f).mtimeMs : 0; };

@@ -225,7 +225,7 @@ test('a fixed-chapter type refuses other chapters; the Part IV volumes take the 
   const uh = await create('naval-uhb', 'R uhb'); const g = (await w.get(`${uh.U}/jss`)).json;
   assert.ok(rules(await check(uh.U, g.xml.replace('<title>Miscellaneous</title>', '<title>Something else</title>'))).includes('JSS-CHAPTERS'));
   // a Land type's document cannot be saved into a Naval project
-  const wrong = await w.put(`${uh.U}/jss`, { xml: g.xml.replace('docType="naval-uhb"', 'docType="uhb"') }); assert.equal(wrong.status, 400); assert.equal(wrong.json.code, 'DOCTYPE_MISMATCH');
+  const wrong = await w.put(`${uh.U}/jss`, { xml: g.xml.replace('docType="naval-uhb"', 'docType="uhb"'), baseHash: (await w.get(`${uh.U}/jss`)).json.hash }); assert.equal(wrong.status, 400); assert.equal(wrong.json.code, 'DOCTYPE_MISMATCH');
   for (const id of ['naval-tm-4-1', 'naval-tm-4-2']) {
     const p = await create(id, `R ${id}`); const d = (await w.get(`${p.U}/jss`)).json;
     const renamed = d.xml.replace('<title>System or Subsystem Name</title>', '<title>Power Output Cabinet (POC)</title>').replace('<title>System or Sub-system Name</title>', '<title>Power Output Cabinet (POC)</title>');

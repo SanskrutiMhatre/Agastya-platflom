@@ -51,7 +51,7 @@ test.before(async () => {
   pid = (await alice.post('/api/projects', { name: 'Alice Pump', templateRef: 'default' })).json.project.id;
   assert.equal((await alice.post(`/api/projects/${pid}/dms`, { file: DM, xml: h.sample(DM) })).status, 201);
   const pmc = (await alice.get(`/api/projects/${pid}/pmc`)).json;
-  assert.equal((await alice.put(`/api/projects/${pid}/pmc`, { meta: pmc.meta, entries: [{ type: 'folder', title: 'Chapter 1', children: [{ type: 'include', title: 'Pump', href: `csdb/${DM}` }] }] })).status, 200);
+  assert.equal((await alice.put(`/api/projects/${pid}/pmc`, { meta: pmc.meta, entries: [{ type: 'folder', title: 'Chapter 1', children: [{ type: 'include', title: 'Pump', href: `csdb/${DM}` }] }], baseHash: (await alice.get(`/api/projects/${pid}/pmc`)).json.hash })).status, 200);
   assert.equal((await alice.post(`/api/projects/${pid}/assign`, { username: 'meera', role: 'manager' })).status, 200);
 });
 test.after(async () => { await h.close(); });
@@ -236,7 +236,7 @@ test('an approval survives the first build: a manual approved before it was ever
   const id = (await alice.post('/api/projects', { name: 'Never Built' })).json.project.id;
   await alice.post(`/api/projects/${id}/dms`, { file: DM, xml: h.sample(DM) });
   const pmc = (await alice.get(`/api/projects/${id}/pmc`)).json;
-  assert.equal((await alice.put(`/api/projects/${id}/pmc`, { meta: pmc.meta, entries: [{ type: 'folder', title: 'C', children: [{ type: 'include', title: 'P', href: `csdb/${DM}` }] }] })).status, 200);
+  assert.equal((await alice.put(`/api/projects/${id}/pmc`, { meta: pmc.meta, entries: [{ type: 'folder', title: 'C', children: [{ type: 'include', title: 'P', href: `csdb/${DM}` }] }], baseHash: (await alice.get(`/api/projects/${id}/pmc`)).json.hash })).status, 200);
   await alice.post(`/api/projects/${id}/assign`, { username: 'meera', role: 'manager' });
   assert.equal((await alice.post(`/api/projects/${id}/release`, {})).status, 200);
   const rel = (await alice.get(`/api/projects/${id}/release`)).json;
@@ -307,7 +307,20 @@ test('CIR: a shared workspace - everyone adds and edits, only a Project Manager 
   // everyone may EDIT: another author saves a change, and replaces by upload
   const got = await carol.get(`/api/projects/${ws}/dms/${DM}`);
   assert.equal((await alice.put(`/api/projects/${ws}/dms/${DM}`, { xml: got.json.xml.replace('Hydraulic pump', 'Hydraulic pump (edited)'), baseHash: got.json.hash })).status, 200);
-  assert.equal((await alice.req('POST', '/api/cir', form([[DM, h.sample(DM)]]))).status, 201, 'an upload replaces it');
+  // WP-11 (SEC-017, REL-002): replacing by upload is the uploader's (or a Project Manager's / an administrator's), and names the current version
+  const notTheirs = await alice.req('POST', '/api/cir', form([[DM, h.sample(DM)]]));
+  assert.equal(notTheirs.status, 403, 'another author cannot replace a module by upload (editing it in the editor stays open to everyone)');
+  assert.equal(notTheirs.json.code, 'CIR_REPLACE_ROLE');
+  const unconfirmed = await carol.req('POST', '/api/cir', form([[DM, h.sample(DM)]]));
+  assert.equal(unconfirmed.status, 409, 'a replacement must be confirmed with the current version');
+  assert.equal(unconfirmed.json.code, 'CIR_EXISTS');
+  const current = unconfirmed.json.existing.find((e) => e.file === DM).hash;
+  const stale = await carol.req('POST', '/api/cir', form([[DM, h.sample(DM)]], { baseHashes: JSON.stringify({ [DM]: 'f'.repeat(64) }) }));
+  assert.equal(stale.status, 409); assert.equal(stale.json.code, 'EDIT_CONFLICT');
+  assert.equal((await carol.req('POST', '/api/cir', form([[DM, h.sample(DM)]], { baseHashes: JSON.stringify({ [DM]: current }) }))).status, 201, 'the uploader replaces it, naming the version');
+  const listed = (await alice.get('/api/cir')).json.modules.find((m) => m.file === DM);
+  assert.equal(listed.addedByName, 'Carol Author', 'the first uploader is kept');
+  assert.equal(listed.updatedByName, 'Carol Author', 'and who replaced it is shown');
 
   // only a Project Manager or an administrator may DELETE - not even the Author who added it
   assert.equal((await alice.del(`/api/cir/${encodeURIComponent(DM)}`)).status, 403);
@@ -400,7 +413,7 @@ test('the S1000D issue chosen on the Validation page drives the schema check, th
 
   // a module that names the issue-6 default BREX is judged by the chosen issue's default instead
   const dm = h.sample(DM).replace(/(<brexDmRef>[\s\S]*?systemDiffCode=")[A-Z]/, '$1H');
-  assert.equal((await alice.put(`/api/projects/${pid}/dms/${DM}`, { xml: dm })).status, 200);
+  assert.equal((await alice.put(`/api/projects/${pid}/dms/${DM}`, { xml: dm, baseHash: (await alice.get(`/api/projects/${pid}/dms/${DM}`)).json.hash })).status, 200);
   const { checkModuleBrex } = require('../dist/services/brex');
   const rep = (iss) => checkModuleBrex(dm, undefined, iss);
   assert.match(rep('4.2').result.brexSource ?? '', /4\.2/);
@@ -409,7 +422,7 @@ test('the S1000D issue chosen on the Validation page drives the schema check, th
 
   // a project settings save must not wipe the choice
   const cur = (await alice.get(`/api/projects/${pid}/settings`)).json;
-  assert.equal((await alice.put(`/api/projects/${pid}/settings`, { project: cur.project })).status, 200);
+  assert.equal((await alice.put(`/api/projects/${pid}/settings`, { project: cur.project, baseHash: (await alice.get(`/api/projects/${pid}/settings`)).json.version })).status, 200);
   assert.equal((await alice.get(`/api/projects/${pid}/validation`)).json.issue, '4.2');
   assert.equal((await alice.put(`/api/projects/${pid}/validation/issue`, { issue: 'auto' })).json.issue, 'auto');
 });

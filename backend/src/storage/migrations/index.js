@@ -25,7 +25,7 @@ const ORDER = [
   '019-review-comment-anchor',
   '020-login-throttle',
   '021-project-lifecycle',
-  '022-document-leases',
+  '023-document-leases',
 ];
 
 const MIGRATIONS = ORDER.map((name) => require(`./${name}`));

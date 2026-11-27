@@ -98,10 +98,10 @@ test('data modules: create, read, save, conflict, history', async () => {
 
 test('writes refuse hostile and damaged XML', async () => {
   const xxe = h.sample(DM_DESC).replace('<!DOCTYPE dmodule [', '<!DOCTYPE dmodule [\n<!ENTITY x SYSTEM "file:///c:/windows/win.ini">');
-  const r = await writer.put(`/api/projects/${pid}/dms/${DM_DESC}`, { xml: xxe });
+  const r = await writer.put(`/api/projects/${pid}/dms/${DM_DESC}`, { xml: xxe, baseHash: (await writer.get(`/api/projects/${pid}/dms/${DM_DESC}`)).json.hash });
   assert.equal(r.status, 400);
   assert.equal(r.json.code, 'UNSAFE_XML');
-  const notDm = await writer.put(`/api/projects/${pid}/dms/${DM_DESC}`, { xml: '<?xml version="1.0"?><x/>' });
+  const notDm = await writer.put(`/api/projects/${pid}/dms/${DM_DESC}`, { xml: '<?xml version="1.0"?><x/>', baseHash: (await writer.get(`/api/projects/${pid}/dms/${DM_DESC}`)).json.hash });
   assert.equal(notDm.json.code, 'NOT_A_DM');
 });
 
@@ -117,9 +117,9 @@ test('publication: place modules, explore resolves them, unplaced and missing ar
     { type: 'folder', title: 'Chapter 1', children: [{ type: 'include', title: 'Pump', href: `csdb/${DM_DESC}` }] },
     { type: 'folder', title: 'Chapter 2', children: [{ type: 'include', title: 'Gone', href: 'csdb/DMC-NOPE.xml' }] },
   ];
-  const saved = await writer.put(`/api/projects/${pid}/pmc`, { meta: pmc.meta, entries });
+  const saved = await writer.put(`/api/projects/${pid}/pmc`, { meta: pmc.meta, entries, baseHash: (await writer.get(`/api/projects/${pid}/pmc`)).json.hash });
   assert.equal(saved.status, 200);
-  assert.equal((await writer.put(`/api/projects/${pid}/pmc`, { entries: [] })).status, 400, 'empty publication refused');
+  assert.equal((await writer.put(`/api/projects/${pid}/pmc`, { entries: [], baseHash: (await writer.get(`/api/projects/${pid}/pmc`)).json.hash })).status, 400, 'empty publication refused');
 
   ex = (await writer.get(`/api/projects/${pid}/explore`)).json;
   assert.equal(ex.tree.length, 2);
@@ -136,7 +136,7 @@ test('publication: a module placed as a dmRef (what the builder writes) leaves t
   const pmc = (await writer.get(`/api/projects/${pid}/pmc`)).json;
   const before = pmc.pool.length;
   const entries = [...pmc.entries, { type: 'folder', title: 'Chapter 3', children: [{ type: 'dm', dmCode: d.dmCodeAttrs, issueInfo: d.issueInfoAttrs, language: d.languageAttrs, techName: d.techName, infoName: d.infoName }] }];
-  assert.equal((await writer.put(`/api/projects/${pid}/pmc`, { meta: pmc.meta, entries })).status, 200);
+  assert.equal((await writer.put(`/api/projects/${pid}/pmc`, { meta: pmc.meta, entries, baseHash: (await writer.get(`/api/projects/${pid}/pmc`)).json.hash })).status, 200);
   const after = (await writer.get(`/api/projects/${pid}/pmc`)).json;
   assert.equal(after.pool.length, before - 1, 'placed module is no longer in the pool');
   const ex = (await writer.get(`/api/projects/${pid}/explore`)).json;
@@ -144,7 +144,7 @@ test('publication: a module placed as a dmRef (what the builder writes) leaves t
   assert.equal(ch3.children[0].kind, 'dm');
   assert.equal(ch3.children[0].file, DM_PROC);
   // put it back so the later tests see the state they expect
-  await writer.put(`/api/projects/${pid}/pmc`, { meta: pmc.meta, entries: pmc.entries });
+  await writer.put(`/api/projects/${pid}/pmc`, { meta: pmc.meta, entries: pmc.entries, baseHash: (await writer.get(`/api/projects/${pid}/pmc`)).json.hash });
 });
 
 test('validation: finds the missing publication entry and records the run', async () => {
@@ -207,7 +207,7 @@ test('access control: non-members see nothing; a viewer cannot write; an invited
   assert.equal((await priya.post(`/api/invitations/${mine.json.invitations[0].id}/accept`)).status, 200);
 
   assert.equal((await priya.get(`/api/projects/${pid}/dms`)).status, 200);
-  const w = await priya.put(`/api/projects/${pid}/dms/${DM_DESC}`, { xml: h.sample(DM_DESC) });
+  const w = await priya.put(`/api/projects/${pid}/dms/${DM_DESC}`, { xml: h.sample(DM_DESC), baseHash: (await priya.get(`/api/projects/${pid}/dms/${DM_DESC}`)).json.hash });
   assert.equal(w.status, 403);
   assert.equal((await priya.post(`/api/projects/${pid}/release`, { scheduledAt: new Date(Date.now() + 5000).toISOString() })).status, 403);
   assert.equal((await priya.post('/api/admin/users', { username: 'x1y2z3', fullName: 'X Y' })).status, 403);

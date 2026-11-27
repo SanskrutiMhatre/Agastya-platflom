@@ -105,7 +105,7 @@ test('the User Handbook takes its cover artwork and first-aid figures from the s
   uhbId = r.json.project.id; const d = path.join(h.ws, 'projects', uhbId);
   const doc = (await w.get(`/api/projects/${uhbId}/jsg`)).json;
   const xml = doc.xml.replace(/<warning>\s*<item><\/item>/, '<warning><item>Do not touch.</item>');          // the first of the stencil's six numbered lines
-  assert.equal((await w.put(`/api/projects/${uhbId}/jsg`, { xml })).json.report.errors, 0);
+  assert.equal((await w.put(`/api/projects/${uhbId}/jsg`, { xml, baseHash: (await w.get(`/api/projects/${uhbId}/jsg`)).json.hash })).json.report.errors, 0);
   const b = await w.post(`/api/projects/${uhbId}/jsg/build`); assert.equal(b.status, 200, JSON.stringify(b.json).slice(0, 400));
   const fo = fs.readFileSync(path.join(d, 'jsg-output.fo'), 'utf8');
   for (const f of ['emblem.png', 'supplier-logo.png', 'firstaid-1.png', 'firstaid-2.png', 'firstaid-3.png', 'firstaid-4.png']) assert.ok(fo.includes(f), `the FO does not use ${f}`);

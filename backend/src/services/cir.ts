@@ -86,10 +86,10 @@ export function noteAdded(file: string, userId: string, note = ''): void {
 }
 export const forget = (file: string): void => { const m = store.cirByFile(file); if (m) store.cirDelete(m.id); };
 
-export async function read(file: string): Promise<{ file: string; xml: string }> {
+export async function read(file: string): Promise<{ file: string; xml: string; hash: string }> {
   const id = await workspaceId();
   const out = csdb.readDm(id, file);
-  return { file: out.file, xml: out.xml };
+  return { file: out.file, xml: out.xml, hash: out.hash };      // hash: the version a replacement names (WP-11)
 }
 
 /**

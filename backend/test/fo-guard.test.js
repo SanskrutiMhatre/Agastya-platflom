@@ -68,7 +68,7 @@ test('end to end: a planted publisher logo URL is never fetched by a build, and 
   const evil = `http://127.0.0.1:${port}/pixel.png`;
   // the settings route refuses it ...
   const { project } = (await w.get(`${U}/settings`)).json;
-  const refused = await w.put(`${U}/settings`, { project: { ...project, publishers: [{ name: 'Attacker Co', addressLines: [], logo: evil }] } });
+  const refused = await w.put(`${U}/settings`, { project: { ...project, publishers: [{ name: 'Attacker Co', addressLines: [], logo: evil }] }, baseHash: (await w.get(`${U}/settings`)).json.version });
   assert.equal(refused.status, 400); assert.equal(refused.json.code, 'UNSAFE_ARTWORK');
   // ... so plant it the way a forged archive or an old project could have it
   const pjPath = path.join(h.ws, 'projects', id, 'project.json');

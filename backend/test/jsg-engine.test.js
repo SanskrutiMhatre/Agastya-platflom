@@ -46,20 +46,20 @@ test('a JSG User Handbook project: its own source file, no S1000D publication mo
 
 test('saving: malformed XML is refused, a schema-invalid draft is kept and reported, a stale hash is a conflict', async () => {
   const d = (await w.get(`/api/projects/${id}/jsg`)).json;
-  assert.equal((await w.put(`/api/projects/${id}/jsg`, { xml: '<jsgdoc' })).json.code, 'MALFORMED_XML');
+  assert.equal((await w.put(`/api/projects/${id}/jsg`, { xml: '<jsgdoc', baseHash: (await w.get(`/api/projects/${id}/jsg`)).json.hash })).json.code, 'MALFORMED_XML');
   const draft = d.xml.replace('<meta>', '<meta><bogus/>');
   const bad = await w.put(`/api/projects/${id}/jsg`, { xml: draft, baseHash: d.hash });
   assert.equal(bad.status, 200); assert.ok(bad.json.report.errors > 0); assert.ok(bad.json.report.findings.some((f) => f.rule === 'JSG-SCHEMA'));
   assert.match(fs.readFileSync(path.join(dir, 'jsg-document.xml'), 'utf8'), /<bogus\/>/, 'the draft is stored');
   const stale = await w.put(`/api/projects/${id}/jsg`, { xml: d.xml, baseHash: d.hash });
   assert.equal(stale.status, 409); assert.equal(stale.json.code, 'STALE_DOCUMENT');
-  const wrongType = await w.put(`/api/projects/${id}/jsg`, { xml: d.xml.replace('type="uhb"', 'type="ispl"') });
+  const wrongType = await w.put(`/api/projects/${id}/jsg`, { xml: d.xml.replace('type="uhb"', 'type="ispl"'), baseHash: (await w.get(`/api/projects/${id}/jsg`)).json.hash });
   assert.equal(wrongType.json.code, 'DOCTYPE_MISMATCH');
   // a draft cannot be published
   const blocked = await w.post(`/api/projects/${id}/jsg/build`);
   assert.equal(blocked.status, 422); assert.equal(blocked.json.code, 'VALIDATION_FAILED');
   // restore the good document
-  assert.equal((await w.put(`/api/projects/${id}/jsg`, { xml: d.xml })).json.report.errors, 0);
+  assert.equal((await w.put(`/api/projects/${id}/jsg`, { xml: d.xml, baseHash: (await w.get(`/api/projects/${id}/jsg`)).json.hash })).json.report.errors, 0);
 });
 
 test('a table that does not hold together, an absolute picture path and a dangling cross-reference are errors', async () => {

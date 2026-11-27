@@ -164,7 +164,7 @@ test('the schema and the stencil rules catch what they should, each naming the p
 
 test('saving: malformed XML is refused; a draft that breaks the rules is kept and reported; a stale save is refused; the type cannot be switched', async () => {
   const p = await create('mm'); const g = (await w.get(`${p.U}/jss`)).json;
-  const bad = await w.put(`${p.U}/jss`, { xml: g.xml.replace('</body>', '') });
+  const bad = await w.put(`${p.U}/jss`, { xml: g.xml.replace('</body>', ''), baseHash: (await w.get(`${p.U}/jss`)).json.hash });
   assert.equal(bad.status, 400); assert.equal(bad.json.code, 'MALFORMED_XML');
   assert.equal(fs.readFileSync(path.join(p.dir, 'publication.xml'), 'utf8'), g.xml, 'nothing was stored');
 
@@ -175,19 +175,19 @@ test('saving: malformed XML is refused; a draft that breaks the rules is kept an
 
   const stale = await w.put(`${p.U}/jss`, { xml: g.xml, baseHash: g.hash });
   assert.equal(stale.status, 409); assert.equal(stale.json.code, 'STALE_DOCUMENT');
-  const wrongType = await w.put(`${p.U}/jss`, { xml: g.xml.replace('docType="mm"', 'docType="uhb"') });
+  const wrongType = await w.put(`${p.U}/jss`, { xml: g.xml.replace('docType="mm"', 'docType="uhb"'), baseHash: (await w.get(`${p.U}/jss`)).json.hash });
   assert.equal(wrongType.status, 400); assert.equal(wrongType.json.code, 'DOCTYPE_MISMATCH');
-  assert.equal((await w.put(`${p.U}/jss`, { notxml: 1 })).status, 400);
+  assert.equal((await w.put(`${p.U}/jss`, { notxml: 1, baseHash: (await w.get(`${p.U}/jss`)).json.hash })).status, 400);
 });
 
 test('the publication gate: a document with errors is not built, with the findings; fixing it builds', async () => {
   const p = await create('orm'); const g = (await w.get(`${p.U}/jss`)).json;
-  await w.put(`${p.U}/jss`, { xml: g.xml.replace('<chapter number="2"', '<chapter number="7"') });
+  await w.put(`${p.U}/jss`, { xml: g.xml.replace('<chapter number="2"', '<chapter number="7"'), baseHash: (await w.get(`${p.U}/jss`)).json.hash });
   const refused = await w.post(`${p.U}/publish`, {});
   assert.equal(refused.status, 422, JSON.stringify(refused.json).slice(0, 300)); assert.equal(refused.json.code, 'VALIDATION_FAILED');
   assert.ok(refused.json.findings.some((f) => f.rule === 'JSS-CHAPTER-NUMBER'));
   const rel = await w.post(`${p.U}/release`, { note: 'x' }); assert.equal(rel.status, 422, 'a release is held to the same check');
-  await w.put(`${p.U}/jss`, { xml: g.xml });
+  await w.put(`${p.U}/jss`, { xml: g.xml, baseHash: (await w.get(`${p.U}/jss`)).json.hash });
   const ok = await w.post(`${p.U}/publish`, {}); assert.equal(ok.status, 200, JSON.stringify(ok.json).slice(0, 300));
 });
 
@@ -217,7 +217,7 @@ test('UHB end to end: what the author writes is what the PDF prints, in the sten
   const p = await create('uhb', 'UHB e2e');
   const g = (await w.get(`${p.U}/jss`)).json;
   const authored = RICH(g.xml, p.dir);
-  const saved = await w.put(`${p.U}/jss`, { xml: authored });
+  const saved = await w.put(`${p.U}/jss`, { xml: authored, baseHash: (await w.get(`${p.U}/jss`)).json.hash });
   assert.equal(saved.status, 200); assert.equal(saved.json.report.errors, 0, JSON.stringify(saved.json.report.findings.filter((f) => f.severity === 'error')));
 
   const f = await build(p.U); const t = await text(f); const flat = t.replace(/\s+/g, ' ');
@@ -283,7 +283,7 @@ test('MM and ORM build from their own stencil chapters, with their own cover tit
   for (const [id, cover, firstChapter] of [['mm', /TECHNICAL MANUAL PART II MAINTENANCE|TECHNICAL MANUAL\s+PART II MAINTENANCE/, 'Inspection and Maintenance Routine'], ['orm', /TECHNICAL MANUAL PART III OVERHAUL AND RECONDITIONING|TECHNICAL MANUAL\s+PART III OVERHAUL AND RECONDITIONING/, 'Dismantling and Re-assembly']]) {
     const p = await create(id, `${id} e2e`); const g = (await w.get(`${p.U}/jss`)).json;
     const body = into(g.xml, firstChapter, '<para>Authored paragraph for ' + id + '.</para>');
-    assert.equal((await w.put(`${p.U}/jss`, { xml: body })).status, 200);
+    assert.equal((await w.put(`${p.U}/jss`, { xml: body, baseHash: (await w.get(`${p.U}/jss`)).json.hash })).status, 200);
     const flat = (await text(await build(p.U))).replace(/\s+/g, ' ');
     assert.match(flat, cover, `${id} cover title`);
     assert.ok(flat.includes(firstChapter), `${id}: the first chapter title is printed`);
@@ -302,12 +302,12 @@ test('six heading levels, a notice holding nested lists, and full-width notices 
     + '<table id="tdeep"><title>Deep table</title><thead><row><cell>H1</cell><cell align="right">H2</cell></row></thead><tbody><row><cell>DEEPCELL</cell><cell align="center">x</cell></row></tbody></table>'
     + '</section></section></section></section>';
   const xml = into(g.xml, 'Purpose', '<para>Opening.</para>').replace('<title>Purpose</title><para>Opening.</para>', '<title>Purpose</title><para>Opening.</para>' + deep);
-  const saved = await w.put(`${p.U}/jss`, { xml });
+  const saved = await w.put(`${p.U}/jss`, { xml, baseHash: (await w.get(`${p.U}/jss`)).json.hash });
   assert.equal(saved.status, 200); assert.equal(saved.json.report.errors, 0, JSON.stringify(saved.json.report.findings.filter((f) => f.severity === 'error')));
   const tooDeep = xml.replace('<para>Deepest text.</para>', '<para>Deepest text.</para><section><title>Level seven</title></section>');
-  const refused = await w.put(`${p.U}/jss`, { xml: tooDeep });
+  const refused = await w.put(`${p.U}/jss`, { xml: tooDeep, baseHash: (await w.get(`${p.U}/jss`)).json.hash });
   assert.ok(JSON.stringify(refused.json).includes('JSS-DEPTH') || refused.json.report?.errors > 0, 'a seventh level is still refused');
-  assert.equal((await w.put(`${p.U}/jss`, { xml })).status, 200);
+  assert.equal((await w.put(`${p.U}/jss`, { xml, baseHash: (await w.get(`${p.U}/jss`)).json.hash })).status, 200);
 
   const f = await build(p.U); const { doc } = await G.openPdf(f);
   const mm = (v) => v / 72 * 25.4;
@@ -361,7 +361,7 @@ test('ancillary pages: choose which are printed, edit one by hand, keep the edit
   flat = (await text(await build(p.U))).replace(/\s+/g, ' '); assert.match(flat, /ANCILLARYEDIT care has been taken/, 'the edit is printed');
   // a change to Settings must not overwrite a page that was edited by hand
   const s = (await w.get(`${p.U}/settings`)).json.project; s.frontMatter = { ...(s.frontMatter ?? {}), foreword: { ...(s.frontMatter?.foreword ?? {}), text: 'SETTINGSTEXT replaced' } };
-  assert.equal((await w.put(`${p.U}/settings`, { project: s })).status, 200);
+  assert.equal((await w.put(`${p.U}/settings`, { project: s, baseHash: (await w.get(`${p.U}/settings`)).json.version })).status, 200);
   flat = (await text(await build(p.U))).replace(/\s+/g, ' '); assert.match(flat, /ANCILLARYEDIT/, 'the hand edit survives a rebuild'); assert.ok(!/SETTINGSTEXT/.test(flat));
   // reset gives the page back to Settings
   const reset = await w.post(`${A}/foreword/reset`, {}); assert.equal(reset.status, 200); assert.equal(reset.json.page.edited, false); assert.match(reset.json.xml, /SETTINGSTEXT replaced/);
