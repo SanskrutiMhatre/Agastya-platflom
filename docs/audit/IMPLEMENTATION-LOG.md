@@ -365,6 +365,22 @@ verified, and what is left or blocked.
 * Left: (1) the Studio stylesheets (58.7 KB of the 82 KB entry CSS) still load with the entry: they also define the app-wide tokens and
   resets, which WP-19 (design tokens) is rewriting; moving them belongs with it. (2) `e2e/wp18-performance.spec.ts` was written, not run
   (the lead's runner); the per-save and navigation counts above are by construction and unit test until it runs.
+* Follow-up after the WP-18 + WP-19 merge (a6fc459), item (1) done. Merged, `check:bundle` failed: initial 186.6 KB gzip, entry CSS
+  101.3 KB raw. Now: initial 122.0 KB gzip (budget 180), entry CSS 59.3 KB raw, Studio chunk 264.0 KB gzip (budget 300).
+  - The app-wide head of `studio/styles/app.css` (resets, body, buttons, fields, modal dialogs, spinner and `@keyframes spin`, which
+    states.css uses, reduced motion, the print body rule, the `.x-table` margin used by two platform pages) is `styles/base.css` in the
+    entry. `app.css` and `document.css` load with the Studio editor (`studio/styles/load.ts`, from `EditorRoute`) as `?url` links put
+    AHEAD of the entry sheets, so the cascade is the old one (platform.css and states.css override Studio rules by coming later). Only
+    base.css moved relative to them; two rules that beat a base rule by order alone are restated one step more specific (end of app.css).
+    states.test.ts reads the sheets in the new cascade order. The JSS/JSG editors and the platform pages use only base.css classes (grep).
+  - Pages a session does not start on (Settings, Administrator, Backup, Activity, Notifications, Graphics, CIR, the preview window,
+    the project Explore/Publication/Validation/Graphics/Ancillary/Release/Settings pages) are lazy routes: entry JS 368.7 -> 148.7 KB.
+  - Entry CSS is still over 30 KB (tokens.css for both themes, platform.css whole); the CSS budget stays advisory. Splitting platform.css
+    per page changes its cascade and was not done.
+  - Regression fixed (e2e 00-platform "the saved publication hierarchy shows in the left panel"): with the progressive tree, collapsing
+    the only open chapter made the row total, and so the draw limit, 0, and the chapter itself was skipped, so the tree vanished. The
+    layout is now `pages/project/editor/publicationTree.ts`, which counts down only when the limit cuts rows;
+    `publicationTree.test.ts` (5) failed 2/5 on the old logic and passes.
 
 ### Environment notes
 

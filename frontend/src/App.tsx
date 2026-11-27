@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { Suspense, lazy, useEffect, useRef, type ComponentType, type ReactNode } from 'react';
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { useSession } from './store/session';
 import { authApi } from './api';
@@ -9,23 +9,28 @@ import { AppShell } from './layouts/AppShell';
 import { Overview } from './pages/Overview';
 import { Workspace } from './pages/Workspace';
 import { Projects } from './pages/Projects';
-import { Activity } from './pages/Activity';
 import { canMonitor } from './lib/roles';
-import { Settings } from './pages/Settings';
-import { Notifications } from './pages/Notifications';
-import { PreviewWindow } from './pages/PreviewWindow';
-import { GraphicsPage } from './pages/Graphics';
-import { CirPage } from './pages/Cir';
-import { BackupPage } from './pages/BackupPage';
-import { AdministratorPage } from './pages/Administrator';
-import { ProjectGraphicsPage } from './pages/project/GraphicsPage';
 import { ProjectShell } from './layouts/ProjectShell';
-import { ExploreRoute } from './pages/project/ExploreRoute';
-import { PublicationRoute } from './pages/project/PublicationRoute';
-import { ValidationPage } from './pages/project/ValidationPage';
-import { ReleasePage } from './pages/project/ReleasePage';
-import { AncillaryRoute } from './pages/project/AncillaryRoute';
-import { ProjectSettingsPage } from './pages/project/ProjectSettingsPage';
+
+// WP-18 (FE-020): the sign-in screens, the shells and the pages a session starts on (Overview, Workspace, Projects, the
+// project editor) are in the entry; every other page is its own chunk, fetched the first time it is opened.
+const page = <K extends string>(load: () => Promise<Record<K, ComponentType>>, name: K) => lazy(() => load().then((m) => ({ default: m[name] })));
+const Activity = page(() => import('./pages/Activity'), 'Activity');
+const Settings = page(() => import('./pages/Settings'), 'Settings');
+const Notifications = page(() => import('./pages/Notifications'), 'Notifications');
+const PreviewWindow = page(() => import('./pages/PreviewWindow'), 'PreviewWindow');
+const GraphicsPage = page(() => import('./pages/Graphics'), 'GraphicsPage');
+const CirPage = page(() => import('./pages/Cir'), 'CirPage');
+const BackupPage = page(() => import('./pages/BackupPage'), 'BackupPage');
+const AdministratorPage = page(() => import('./pages/Administrator'), 'AdministratorPage');
+const ProjectGraphicsPage = page(() => import('./pages/project/GraphicsPage'), 'ProjectGraphicsPage');
+const ExploreRoute = page(() => import('./pages/project/ExploreRoute'), 'ExploreRoute');
+const PublicationRoute = page(() => import('./pages/project/PublicationRoute'), 'PublicationRoute');
+const ValidationPage = page(() => import('./pages/project/ValidationPage'), 'ValidationPage');
+const ReleasePage = page(() => import('./pages/project/ReleasePage'), 'ReleasePage');
+const AncillaryRoute = page(() => import('./pages/project/AncillaryRoute'), 'AncillaryRoute');
+const ProjectSettingsPage = page(() => import('./pages/project/ProjectSettingsPage'), 'ProjectSettingsPage');
+const lazyEl = (el: ReactNode) => <Suspense fallback={<Loading />}>{el}</Suspense>;
 
 // The editors (the S1000D Studio: CodeMirror, pdfmake, the schema engine; the JSS editor) are large and only this route needs them: EditorRoute loads the one that fits.
 import { FocusTooltip } from './components/FocusTooltip';
@@ -75,26 +80,26 @@ export function App() {
         <Route path="overview" element={<Overview />} />
         <Route path="workspace" element={<Workspace />} />
         <Route path="projects" element={<Projects />} />
-        {canMonitor(user) ? <Route path="activity" element={<Activity />} /> : null}
-        <Route path="notifications" element={<Notifications />} />
-        <Route path="graphics" element={<GraphicsPage />} />
-        <Route path="cir" element={<CirPage />} />
-        <Route path="backup" element={<BackupPage />} />
-        {user?.role === 'admin' ? <Route path="administrator/*" element={<AdministratorPage />} /> : null}
-        <Route path="settings/*" element={<Settings />} />
+        {canMonitor(user) ? <Route path="activity" element={lazyEl(<Activity />)} /> : null}
+        <Route path="notifications" element={lazyEl(<Notifications />)} />
+        <Route path="graphics" element={lazyEl(<GraphicsPage />)} />
+        <Route path="cir" element={lazyEl(<CirPage />)} />
+        <Route path="backup" element={lazyEl(<BackupPage />)} />
+        {user?.role === 'admin' ? <Route path="administrator/*" element={lazyEl(<AdministratorPage />)} /> : null}
+        <Route path="settings/*" element={lazyEl(<Settings />)} />
       </Route>
-      <Route path="preview/:id/:mode" element={<PreviewWindow />} />
+      <Route path="preview/:id/:mode" element={lazyEl(<PreviewWindow />)} />
       <Route path="projects/:id" element={<ProjectShell />}>
         <Route index element={<Navigate to="editor" replace />} />
         <Route path="editor" element={<EditorRoute />} />
-        <Route path="explore" element={<ExploreRoute />} />
-        <Route path="publication" element={<PublicationRoute />} />
-        <Route path="validation" element={<ValidationPage />} />
-        <Route path="graphics" element={<ProjectGraphicsPage />} />
-        <Route path="ancillary" element={<AncillaryRoute />} />
-        <Route path="release" element={<ReleasePage />} />
+        <Route path="explore" element={lazyEl(<ExploreRoute />)} />
+        <Route path="publication" element={lazyEl(<PublicationRoute />)} />
+        <Route path="validation" element={lazyEl(<ValidationPage />)} />
+        <Route path="graphics" element={lazyEl(<ProjectGraphicsPage />)} />
+        <Route path="ancillary" element={lazyEl(<AncillaryRoute />)} />
+        <Route path="release" element={lazyEl(<ReleasePage />)} />
         <Route path="csdb" element={<Navigate to="../editor" replace />} />   {/* the Files (CSDB) page was removed; an old link lands in the editor */}
-        <Route path="settings/*" element={<ProjectSettingsPage />} />
+        <Route path="settings/*" element={lazyEl(<ProjectSettingsPage />)} />
       </Route>
       <Route path="*" element={<Navigate to="/overview" replace />} />
     </Routes>

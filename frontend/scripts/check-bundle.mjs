@@ -52,7 +52,9 @@ const failures = [];
 if (initialGzip > BUDGETS.initialGzip) failures.push(`initial JS + CSS ${kb(initialGzip)} gzip is over ${kb(BUDGETS.initialGzip)}`);
 if (studio.length && studioGzip > BUDGETS.studioGzip) failures.push(`the Studio chunk ${kb(studioGzip)} gzip is over ${kb(BUDGETS.studioGzip)}`);
 if (!studio.length) failures.push('no EditorPage-*.js chunk found (the Studio is no longer split out?)');
-// Advisory until the Studio styles move into the Studio chunk: they also hold the app-wide tokens and resets, which WP-19 (design tokens) owns.
+// Still advisory: the Studio sheets now load with the Studio chunk (studio/styles/load.ts), but the entry keeps tokens.css (both
+// themes, WP-19), base.css, platform.css (every platform page in one sheet), pdf.css and states.css, about 59 KB minified.
+// Getting under 30 KB means splitting platform.css per page, which changes its cascade order; not done yet.
 const warnings = [];
 if (entryCssRaw > BUDGETS.entryCssRaw) (process.env.CHECK_BUNDLE_STRICT_CSS === '1' ? failures : warnings).push(`the entry stylesheet ${kb(entryCssRaw)} is over ${kb(BUDGETS.entryCssRaw)}`);
 for (const d of duplicates) failures.push(`${d.files.length} copies of ${d.name}: ${d.files.join(', ')}`);

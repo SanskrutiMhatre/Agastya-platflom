@@ -14,6 +14,7 @@ import { studio, useStudio } from '../../../lib/studioSession';
 import { useSession } from '../../../store/session';
 import { useUi } from '../../../store/ui';
 import { MoreRows, VirtualRows, useProgressive } from '../../../components/windowing';
+import { countTreeRows, layoutTree, type TreeItem } from './publicationTree';
 
 type View = 'tree' | 'all';
 
@@ -108,49 +109,30 @@ export function EditorSide({ ctx, refreshKey, treeKey, width, onCollapse }: { ct
   };
 
   const matchNode = (n: Extract<ExploreNode, { kind: 'dm' }>) => match({ file: n.file, title: n.title, dmc: n.dmc, infoName: n.infoName, techName: byFile.get(n.file)?.techName });
-  /** How many module rows the tree would draw (open chapters, matching the filter): the total the progressive drawing counts against. */
-  const countRows = (nodes: ExploreNode[], path: string): number => nodes.reduce((sum, n, i) => {
-    const key = `${path}/${i}`;
-    if (n.kind === 'chapter') return sum + (!q && closed.has(key) ? 0 : countRows(n.children, key));
-    return sum + (n.kind === 'dm' && matchNode(n) ? 1 : 0);
-  }, 0);
-  // WP-18 (FE-030): in a large publication the tree draws its first rows and more as the end comes into view
-  let budget = Number.MAX_SAFE_INTEGER;
+  const treeOpts = { closed, q, match: matchNode };
 
-  /** Chapters with their modules, in publication order. A chapter is shown when it, or anything in it, matches the filter. */
-  const renderNodes = (nodes: ExploreNode[], depth: number, path: string): React.ReactNode[] => nodes.flatMap((n, i): React.ReactNode[] => {
-    const key = `${path}/${i}`;
-    if (n.kind === 'chapter') {
-      if (budget <= 0) return [];
-      const shut = !q && closed.has(key);
-      const inner = shut ? [] : renderNodes(n.children, depth + 1, key);
-      if (q && inner.length === 0) return [];
-      return [(
-        <div key={key} data-testid="chapter-node">
-          <button className="v2-chap" style={{ paddingLeft: 4 + depth * 14 }} onClick={() => toggle(key)} aria-expanded={!shut}>
-            <Icon name={shut ? 'right' : 'down'} size={13} /><Icon name="folder" size={14} /><span className="v2-trunc">{n.title || 'Untitled chapter'}</span><span className="v2-hint">{n.dmCount}</span>
-          </button>
-          {shut ? null : inner}
-        </div>
-      )];
-    }
-    if (n.kind === 'dm') {
-      const d = byFile.get(n.file);
-      if (!matchNode(n) || budget <= 0) return [];
-      budget--;
-      return [row({ file: n.file, title: d?.techName || n.title, sub: n.infoName || n.dmc, indent: depth + 0.5 })];
-    }
-    if (n.kind === 'missing' && !q) return [<div key={key} className="v2-hint" style={{ padding: `2px 8px 2px ${12 + depth * 14}px` }} title="Listed in the publication but not in the project">Missing: {n.ref}</div>];
-    return [];
+  /** Draws the laid-out tree (publicationTree.ts): chapters with their modules, in publication order. */
+  const renderItems = (items: TreeItem[]): React.ReactNode[] => items.map((it) => {
+    if (it.kind === 'chapter') return (
+      <div key={it.key} data-testid="chapter-node">
+        <button className="v2-chap" style={{ paddingLeft: 4 + it.depth * 14 }} onClick={() => toggle(it.key)} aria-expanded={!it.shut}>
+          <Icon name={it.shut ? 'right' : 'down'} size={13} /><Icon name="folder" size={14} /><span className="v2-trunc">{it.title || 'Untitled chapter'}</span><span className="v2-hint">{it.dmCount}</span>
+        </button>
+        {it.shut ? null : renderItems(it.children)}
+      </div>
+    );
+    if (it.kind === 'dm') return row({ file: it.node.file, title: byFile.get(it.node.file)?.techName || it.node.title, sub: it.node.infoName || it.node.dmc, indent: it.depth + 0.5 });
+    return <div key={it.key} className="v2-hint" style={{ padding: `2px 8px 2px ${12 + it.depth * 14}px` }} title="Listed in the publication but not in the project">Missing: {it.ref}</div>;
   });
 
   const rows: DmSummary[] = (list.data ?? []).filter(match);
   const unplaced = (explore.data?.unplaced ?? []).filter(match);
-  const treeTotal = view === 'tree' && explore.data ? countRows(explore.data.tree, 'r') + unplaced.length : 0;
+  // WP-18 (FE-030): in a large publication the tree draws its first rows and more as the end comes into view
+  const treeTotal = view === 'tree' && explore.data ? countTreeRows(explore.data.tree, treeOpts) + unplaced.length : 0;
   const progressive = useProgressive(treeTotal, `${q}|${view}|${ctx.id}`);
-  budget = progressive.limit;
-  const tree = explore.data ? renderNodes(explore.data.tree, 0, 'r') : [];
-  const unplacedShown = unplaced.slice(0, Math.max(0, budget));
+  const laid = explore.data ? layoutTree(explore.data.tree, { ...treeOpts, limit: progressive.limit, total: treeTotal }) : { items: [], left: progressive.limit };
+  const tree = renderItems(laid.items);
+  const unplacedShown = unplaced.slice(0, Math.max(0, laid.left));
   const treeShown = progressive.limit;
 
   return (
