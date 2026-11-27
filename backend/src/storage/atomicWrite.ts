@@ -70,6 +70,35 @@ export function writeFileAtomic(target: string, data: string | Uint8Array, encod
   fsyncDir(path.dirname(target));
 }
 
+/**
+ * WP-30 (QA-008, found by the chaos suite): make `tmp` - a complete file that another program wrote under a `tempNameFor` name, such as FOP's
+ * PDF - the file `target`: flush it, rename it over the target (retrying the transient Windows refusals), flush the folder. A server killed
+ * while the program was still writing leaves only the temporary file (swept by `sweepTempFiles`), never a torn `target`. On failure the
+ * temporary file is removed and `target` is as it was.
+ */
+export function commitFile(tmp: string, target: string): void {
+  try {
+    const fd = fs.openSync(tmp, 'r+');
+    try { fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+    if (atomicFaults.beforeRename) atomicFaults.beforeRename(target, tmp);
+    renameWithRetry(tmp, target);
+  } catch (e) {
+    try { fs.unlinkSync(tmp); } catch { /* never written, or already renamed */ }
+    throw e;
+  }
+  fsyncDir(path.dirname(target));
+}
+
+/** Copy `src` over `target` atomically (a sibling temporary copy, then `commitFile`). */
+export function copyFileAtomic(src: string, target: string): void {
+  const tmp = tempNameFor(target);
+  try { fs.copyFileSync(src, tmp); } catch (e) { try { fs.unlinkSync(tmp); } catch { /* none */ } throw e; }
+  commitFile(tmp, target);
+}
+
+/** Remove `tmp` if it is there (a build that failed before `commitFile`). */
+export function discardTemp(tmp: string): void { try { fs.unlinkSync(tmp); } catch { /* never written */ } }
+
 /** Is this a temporary file left by an interrupted atomic write? */
 export const isAtomicTemp = (name: string): boolean => TMP_RE.test(name);
 

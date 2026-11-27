@@ -24,6 +24,7 @@ import { readProjectJson } from '../projects';
 import { releaseStateOf } from '../release';
 import { injectPdfInfo, firstText, type PdfInfo } from '../pdfInfo';
 import { assertJsgPublishable, jsgTypeOfProject, JSG_ENGINE_DIR, SOURCE_NAME, readSource } from './service';
+import { tempNameFor, commitFile, discardTemp } from '../../storage/atomicWrite';
 
 const paths = vendor('engine/paths');
 const fontConf = vendor('engine/fontconf');
@@ -146,6 +147,9 @@ export function buildJsgPdf(projectId: string): Promise<JsgBuild> {
     } catch (e) { console.error(`[jsg:${projectId}] watermark/release resolution failed:`, (e as Error).message); }
     const info = jsgPdfInfo(projectId, sourceXml);
     let warmFop = false;
+    // WP-30 (QA-008, found by the chaos suite): FOP writes a temporary sibling, renamed to the PDF only when complete (commitFile): a server
+    // killed mid-build never leaves a torn jsg-output.pdf
+    const pdfTmp = tempNameFor(path.join(dir, PDF_NAME)); const pdfTmpName = path.basename(pdfTmp);
 
     try {
       const render = async (total?: number): Promise<void> => {
@@ -161,14 +165,14 @@ export function buildJsgPdf(projectId: string): Promise<JsgBuild> {
         log('Generating PDF (FOP)...');
         let used = false;
         if (fopd.isAvailable()) {
-          try { await fopd.render({ baseDir: dir, foPath: foAbs, pdfPath: path.join(dir, PDF_NAME) }); used = true; }
+          try { await fopd.render({ baseDir: dir, foPath: foAbs, pdfPath: pdfTmp }); used = true; }
           catch (e) { log(`Warm FOP unavailable (${(e as Error).message}); running FOP via java`); }
         }
         if (!used) {
           const fopArgs: string[] = paths.FOP_ARGS.slice();
           const conf = fontConf.fopConf();
           if (conf) fopArgs.push('-c', conf);
-          fopArgs.push('-fo', FO_NAME, '-pdf', PDF_NAME);
+          fopArgs.push('-fo', FO_NAME, '-pdf', pdfTmpName);
           await run(paths.JAVA, fopArgs, dir);
         }
         warmFop = used;
@@ -176,10 +180,11 @@ export function buildJsgPdf(projectId: string): Promise<JsgBuild> {
       await render();
       // the certificate may say how many pages the book has ({total}): the first render counts them, the second prints the number. (Every other page number is a citation FOP resolves itself.)
       if (/\{total\}/.test(sourceXml)) {
-        const counted = pdfPageCount(path.join(dir, PDF_NAME));
+        const counted = pdfPageCount(pdfTmp);
         if (counted) { log(`The certificate cites the page count: ${counted} pages. Rendering again...`); await render(counted); }
       }
     } catch (e) {
+      discardTemp(pdfTmp);
       if (e instanceof HttpError) { log(e.message, { error: true, done: true }); throw e; }
       const message = `Build failed: ${why(e)}`;
       console.error(`[jsg:${projectId}] ${message}\n${(e as any)?.stderr ?? ''}`);
@@ -188,7 +193,8 @@ export function buildJsgPdf(projectId: string): Promise<JsgBuild> {
     }
 
     const abs = path.join(dir, PDF_NAME);
-    if (!fs.existsSync(abs) || fs.statSync(abs).size === 0) throw new HttpError(500, 'Build failed: FOP wrote no PDF.', 'BUILD_FAILED');
+    if (!fs.existsSync(pdfTmp) || fs.statSync(pdfTmp).size === 0) { discardTemp(pdfTmp); throw new HttpError(500, 'Build failed: FOP wrote no PDF.', 'BUILD_FAILED'); }
+    commitFile(pdfTmp, abs);
     try { fs.writeFileSync(path.join(dir, BUILD_STATE), JSON.stringify({ fingerprint: rendered.fingerprint, released: rendered.released, builtAt: new Date().toISOString() }), 'utf8'); } catch { /* the PDF is then reported as stale */ }
     const totalMs = Date.now() - t0;
     log(`Done in ${(totalMs / 1000).toFixed(1)}s (${warmFop ? 'warm FOP' : 'FOP via java'})`, { done: true });

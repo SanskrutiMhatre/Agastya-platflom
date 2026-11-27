@@ -102,9 +102,30 @@ export async function createPlatformBackup(o: CreateBackupOptions): Promise<Crea
   try { return await job; } finally { running = null; }
 }
 
+/**
+ * WP-30 (QA-008, seen in the chaos suite): a backup cut off by a killed server leaves its `.partial` archive and its `.staging-` folder (the
+ * database image) behind - never listed as a backup, but each one as large as a backup. The next backup removes those that nothing has
+ * written to for ten minutes (a backup being written by the CLI next to the server keeps touching its own files).
+ */
+function sweepAbandoned(backupDir: string, idleMs = 10 * 60_000): void {
+  let names: string[] = []; try { names = fs.readdirSync(backupDir); } catch { return; }
+  const now = Date.now();
+  for (const n of names) {
+    if (!/\.zip\.partial$/.test(n) && !/^\.staging-/.test(n)) continue;
+    const p = path.join(backupDir, n);
+    try {
+      const st = fs.statSync(p);
+      let newest = st.mtimeMs;
+      if (st.isDirectory()) for (const f of fs.readdirSync(p)) { try { newest = Math.max(newest, fs.statSync(path.join(p, f)).mtimeMs); } catch { /* gone */ } }
+      if (now - newest >= idleMs) fs.rmSync(p, { recursive: true, force: true });
+    } catch { /* in use or gone: tried again next time */ }
+  }
+}
+
 async function writeBackup(o: CreateBackupOptions): Promise<CreatedBackup> {
   const backupDir = path.resolve(o.backupDir);
   fs.mkdirSync(backupDir, { recursive: true });
+  sweepAbandoned(backupDir);
   let name = `agastya-backup-${stampOf(o.nowIso)}-${o.kind}.zip`;
   for (let n = 1; fs.existsSync(path.join(backupDir, name)); n++) name = `agastya-backup-${stampOf(o.nowIso)}-${o.kind}-${n}.zip`;
   const file = path.join(backupDir, name);
