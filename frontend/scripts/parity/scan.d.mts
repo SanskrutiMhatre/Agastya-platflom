@@ -9,4 +9,5 @@ export function scanRoutes(): ParityItem[];
 export function scanTestIds(): { items: ParityItem[]; computed: Record<string, number>; auditScope: { files: number; literal: number } };
 export function scanTests(): ParityItem[];
 export function scanHandlerKeys(): ParityItem[];
+export function testidsWithoutBrowserTest(ids: string[]): string[];
 export function staticSurface(): { routes: ParityItem[]; testids: ParityItem[]; tests: ParityItem[]; handlerKeys: ParityItem[]; info: Record<string, unknown> };

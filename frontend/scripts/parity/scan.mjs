@@ -206,6 +206,13 @@ function dedupe(items) {
   return items.map((it) => { const n = (seen.get(it.key) ?? 0) + 1; seen.set(it.key, n); return n > 1 ? { ...it, key: `${it.key} #${n}` } : it; });
 }
 
+/** The test ids no browser spec mentions: controls with no browser guard (the "guard gap" of the checklist). */
+export function testidsWithoutBrowserTest(ids) {
+  const e2e = path.join(FRONTEND, 'e2e');
+  const text = walk(e2e, (x) => /\.(ts|mjs)$/.test(x)).map(read).join('\n');
+  return ids.filter((id) => !text.includes(id));
+}
+
 export function staticSurface() {
   const testids = scanTestIds();
   return {
@@ -213,7 +220,10 @@ export function staticSurface() {
     testids: testids.items,
     tests: scanTests(),
     handlerKeys: scanHandlerKeys(),
-    info: { testidsComputedPerFile: testids.computed, auditScopeTestids: testids.auditScope },
+    info: {
+      testidsComputedPerFile: testids.computed, auditScopeTestids: testids.auditScope,
+      testidsWithoutBrowserTest: testidsWithoutBrowserTest(testids.items.map((i) => i.key)),
+    },
   };
 }
 
