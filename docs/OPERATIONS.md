@@ -112,11 +112,15 @@ By default the server answers on this computer only (`Bind=loopback`). To serve 
 
 1. Set `Bind=lan` (or choose *Allow other computers on the network* in the installer, or `AgastyaCtl.exe --install-service --lan`).
 2. Allow the port through the Windows Firewall. The installer option does it for you (an inbound rule named *Agastya Platform (LAN access)* for
-   `runtime\node.exe`, TCP, **private and domain networks only**). By hand:
-   `netsh advfirewall firewall add rule name="Agastya Platform" dir=in action=allow protocol=TCP localport=4040 program="C:\Program Files\Agastya Platform\runtime\node.exe" profile=private,domain`
+   the port, TCP, **private and domain networks only**; bound to the port because the program folder changes with every update). By hand:
+   `AgastyaCtl.exe --configure-server --firewall` (elevated), or
+   `netsh advfirewall firewall add rule name="Agastya Platform (LAN access)" dir=in action=allow protocol=TCP localport=4040 profile=private,domain`
 3. Give the server a certificate (below, "Mode B: TLS"). Without one the server does **not** start on a network address; the server log and
    `AgastyaCtl.exe --doctor` name the missing setting.
 4. People open `https://<server name>:4040/`.
+
+The whole team-server set-up - certificate, configuration, service, backup with a standby copy, clients, load and capacity - is the runbook in
+section 13.
 
 Every action needs a signed-in account; there is no anonymous access.
 
@@ -340,7 +344,9 @@ On a network server (Mode B) people can sign in with their domain account (WP-27
 **LDAPS only** (TLS 1.2 or later, the certificate verified, no plain LDAP, no StartTLS), and the directory groups the person is in decide their
 role. On this computer only (Mode A) the setting is refused at start: a desktop installation keeps local accounts.
 
-Set these as **system environment variables** for the service (there is no `agastya.ini` section yet), then restart:
+Set them in the `[directory]` section of `agastya.ini` (WP-28: `Url`, `BaseDn`, `BindDn`, `BindPasswordFile`, `CaFile`, `GroupBaseDn`,
+`LoginAttribute`, `UserClass`, `NestedGroups`, `TimeoutMs`, `SyncHours` - a relative file path is relative to `agastya.ini`), or as system
+environment variables for the service; then restart. The ini key and the variable are the same setting:
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
@@ -434,3 +440,145 @@ connection* with a known user name, map one test group, sign in as a member, che
 
 A clean stop (the tray's Stop, `net stop`, closing the console) lets requests that are running finish for up to 15 seconds, then writes
 the database's journal back into `publisher.db` and gives the data folder back. A copy of the data folder taken after a clean stop is complete.
+
+## 13. Team server runbook (Mode B)
+
+One Windows server runs the platform as a service; people use it from their own computers through a browser (or the Edge app window a client
+installation opens). This section is the whole procedure. Sizing assumption (audit PRD-007): up to **25 people working at once out of 100
+named accounts, and 100 projects**.
+
+### 13.1 Install the server
+
+1. **Machine.** Windows Server 2019 or later (or Windows 10/11 Pro), 64-bit, 4 cores or more, 8 GB of memory, an SSD with room for the
+   projects plus at least three backups. A fixed DNS name (for example `docs.example.local`) that every client resolves.
+2. **Setup**, elevated, with *Run as a Windows service* and *Allow other computers on the network*. Unattended:
+   `Agastya-Platform-<ver>-win-x64-Setup.exe /VERYSILENT /LAN /SERVERNAMES=docs.example.local,docs /ADMINUSER=admin /ADMINPASSWORDFILE=C:\temp\pw.txt`
+   adds a certificate (next step) before the service starts. With your organisation's certificate add `/TLSPFX=<file> /TLSPASSFILE=<file>`
+   or `/TLSCERT=<pem> /TLSKEY=<pem>`; with neither, Setup makes a private CA and a server certificate for `SERVERNAMES` (default: the
+   computer's name).
+3. **Certificate by hand** (or to change it later), elevated, from the program folder:
+
+   ```
+   AgastyaCtl.exe --configure-server --name docs.example.local --name docs --make-cert            (a private CA, 397 days)
+   AgastyaCtl.exe --configure-server --name docs.example.local --pfx D:\certs\docs.pfx --passphrase-file D:\certs\pass.txt
+   AgastyaCtl.exe --configure-server --name docs.example.local --cert server.pem --key server-key.pem
+   ```
+
+   The material is copied to `<state>\tls\` (an earlier file is kept as `*.old-<time>`), `[server] Bind=lan`, `Mode=server`, `ServerNames` and
+   `[tls]` are written to `agastya.ini`, and `tls\` is limited to SYSTEM, the Administrators and LOCAL SERVICE (read). With `--make-cert` the
+   CA's private key goes to `tls\ca\`, which the service cannot read: **move `tls\ca\ca-key.pem` to offline storage**; it is needed only to
+   renew. `--bind <address>` serves one address instead of all; `--port` changes the port; `--firewall` adds the port rule.
+4. **Check**: `AgastyaCtl.exe --doctor` (TLS certificate, days left, port, data folder), then `--install-service` and `--start` if Setup did not.
+5. **First sign-in** at `https://docs.example.local:4040/` from another computer; create the project managers; optionally connect the
+   directory (section 10, *Mode B: directory sign-on*, `[directory]` in `agastya.ini`).
+
+`agastya.ini` on a team server (everything else as in section 4):
+
+| Section / key | Meaning |
+| --- | --- |
+| `[server] Bind`, `Mode`, `ServerNames`, `Port` | written by `--configure-server` |
+| `[server] MaxConnections` | live connections (open browser tabs) at most, default 1000; one more gets `503`. One person may hold 8 at once |
+| `[server] LeaseMinutes` | how long a check-out lasts without activity, default 30 |
+| `[tls] Certificate`, `Key` or `Pfx`, `PassphraseFile` | written by `--configure-server` |
+| `[directory] ...` | directory sign-on (section 10) |
+| `[backup] Dir`, `IntervalHours`, `Keep`, `RestoreTestDays` | the platform backup (section 7) |
+| `[backup] CopyTo` | warm standby: an absolute folder (another disk or `\\host\share`) that receives a copy of every scheduled backup |
+
+A wrong value (`IntervalHours=often`, a relative `CopyTo`) stops the server at start with the setting named in `logs\agastya-server.log`;
+`--doctor` lists an unknown key as a warning.
+
+### 13.2 Clients
+
+* **Browser (the default).** Nothing to install: open `https://docs.example.local:4040/`. With the private CA, distribute `<state>\tls\ca.pem`
+  once as a trusted root (Group Policy: *Computer Configuration > Windows Settings > Security Settings > Public Key Policies > Trusted Root
+  Certification Authorities*).
+* **Client installation** (a Start-menu shortcut that opens the server's address the way section 2 opens the local one; no server runs on
+  the client):
+  `Setup.exe /VERYSILENT /CURRENTUSER /CLIENTOF=https://docs.example.local:4040/`, or `[client] Server=` in that computer's `agastya.ini`.
+  `AgastyaCtl.exe --check-server` (and `--doctor`) checks from that computer that the certificate is trusted - or equals a pinned
+  `[client] Thumbprint=` (SHA-256) - and that the server accepts this client's version.
+
+### 13.3 Working together
+
+* **Who is here.** Each editor shows the faces of the other people in the same project and what they have open; Home has a *Working now*
+  card. Presence lives only in the server's memory (never on disk) and disappears within 75 seconds of a closed tab, at once at sign-out, and
+  when the person loses access to the project.
+* **Check-out.** A module opened for editing can be checked out; everyone else sees *Checked out by ...* within seconds (measured below:
+  95% within 0.08 s at the normal load, all within 5 s at every load measured) and cannot save it (`423`). Check-in or the end of `LeaseMinutes`
+  releases it, and the others get a notice. The owner, a project manager or an administrator can **break** a check-out (audited
+  `lease.broken`); the holder is told.
+* **Without a check-out**, two people saving the same file are protected by the version check: the second save is refused (`409`) and shows
+  the other version; nothing is overwritten silently (verified in the load test: 0 silent overwrites in 2,326 accepted saves).
+
+### 13.4 Backup, standby and recovery (availability position)
+
+**Position (PRD-007): one server, no automatic failover.** Availability comes from a scheduled backup, a copy on a second machine, and a
+practised restore.
+
+* **Backup.** `[backup] IntervalHours=24` (default; `1`-`6` for a team that cannot lose a day); `Keep` archives, pruned grandfather-father-son.
+  *Administrator > Platform backup* shows the last backup and the restore test; the backup status (`lastCopy`) also records the last copy.
+* **Warm standby.** `[backup] CopyTo=\\standby\agastya-backups` (or another disk): after every scheduled backup the archive is copied there and
+  checked; a failed copy is audited (`backup.copy_failed`) and every administrator gets a notification. The standby machine has the **same
+  version** installed with the service stopped. The service account (LOCAL SERVICE) reaches a share as the computer account
+  (`DOMAIN\SERVER$`): give that account write access on the share.
+* **RPO** = the backup interval (24 h by default; 1 h at `IntervalHours=1`).
+* **RTO** = time to notice + restore + start. Measured by the load harness's drill (`--drill`) on a 1 MB data set (10 projects, 50 authors'
+  modules) on the shared test computer: backup 3.7 s, restore 2.6 s, start to ready 1.8 s, first read 2.2 s - **8.5 s of machine time**.
+  Restore scales with the archive size and the disk; **measure yours at the first drill** with your data (*Verify* a backup, or the harness
+  against a copy) and write the number here: \_\_\_\_\_.
+* **Failover procedure (manual).** On the standby: restore the newest archive of the copy folder into a new folder (section 7, *Restore*:
+  `agastya-backup.js restore <archive> <new folder>`), point `[storage] DataDir` at it, `AgastyaCtl.exe --doctor`, `--start`; point the DNS name (`docs.example.local`) at the standby, or give it the server's certificate and names.
+  Tell people to sign in again (sessions are in the restored database; check-outs older than the backup are gone). Work saved after the last
+  backup is lost (RPO).
+* **Drill.** Do it once after installation and then every quarter (`RestoreTestDays` checks restorability automatically; the drill checks
+  the procedure and the people).
+
+### 13.5 Upgrades
+
+**Server first, then clients.** The server accepts clients down to its `minClientVersion` (`/api/version`); an older page is answered `426`
+and offers *Reload*; a client installation's `--check-server` says "older than the server accepts". A server older than a client says the server
+needs the update. Upgrade the server out of hours (section 8: a verified backup is made first, `--rollback` goes back); browser clients
+pick up the new pages at their next reload; client installations are updated afterwards.
+
+| Server \ client | same version | older client, at least `minClientVersion` | older than `minClientVersion` | newer client |
+| --- | --- | --- | --- | --- |
+| Behaviour | works | works | `426`, *Reload* (browser) / `--check-server` fails | "the server needs an update" |
+
+### 13.6 Capacity and monitoring
+
+`GET /api/admin/metrics` (administrators only; there is no screen for it yet) shows the request times (p50/p95/p99, writes separately), the
+event-loop delay, the database statement times and slow statements, live connections and presence entries, memory, and the two **D21
+triggers**: write p95 above 200 ms, event-loop p99 above 100 ms. `POST /api/admin/metrics/reset` (audited) starts a new measurement window.
+A trigger that stays on at normal load is the signal of section 8, *Why SQLite, and when that changes*.
+
+**Measured (WP-28, 2026-11-27)** with `backend\scripts\load-test.js`: 50 scripted authors (2x the assumption) over WebSockets with presence,
+10 projects, check-out / edit / save / check-in, contended saves on a shared module, lists and the dashboard; own server on loopback HTTP, on
+a **shared 8-core laptop CPU (i7-6820HQ) with other work running**, runs of 1-2 minutes:
+
+| Run | Requests/s | p50 / p95 (client) | Errors | Check-out notice p95 | Server event loop p99 | D21 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Normal pace (1-3 s think), no project validation | 52 | 20 / 79 ms | 0 | 75 ms | 69 ms | none |
+| Normal pace, with project validation | 27 | 639 / 1,957 ms | 0 | 1,710 ms | 1,874 ms | event loop |
+| Stress (0.1-0.5 s think, ~4x the pace) | 86 | 363 / 653 ms | 0 | 636 ms | 826 ms | event loop |
+
+* At the assumed load and 2x the people the server meets the targets with room to spare, **except while someone runs a whole-project
+  validation**: that work runs on the server's main thread (18 s median at 50 authors) and every other request waits behind it. Until the job
+  service (audit WP-14) moves validation and publishing off the main thread, ask people to validate single modules while others work, and run
+  whole-project validation and publishing out of busy hours.
+* The **ceiling** on this computer is one CPU core: about 85-105 requests per second (86 and 106 in two stress runs), reached at roughly 4x the normal pace of 50 people;
+  beyond it every request waits in line (server-side handling stays at p95 25-35 ms, the waiting grows). A CPU profile at the ceiling shows
+  about a quarter of the busy time in SQLite statements and a tenth in file reads and `fsync`. Database lock waits: **none** in any run.
+* Not measured here: real separate client machines and networks, a domain, TLS on the wire, more than 50 users. Repeat on your server
+  (below) before go-live.
+
+**Run it against your server** (another computer, a test copy, never the production data):
+
+```
+cd <program folder>\app\backend
+..\..\runtime\node.exe scripts\load-test.js --base https://docs-test.example.local:4040 --admin admin --admin-password-file pw.txt --authors 50 --duration 300
+```
+
+(`NODE_EXTRA_CA_CERTS=<ca.pem>` for a private CA.) It creates its own `load-...` project manager, projects and authors, prints the table above
+and `ACCEPTANCE: PASS/FAIL` (no errors, no silent overwrite, every check-out notice within 5 s), and exits 0, 1 or 2 (could not run). Without
+`--base` it starts its own server in a temporary folder. `--drill` adds the backup / restore / start timing; `--no-validate` leaves project
+validation out; `--profile <dir>` writes a CPU profile of its own server.

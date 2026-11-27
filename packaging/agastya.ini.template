@@ -79,7 +79,7 @@ Name=@SERVICENAME@
 ;LoginAttribute=sAMAccountName
 ;UserClass=user
 ;NestedGroups=true
-;TimeoutMs=8000
+;TimeoutMs=10000
 ;SyncHours=24
 
 [backup]
