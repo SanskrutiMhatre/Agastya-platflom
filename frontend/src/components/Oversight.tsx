@@ -6,6 +6,7 @@ import { BACKUP_URL, workspaceApi, type Oversight, type ReleaseStatus } from '..
 import { actionLabel } from '../lib/activity';
 import { globalLabel } from '../lib/roles';
 import { Icon } from './Icon';
+import { RowLink } from './a11y';
 import { Badge, Empty, ago } from './ui';
 
 const initials = (name: string) => name.split(/\s+/).map((p) => p.charAt(0)).slice(0, 2).join('').toUpperCase();
@@ -45,7 +46,7 @@ export function ProjectStatusTable({ projects, empty }: { projects: Oversight['p
           <thead><tr><th>Project</th><th>Status</th><th>Owner</th><th>Data modules</th><th>People</th><th>Last activity</th></tr></thead>
           <tbody>{shown.map((p) => (
             <tr key={p.id} className="clickable" onClick={() => open(p.id)} data-testid="status-row">
-              <td><strong>{p.name}</strong>{p.folder ? <div className="v2-hint">{p.folder}</div> : null}</td>
+              <td><strong><RowLink href={`/projects/${p.id}`} onOpen={() => open(p.id)}>{p.name}</RowLink></strong>{p.folder ? <div className="v2-hint">{p.folder}</div> : null}</td>
               <td><StatusBadge status={p.status} stale={p.changedSinceRelease} />{p.releaseNumber ? <span className="v2-hint"> R{p.releaseNumber}</span> : null}</td>
               <td>{p.owners[0] ?? <span className="v2-hint">-</span>}</td><td>{p.dataModules}</td><td>{p.members}</td><td>{p.lastActivityAt ? ago(p.lastActivityAt) : <span className="v2-hint">no activity</span>}</td>
             </tr>))}</tbody>

@@ -22,6 +22,7 @@ import { useLeaveGuard } from '../../lib/leaveGuard';
 import { downloadText, useLocalDraft } from '../../lib/localDraft';
 import { useProgress } from '../../lib/progress';
 import { useUi } from '../../store/ui';
+import { splitterKeys } from '../../components/a11y';
 
 type View = 'edit' | 'split' | 'pdf';
 const VIEW_KEY = 'agastya.jsg.view';
@@ -248,7 +249,8 @@ export function JsgEditorPage() {
         <div className="a" style={{ display: shown === 'pdf' ? 'none' : 'flex', flex: shown === 'edit' ? '1 1 0' : `0 0 ${pct}%`, minWidth: 0 }}>
           <div ref={hostRef} style={{ flex: 1, minWidth: 0, minHeight: 0, position: 'relative' }} data-testid="jsg-host" />
         </div>
-        {shown === 'split' ? <div className={`v2-divider ${dragging ? 'drag' : ''}`} role="separator" aria-orientation="vertical" aria-label="Resize editor and PDF" onPointerDown={startDrag} /> : null}
+        {shown === 'split' ? <div className={`v2-divider ${dragging ? 'drag' : ''}`} role="separator" aria-orientation="vertical" aria-label="Resize editor and PDF" tabIndex={0} aria-valuenow={Math.round(pct)} aria-valuemin={30} aria-valuemax={80}
+          onKeyDown={splitterKeys(pct, 30, 80, 2, (v) => { setPct(v); localStorage.setItem(SPLIT_KEY, String(v)); })} onPointerDown={startDrag} /> : null}
         <div className="b" style={{ flex: '1 1 0', display: shown === 'edit' ? 'none' : 'flex', flexDirection: 'column', minWidth: 0, borderLeft: shown === 'pdf' ? 0 : undefined }}>
           <div className="v2-pdfbar">
             <span className="v2-hint">{src ? 'The PDF built by the JSG engine from the saved document' : 'Press Generate PDF to build the document'}</span>

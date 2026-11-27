@@ -202,8 +202,45 @@ export function auditPage(): AuditResult {
     if (r + 0.005 < need) add('color-contrast', 'serious', el, `${r.toFixed(2)}:1 (needs ${need}) "${textOf(el).slice(0, 40)}"`);
   }
 
-  // ------------------------------------------------------------ structure (moderate: reported, not budgeted)
-  count('landmark-one-main'); if (!document.querySelector('main, [role="main"]')) add('landmark-one-main', 'moderate', document.body, 'no main landmark');
-  count('page-has-heading-one'); if (!document.querySelector('h1, [role="heading"][aria-level="1"]')) add('page-has-heading-one', 'moderate', document.body, 'no level-one heading');
+  // ------------------------------------------------------------ keyboard operation (WP-23: WCAG 2.1.1, 4.1.2)
+  // focusable-role (Agastya rule): an element that says it is a widget (button, link, checkbox, ...) must be reachable with Tab. Widgets that a
+  // composite parent moves focus to (menu items, options, tree items, tabs, radios in a group) carry tabindex="-1" and pass.
+  const NATIVE_FOCUS = 'a[href], button, input:not([type="hidden"]), select, textarea, summary, iframe, [contenteditable="true"], [contenteditable=""]';
+  for (const el of Array.from(document.querySelectorAll('[role="button"], [role="link"], [role="checkbox"], [role="switch"], [role="radio"], [role="tab"], [role="menuitem"], [role="option"], [role="treeitem"], [role="slider"], [role="spinbutton"]'))) {
+    if (!visible(el) || hiddenFromAT(el) || el.matches(NATIVE_FOCUS) || el.hasAttribute('tabindex') || el.getAttribute('aria-disabled') === 'true') continue;
+    const role = el.getAttribute('role') || '';
+    if (/^(option|treeitem|menuitem|tab|radio)$/.test(role) && el.closest('[aria-activedescendant]')) continue;   // focus stays on the composite
+    count('focusable-role'); add('focusable-role', 'serious', el, `role="${role}" cannot be reached with the keyboard (no tabindex)`);
+  }
+  // clickable-row (Agastya rule, FE-014): a table row or list item that reacts to the pointer (cursor: pointer) must hold a keyboard target.
+  for (const el of Array.from(document.querySelectorAll('tr, [role="row"], li'))) {
+    if (!visible(el) || hiddenFromAT(el) || getComputedStyle(el).cursor !== 'pointer') continue;
+    if (el.parentElement && getComputedStyle(el.parentElement).cursor === 'pointer') continue;   // the pointer comes from a parent that is judged itself
+    count('clickable-row');
+    if (el.matches(`${FOCUSABLE}`) || el.querySelector(FOCUSABLE) || el.closest(FOCUSABLE)) continue;
+    add('clickable-row', 'serious', el, `${el.tagName.toLowerCase()} is clickable but holds nothing the keyboard can reach`);
+  }
+  // aria-required-attr (axe, subset): a focusable separator is a resize control and must say where it is; sliders and scrollbars too.
+  for (const el of Array.from(document.querySelectorAll('[role="separator"][tabindex]:not([tabindex="-1"]), [role="slider"], [role="scrollbar"]'))) {
+    if (!rendered(el) || hiddenFromAT(el)) continue;
+    count('aria-required-attr'); if (!el.hasAttribute('aria-valuenow')) add('aria-required-attr', 'critical', el, `role="${el.getAttribute('role')}" needs aria-valuenow`);
+  }
+
+  // ------------------------------------------------------------ structure (WP-23: WCAG 1.3.1, 2.4.1; axe impact "moderate", enforced by the spec)
+  const mains = Array.from(document.querySelectorAll('main, [role="main"]')).filter((m) => rendered(m) && !hiddenFromAT(m));
+  count('landmark-one-main'); if (!mains.length) add('landmark-one-main', 'moderate', document.body, 'no main landmark');
+  count('landmark-no-duplicate-main'); if (mains.length > 1) add('landmark-no-duplicate-main', 'moderate', mains[1], `${mains.length} main landmarks`);
+  count('page-has-heading-one'); if (!Array.from(document.querySelectorAll('h1, [role="heading"][aria-level="1"]')).some((h) => rendered(h) && !hiddenFromAT(h))) add('page-has-heading-one', 'moderate', document.body, 'no level-one heading');
+  // skip-link (Agastya rule for axe "bypass", WCAG 2.4.1): a page with a navigation block starts, for the keyboard, with a link to its main content.
+  const navs = Array.from(document.querySelectorAll('nav, [role="navigation"]')).filter((n) => visible(n) && !hiddenFromAT(n));
+  if (navs.length) {
+    count('skip-link');
+    const first = Array.from(document.querySelectorAll<HTMLElement>(FOCUSABLE)).find((el) => rendered(el) && !hiddenFromAT(el) && el.tabIndex >= 0);
+    const href = first instanceof HTMLAnchorElement ? first.getAttribute('href') || '' : '';
+    const dest = href.startsWith('#') && href.length > 1 ? document.getElementById(href.slice(1)) : null;
+    if (!first || !dest || !(dest.matches('main, [role="main"]') || dest.closest('main, [role="main"]'))) {
+      add('skip-link', 'serious', first || document.body, `the first Tab stop is ${first ? target(first) : 'nothing'}, not a link to the main landmark`);
+    }
+  }
   return { violations, incomplete, checked };
 }

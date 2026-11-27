@@ -191,7 +191,10 @@ export class App {
     const ribbon = h('div', { class: 'ribbon' }, this.ribbonTabs, this.ribbonBody);
     this.editorHost = h('div', { class: 'editor-host' });
     this.startPage = h('div', { class: 'start-page' });
-    const center = h('main', { class: 'center' }, this.find.el, this.editorHost, this.startPage);
+    // WP-23: inside the platform the project shell's <main> already holds the Studio; one main landmark per page (a region here instead)
+    const center = this.host
+      ? h('div', { class: 'center', role: 'region', 'aria-label': 'Document' }, this.find.el, this.editorHost, this.startPage)
+      : h('main', { class: 'center' }, this.find.el, this.editorHost, this.startPage);
     this.leftPane = h('aside', { class: 'pane pane-left' }, this.outline.el, h('div', { class: 'pane-resize', 'data-pane': 'left' }));
     const rtabs = h('div', { class: 'panel-tabs pane-tabs', role: 'tablist' },
       h('button', { class: 'panel-tab', 'data-rtab': 'attributes', role: 'tab', on: { click: () => this.setRightTab('attributes') } }, 'Attributes'),
@@ -504,7 +507,7 @@ export class App {
     const inField = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT');
     const inCm = !!t?.closest?.('.cm-editor');
     // let form fields and CodeMirror keep their own editing keys
-    if (inField && !/^(Mod\+S|Mod\+Shift\+S|Mod\+O|F7|Shift\+F7|F1|Mod\+Shift\+P|F3|Shift\+F3|Mod\+Alt\+N)$/.test(k)) return;
+    if (inField && !/^(Mod\+S|Mod\+Shift\+S|Mod\+O|F7|Shift\+F7|F1|Mod\+Shift\+P|Mod\+K|F3|Shift\+F3|Mod\+Alt\+N)$/.test(k)) return;
     if (inCm && /^(Mod\+Z|Mod\+Y|Mod\+Shift\+Z|Mod\+F|Mod\+H|Mod\+G|Mod\+A|Alt\+Shift\+Arrow(Up|Down)|Mod\+Shift\+K|F3|Shift\+F3|Mod\+E|Mod\+B|Mod\+I|Mod\+U)$/.test(k)) {
       if (k === 'Mod+Z' || k === 'Mod+Y' || k === 'Mod+Shift+Z') return; // handled by CodeMirror keymap -> app
       if (k === 'Mod+H') {

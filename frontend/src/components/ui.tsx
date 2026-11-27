@@ -60,13 +60,25 @@ export function Field({ label, hint, error, children }: { label: string; hint?: 
 /** `sticky`: a click on the dimmed backdrop does not close it (a dialog that holds work in progress); Escape and the close button still do. */
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]), [contenteditable="true"]';
 
+/** WP-23 (UX-004, FE-014): the open dialogs, innermost last. Escape closes only the top one (a waiver over a refusal, a confirm over the wizard). */
+const openDialogs: object[] = [];
+
 export function Modal({ title, onClose, children, buttons, width, sticky }: { title: string; onClose: () => void; children: ReactNode; buttons?: ReactNode; width?: number; sticky?: boolean }) {
   const box = useRef<HTMLDivElement>(null);
+  const [me] = useState(() => ({}));
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    openDialogs.push(me);
+    return () => { const i = openDialogs.lastIndexOf(me); if (i >= 0) openDialogs.splice(i, 1); };
+  }, [me]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented || openDialogs[openDialogs.length - 1] !== me) return;
+      e.preventDefault();
+      onClose();
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [onClose, me]);
   // DS-005: focus moves into the dialog on open (an autoFocus field keeps it), Tab stays inside, and focus returns to the trigger on close.
   useEffect(() => {
     const trigger = document.activeElement as HTMLElement | null;
@@ -130,11 +142,18 @@ export function PromptModal({ title, label, initial = '', hint, confirmLabel = '
   );
 }
 
+/**
+ * WP-23 (UX-028, WCAG 4.1.3): success and information go to a polite live region that is always in the page (a region made at the moment
+ * of the message is often not announced); an error is a role="alert" of its own outside that region, so it is announced at once and not
+ * queued behind the polite ones.
+ */
 export function Toasts() {
   const { toasts, dismiss } = useUi();
+  const item = (t: Toast) => <ToastItem key={t.id} toast={t} onDismiss={() => dismiss(t.id)} />;
   return (
-    <div className="v2-toasts" aria-live="polite">
-      {toasts.map((t) => <ToastItem key={t.id} toast={t} onDismiss={() => dismiss(t.id)} />)}
+    <div className="v2-toasts">
+      <div className="v2-toast-region" aria-live="polite" data-testid="toasts-polite">{toasts.filter((t) => t.kind !== 'error').map(item)}</div>
+      <div className="v2-toast-region" data-testid="toasts-errors">{toasts.filter((t) => t.kind === 'error').map(item)}</div>
     </div>
   );
 }
@@ -149,7 +168,7 @@ function ToastItem({ toast: t, onDismiss }: { toast: Toast; onDismiss: () => voi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paused, t.id]);
   return (
-    <div className={'v2-toast ' + t.kind} role={t.kind === 'error' ? 'alert' : 'status'} onClick={onDismiss}
+    <div className={'v2-toast ' + t.kind} role={t.kind === 'error' ? 'alert' : undefined} onClick={onDismiss}
       onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} onFocus={() => setPaused(true)} onBlur={() => setPaused(false)}>
       <span className="v2-toast-text">{t.text}</span>
       <button type="button" className="v2-toast-x" aria-label="Dismiss" onClick={(e) => { e.stopPropagation(); onDismiss(); }}>×</button>

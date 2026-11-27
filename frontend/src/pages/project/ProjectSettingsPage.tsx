@@ -17,6 +17,7 @@ import { useSession } from '../../store/session';
 import { useUi } from '../../store/ui';
 import { PublishSettings } from './reused/PublishSettings';
 import { S1000dConfig } from './S1000dConfig';
+import { tablistKeys } from '../../components/a11y';
 
 const SHARE_ROLES: ProjectRole[] = ['viewer', 'reviewer', 'editor'];
 const ROLE_HELP: Record<ProjectRole, string> = {
@@ -227,7 +228,7 @@ export function ProjectSettingsPage() {
     <div className="v2-page">
       <PageHeader icon="settings" title="Project settings" sub="Everything about this project that is not authoring."
         stats={[{ label: 'Members', value: summary.members }, { label: 'Type', value: formatLabel(summary.project) }, { label: 'Your access', value: PROJECT_LABEL[role], tone: 'accent' }]} />
-      <div className="v2-tabs" role="tablist">{tabs.map((t) => <NavLink key={t.to} to={t.to} role="tab" className={({ isActive }) => `v2-tab ${isActive ? 'active' : ''}`} style={{ textDecoration: 'none' }}>{t.label}</NavLink>)}</div>
+      <div className="v2-tabs" role="tablist" aria-label="Project settings sections" onKeyDown={tablistKeys}>{tabs.map((t) => <NavLink key={t.to} to={t.to} role="tab" className={({ isActive }) => `v2-tab ${isActive ? 'active' : ''}`} style={{ textDecoration: 'none' }}>{t.label}</NavLink>)}</div>
       <Routes>
         <Route index element={<Navigate to="general" replace />} />
         <Route path="general" element={<General />} />

@@ -125,7 +125,7 @@ export function ValidationPage() {
                     <Icon name="xml" size={14} /><span className="v2-trunc v2-mono">{file}</span><span className="spacer" /><Badge tone={list.some((x) => x.sev === 'error') ? 'bad' : 'warn'}>{count}</Badge>
                   </div>
                   {list.map((i) => (
-                    <div key={i.id} className={`v2-issue ${selId === i.id ? 'sel' : ''}`} onClick={() => setSelId(i.id)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') setSelId(i.id); }} data-testid="issue">
+                    <div key={i.id} className={`v2-issue ${selId === i.id ? 'sel' : ''}`} onClick={() => setSelId(i.id)} role="button" tabIndex={0} aria-pressed={selId === i.id} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelId(i.id); } }} data-testid="issue">
                       <span className={`v2-sev ${i.sev}`} aria-label={i.sev} />
                       <div style={{ minWidth: 0, flex: 1, opacity: reviewed.has(issueKey(i)) ? .5 : 1 }}>
                         <div style={{ fontWeight: 600 }}>{i.title}{i.line > 1 ? <span className="v2-hint"> · line {i.line}</span> : null}</div>

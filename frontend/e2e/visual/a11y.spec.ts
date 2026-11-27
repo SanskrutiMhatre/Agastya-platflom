@@ -14,6 +14,10 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 interface Waiver { rule: string; route: string; target: string; reason: string; wp: string; expires: string }
 const ALLOW: Waiver[] = JSON.parse(fs.readFileSync(path.join(HERE, 'a11y-allowlist.json'), 'utf8')).waivers;
 const BUDGET = new Set(['critical', 'serious']);
+// WP-23 (UX-005): the structure rules are "moderate" in axe but are part of the budget here: every named route has exactly one main landmark and a
+// level-one heading (they were the two moderate findings WP-20 reported and left to this package).
+const ENFORCED = new Set(['landmark-one-main', 'landmark-no-duplicate-main', 'page-has-heading-one']);
+const counts = (v: Violation) => BUDGET.has(v.impact) || ENFORCED.has(v.rule);
 
 let s: Seed;
 test.beforeAll(async ({ baseURL }) => { s = await seed(baseURL); });
@@ -40,12 +44,12 @@ for (const screen of SCREENS.filter((x) => x.named)) {
       await screen.ready(page);
       await settle(page, theme);
       const result = await page.evaluate(auditPage);
-      const open = result.violations.filter((v) => BUDGET.has(v.impact) && !waived(screen.name, v));
+      const open = result.violations.filter((v) => counts(v) && !waived(screen.name, v));
       const report = { route: screen.name, theme, checked: result.checked, violations: result.violations, waived: result.violations.filter((v) => waived(screen.name, v)), incomplete: result.incomplete };
       await info.attach(`a11y-${screen.name}-${theme}.json`, { body: JSON.stringify(report, null, 2), contentType: 'application/json' });
       fs.mkdirSync(info.outputPath(), { recursive: true });
       fs.writeFileSync(info.outputPath(`a11y-${screen.name}-${theme}.json`), JSON.stringify(report, null, 2));
-      const moderate = result.violations.filter((v) => !BUDGET.has(v.impact));
+      const moderate = result.violations.filter((v) => !counts(v));
       if (moderate.length) console.log(`[a11y] ${screen.name}/${theme}: ${moderate.length} moderate (reported, not budgeted): ${[...new Set(moderate.map((v) => v.rule))].join(', ')}`);
       if (result.incomplete.length) console.log(`[a11y] ${screen.name}/${theme}: ${result.incomplete.length} text node(s) not judged (images/gradients): see the attachment`);
       expect(result.checked['color-contrast'] ?? 0, 'the contrast sweep looked at some text').toBeGreaterThan(0);
@@ -79,5 +83,32 @@ test('the audit finds planted defects', async ({ page }) => {
   expect(r.violations.filter((v) => v.rule === 'color-contrast').map((v) => v.target)).toEqual(['p#low']);
   await page.setContent(`<!doctype html><html lang="en"><head><title>t</title></head><body style="background:#ffffff;color:#111111"><main><h1>Clean</h1>
     <label for="f">Name</label><input id="f"><button style="min-width:24px;min-height:24px">Go</button></main></body></html>`);
+  expect((await page.evaluate(auditPage)).violations).toEqual([]);
+});
+
+// WP-23: the keyboard and structure rules fire on planted defects (a shell with a sidebar and no skip link, two main landmarks, no h1, a div
+// button and a clickable row the keyboard cannot reach, a focusable divider without a value) and stay quiet on the corrected twin.
+test('the audit finds planted keyboard and structure defects (WP-23)', async ({ page }) => {
+  await page.setContent(`<!doctype html><html lang="en"><head><title>t</title><style>tr.clickable{cursor:pointer}</style></head><body style="background:#ffffff;color:#111111">
+    <nav aria-label="Main"><a href="/a">A</a> <a href="/b">B</a></nav>
+    <main><h2>No level one</h2>
+      <div role="button" id="divbtn" style="display:inline-block;min-width:30px;min-height:30px">Go</div>
+      <table><tbody><tr class="clickable" id="row"><td>Row without a target</td></tr></tbody></table>
+      <div role="separator" tabindex="0" aria-label="Resize" id="sep" style="width:30px;height:30px"></div>
+    </main>
+    <main><p>second main</p></main></body></html>`);
+  const r = await page.evaluate(auditPage);
+  const rules = new Set(r.violations.map((v) => v.rule));
+  for (const rule of ['skip-link', 'landmark-no-duplicate-main', 'page-has-heading-one', 'focusable-role', 'clickable-row', 'aria-required-attr']) expect(rules.has(rule), `${rule} is detected`).toBe(true);
+  await page.setContent('<!doctype html><html lang="en"><head><title>t</title></head><body style="background:#ffffff;color:#111111"><nav aria-label="Main"><a href="/a">A</a></nav><p>no main</p></body></html>');
+  expect((await page.evaluate(auditPage)).violations.map((v) => v.rule)).toEqual(expect.arrayContaining(['landmark-one-main', 'skip-link']));
+  await page.setContent(`<!doctype html><html lang="en"><head><title>t</title><style>tr.clickable{cursor:pointer} a,button,[tabindex]{display:inline-block;min-width:24px;min-height:24px}</style></head><body style="background:#ffffff;color:#111111">
+    <a href="#m">Skip to main content</a>
+    <nav aria-label="Main"><a href="/a">A</a> <a href="/b">B</a></nav>
+    <main id="m" tabindex="-1"><h1>Clean</h1>
+      <div role="button" tabindex="0">Go</div>
+      <table><tbody><tr class="clickable"><td><a href="/p">Project</a></td></tr></tbody></table>
+      <div role="separator" tabindex="0" aria-label="Resize" aria-valuenow="50" style="width:30px;height:30px"></div>
+    </main></body></html>`);
   expect((await page.evaluate(auditPage)).violations).toEqual([]);
 });

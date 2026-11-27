@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { graphicsApi } from '../../api';
 import { xengineApi } from '../../api/xengine';
 import { Icon } from '../../components/Icon';
+import { RowButton } from '../../components/a11y';
 import { PageHeader } from '../../components/PageHeader';
 import { Alert, Badge, Empty, Loading, useAsync } from '../../components/ui';
 import { useProject } from '../../layouts/ProjectShell';
@@ -118,7 +119,7 @@ export function DocExplorePage() {
               <table className="v2-table"><thead><tr><th>No.</th><th>Title</th><th>Code</th><th>Chapter</th><th>Kind</th><th>Pictures</th></tr></thead>
                 <tbody>{rows.map(({ m, ch }) => (
                   <tr key={m.key} className={`clickable ${sel && 'module' in sel && sel.module === m.key ? 'sel' : ''}`} onClick={() => setSel({ module: m.key })} data-testid="explore-row" data-code={m.dmc}>
-                    <td className="v2-mono">{m.label}</td><td><strong>{m.title}</strong></td><td className="v2-mono">{m.dmc}</td><td>{ch}</td><td>{kindText(m)}</td><td>{m.pictures.length || '—'}</td>
+                    <td className="v2-mono">{m.label}</td><td><strong><RowButton onSelect={() => setSel({ module: m.key })} selected={!!(sel && 'module' in sel && sel.module === m.key)} label={m.title ? undefined : m.dmc}>{m.title}</RowButton></strong></td><td className="v2-mono">{m.dmc}</td><td>{ch}</td><td>{kindText(m)}</td><td>{m.pictures.length || '—'}</td>
                   </tr>))}</tbody></table>
               {rows.length === 0 ? <Empty title="No data modules match" /> : null}
             </div>
@@ -127,7 +128,7 @@ export function DocExplorePage() {
               <table className="v2-table"><thead><tr><th>Picture</th><th>Picture name (ICN)</th><th>Used in</th><th>Code</th></tr></thead>
                 <tbody>{pics.map((p) => (
                   <tr key={p.file} className={`clickable ${selPic?.file === p.file ? 'sel' : ''}`} onClick={() => setSel({ picture: p.file })} data-testid="explore-picture">
-                    <td><strong>{p.file}</strong></td><td className="v2-mono">{p.icn}</td><td>{byKey.get(p.module)?.m.title ?? '—'}</td><td>{p.origin === 'imported' ? <Badge>imported</Badge> : <span className="v2-hint">platform</span>}</td>
+                    <td><strong><RowButton onSelect={() => setSel({ picture: p.file })} selected={selPic?.file === p.file}>{p.file}</RowButton></strong></td><td className="v2-mono">{p.icn}</td><td>{byKey.get(p.module)?.m.title ?? '—'}</td><td>{p.origin === 'imported' ? <Badge>imported</Badge> : <span className="v2-hint">platform</span>}</td>
                   </tr>))}</tbody></table>
               {pics.length === 0 ? <Empty title={c.pictures.length ? 'No picture matches' : 'No pictures in this document'} /> : null}
             </div>

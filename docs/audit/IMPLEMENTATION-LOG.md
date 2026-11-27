@@ -1129,3 +1129,68 @@ internal CA is the recommended path, and the generator is a separate tool, not a
   `tls\` belong to WP-28. G-SEC-1's listener scan on a VM (`Get-NetTCPConnection`) was not run here. The frontend was not rebuilt and
   Playwright was not run (what a browser on this computer sees on loopback is unchanged). The host program's `--doctor` and probe changes
   were compiled, not executed. Certificate pinning for a thin Mode B client (WP-28) is not built; browsers use the Windows trust store.
+## Phase 6 (taken early)
+
+### WP-23 Accessibility to WCAG 2.2 AA (UX-004, UX-005, FE-014, ENT-018, UX-010, UX-027, UX-028) - done in part (automated and keyboard parts; manual screen-reader pass open)
+
+* Landmarks and bypass (UX-005 a, WCAG 1.3.1 / 2.4.1): the main shell wraps its pages in `<main id="main-content">` (`.v2-main-region`, the
+  same flex column the page had); the project shell's content column is now `<main>`; the sign-in screens are a `<main>`. Every signed-in
+  page starts with a skip link (`components/a11y.tsx` `SkipLink`, `data-testid="skip-link"`): hidden until it has keyboard focus, it moves
+  focus to the main landmark without changing the address (no `#hash` route). Inside the platform the Studio's own `<main class="center">`
+  becomes a named region (`role="region"`, "Document"), so a page has exactly one main; the standalone Studio keeps its `<main>`.
+* Headings (WCAG 1.3.1): `PageHeader` renders `h1` on project pages and `h2` under the main shell, whose top bar already holds the page's
+  `h1` (context `HeadingLevel`); same look (`.v2-ph-text :is(h1, h2)`). Fixes "no level-one heading" on Publication, Release, Explore,
+  Validation, Graphics, Ancillary and project Settings (WP-20's report named publication and release).
+* Titles (UX-005, WCAG 2.4.2): `useDocumentTitle` gives every route its own title: "Projects · Agastya Platform",
+  "Publication · <project> · Agastya Platform", "Sign in · Agastya Platform" (app name from the administrator settings).
+* Rows (UX-005 b, FE-014, WCAG 2.1.1): the project name in the Projects and the oversight status tables is a real link (`RowLink`: Enter
+  opens, Ctrl/middle click opens a tab, the row click still works); the numbering-preset rows and the Explore tables (S1000D and JSS/JSG
+  documents, pictures) get a button on the name (`RowButton`, `aria-pressed` for the selected row). Validation issue rows and the JSS
+  outline/problem rows (`role="button"`) now answer Space as well as Enter.
+* Account menu (UX-005 d, WCAG 4.1.2): focus goes to the first item on open; Up/Down (wrapping), Home/End move; Escape closes and returns
+  focus to the button; Tab closes; Down on the closed button opens it; the menu is named "Account"; items are `tabindex=-1` (roving).
+* Tabs: the platform tab strips (Settings, project Settings, S1000D configuration, Activity views, the S1000D code lists, the import dialog)
+  move focus with Left/Right/Up/Down/Home/End (`tablistKeys`) and have names. The JSS/JSG/Studio editor toolbars are WP-21's (not touched).
+* Dividers (UX-005 e): the editor/PDF divider of the Studio, JSS and JSG pages is focusable and resizes with the arrow keys (2 % steps),
+  PageUp/PageDown (8 %), Home/End (limits), stored where a drag stores it; all dividers expose `aria-valuenow/min/max`.
+* Dialogs (UX-004, FE-014): WP-19 already trapped and returned focus. Added: Escape closes only the top dialog (a stack in `Modal`); the
+  New-project wizard asks "Discard the new project?" before Escape, the close button or a backdrop click throw away typed input. Decision
+  (audit's recommendation, the owner's standing approval): the explicit Cancel button closes at once without asking - it is the deliberate
+  way out, and the main e2e suite (00-platform) relies on it.
+* Status messages (UX-028, WCAG 4.1.3): success and information toasts go into a polite live region that is in the page before any message;
+  an error toast is a `role="alert"` outside it (announced at once). Reduced motion: the platform rule already exists in `styles/base.css`
+  (moved there by WP-18); the keyboard spec now proves transitions are off under the setting.
+* UX-027: the Studio command palette is on Ctrl+K (primary, shown in menus) with Ctrl+Shift+P kept as an alias; Ctrl+K also works from a field.
+* UX-010 was done by WP-05 (JSS/JSG drafts in IndexedDB every 3 s, offered on open; JSG autosave on by default); nothing added here.
+* Audit extended (`e2e/visual/a11y-audit.ts`), each rule proven by a planted-defect page and a clean twin (`a11y.spec.ts` "the audit finds
+  planted keyboard and structure defects (WP-23)"): `focusable-role` (a widget role nobody can Tab to, serious), `clickable-row` (a
+  pointer row or list item with no keyboard target, serious; FE-014), `aria-required-attr` (focusable separator, slider, scrollbar without
+  `aria-valuenow`, critical), `landmark-no-duplicate-main`, and `skip-link` (a page with a navigation block whose first Tab stop is not a
+  link to the main landmark, serious; axe "bypass"). The structure rules `landmark-one-main`, `landmark-no-duplicate-main` and
+  `page-has-heading-one` stay "moderate" (axe's level) but are now in the budget of the ten named routes. The allow-list stays empty.
+* Keyboard scripts (`e2e/visual/keyboard.spec.ts`, light project only): skip link first and focus to main on two shells; distinct titles on
+  eight routes; open a project from the Projects table with Tab and Enter; account menu arrows/End/Escape/Down; Escape on an empty wizard
+  closes it and returns focus, on a filled one asks, a second Escape closes only the question; divider arrows/Home/End; live regions exist
+  and transitions are off under reduced motion. Unit tests `src/components/a11y.test.tsx` (9): skip link, titles, heading level, row
+  link/button, tab keys, splitter keys, Escape on the top of two dialogs, the toast regions.
+* Defect found by the new rules and fixed: the Studio inside the project shell made two `main` landmarks (its `main.center`), on the project
+  and Studio routes in both themes (`landmark-no-duplicate-main`, run 1).
+* Test-harness fix (`e2e/visual/seed.ts`): every spec file signed in again, and each sign-in is an `auth.login` event; the Overview reads
+  the newest 12 events before dropping sign-ins, so adding the keyboard spec pushed the seeded project events out and the dark Overview
+  baseline failed with "Nothing yet" (runs 1 and 2; 21 084 px, data only, no visual change of mine). Sessions are now reused across spec
+  files and projects of the worker (checked with `/api/auth/me`, a fresh sign-in if they ended). No baseline was updated.
+* Verified (this worktree, Edge, my own port 4081 and `--output=test-results-wp23`; port 4050 and the main suite not touched): frontend
+  `tsc --noEmit` clean, the e2e/visual files type-checked strict on their own; vitest `src/components/a11y.test.tsx` 9/9,
+  `src/components/ui.test.tsx` 10/10, `src/components/theme.test.ts` 15/15, `src/styles/states.test.ts` 131/131,
+  `src/styles/tokens/coverage.test.ts` 3/3; `npm run -s lint:theme` ok (0 literals); `scripts/ci/lint.mjs` ok (no new any/require);
+  `vite build` ok; `check:bundle` PASS; parity check PASS (nothing removed; test ids kept). Visual/a11y suite:
+  Run 1: 62 passed, 5 failed (duplicate main on project/studio x2 themes; dark Overview data); run 2 after the Studio fix: 66 passed,
+  1 failed (dark Overview data); run 3 after the seed fix: **67 passed, 7 skipped (the keyboard spec in the dark project), 0 failed**, no
+  moderate notes left on any named route.
+* Not done / limits: G-UX-4, the manual screen-reader pass on three routes, and the manual parts of RES-007 (200 % zoom, reflow) need a person
+  with NVDA/JAWS/Narrator: not done. G-UX-2 is covered in part: sign-in is a plain form, opening a project and the dialogs are scripted
+  above, but "create and edit a data module, validate, request and approve a release" keyboard-only was not scripted (the Studio's
+  contenteditable surface and ribbon are WP-21's chrome). axe-core itself is still not in the offline cache (the in-repo subset grew).
+  The editors' own toolbars, menus and tablists (Studio ribbon, JSS/JSG tabs) were left to WP-21 except the targeted fixes named above.
+  Not run here: the main e2e suite (00-platform's wizard Cancel and account-menu tests should be unaffected: Cancel still closes at once,
+  menu items are still `menuitem` buttons), the full vitest, the backend suite, the gate.

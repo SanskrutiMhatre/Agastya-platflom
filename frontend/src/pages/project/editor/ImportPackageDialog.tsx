@@ -21,6 +21,7 @@ import { canAssignModules, canImportPackage, type Can } from '../../../lib/roles
 import { ImportAssignPanel } from './ImportAssignPanel';
 import { ImportReportView } from './ImportReportView';
 import { ImportResultView } from './ImportResultView';
+import { tablistKeys } from '../../../components/a11y';
 
 type Stage = 'choose' | 'scanning' | 'applying' | 'report' | 'applied';
 type Tab = 'import' | 'place';
@@ -207,7 +208,7 @@ export function ImportPackageDialog({ projectId, can, onClose, onChanged }: {
 
   return (
     <Modal title="Import package" width={900} sticky onClose={close} buttons={footer}>
-      <div className="v2-tabs" role="tablist" aria-label="Import package sections" style={{ marginBottom: 14 }}>
+      <div className="v2-tabs" role="tablist" aria-label="Import package sections" onKeyDown={tablistKeys} style={{ marginBottom: 14 }}>
         <button role="tab" aria-selected={tab === 'import'} className={`v2-tab ${tab === 'import' ? 'active' : ''}`} onClick={() => setTab('import')} data-testid="tab-import">Import a package</button>
         <button role="tab" aria-selected={tab === 'place'} className={`v2-tab ${tab === 'place' ? 'active' : ''}`} onClick={() => setTab('place')} data-testid="tab-place">Modules not in the publication{unassignedCount !== null ? ` (${unassignedCount})` : ''}</button>
       </div>

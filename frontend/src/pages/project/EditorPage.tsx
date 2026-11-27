@@ -11,6 +11,7 @@ import { Alert, errText } from '../../components/ui';
 import { canWrite, useProject } from '../../layouts/ProjectShell';
 import { studio, useStudio } from '../../lib/studioSession';
 import { useUi } from '../../store/ui';
+import { splitterKeys } from '../../components/a11y';
 import { EditorSide } from './editor/EditorSide';
 import { PdfPane } from './editor/PdfPane';
 
@@ -141,12 +142,13 @@ export function EditorPage() {
       {error ? <Alert tone="bad">{error}</Alert> : null}
       <div className="v2-split" data-testid="editor-split" ref={splitRef} style={dragging || listDrag ? { userSelect: 'none' } : undefined}>
         {sideOpen ? <EditorSide ctx={ctx} refreshKey={sideKey} treeKey={treeKey} width={listW} onCollapse={() => setSide(false)} /> : null}
-        {sideOpen ? <div className={`v2-divider ${listDrag ? 'drag' : ''}`} role="separator" aria-orientation="vertical" aria-label="Resize data module list" tabIndex={0}
+        {sideOpen ? <div className={`v2-divider ${listDrag ? 'drag' : ''}`} role="separator" aria-orientation="vertical" aria-label="Resize data module list" tabIndex={0} aria-valuenow={listW} aria-valuemin={180} aria-valuemax={480}
           onPointerDown={startListDrag} onKeyDown={(e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { const w = Math.min(480, Math.max(180, listW + (e.key === 'ArrowRight' ? 16 : -16))); setListW(w); localStorage.setItem('agastya.editor.listw', String(w)); studio.relayout(); } }} /> : null}
         <div className="a" style={{ display: shown === 'pdf' ? 'none' : 'flex', flex: shown === 'edit' ? '1 1 0' : `0 0 calc((100% - ${sideOpen ? listW + 5 : 0}px) * ${pct / 100})` }}>
           <div ref={hostRef} className="v2-studio-host" data-testid="studio-host" />
         </div>
-        {shown === 'split' ? <div className={`v2-divider ${dragging ? 'drag' : ''}`} role="separator" aria-orientation="vertical" aria-label="Resize editor and PDF" onPointerDown={startDrag} /> : null}
+        {shown === 'split' ? <div className={`v2-divider ${dragging ? 'drag' : ''}`} role="separator" aria-orientation="vertical" aria-label="Resize editor and PDF" tabIndex={0} aria-valuenow={Math.round(pct)} aria-valuemin={25} aria-valuemax={80}
+          onKeyDown={splitterKeys(pct, 25, 80, 2, (v) => { setPct(v); localStorage.setItem('agastya.editor.split', String(v)); studio.relayout(); })} onPointerDown={startDrag} /> : null}
         <div className="b" style={{ flex: '1 1 0', borderLeft: shown === 'pdf' ? 0 : undefined, display: shown === 'edit' ? 'none' : undefined }}><PdfPane ctx={ctx} savedTick={savedTick} onOpenAt={openAt} onPopped={setBothPopped} /></div>
       </div>
     </>
