@@ -98,6 +98,8 @@ export async function planExport(projectId: string): Promise<ExportPlan> {
     const own = chapter.children.filter((c): c is Block => !isSection(c));
     const subs = chapter.children.filter(isSection);
     const parts: Section[] = own.length ? [{ k: 'section', id: `chapter-${chapter.number}-own`, title: chapter.title, children: own }, ...subs] : subs;
+    // WP-15 (PUB-008): a data module has a heading; the text before a chapter's first section has none of its own, so it travels as a first module named by the chapter (and comes back as a section)
+    if (own.length && !recBySection.has(`chapter-${chapter.number}-own`)) findings.add('warning', 'chapter-text-moved', `The text of chapter ${chapter.number} "${chapter.title}" that stands before its first section was written as a data module of its own, titled "${chapter.title}"; imported back, it is a first section of the chapter.`, chapter.title);
     for (const [pi, s] of parts.entries()) {
       const r = s.id ? recBySection.get(s.id) : undefined;
       let name: string; let text: string; let identity: ModuleIdentity; let generated = true; let pmTitle = '';
@@ -163,9 +165,12 @@ export async function planExport(projectId: string): Promise<ExportPlan> {
 
   const labels: Record<string, string> = {
     'list-style': 'Lettered and roman-numeral lists are exported as numbered lists.', 'page-break': 'Page breaks are not part of the package format and were left out.',
-    'figure-legend': 'A figure\'s numbered key was not exported (the package format has no place for it).', 'notice-list': 'A list inside a note or warning was exported as plain paragraphs.',
+    'notice-list': 'A list inside a note or warning was exported as plain paragraphs.',
+    xref: 'Cross-references and links were exported as their words only (the target is not linked).',
   };
-  for (const [code, where] of notes) findings.add('info', `export-${code}`, `${labels[code] ?? code} (${[...where].slice(0, 3).join(', ')}${where.size > 3 ? ', …' : ''})`);
+  // WP-15 (PUB-015): what changes the reading (a dropped page break, a lost link, a flattened list) is a warning; only a change of style stays information
+  const LOSS = new Set(['page-break', 'notice-list', 'xref']);
+  for (const [code, where] of notes) findings.add(LOSS.has(code) ? 'warning' : 'info', `export-${code}`, `${labels[code] ?? code} (${[...where].slice(0, 3).join(', ')}${where.size > 3 ? ', …' : ''})`);
 
   const report: ExportReport = {
     ok: true, fileName: `${root}.zip`, findings: findings.list,

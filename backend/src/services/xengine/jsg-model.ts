@@ -136,7 +136,7 @@ function inlineXml(inl: Inline[], ctx: Ctx): string {
     if (i.t === 'br') return '<br/>';
     if (i.t === 'xref') {
       if (i.to && ctx.ids.has(i.to)) return `<xref to="${esc(i.to)}">${inlineXml(i.children, ctx)}</xref>`;
-      ctx.findings.add('info', 'link-dropped', `A link ${i.href ? 'to an outside address' : 'to a part of the document that is not in JSG'} was kept as plain text.`, ctx.where);
+      ctx.findings.add('warning', 'link-dropped', `A link ${i.href ? 'to an outside address' : 'to a part of the document that is not in JSG'} was kept as plain text.`, ctx.where);
       return inlineXml(i.children, ctx);
     }
     return `<${i.mark}>${inlineXml(i.children, ctx)}</${i.mark}>`;
@@ -168,15 +168,17 @@ function blockXml(b: Block, ctx: Ctx, pad: string): string {
     }
     case 'figure': {
       const f: Figure = b;
-      if (f.legend.length) ctx.findings.add('info', 'figure-legend', 'A figure\'s numbered key was not carried (JSG has no place for it).', ctx.where);
-      return `${pad}<figure${at('id', idOk(f.id))} title="${esc(f.title || 'Figure')}">${f.graphics.map((g) => `<graphic${at('src', g.src)}${at('width', g.width)}${at('height', g.height)}/>`).join('')}</figure>`;
+      // WP-15 (PUB-015): JSG has no figure key; its words are kept as one paragraph per key item after the figure (number in bold), said as a warning
+      if (f.legend.length) ctx.findings.add('warning', 'figure-legend', 'A figure\'s numbered key has no place in JSG; each key item was written as a paragraph after the figure.', ctx.where);
+      const key = f.legend.map((k) => `\n${pad}<para><b>${esc(k.num)}</b> ${esc(k.text)}</para>`).join('');
+      return `${pad}<figure${at('id', idOk(f.id))} title="${esc(f.title || 'Figure')}">${f.graphics.map((g) => `<graphic${at('src', g.src)}${at('width', g.width)}${at('height', g.height)}/>`).join('')}</figure>${key}`;
     }
     default: {
       // note / warning / caution: JSG notices hold paragraphs only
       const n = b as Notice; const paras: Para[] = [];
       for (const x of n.blocks) {
         if (x.k === 'para') paras.push(x);
-        else { ctx.findings.add('info', 'notice-list', 'A list inside a note, warning or caution was written as plain paragraphs.', ctx.where); for (const it of x.items) paras.push({ k: 'para', inline: it.parts.flatMap(partInline) }); }
+        else { ctx.findings.add('warning', 'notice-list', 'A list inside a note, warning or caution was written as plain paragraphs.', ctx.where); for (const it of x.items) paras.push({ k: 'para', inline: it.parts.flatMap(partInline) }); }
       }
       if (!paras.length) paras.push({ k: 'para', inline: [] });
       return `${pad}<${n.k}>\n${paras.map((p) => paraXml(p, ctx, pad + '  ')).join('\n')}\n${pad}</${n.k}>`;

@@ -10,6 +10,7 @@
 //
 //   const pdf = await readPdf(fileOrBuffer);
 //   pdf.pageCount                       number of pages                           (was: pdfinfo "Pages:")
+//   pdf.info                            the document properties { Title, Author, Subject, Keywords, Creator, Producer, ... } (was: pdfinfo)
 //   pdf.pageSize(n)                     { width, height } in points, rotation applied (was: pdfinfo -f n -l n "Page n size")
 //   pdf.text({ first, last, mode })     text of pages first..last, each followed by \f (was: pdftotext [-layout|-raw] -f -l)
 //   await pdfImageCount(src, n?)        pictures painted on page n, or in the whole document (was: pdfimages -list); the same as
@@ -146,7 +147,9 @@ async function parse(src, withImages) {
   const IMAGE_OPS = new Set([pdfjs.OPS.paintImageXObject, pdfjs.OPS.paintInlineImageXObject, pdfjs.OPS.paintImageMaskXObject,
     pdfjs.OPS.paintImageXObjectRepeat, pdfjs.OPS.paintImageMaskXObjectRepeat, pdfjs.OPS.paintInlineImageXObjectGroup, pdfjs.OPS.paintImageMaskXObjectGroup].filter((x) => x !== undefined));
   const pages = [];
+  let info = {};
   try {
+    try { info = (await doc.getMetadata()).info || {}; } catch { info = {}; }     // WP-15: the document properties (was: pdfinfo Title / Author ...)
     for (let n = 1; n <= doc.numPages; n++) {
       const page = await doc.getPage(n);
       const vp = page.getViewport({ scale: 1 });
@@ -171,6 +174,7 @@ async function parse(src, withImages) {
   };
   return {
     pageCount: pages.length,
+    info,
     pageSize(n) { const p = pages[n - 1]; if (!p) throw new Error(`page ${n} does not exist (the PDF has ${pages.length})`); return { width: p.width, height: p.height }; },
     text({ first, last, mode = 'layout' } = {}) {
       if (!['layout', 'plain', 'raw'].includes(mode)) throw new Error(`unknown text mode ${mode}`);

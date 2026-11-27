@@ -176,6 +176,7 @@ export function repairPackage(pkg: Package, options: RepairOptions = {}): Repair
     publication = {
       model: structure.publication.model, sourceFile: structure.publication.sourceFile,
       reconstructed: reconstructedKind(pmcTexts.get(structure.publication.sourceFile) ?? ''),
+      sourceText: pkg.pmcs.find((p) => p.file.path === structure.publication?.sourceFile)?.text ?? null,
     };
     if (options.assembleUnassigned && pool.length) {
       const dmsByFile = new Map(pkg.dms.map((d) => [d.file.path, d]));

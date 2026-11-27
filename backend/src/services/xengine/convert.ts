@@ -31,6 +31,7 @@ import { createProject, clearImportPending, csdbRel, discardProject, isS1000dPro
 import { adoptFromContents } from '../projectConfig';
 import { restoreSettings } from '../packageSettings';
 import { ZipStreamWriter } from '../zipio';
+import { formatOf } from '../mediaFormats';
 import { jsgBodyXml, parseJsg, withJsgBody, type JsgAppendix } from './jsg-model';
 import { identityOf } from './project';
 
@@ -87,13 +88,21 @@ async function zipOfS1000dProject(projectId: string): Promise<string> {
   const pj = readProjectJson(projectId); const dir = projectDirFor(projectId); const file = tmpFile('.zip');
   const out = fs.createWriteStream(file); const z = new ZipStreamWriter(out);
   const csdb = path.join(dir, csdbRel(pj)); const media = path.join(dir, mediaRel(pj)); const pm = path.join(dir, pmRel(pj));
-  const walk = async (d: string, prefix: string, only?: RegExp): Promise<void> => {
+  // WP-09 (QA-021) / WP-15 (PUB-008, ARC-024): ICN artwork uploaded through the product lives beside the data modules (csdb/), and the importer may
+  // have put it in Media/. EVERY picture or multimedia file of either folder (by the extension list of mediaFormats.ts, whatever its name) goes into the
+  // package's ICN/ folder, where the package reader recognises a picture by its folder as well as by an ICN- name; data modules stay under csdb/.
+  // Files are streamed into the zip one at a time (ZipStreamWriter), so a large picture set is not held in memory.
+  const pictures = new Set<string>();
+  const walk = async (d: string, prefix: string, xml: boolean): Promise<void> => {
     if (!fs.existsSync(d)) return;
-    for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) await walk(p, `${prefix}/${e.name}`, only); else if (!only || only.test(e.name)) await z.addFile(`${prefix}/${e.name}`, p); }
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) { await walk(p, `${prefix}/${e.name}`, xml); continue; }
+      if (xml && /\.xml$/i.test(e.name)) { await z.addFile(`${prefix}/${e.name}`, p); continue; }
+      if (formatOf(e.name) && !pictures.has(e.name.toLowerCase())) { pictures.add(e.name.toLowerCase()); await z.addFile(`ICN/${e.name}`, p); }
+    }
   };
-  // WP-09 (QA-021, PUB-008): ICN artwork uploaded through the product lives beside the data modules (csdb/); it goes into the package too,
-  // or the converted project has no pictures. The package reader recognises a picture by its ICN- name wherever it is.
-  await walk(csdb, 'csdb', /\.xml$|^ICN-/i); await walk(media, 'Media');
+  await walk(csdb, 'csdb', true); await walk(media, 'Media', false);
   if (fs.existsSync(pm)) await z.addFile(`PM/${path.basename(pm)}`, pm);
   await z.finish();
   return file;

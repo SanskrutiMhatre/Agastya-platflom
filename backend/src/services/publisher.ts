@@ -39,6 +39,8 @@ import { buildSelection, planConfiguration, assertResolved, type ConfigInput } f
 import { readSidecar } from './jssdm/sidecar';
 import { dropConsumedModules } from './jssdm/prune';
 import { unwrapChapterFolders } from './jssdm/unwrap';
+import { injectPdfInfo, firstText, firstAttr, type PdfInfo } from './pdfInfo';
+import { ownEngineFormatOf } from './ownEngines';
 
 export const PDF_NAME = 'jss-output.pdf';
 export const PREVIEW_NAME = 'jss-preview.pdf';
@@ -237,6 +239,7 @@ function prepareInput(projectId: string, project: any, effective: any, useDirect
  * fingerprint that gets approved is already the one every later build reproduces.
  */
 export function syncFrontMatter(projectId: string): void {
+  if (ownEngineFormatOf(projectId)) return;                        // WP-15: a format with its own engine makes its own front pages; nothing to write
   try {
     const { project, effective } = effectiveConfig(projectId);
     const dir = projectDirFor(projectId);
@@ -312,7 +315,32 @@ function resolveMarks(projectId: string, effective: any, pipeline: string, log: 
   return { wm, releaseLabel };
 }
 
+/**
+ * WP-15 (PUB-017): the document properties of a built PDF. Title: the book's own (JSS: system and book name; S1000D: the publication module's
+ * title), else the project's name. Author: the publishers of the title page, else the publication's responsible partner company. Subject: the
+ * format and the kind of manual. Keywords: the publication code / number.
+ */
+export function pdfInfoFor(projectId: string, project: any, effective: any, dir: string): PdfInfo {
+  const pub = effective?.publication ?? {};
+  const publishers = ((effective?.branding?.publishers ?? []) as Array<{ name?: string }>).map((p) => String(p?.name ?? '').trim()).filter(Boolean).join(', ');
+  let text = ''; try { text = fs.readFileSync(path.join(dir, pmRel(project)), 'utf8'); } catch { /* no publication file */ }
+  if (/<\s*jssbook[\s>]/.test(text)) {
+    const type = isJssAuthored(projectId) ? jssTypeOfProject(projectId) : undefined;
+    const title = [firstText(text, 'systemName'), firstText(text, 'bookName')].filter(Boolean).join(' - ') || pub.bookName || project.name;
+    return { title, author: publishers || undefined, subject: `JSS ${type?.label ?? 'publication'}`, keywords: [firstText(text, 'publicationNo'), firstText(text, 'projectCode')].filter(Boolean).join(', ') };
+  }
+  const code = ['modelIdentCode', 'pmIssuer', 'pmNumber', 'pmVolume'].map((a) => firstAttr(text, 'pmCode', a));
+  const rpc = firstText(/<responsiblePartnerCompany\b[\s\S]*?<\/responsiblePartnerCompany>/.exec(text)?.[0] ?? '', 'enterpriseName');
+  return { title: firstText(text, 'pmTitle') || pub.bookName || project.name, author: publishers || rpc || undefined, subject: 'S1000D publication', keywords: code.every(Boolean) ? `PMC-${code.join('-')}` : '' };
+}
+
 // ── Builds ────────────────────────────────────────────────────────────────
+
+/** WP-15 (PUB-011): a format with an engine of its own (ownEngines.ts) is never rendered by the S1000D / JSS build; the format says what to do instead. */
+function refuseOwnEngine(projectId: string): void {
+  const own = ownEngineFormatOf(projectId);
+  if (own) throw new HttpError(409, own.refusal.message, own.refusal.code);
+}
 
 export interface BuildResult { pdf: string; totalMs?: number; releaseLabel: string }
 
@@ -337,6 +365,7 @@ export function lastBuildState(projectId: string): BuildState | null {
 }
 
 export function buildPublication(projectId: string, opts: { compression?: number; allowRuleBreaks?: boolean } = {}): Promise<BuildResult> {
+  refuseOwnEngine(projectId);
   return serial(`${projectId}:full`, async () => {
     const log = (m: string) => { console.log(`[build:${projectId}] ${m}`); broadcast(projectId, { type: 'progress', message: m }); };
     // A PDF is only built from modules that have JUST been checked against their schema (a draft that does not match blocks it).
@@ -384,6 +413,7 @@ async function renderFull(projectId: string, gate: GatePass, log: (m: string) =>
       pdfCompressLevel: Number(project.output?.pdfCompressLevel ?? 0),
       watermarkUri: wm ? wm.uri : undefined, watermarkRepeat: wm ? wm.repeat : undefined, releaseLabel,
       onMessage: log,
+      onFo: (fo: string) => { try { injectPdfInfo(fo, pdfInfoFor(projectId, project, effective, dir)); } catch (e) { log(`PDF document properties not written: ${(e as Error).message}`); } },   // WP-15 (PUB-017)
     };
     // A JSS-authored document sends the stencils' layout settings (spacing, heading font, indent, cover title lines, no foreword document number, and no INBR No. line
     // on covers that do not have one). Each is a parameter whose stylesheet default is the old behaviour, so every other build (S1000D direct, S1000D through JSS, an
@@ -464,6 +494,7 @@ export function buildPreview(projectId: string, dmFile: string): Promise<BuildRe
         : engineConfig.stage2Params(effective), compression: 0,
       watermarkUri: wm ? wm.uri : undefined, watermarkRepeat: wm ? wm.repeat : undefined, releaseLabel,
       onMessage: () => undefined,
+      onFo: (fo: string) => { try { injectPdfInfo(fo, pdfInfoFor(projectId, project, effective, dir)); } catch { /* a preview without properties */ } },   // WP-15 (PUB-017)
     };
     try {
       const result = project.pipeline === 's1000dtofo'
@@ -501,6 +532,7 @@ function pmCodeOf(pmXml: string, fallback: string): string {
  *   - a configuration that leaves a deciding property without a value is refused, listing every place (APPLICABILITY_UNRESOLVED).
  */
 export function buildConfiguredPublication(projectId: string, input: ConfigInput): Promise<ConfiguredBuildResult> {
+  refuseOwnEngine(projectId);
   return serial(`${projectId}:configured`, async () => {
     const log = (m: string) => { console.log(`[configured:${projectId}] ${m}`); broadcast(projectId, { type: 'progress', message: m }); };
     log('Validating the publication against the S1000D schemas, business rules and applicability...');

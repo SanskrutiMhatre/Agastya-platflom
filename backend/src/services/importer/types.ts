@@ -229,6 +229,8 @@ export interface AssembledPublication {
   sourceFile: string;
   /** `full`: synthesised from the modules. `metadata`: the PMC's structure was kept, its placeholder header was rebuilt. null: as delivered. */
   reconstructed: 'full' | 'metadata' | null;
+  /** WP-15 (PUB-015): the package's own text of that PMC (null when synthesised): the header elements the model does not carry are taken from it. */
+  sourceText?: string | null;
   /** Folder holding the modules assembled out of the pool, when the caller asked for that. */
   assembledPoolFolder?: string;
 }

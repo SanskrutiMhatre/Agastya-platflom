@@ -210,6 +210,7 @@ ${overrides}
                   publishers, emblem, book/system name)
     layoutParams  [[name,value], ...] from config.stage2Params (stage 2 only)
     onMessage     optional (msg) => void progress callback
+    onFo          optional (foAbsPath) => void, called once the FO is final, before FOP (vendor exception "FO hook")
 
   Resolves { pdf, stage1: {stamped,missing} | null }.
 */
@@ -504,6 +505,8 @@ async function buildJss(o) {
 
     // Vendor exception "foGuard" (WP-02 / SEC-003): no picture outside the allowed folders, no URL, reaches FOP.
     { const m = foGuard.formatConfine(foGuard.confineFo(path.join(o.workDir, o.foOut), { baseDir: o.workDir, roots: o.resourceRoots })); if (m) log(`Security: ${m}`); }
+    // Vendor exception "FO hook" (2026-11-27, audit WP-15 PUB-017): the server edits the finished FO before FOP reads it (the PDF document properties).
+    if (typeof o.onFo === 'function') o.onFo(path.join(o.workDir, o.foOut));
 
     // FOP renders a missing image as a silent blank, so check before it runs.
     const images = checkImages(path.join(o.workDir, o.foOut), o.workDir);
@@ -678,6 +681,8 @@ async function buildS1000dToFo(o) {
 
     // Vendor exception "foGuard" (WP-02 / SEC-003), as in the JSS-path build above.
     { const m = foGuard.formatConfine(foGuard.confineFo(path.join(o.workDir, o.foOut), { baseDir: o.workDir, roots: o.resourceRoots })); if (m) log(`Security: ${m}`); }
+    // Vendor exception "FO hook" (2026-11-27, audit WP-15 PUB-017): the server edits the finished FO before FOP reads it (the PDF document properties).
+    if (typeof o.onFo === 'function') o.onFo(path.join(o.workDir, o.foOut));
 
     const images = checkImages(path.join(o.workDir, o.foOut), o.workDir);
     { const m = formatImageCheck(images); if (m) log(`Image references: ${m}`); }
