@@ -15,6 +15,7 @@ import { configApi, platformApi, workspaceApi, type AppSettings, type ConfigItem
 import { Icon } from '../components/Icon';
 import { PageHeader } from '../components/PageHeader';
 import { Alert, Badge, ConfirmModal, Empty, Field, Loading, Modal, errText, fmtDate, useAsync } from '../components/ui';
+import '../styles/pages/admin.css';   // WP-35 second pass: the administrator screens' styles load with this chunk
 import { useApp } from '../store/appSettings';
 import { DEFAULT_ACCENT, deriveAccent } from '../lib/accent';
 import { useUi } from '../store/ui';
@@ -51,11 +52,11 @@ function FormatSection({ format }: { format: 'jss' | 'jsg' }) {
   if (!f) return <Loading />;
   return (
     <div className="v2-stack" data-testid={`format-${format}`}>
-      <div><h3 style={{ margin: 0 }}>{f.label} manuals</h3><p className="v2-sub" style={{ margin: '2px 0 0' }}>{f.description} There is nothing to configure here: the layout of each manual type comes from its stencil, which is built into the platform. People pick the domain and manual type when they create a project.</p></div>
+      <div className="v2-admin-head"><h3>{f.label} manuals</h3><p className="v2-sub">{f.description} There is nothing to configure here: the layout of each manual type comes from its stencil, which is built into the platform. People pick the domain and manual type when they create a project.</p></div>
       {f.domains.map((d) => (
         <div key={d.id} className="v2-card v2-card-pad">
-          <h4 style={{ marginTop: 0 }}>{d.label}</h4>
-          <table className="v2-table"><tbody>{d.manualTypes.map((m) => <tr key={m.id}><td>{m.label}</td><td style={{ width: 180 }}>{f.ready && m.ready ? <Badge tone="ok">Available</Badge> : <Badge tone="warn">Coming soon</Badge>}</td></tr>)}</tbody></table>
+          <h4 className="v2-mt0">{d.label}</h4>
+          <table className="v2-table"><tbody>{d.manualTypes.map((m) => <tr key={m.id}><td>{m.label}</td><td className="v2-w-180">{f.ready && m.ready ? <Badge tone="ok">Available</Badge> : <Badge tone="warn">Coming soon</Badge>}</td></tr>)}</tbody></table>
         </div>
       ))}
     </div>
@@ -72,7 +73,7 @@ export function AdministratorPage() {
             <div key={g.title}>
               <div className="v2-admin-group">{g.title}</div>
               {g.items.map(([to, label]) => <NavLink key={to} to={`/administrator/${to}`} className={({ isActive }) => (isActive ? 'active' : '')}>{label}</NavLink>)}
-              {g.advanced ? <details><summary className="v2-hint" style={{ cursor: 'pointer', padding: '4px 12px' }}>Advanced</summary>
+              {g.advanced ? <details><summary className="v2-hint v2-admin-more">Advanced</summary>
                 {g.advanced.map(([to, label]) => <NavLink key={to} to={`/administrator/${to}`} className={({ isActive }) => (isActive ? 'active' : '')}>{label}</NavLink>)}</details> : null}
             </div>
           ))}
@@ -122,11 +123,11 @@ function ConfigTable({ collection }: { collection: string }) {
   return (
     <div className="v2-stack" data-testid={`config-${collection}`}>
       <div className="v2-row v2-spread">
-        <div><h3 style={{ margin: 0 }}>{spec.title}</h3><p className="v2-sub" style={{ margin: '2px 0 0' }}>{spec.description}</p></div>
+        <div className="v2-admin-head"><h3>{spec.title}</h3><p className="v2-sub">{spec.description}</p></div>
         <button className="btn btn-primary" onClick={() => setEditing('new')} data-testid="config-add"><Icon name="plus" />Add {spec.noun}</button>
       </div>
       {ENTERPRISE.has(collection) && !data.data?.items.length ? <Alert tone="warn">No enterprises are registered, so imported data modules are <b>not checked</b> against this list. Register the enterprises to switch the check on.</Alert> : null}
-      <div className="v2-row"><input className="v2-input" style={{ maxWidth: 280 }} placeholder="Filter…" value={q} onChange={(e) => setQ(e.target.value)} aria-label={`Filter ${spec.title}`} /></div>
+      <div className="v2-row"><input className="v2-input v2-maxw-280" placeholder="Filter…" value={q} onChange={(e) => setQ(e.target.value)} aria-label={`Filter ${spec.title}`} /></div>
       <div className="v2-card">
         {items.length === 0 ? <Empty title={q ? 'Nothing matches' : `No ${spec.title.toLowerCase()} yet`} /> : (
           <div className="v2-scroll-x"><table className="v2-table">
@@ -134,7 +135,7 @@ function ConfigTable({ collection }: { collection: string }) {
             <tbody>{items.map((it) => (
               <tr key={it.id} data-testid="config-row">
                 {spec.fields.map((f) => <td key={f.key} className={f.mono ? 'v2-mono' : ''}>{f.type === 'boolean' ? <Badge tone={it[f.key] ? 'ok' : undefined}>{it[f.key] ? 'Yes' : 'No'}</Badge> : String(it[f.key] ?? '')}</td>)}
-                <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                <td className="v2-td-end">
                   <button className="icon-btn" aria-label={`Edit ${String(it[spec.fields[0].key])}`} title="Edit" onClick={() => setEditing(it)}><Icon name="edit" size={14} /></button>
                   <button className="icon-btn" aria-label={`Delete ${String(it[spec.fields[0].key])}`} title="Delete" onClick={() => setDel(it)}><Icon name="trash" size={14} /></button>
                 </td>
@@ -145,7 +146,7 @@ function ConfigTable({ collection }: { collection: string }) {
       {editing ? <ItemModal spec={spec} collection={collection} item={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); data.reload(); }} /> : null}
       {del ? (
         <ConfirmModal title={`Delete this ${spec.noun}?`} danger confirmLabel="Delete" onClose={() => setDel(null)}
-          body={<p style={{ marginTop: 0 }}><strong>{String(del[spec.fields[0].key])}</strong> is removed from {spec.title}.</p>}
+          body={<p className="v2-mt0"><strong>{String(del[spec.fields[0].key])}</strong> is removed from {spec.title}.</p>}
           onConfirm={async () => { const d = del; setDel(null); try { await configApi.remove(collection, d.id); toast('Deleted', 'success'); data.reload(); } catch (e) { toast(errText(e), 'error'); } }} />
       ) : null}
     </div>
@@ -167,7 +168,7 @@ function ItemModal({ spec, collection, item, onClose, onSaved }: { spec: ConfigS
       buttons={<><button className="btn" onClick={onClose}>Cancel</button><button className="btn btn-primary" disabled={busy} onClick={save} data-testid="config-save">Save</button></>}>
       <form className="v2-stack" onSubmit={(e) => { e.preventDefault(); void save(); }}>
         {spec.fields.map((f) => f.type === 'boolean'
-          ? <label key={f.key} className="v2-row" style={{ gap: 6 }}><input type="checkbox" checked={!!form[f.key]} onChange={(e) => setForm({ ...form, [f.key]: e.target.checked })} />{f.label}</label>
+          ? <label key={f.key} className="v2-row v2-gap-6"><input type="checkbox" checked={!!form[f.key]} onChange={(e) => setForm({ ...form, [f.key]: e.target.checked })} />{f.label}</label>
           : <Field key={f.key} label={f.label}><input className={`v2-input ${f.mono ? 'v2-mono' : ''}`} value={String(form[f.key] ?? '')} maxLength={300} autoFocus={f === spec.fields[0]} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} /></Field>)}
         {err ? <Alert tone="bad">{err}</Alert> : null}
         <button type="submit" hidden />
@@ -183,16 +184,16 @@ function RolesSection() {
   if (r.loading && !r.data) return <Loading />;
   if (!r.data) return <Alert tone="bad">{r.error}</Alert>;
   const table = (rows: Array<{ name: string; description: string }>) => (
-    <div className="v2-card"><table className="v2-table"><thead><tr><th style={{ width: 200 }}>Role</th><th>What it can do</th></tr></thead><tbody>{rows.map((x) => <tr key={x.name}><td><b>{x.name}</b></td><td>{x.description}</td></tr>)}</tbody></table></div>
+    <div className="v2-card"><table className="v2-table"><thead><tr><th className="v2-w-200">Role</th><th>What it can do</th></tr></thead><tbody>{rows.map((x) => <tr key={x.name}><td><b>{x.name}</b></td><td>{x.description}</td></tr>)}</tbody></table></div>
   );
   return (
     <div className="v2-stack" data-testid="roles">
-      <div><h3 style={{ margin: 0 }}>Roles</h3><p className="v2-sub" style={{ margin: '2px 0 0' }}>The platform's roles are fixed by the code that enforces them, so they are shown here, not edited.</p></div>
-      <h4 style={{ margin: 0 }}>Platform roles</h4>{table(r.data.roles)}
-      <h4 style={{ margin: 0 }}>Roles inside a project</h4>{table(r.data.projectRoles)}
+      <div className="v2-admin-head"><h3>Roles</h3><p className="v2-sub">The platform's roles are fixed by the code that enforces them, so they are shown here, not edited.</p></div>
+      <h4 className="v2-m0">Platform roles</h4>{table(r.data.roles)}
+      <h4 className="v2-m0">Roles inside a project</h4>{table(r.data.projectRoles)}
       {r.data.capabilities?.length ? <>
-        <h4 style={{ margin: 0 }}>Actions inside a project</h4>
-        <p className="v2-sub" style={{ margin: 0 }}>The lowest project role that may do each action. A project's managers can allow one action to a person or group below that role, or deny it (Project settings &gt; Access).</p>
+        <h4 className="v2-m0">Actions inside a project</h4>
+        <p className="v2-sub v2-m0">The lowest project role that may do each action. A project's managers can allow one action to a person or group below that role, or deny it (Project settings &gt; Access).</p>
         <div className="v2-card" data-testid="capabilities"><table className="v2-table"><thead><tr><th>Action</th><th>From role</th></tr></thead><tbody>{r.data.capabilities.map((c) => <tr key={c.capability}><td className="v2-mono">{c.capability}</td><td>{c.minRole}</td></tr>)}</tbody></table></div>
       </> : null}
     </div>
@@ -203,7 +204,7 @@ function AuditSection() {
   return (
     <div className="v2-stack">
       <div className="v2-row v2-spread">
-        <div><h3 style={{ margin: 0 }}>Audit logs</h3><p className="v2-sub" style={{ margin: '2px 0 0' }}>Who did what, newest first. Every row is chained and signed; Verify chain shows whether any was changed, removed or inserted.</p></div>
+        <div className="v2-admin-head"><h3>Audit logs</h3><p className="v2-sub">Who did what, newest first. Every row is chained and signed; Verify chain shows whether any was changed, removed or inserted.</p></div>
         <a className="btn" href={platformApi.AUDIT_CSV} download data-testid="audit-export"><Icon name="download" />Export all (CSV)</a>
       </div>
       <Audit />
@@ -231,15 +232,15 @@ function SecuritySection() {
     try { setForm(await platformApi.saveSecurityPolicy(form)); toast('Saved', 'success'); } catch (e) { setErr(errText(e)); } finally { setBusy(false); }
   };
   return (
-    <div className="v2-stack" style={{ maxWidth: 560 }} data-testid="security-policy">
-      <div><h3 style={{ margin: 0 }}>Security</h3><p className="v2-sub" style={{ margin: '2px 0 0' }}>How long people stay signed in, and who may approve a release.</p></div>
+    <div className="v2-stack v2-maxw-560" data-testid="security-policy">
+      <div className="v2-admin-head"><h3>Security</h3><p className="v2-sub">How long people stay signed in, and who may approve a release.</p></div>
       {audit && audit.failures > 0 ? <Alert tone="bad">The audit log could not record {audit.failures} action{audit.failures === 1 ? '' : 's'} since the server started (last: {audit.last?.action} at {audit.last?.at}: {audit.last?.error}). The details are in workspace\logs\audit-failures.log.</Alert> : null}
       {audit?.lastVerification ? <Alert tone={audit.lastVerification.ok ? 'ok' : 'bad'}><span data-testid="sec-audit-verify">Audit chain, last checked {fmtDate(audit.lastVerification.at)}: {audit.lastVerification.summary}.</span>{audit.lastVerification.ok ? null : ' See Audit logs > Verify chain, and docs/OPERATIONS.md section 13.'}</Alert> : null}
       <Field label="Sign out after this many minutes without activity" hint="0 means no idle limit. Typing in an editor counts as activity."><input className="v2-input" type="number" min={0} max={1440} value={form.idleMinutes} onChange={num('idleMinutes')} data-testid="sec-idle" /></Field>
       <Field label="Sign out this many hours after signing in" hint="Whatever happens; one working day is usual."><input className="v2-input" type="number" min={1} max={720} value={form.absoluteHours} onChange={num('absoluteHours')} data-testid="sec-absolute" /></Field>
       <Field label="Shortest password a person may choose" hint="15 or more when there is no second sign-in factor. Existing passwords keep working."><input className="v2-input" type="number" min={8} max={64} value={form.passwordMinLength} onChange={num('passwordMinLength')} data-testid="sec-pwmin" /></Field>
-      <label className="v2-row" style={{ gap: 8 }}><input type="checkbox" checked={form.singleSession} onChange={(e) => setForm({ ...form, singleSession: e.target.checked })} data-testid="sec-single" />One session per person: signing in on another computer signs the first one out (it is told why).</label>
-      <label className="v2-row" style={{ gap: 8 }}><input type="checkbox" checked={form.separationOfDuties} onChange={(e) => setForm({ ...form, separationOfDuties: e.target.checked })} data-testid="sec-sod" />Separation of duties: the person who requests a release cannot approve it.</label>
+      <label className="v2-row v2-gap-8"><input type="checkbox" checked={form.singleSession} onChange={(e) => setForm({ ...form, singleSession: e.target.checked })} data-testid="sec-single" />One session per person: signing in on another computer signs the first one out (it is told why).</label>
+      <label className="v2-row v2-gap-8"><input type="checkbox" checked={form.separationOfDuties} onChange={(e) => setForm({ ...form, separationOfDuties: e.target.checked })} data-testid="sec-sod" />Separation of duties: the person who requests a release cannot approve it.</label>
       {!form.separationOfDuties ? <Alert tone="warn">Self-approval is allowed. Use this only on a one-person installation; the change is recorded in the audit log.</Alert> : null}
       {err ? <Alert tone="bad">{err}</Alert> : null}
       <div><button className="btn btn-primary" disabled={busy} onClick={() => void save()} data-testid="sec-save">Save</button></div>
@@ -271,26 +272,26 @@ function MaintenanceSection() {
   return (
     <div className="v2-stack" data-testid="maintenance">
       {asking ? <ConfirmModal title={`${asking.title}?`} body={<p>{asking.ask}</p>} confirmLabel="Go ahead" onClose={() => setAsking(null)} onConfirm={() => { const a = asking; setAsking(null); void run(a.id, a.go); }} /> : null}
-      <div><h3 style={{ margin: 0 }}>Maintenance</h3><p className="v2-sub" style={{ margin: '2px 0 0' }}>System maintenance tools.</p></div>
+      <div className="v2-admin-head"><h3>Maintenance</h3><p className="v2-sub">System maintenance tools.</p></div>
       <div className="v2-grid cols-2">
         {cards.map((c) => (
-          <div key={c.id} className="v2-card v2-card-pad">
-            <h4 style={{ marginTop: 0 }}>{c.title}</h4>
+          <div key={c.id} className="v2-card v2-card-pad v2-maint-card">
+            <h4 className="v2-mt0">{c.title}</h4>
             <p className="v2-sub">{c.desc}</p>
             <button className="btn btn-primary" disabled={!!busy} onClick={() => { if (ASK[c.id]) setAsking({ id: c.id, title: c.title, ask: ASK[c.id], go: c.go }); else void run(c.id, c.go); }} data-testid={`maint-${c.id}`}>{busy === c.id ? 'Working…' : c.btn}</button>
-            {result[c.id] ? <p className="v2-hint" style={{ marginBottom: 0 }} data-testid={`maint-${c.id}-result`}>{result[c.id]}</p> : null}
+            {result[c.id] ? <p className="v2-hint v2-mb0" data-testid={`maint-${c.id}-result`}>{result[c.id]}</p> : null}
           </div>
         ))}
         {/* WP-12 (PLT-001, ENT-006, ARC-005): the restorable platform backup; the project files export below is a convenience copy */}
         <PlatformBackups />
-        <div className="v2-card v2-card-pad">
-          <h4 style={{ marginTop: 0 }}>Project files export</h4>
+        <div className="v2-card v2-card-pad v2-maint-card">
+          <h4 className="v2-mt0">Project files export</h4>
           <p className="v2-sub">A ZIP of every project's files, the people and their memberships, and the last 5,000 events of the activity log, to read or hand on.</p>
           <p className="v2-hint">It is not a backup: it holds no passwords, settings, history or release records and cannot be restored. Use Platform backup above for that.</p>
           <a className="btn" href="/api/backup" download>Export project files</a>
         </div>
-        <div className="v2-card v2-card-pad">
-          <h4 style={{ marginTop: 0 }}>Download logs</h4>
+        <div className="v2-card v2-card-pad v2-maint-card">
+          <h4 className="v2-mt0">Download logs</h4>
           <p className="v2-sub">The audit log of everything done on the platform, as CSV.</p>
           <a className="btn btn-primary" href={platformApi.AUDIT_CSV} download>Download</a>
         </div>
@@ -317,8 +318,8 @@ function useSettingsForm() {
 function SettingsSection() {
   const { form, setForm, save, busy, err } = useSettingsForm();
   return (
-    <div className="v2-stack" style={{ maxWidth: 520 }} data-testid="platform-settings">
-      <div><h3 style={{ margin: 0 }}>Settings</h3><p className="v2-sub" style={{ margin: '2px 0 0' }}>Shown to everyone once they are signed in.</p></div>
+    <div className="v2-stack v2-maxw-520" data-testid="platform-settings">
+      <div className="v2-admin-head"><h3>Settings</h3><p className="v2-sub">Shown to everyone once they are signed in.</p></div>
       <Field label="Application name" hint="Appears at the top of the sidebar."><input className="v2-input" maxLength={60} value={form.appName} onChange={(e) => setForm({ ...form, appName: e.target.value })} /></Field>
       <Field label="Organisation"><input className="v2-input" maxLength={100} value={form.organisation} onChange={(e) => setForm({ ...form, organisation: e.target.value })} /></Field>
       {err ? <Alert tone="bad">{err}</Alert> : null}
@@ -330,16 +331,16 @@ function SettingsSection() {
 function VisualSection() {
   const { form, setForm, save, busy, err } = useSettingsForm();
   return (
-    <div className="v2-stack" style={{ maxWidth: 520 }} data-testid="visual-settings">
-      <div><h3 style={{ margin: 0 }}>Visual settings</h3><p className="v2-sub" style={{ margin: '2px 0 0' }}>How the application looks for everyone.</p></div>
+    <div className="v2-stack v2-maxw-520" data-testid="visual-settings">
+      <div className="v2-admin-head"><h3>Visual settings</h3><p className="v2-sub">How the application looks for everyone.</p></div>
       <Field label="Accent colour" hint="Buttons, links and highlights. Clear it to use the default."><div className="v2-row">
-        <input type="color" value={form.accent || DEFAULT_ACCENT} onChange={(e) => setForm({ ...form, accent: e.target.value })} aria-label="Accent colour" style={{ width: 44, height: 32 }} />
+        <input type="color" value={form.accent || DEFAULT_ACCENT} onChange={(e) => setForm({ ...form, accent: e.target.value })} aria-label="Accent colour" className="v2-color-input" />
         <span className="v2-mono">{form.accent || 'default'}</span>{form.accent ? <button className="btn btn-sm" onClick={() => setForm({ ...form, accent: '' })}>Use default</button> : null}
       </div></Field>
       {form.accent ? <AccentPreview hex={form.accent} /> : null}
       <Field label="Default theme" hint="Used until a person picks their own with the theme button."><select className="v2-select" value={form.theme} onChange={(e) => setForm({ ...form, theme: e.target.value as AppSettings['theme'] })}>
         <option value="system">Follow the device</option><option value="light">Light</option><option value="dark">Dark</option></select></Field>
-      <label className="v2-row" style={{ gap: 6 }}><input type="checkbox" checked={form.compact} onChange={(e) => setForm({ ...form, compact: e.target.checked })} />Compact layout (tighter spacing)</label>
+      <label className="v2-row v2-gap-6"><input type="checkbox" checked={form.compact} onChange={(e) => setForm({ ...form, compact: e.target.checked })} />Compact layout (tighter spacing)</label>
       {err ? <Alert tone="bad">{err}</Alert> : null}
       <div><button className="btn btn-primary" disabled={busy} onClick={() => void save({ accent: form.accent, theme: form.theme, compact: form.compact })} data-testid="visual-save">Save</button></div>
     </div>
@@ -361,7 +362,7 @@ function AccentPreview({ hex }: { hex: string }) {
     );
   };
   return (
-    <div className="v2-stack" data-testid="accent-preview" style={{ gap: 6 }}>
+    <div className="v2-stack v2-gap-6" data-testid="accent-preview">
       <div className="v2-row wrap">{swatch('light')}{swatch('dark')}</div>
       {d.adjusted ? <span className="v2-hint" data-testid="accent-adjusted">{hex} is adjusted so text on it stays readable (at least 4.5:1) in each theme.</span> : null}
     </div>
@@ -371,8 +372,8 @@ function AccentPreview({ hex }: { hex: string }) {
 function LicenceSection() {
   const app = useApp((s) => s.settings);
   return (
-    <div className="v2-stack" style={{ maxWidth: 560 }} data-testid="licence">
-      <div><h3 style={{ margin: 0 }}>Licence</h3><p className="v2-sub" style={{ margin: '2px 0 0' }}>About this installation.</p></div>
+    <div className="v2-stack v2-maxw-560" data-testid="licence">
+      <div className="v2-admin-head"><h3>Licence</h3><p className="v2-sub">About this installation.</p></div>
       <div className="v2-card v2-card-pad">
         <table className="v2-table"><tbody>
           <tr><td>Product</td><td><b>{app.appName}</b> 2.0</td></tr>

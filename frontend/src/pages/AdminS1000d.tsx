@@ -9,6 +9,7 @@ import { s1000dApi, issueLabel, KIND_LABEL, type CodeKind, type CodeRow, type Im
 import { Icon } from '../components/Icon';
 import { RowButton, tablistKeys } from '../components/a11y';
 import { Alert, Badge, ConfirmModal, Empty, Field, Loading, Modal, PromptModal, errText, useAsync } from '../components/ui';
+import '../styles/pages/admin.css';   // WP-35 second pass
 import { useUi } from '../store/ui';
 import { csdbApi } from '../api/csdb';
 
@@ -16,11 +17,11 @@ const KINDS: CodeKind[] = ['infoCode', 'learnCode', 'learnEventCode', 'itemLocat
 
 function ImpactBody({ impact, verb }: { impact: Impact; verb: string }) {
   return (
-    <div className="v2-stack" style={{ gap: 6 }} data-testid="impact">
-      <p style={{ margin: 0 }}>{verb} <b className="v2-mono">{impact.code}</b> affects <b>{impact.projects.length}</b> project{impact.projects.length === 1 ? '' : 's'} ({impact.dmsUsing} data module{impact.dmsUsing === 1 ? '' : 's'} use it):</p>
+    <div className="v2-stack v2-gap-6" data-testid="impact">
+      <p className="v2-m0">{verb} <b className="v2-mono">{impact.code}</b> affects <b>{impact.projects.length}</b> project{impact.projects.length === 1 ? '' : 's'} ({impact.dmsUsing} data module{impact.dmsUsing === 1 ? '' : 's'} use it):</p>
       <table className="v2-table"><thead><tr><th>Project</th><th>Selected in its configuration</th><th>Data modules using it</th></tr></thead><tbody>
         {impact.projects.map((p) => <tr key={p.id}><td>{p.name}</td><td>{p.selected ? 'yes' : 'no'}</td><td>{p.dmsUsing}</td></tr>)}</tbody></table>
-      <p className="v2-hint" style={{ margin: 0 }}>No data module is changed. A deleted code simply stops being offered; the BREX check still judges existing modules.</p>
+      <p className="v2-hint v2-m0">No data module is changed. A deleted code simply stops being offered; the BREX check still judges existing modules.</p>
     </div>
   );
 }
@@ -47,27 +48,27 @@ export function CatalogueSection() {
   };
   return (
     <div className="v2-stack" data-testid="s1000d-catalogue">
-      <div><h3 style={{ margin: 0 }}>Information codes</h3><p className="v2-sub" style={{ margin: '2px 0 0' }}>The codes projects choose from when they create a data module, for each S1000D issue. Pick the issue, search the list, and add your own code if a project needs one. Where the codes come from is under <b>Technical details</b> at the bottom.</p></div>
+      <div className="v2-admin-head"><h3>Information codes</h3><p className="v2-sub">The codes projects choose from when they create a data module, for each S1000D issue. Pick the issue, search the list, and add your own code if a project needs one. Where the codes come from is under <b>Technical details</b> at the bottom.</p></div>
       <div className="v2-row wrap">
-        <select className="v2-select" style={{ width: 150 }} value={issue} onChange={(e) => setIssue(e.target.value as IssueKey)} aria-label="Issue" data-testid="cat-issue">{ov.issues.map((i) => <option key={i.key} value={i.key}>Issue {i.label}</option>)}</select>
+        <select className="v2-select v2-w-150" value={issue} onChange={(e) => setIssue(e.target.value as IssueKey)} aria-label="Issue" data-testid="cat-issue">{ov.issues.map((i) => <option key={i.key} value={i.key}>Issue {i.label}</option>)}</select>
         <div className="v2-tabs" role="tablist" aria-label="Code lists" onKeyDown={tablistKeys}>{KINDS.map((k) => <button key={k} role="tab" aria-selected={kind === k} className={`v2-tab ${kind === k ? 'active' : ''}`} onClick={() => setKind(k)}>{KIND_LABEL[k]}</button>)}</div>
-        <input className="v2-input" style={{ width: 220 }} placeholder="Filter…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Filter codes" />
+        <input className="v2-input v2-w-220" placeholder="Filter…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Filter codes" />
         <button className="btn btn-primary" onClick={() => setAdding(true)} data-testid="cat-add"><Icon name="plus" />Add custom code</button>
       </div>
       <div className="v2-card">
         {cat.loading && !cat.data ? <Loading /> : rows.length === 0 ? <Empty title="Nothing matches" /> : (
-          <div className="v2-scroll-x" style={{ maxHeight: 520, overflow: 'auto' }}><table className="v2-table"><thead><tr><th style={{ width: 90 }}>Code</th><th>Title</th><th style={{ width: 230 }}>Source</th><th /></tr></thead><tbody>
+          <div className="v2-scroll-x v2-scroll-520"><table className="v2-table"><thead><tr><th className="v2-w-90">Code</th><th>Title</th><th className="v2-w-230">Source</th><th /></tr></thead><tbody>
             {rows.map((c) => (
               <tr key={c.code} data-testid="cat-row">
                 <td className="v2-mono">{c.code}</td><td>{c.title}</td>
                 <td>{c.origin === 'brex' ? <Badge title={`${c.sourceLabel} · ${c.ruleId}`}>{c.ruleId}</Badge> : <Badge tone={c.brexAccepts ? 'ok' : 'warn'} title={c.brexAccepts ? 'Falls in a project-available range the BREX accepts' : 'Not in the default BREX: fails the BREX rule unless the project BREX allows it'}>{c.brexAccepts ? 'custom, in BREX range' : 'custom, outside BREX'}</Badge>}</td>
-                <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{c.origin === 'custom' ? <>
+                <td className="v2-td-end">{c.origin === 'custom' ? <>
                   <button className="icon-btn" aria-label={`Edit ${c.code}`} title={`Edit ${c.code}`} onClick={() => setEditing(c)}><Icon name="edit" size={14} /></button>
                   <button className="icon-btn" aria-label={`Delete ${c.code}`} title={`Delete ${c.code}`} onClick={() => void askDelete(c)}><Icon name="trash" size={14} /></button></> : null}</td>
               </tr>))}</tbody></table></div>
         )}
       </div>
-      <details className="v2-card v2-card-pad" data-testid="cat-technical"><summary><b>Technical details</b> — where the codes come from</summary><div className="v2-stack" style={{ marginTop: 8 }}>
+      <details className="v2-card v2-card-pad" data-testid="cat-technical"><summary><b>Technical details</b> — where the codes come from</summary><div className="v2-stack v2-mt8">
       <div className="v2-card"><table className="v2-table"><thead><tr><th>Issue</th>{KINDS.map((k) => <th key={k}>{KIND_LABEL[k]}</th>)}</tr></thead><tbody>
         {ov.summary.map((s) => <tr key={s.issue}><td><b>{s.label}</b></td>{KINDS.map((k) => <td key={k}>{s.kinds[k].count}{s.kinds[k].ranges ? ` + ${s.kinds[k].ranges} ranges` : ''}{s.kinds[k].custom ? <> <Badge tone="warn">{s.kinds[k].custom} custom</Badge></> : null}</td>)}</tr>)}</tbody></table></div>
       <details className="v2-card v2-card-pad" data-testid="default-evidence"><summary><b>Default information codes: what the specification says</b> ({Object.keys(ov.evidence.types).length} checked, {Object.keys(ov.unresolved).length} still open)</summary>
@@ -78,9 +79,9 @@ export function CatalogueSection() {
             <td><Badge tone={e.status === 'confirmed' || e.status === 'supported' || e.status === 'corrected' ? 'ok' : 'warn'} title={ov.evidence.statuses[e.status]}>{e.status}</Badge></td>
             <td>{e.note}<div className="v2-hint">{e.refs.join(' · ')}{e.codes.length ? ` — codes: ${e.codes.join(', ')}` : ''}</div></td></tr>))}</tbody></table></details>
       {src ? (
-        <p className="v2-hint" style={{ margin: 0 }} data-testid="cat-source"><b>Source:</b> {src.label} — <span className="v2-mono">{src.file}</span>, SHA-256 <span className="v2-mono">{src.sha256?.slice(0, 16)}…</span>, rule <span className="v2-mono">{cat.data?.rule}</span>. {src.limitation}</p>
+        <p className="v2-hint v2-m0" data-testid="cat-source"><b>Source:</b> {src.label} — <span className="v2-mono">{src.file}</span>, SHA-256 <span className="v2-mono">{src.sha256?.slice(0, 16)}…</span>, rule <span className="v2-mono">{cat.data?.rule}</span>. {src.limitation}</p>
       ) : null}
-      {cat.data?.ranges.length ? <p className="v2-hint" style={{ margin: 0 }}><b>Project-available ranges</b> (any code matching is accepted by the BREX; the project defines its meaning): <span className="v2-mono">{cat.data.ranges.map((r) => r.pattern).join('  ')}</span></p> : null}
+      {cat.data?.ranges.length ? <p className="v2-hint v2-m0"><b>Project-available ranges</b> (any code matching is accepted by the BREX; the project defines its meaning): <span className="v2-mono">{cat.data.ranges.map((r) => r.pattern).join('  ')}</span></p> : null}
       </div></details>
       {adding ? <AddCode kind={kind} issue={issue} onClose={() => setAdding(false)} onSaved={() => { setAdding(false); reload(); }} /> : null}
       {editing ? <EditCode row={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); reload(); }} /> : null}
@@ -102,7 +103,7 @@ function AddCode({ kind, issue, onClose, onSaved }: { kind: CodeKind; issue: Iss
         <Alert tone="warn">A custom code is not in the default BREX. A data module using it fails the BREX check unless the code falls in a range the BREX leaves to projects, or the project's own BREX allows it.</Alert>
         <Field label="Code"><input className="v2-input v2-mono" autoFocus value={code} maxLength={3} onChange={(e) => setCode(e.target.value)} data-testid="cat-code" /></Field>
         <Field label="Title"><input className="v2-input" value={title} maxLength={300} onChange={(e) => setTitle(e.target.value)} data-testid="cat-title" /></Field>
-        <div className="v2-row wrap">{(['4-2', '5-0', '6', '7'] as IssueKey[]).map((i) => <label key={i} className="v2-row" style={{ gap: 4 }}><input type="checkbox" checked={issues.includes(i)} onChange={(e) => setIssues(e.target.checked ? [...issues, i] : issues.filter((x) => x !== i))} />Issue {issueLabel(i)}</label>)}</div>
+        <div className="v2-row wrap">{(['4-2', '5-0', '6', '7'] as IssueKey[]).map((i) => <label key={i} className="v2-row v2-gap-4"><input type="checkbox" checked={issues.includes(i)} onChange={(e) => setIssues(e.target.checked ? [...issues, i] : issues.filter((x) => x !== i))} />Issue {issueLabel(i)}</label>)}</div>
         {err ? <Alert tone="bad">{err}</Alert> : null}<button type="submit" hidden />
       </form>
     </Modal>
@@ -133,8 +134,8 @@ function ModelField({ preset, onSaved }: { preset: { id: string; model: string |
   useEffect(() => { setV(preset.model ?? ''); }, [preset.id, preset.model]);
   const save = async () => { try { await s1000dApi.setPresetModel(preset.id, v.trim()); toast(v.trim() ? `Offered to projects with model code ${v.trim().toUpperCase()}` : 'No model code: offered to nobody automatically', 'success'); onSaved(); } catch (e) { toast(errText(e), 'error'); } };
   return (
-    <div className="v2-row wrap" style={{ gap: 8 }} data-testid="preset-model">
-      <label className="v2-row" style={{ gap: 6 }}>Model code<input className="v2-input v2-mono" style={{ width: 150 }} maxLength={14} value={v} onChange={(e) => setV(e.target.value)} placeholder="e.g. RDR" aria-label="Model code of this preset" /></label>
+    <div className="v2-row wrap v2-gap-8" data-testid="preset-model">
+      <label className="v2-row v2-gap-6">Model code<input className="v2-input v2-mono v2-w-150" maxLength={14} value={v} onChange={(e) => setV(e.target.value)} placeholder="e.g. RDR" aria-label="Model code of this preset" /></label>
       <button className="btn btn-sm" disabled={v.trim().toUpperCase() === (preset.model ?? '')} onClick={() => void save()}>Save</button>
       <span className="v2-hint">Projects with this model code are offered this numbering.</span>
     </div>
@@ -155,30 +156,30 @@ export function SnsPresetsSection() {
   if (list.loading && !list.data) return <Loading />;
   return (
     <div className="v2-stack" data-testid="sns-presets">
-      <div className="v2-row v2-spread"><div><h3 style={{ margin: 0 }}>Numbering (SNS)</h3><p className="v2-sub" style={{ margin: '2px 0 0' }}>The system / subsystem / assembly numbers of a data module code. Give a preset a <b>model code</b> and every project with that model code is offered it when it is created: add the model's systems once, and its data module codes follow. Reusable starting points. Projects copy a preset and then own their SNS; changing a preset never changes a project.</p></div>
+      <div className="v2-row v2-spread"><div className="v2-admin-head"><h3>Numbering (SNS)</h3><p className="v2-sub">The system / subsystem / assembly numbers of a data module code. Give a preset a <b>model code</b> and every project with that model code is offered it when it is created: add the model's systems once, and its data module codes follow. Reusable starting points. Projects copy a preset and then own their SNS; changing a preset never changes a project.</p></div>
         <button className="btn btn-primary" onClick={() => setCreating(true)} data-testid="preset-new"><Icon name="plus" />New preset</button></div>
       <div className="v2-card"><table className="v2-table"><thead><tr><th>Preset</th><th>Model code</th><th>Systems</th><th>Entries</th><th /></tr></thead><tbody>
-        {(list.data ?? []).map((x) => <tr key={x.id} className="clickable" onClick={() => setSel(x.id)} data-testid="preset-row"><td><b><RowButton onSelect={() => setSel(x.id)} selected={sel === x.id}>{x.name}</RowButton></b> {x.readOnly ? <Badge>read-only</Badge> : <Badge tone="ok">custom</Badge>}</td><td className="v2-mono">{x.model ?? '—'}</td><td>{x.systems}</td><td>{x.entries}</td><td style={{ textAlign: 'right' }}>{sel === x.id ? <Badge tone="accent">open</Badge> : null}</td></tr>)}</tbody></table></div>
+        {(list.data ?? []).map((x) => <tr key={x.id} className="clickable" onClick={() => setSel(x.id)} data-testid="preset-row"><td><b><RowButton onSelect={() => setSel(x.id)} selected={sel === x.id}>{x.name}</RowButton></b> {x.readOnly ? <Badge>read-only</Badge> : <Badge tone="ok">custom</Badge>}</td><td className="v2-mono">{x.model ?? '—'}</td><td>{x.systems}</td><td>{x.entries}</td><td className="v2-td-end">{sel === x.id ? <Badge tone="accent">open</Badge> : null}</td></tr>)}</tbody></table></div>
       {p ? (
         <div className="v2-card v2-card-pad v2-stack">
-          <div className="v2-row v2-spread wrap"><h4 style={{ margin: 0 }}>{p.name}</h4>
-            <div className="v2-row wrap"><input className="v2-input" style={{ width: 200 }} placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search the preset" />
+          <div className="v2-row v2-spread wrap"><h4 className="v2-m0">{p.name}</h4>
+            <div className="v2-row wrap"><input className="v2-input v2-w-200" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search the preset" />
               <a className="btn" href={s1000dApi.presetExportUrl(p.id, 'csv')} download>Export CSV</a><a className="btn" href={s1000dApi.presetExportUrl(p.id, 'json')} download>Export JSON</a>
               <button className="btn" onClick={() => setDup(true)}>Copy as custom…</button>
               {!p.readOnly ? <button className="btn" onClick={() => setDel(true)}>Delete preset</button> : null}</div></div>
           {!p.readOnly ? <ModelField preset={p} onSaved={() => list.reload()} /> : null}
-          <p className="v2-hint" style={{ margin: 0 }}><b>Source:</b> {p.source}<br /><b>Limitation:</b> {p.limitation ?? 'none recorded'}</p>
+          <p className="v2-hint v2-m0"><b>Source:</b> {p.source}<br /><b>Limitation:</b> {p.limitation ?? 'none recorded'}</p>
           {!p.readOnly ? <PresetEditor id={p.id} onChanged={() => { detail.reload(); list.reload(); }} /> : null}
-          <div className="v2-card" style={{ maxHeight: 460, overflow: 'auto' }}><table className="v2-table"><tbody>{nodes.map((n: PresetNode) => (
+          <div className="v2-card v2-scroll-460"><table className="v2-table"><tbody>{nodes.map((n: PresetNode) => (
             <tr key={n.path}><td style={{ paddingLeft: 8 + Math.max(0, n.level - 1) * 22, width: 160 }} className="v2-mono">{n.code}{n.note?.ambiguous ? '*' : ''}</td>
               <td>{n.title}{n.note?.category ? <> <Badge>category</Badge></> : null}{n.note?.ambiguous ? <> <Badge tone="warn" title="The specification defines this system more than once; it is not copied into projects automatically">defined twice</Badge></> : null}{n.note?.rangeEnd ? <> <Badge>range to {String(n.note.rangeEnd)}</Badge></> : null}
                 {n.definition ? <div className="v2-hint">{n.definition}</div> : null}</td>
-              {!p.readOnly ? <td style={{ textAlign: 'right' }}><button className="icon-btn" aria-label={`Delete ${n.path}`} title={`Delete ${n.path}`} onClick={async () => { try { await s1000dApi.deletePresetNode(p.id, n.path, true); detail.reload(); list.reload(); } catch (e) { toast(errText(e), 'error'); } }}><Icon name="trash" size={14} /></button></td> : null}</tr>))}</tbody></table></div>
+              {!p.readOnly ? <td className="v2-td-end"><button className="icon-btn" aria-label={`Delete ${n.path}`} title={`Delete ${n.path}`} onClick={async () => { try { await s1000dApi.deletePresetNode(p.id, n.path, true); detail.reload(); list.reload(); } catch (e) { toast(errText(e), 'error'); } }}><Icon name="trash" size={14} /></button></td> : null}</tr>))}</tbody></table></div>
         </div>
       ) : <Empty title="Choose a preset to see its entries" />}
       {creating ? <PromptModal title="New SNS preset" label="Name" confirmLabel="Create" onClose={() => setCreating(false)} onSubmit={async (name) => { const r = await s1000dApi.createPreset(name); toast('Preset created', 'success'); list.reload(); setSel(r.preset.id); }} /> : null}
       {dup && p ? <PromptModal title="Copy as a custom preset" label="Name" initial={`${p.name} (copy)`} confirmLabel="Copy" onClose={() => setDup(false)} onSubmit={async (name) => { const r = await s1000dApi.duplicatePreset(p.id, name); list.reload(); setSel(r.preset.id); }} /> : null}
-      {del && p ? <ConfirmModal title="Delete this preset?" danger confirmLabel="Delete" onClose={() => setDel(false)} body={<p style={{ marginTop: 0 }}>{p.name}. Projects that copied it keep their SNS.</p>} onConfirm={async () => { setDel(false); try { await s1000dApi.deletePreset(p.id); setSel(''); list.reload(); } catch (e) { toast(errText(e), 'error'); } }} /> : null}
+      {del && p ? <ConfirmModal title="Delete this preset?" danger confirmLabel="Delete" onClose={() => setDel(false)} body={<p className="v2-mt0">{p.name}. Projects that copied it keep their SNS.</p>} onConfirm={async () => { setDel(false); try { await s1000dApi.deletePreset(p.id); setSel(''); list.reload(); } catch (e) { toast(errText(e), 'error'); } }} /> : null}
     </div>
   );
 }
@@ -189,8 +190,8 @@ function PresetEditor({ id, onChanged }: { id: string; onChanged: () => void }) 
   const add = async () => { try { await s1000dApi.putPresetNode(id, path.trim().toUpperCase(), title); setPath(''); setTitle(''); onChanged(); } catch (e) { toast(errText(e), 'error'); } };
   return (
     <div className="v2-row wrap">
-      <input className="v2-input v2-mono" style={{ width: 160 }} placeholder="21 or 21/10 or 21/10/00" value={path} onChange={(e) => setPath(e.target.value)} aria-label="Path" />
-      <input className="v2-input" style={{ width: 280 }} placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Title" />
+      <input className="v2-input v2-mono v2-w-160" placeholder="21 or 21/10 or 21/10/00" value={path} onChange={(e) => setPath(e.target.value)} aria-label="Path" />
+      <input className="v2-input v2-w-280" placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Title" />
       <button className="btn" onClick={add} disabled={!path.trim()}>Add / retitle</button>
     </div>
   );
@@ -214,7 +215,7 @@ export function ExtensionsSection() {
         <table className="v2-table"><thead><tr><th>Name</th><th>Namespace</th><th>Schema</th><th>Projects</th><th /></tr></thead><tbody>
           {list.data.profiles.map((p) => <tr key={p.id}><td>{p.name}</td><td className="v2-mono">{p.namespace}</td><td>{p.xsdName}</td><td>{p.projects}</td><td><button className="v2-btn v2-btn-sm v2-btn-danger" onClick={() => setDel(p.id)}>Delete</button></td></tr>)}</tbody></table>
       )}
-      <div className="v2-card"><h3 style={{ marginTop: 0 }}>Register a profile</h3>
+      <div className="v2-card"><h3 className="v2-mt0">Register a profile</h3>
         <div className="v2-stack">
           <Field label="Name"><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
           <Field label="Namespace URI"><input value={form.namespace} onChange={(e) => setForm({ ...form, namespace: e.target.value })} placeholder="http://example.com/ns/ext" /></Field>
