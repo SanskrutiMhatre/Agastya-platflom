@@ -8,10 +8,12 @@ import { authApi } from '../api';
 import { Icon } from '../components/Icon';
 import { Alert, Field, errText } from '../components/ui';
 import { useSession } from '../store/session';
+import { useDocumentTitle } from '../components/a11y';
 
 function Frame({ title, sub, children }: { title: string; sub?: string; children: ReactNode }) {
+  useDocumentTitle(title, 'Agastya Platform');   // WP-23 (WCAG 2.4.2)
   return (
-    <div className="v2-auth">
+    <main className="v2-auth">
       <div className="v2-card v2-auth-card">
         <div className="v2-row" style={{ marginBottom: 16 }}>
           <span className="v2-brand-mark"><Icon name="book" size={16} /></span><strong style={{ fontSize: 15 }}>Agastya Platform</strong>
@@ -20,7 +22,7 @@ function Frame({ title, sub, children }: { title: string; sub?: string; children
         {sub ? <p className="v2-sub" style={{ marginBottom: 16 }}>{sub}</p> : <div style={{ height: 12 }} />}
         {children}
       </div>
-    </div>
+    </main>
   );
 }
 

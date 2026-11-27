@@ -7,6 +7,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { contentApi, type DmSummary, type ExploreNode } from '../../api';
 import { Icon } from '../../components/Icon';
+import { RowButton } from '../../components/a11y';
 import { PageHeader } from '../../components/PageHeader';
 import { Alert, Badge, Empty, Loading, Modal, fmtDate, fmtSize, useAsync, ago, errText } from '../../components/ui';
 import { canWrite, useProject } from '../../layouts/ProjectShell';
@@ -128,7 +129,7 @@ export function ExplorePage() {
               <table className="v2-table"><thead><tr><th>Title</th><th>Code</th><th>Issue</th><th>In publication</th><th>Modified</th></tr></thead>
                 <tbody>{tableRows.map((d) => (
                   <tr key={d.file} className={`clickable`} onClick={() => setSel({ file: d.file })} data-testid="explore-row">
-                    <td><strong>{d.techName || d.file}</strong><div className="v2-hint">{d.infoName}</div></td><td className="v2-mono">{d.dmc}</td><td>{d.issueNumber}-{d.inWork}</td>
+                    <td><strong><RowButton onSelect={() => setSel({ file: d.file })}>{d.techName || d.file}</RowButton></strong><div className="v2-hint">{d.infoName}</div></td><td className="v2-mono">{d.dmc}</td><td>{d.issueNumber}-{d.inWork}</td>
                     <td>{placedFiles.has(d.file) ? <Badge tone="ok">yes</Badge> : <Badge tone="warn">no</Badge>}</td><td>{ago(d.modified)}</td>
                   </tr>))}</tbody></table>
               {tableRows.length === 0 ? <Empty title="No data modules match" /> : null}

@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { s1000dApi, issueLabel, KIND_LABEL, type CodeKind, type CodeRow, type Impact, type IssueKey, type PresetNode } from '../api';
 import { Icon } from '../components/Icon';
+import { RowButton, tablistKeys } from '../components/a11y';
 import { Alert, Badge, ConfirmModal, Empty, Field, Loading, Modal, PromptModal, errText, useAsync } from '../components/ui';
 import { useUi } from '../store/ui';
 import { csdbApi } from '../api/csdb';
@@ -49,7 +50,7 @@ export function CatalogueSection() {
       <div><h3 style={{ margin: 0 }}>Information codes</h3><p className="v2-sub" style={{ margin: '2px 0 0' }}>The codes projects choose from when they create a data module, for each S1000D issue. Pick the issue, search the list, and add your own code if a project needs one. Where the codes come from is under <b>Technical details</b> at the bottom.</p></div>
       <div className="v2-row wrap">
         <select className="v2-select" style={{ width: 150 }} value={issue} onChange={(e) => setIssue(e.target.value as IssueKey)} aria-label="Issue" data-testid="cat-issue">{ov.issues.map((i) => <option key={i.key} value={i.key}>Issue {i.label}</option>)}</select>
-        <div className="v2-tabs" role="tablist">{KINDS.map((k) => <button key={k} role="tab" aria-selected={kind === k} className={`v2-tab ${kind === k ? 'active' : ''}`} onClick={() => setKind(k)}>{KIND_LABEL[k]}</button>)}</div>
+        <div className="v2-tabs" role="tablist" aria-label="Code lists" onKeyDown={tablistKeys}>{KINDS.map((k) => <button key={k} role="tab" aria-selected={kind === k} className={`v2-tab ${kind === k ? 'active' : ''}`} onClick={() => setKind(k)}>{KIND_LABEL[k]}</button>)}</div>
         <input className="v2-input" style={{ width: 220 }} placeholder="Filter…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Filter codes" />
         <button className="btn btn-primary" onClick={() => setAdding(true)} data-testid="cat-add"><Icon name="plus" />Add custom code</button>
       </div>
@@ -157,7 +158,7 @@ export function SnsPresetsSection() {
       <div className="v2-row v2-spread"><div><h3 style={{ margin: 0 }}>Numbering (SNS)</h3><p className="v2-sub" style={{ margin: '2px 0 0' }}>The system / subsystem / assembly numbers of a data module code. Give a preset a <b>model code</b> and every project with that model code is offered it when it is created: add the model's systems once, and its data module codes follow. Reusable starting points. Projects copy a preset and then own their SNS; changing a preset never changes a project.</p></div>
         <button className="btn btn-primary" onClick={() => setCreating(true)} data-testid="preset-new"><Icon name="plus" />New preset</button></div>
       <div className="v2-card"><table className="v2-table"><thead><tr><th>Preset</th><th>Model code</th><th>Systems</th><th>Entries</th><th /></tr></thead><tbody>
-        {(list.data ?? []).map((x) => <tr key={x.id} className="clickable" onClick={() => setSel(x.id)} data-testid="preset-row"><td><b>{x.name}</b> {x.readOnly ? <Badge>read-only</Badge> : <Badge tone="ok">custom</Badge>}</td><td className="v2-mono">{x.model ?? '—'}</td><td>{x.systems}</td><td>{x.entries}</td><td style={{ textAlign: 'right' }}>{sel === x.id ? <Badge tone="accent">open</Badge> : null}</td></tr>)}</tbody></table></div>
+        {(list.data ?? []).map((x) => <tr key={x.id} className="clickable" onClick={() => setSel(x.id)} data-testid="preset-row"><td><b><RowButton onSelect={() => setSel(x.id)} selected={sel === x.id}>{x.name}</RowButton></b> {x.readOnly ? <Badge>read-only</Badge> : <Badge tone="ok">custom</Badge>}</td><td className="v2-mono">{x.model ?? '—'}</td><td>{x.systems}</td><td>{x.entries}</td><td style={{ textAlign: 'right' }}>{sel === x.id ? <Badge tone="accent">open</Badge> : null}</td></tr>)}</tbody></table></div>
       {p ? (
         <div className="v2-card v2-card-pad v2-stack">
           <div className="v2-row v2-spread wrap"><h4 style={{ margin: 0 }}>{p.name}</h4>
