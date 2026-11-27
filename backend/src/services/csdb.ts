@@ -10,9 +10,9 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { vendor, nowIso } from '../config';
+import { vendor, nowIso, config } from '../config';
 import { docIndex, revisions, projectDirFor, content } from '../context';
-import { bad, conflict, notFound, forbidden } from './http';
+import { bad, conflict, notFound, forbidden, HttpError } from './http';
 import { HEAD_BYTES, MAX_PROLOG, headOf, rootStart } from './xmlHead';
 import { FileMemo } from './fileMemo';
 import { wellFormedError } from './wellFormed';
@@ -53,6 +53,19 @@ function lockedFor(projectId: string, rel: string, actor: Actor, projectRole: st
  * so a draft with problems can still be brought in and fixed in the editor. The safety rules (not empty,
  * no entity bombs / external entities) are never lenient.
  */
+/**
+ * WP-17 (PERF-014): the documented maximum size of a module saved or created in the editor (config.limits.maxModuleBytes, 16 MiB unless
+ * AGASTYA_MAX_MODULE_BYTES says otherwise). Measured here: 1 MB about 90 ms, 4 MB about 350 ms, 10 MB about 0.9 s per save. Imports (lenient)
+ * are not limited: what is in a package is brought in as it is.
+ */
+export function assertModuleSize(xml: string): void {
+  const max = config.limits.maxModuleBytes; const n = Buffer.byteLength(xml, 'utf8');
+  if (n > max) {
+    const mb = (b: number) => (b / 1048576).toFixed(1);
+    throw new HttpError(413, `This data module is ${mb(n)} MB, larger than the ${mb(max)} MB a module may be. Split it into smaller modules (or ask the administrator to raise AGASTYA_MAX_MODULE_BYTES); nothing was saved.`, 'MODULE_TOO_LARGE', { bytes: n, maxBytes: max });
+  }
+}
+
 export function validateContent(rel: string, xml: string, lenient = false): void {
   if (typeof xml !== 'string' || !xml.trim()) throw bad('The data module is empty.', 'EMPTY');
   const guard = checkXmlSafety(xml);
@@ -96,6 +109,7 @@ export async function writeDm(projectId: string, file: string, xml: string, base
   const rel = `${csdbRel(readProjectJson(projectId))}/${file}`;
   if (!content.exists(projectId, at)) throw notFound('No such data module. Create it first.');
   if (lockedFor(projectId, rel, actor, projectRole)) throw forbidden('This data module is locked. Only a project owner can edit it.', 'DOCUMENT_LOCKED');
+  if (!lenient) assertModuleSize(xml);
   validateContent(rel, xml, lenient);
   assertUnique(projectId, file, xml);
 
@@ -123,6 +137,7 @@ export async function writeDm(projectId: string, file: string, xml: string, base
 export async function createDm(projectId: string, file: string, xml: string, actor: Actor, lenient = false, opts: { fromRepository?: boolean; revisionOf?: string } = {}) {
   const abs = resolveDmFile(projectId, file); const at = inProject(projectId, abs);
   const rel = `${csdbRel(readProjectJson(projectId))}/${file}`;
+  if (!lenient) assertModuleSize(xml);
   validateContent(rel, xml, lenient);
   assertUnique(projectId, file, xml);
   if (content.exists(projectId, at)) throw conflict(`A data module named ${file} already exists in this project.`, 'ALREADY_EXISTS');

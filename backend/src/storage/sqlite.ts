@@ -45,7 +45,7 @@ export const BASE_SCHEMA = `
     );
   `;
 
-export function openSqlite(workspaceDir: string): SqlDatabase {
+export function openSqlite(workspaceDir: string, opts: { synchronous?: 'NORMAL' | 'FULL' } = {}): SqlDatabase {
   const db = new DatabaseSync(path.join(workspaceDir, 'publisher.db'));
   // A second process (the break-glass reset-admin script, a backup) waits up to 5 s for a write lock instead of failing at once with
   // "database is locked" while the server runs (audit PLT-012).
@@ -55,17 +55,12 @@ export function openSqlite(workspaceDir: string): SqlDatabase {
   db.exec(BASE_SCHEMA);
   // WP-17 (PERF-009, decision D14): in WAL mode NORMAL keeps the database consistent after any crash of the application or the machine; a power
   // cut can lose only the last commits before it. An autocommit write costs about 0.1 ms instead of 3 ms (FULL syncs the log on every commit).
-  // Migrations run under FULL (appContext.start). AGASTYA_DB_SYNCHRONOUS=FULL keeps FULL throughout.
-  db.exec(`PRAGMA synchronous = ${dbSynchronous()};`);
+  // Migrations run under FULL (appContext.start); config.database.synchronous (AGASTYA_DB_SYNCHRONOUS=FULL) keeps FULL throughout.
+  db.exec(`PRAGMA synchronous = ${opts.synchronous === 'FULL' ? 'FULL' : 'NORMAL'};`);
   // 64 MB page cache (the default is 2 MB) and temporary tables in memory: reads of the hot tables stay off the disk.
   db.exec('PRAGMA cache_size = -65536; PRAGMA temp_store = MEMORY;');
   // WP-28: every statement is timed (services/metrics.ts: on a synchronous engine a slow statement is a lock wait that stalls everyone)
   return instrumentDatabase(db);
-}
-
-/** The working `synchronous` level: NORMAL (decision D14), or FULL when AGASTYA_DB_SYNCHRONOUS=FULL. */
-export function dbSynchronous(): 'NORMAL' | 'FULL' {
-  return String(process.env.AGASTYA_DB_SYNCHRONOUS ?? '').trim().toUpperCase() === 'FULL' ? 'FULL' : 'NORMAL';
 }
 
 export function setSynchronous(db: SqlDatabase, level: 'NORMAL' | 'FULL'): void { db.exec(`PRAGMA synchronous = ${level};`); }
