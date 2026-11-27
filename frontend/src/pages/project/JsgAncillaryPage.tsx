@@ -6,6 +6,7 @@
 // Everything is saved into the handbook's XML (front matter), so the editor, the PDF and this page always agree.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import '../../styles/pages/structure.css';   // WP-35: this page's styles load with its chunk
 import { graphicsApi } from '../../api';
 import { ApiError } from '../../api/client';
 import { jsgApi } from '../../api/jsg';

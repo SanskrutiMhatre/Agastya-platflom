@@ -94,7 +94,7 @@ export function ReleasePage() {
         ]} />
 
       {/* WP-35 (group 9): the review task takes the wide column; the watermark, a setting changed once, the narrow one (audit 5.4 Release) */}
-      <div className="v2-grid v2-split">
+      <div className="v2-grid v2-cols-main">
         <div className="v2-stack">
           {refusal ? <PublishRefusal refusal={refusal} projectId={id} can={can} mode="release" onDismiss={() => setRefusal(null)} /> : null}
           <div className="v2-card v2-card-pad" data-testid="review-status" data-state={rv.state}>

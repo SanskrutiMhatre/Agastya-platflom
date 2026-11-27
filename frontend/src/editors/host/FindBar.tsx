@@ -5,6 +5,7 @@
 // model up to date), so a replacement is an ordinary edit: Undo takes it back, and Replace all is one Undo step. Read-only documents can be searched.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import '../../styles/pages/editor-host.css';   // WP-35: loads with the editor chunks
 import { Icon } from '../../components/Icon';
 
 type HighlightCtor = new (...r: Range[]) => unknown;

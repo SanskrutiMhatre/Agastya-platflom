@@ -6,6 +6,7 @@
 // buttons for keyboard users), and one clear place to save and build.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import '../../styles/pages/structure.css';   // WP-35: this page's styles load with its chunk
 import { useNavigate } from 'react-router-dom';
 import { contentApi, type DmSummary } from '../../api';
 import { onlyRuleBreaks } from '../../lib/ruleBreaks';

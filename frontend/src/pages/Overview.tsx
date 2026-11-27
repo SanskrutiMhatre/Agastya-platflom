@@ -35,7 +35,7 @@ function AdminOverview() {
           { label: 'Released', value: c.released, tone: 'ok' }, { label: 'Awaiting approval', value: c.pending, tone: c.pending ? 'warn' : undefined }, { label: 'Not released', value: c.unreleased },
         ]} />
       <Section title="Projects"><ProjectStatusTable projects={o.data.projects} empty="No projects on the platform yet." /></Section>
-      <div className="v2-grid v2-split">
+      <div className="v2-grid v2-cols-main">
         <Section title="People" action={<a href="/activity" onClick={(e) => { e.preventDefault(); nav('/activity'); }}>Full activity</a>}><TeamTable team={o.data.team} showRole /></Section>
         <Section title="Recent activity"><FeedList feed={o.data.feed} /></Section>
       </div>
@@ -71,7 +71,7 @@ function ManagerOverview() {
           <button className="btn btn-sm btn-primary" onClick={() => nav('/activity')}>Review</button>
         </div>
       ) : null}
-      <div className="v2-grid v2-split">
+      <div className="v2-grid v2-cols-main">
         <div>
           <Section title="My team"><TeamTable team={o.data.team} empty="Create an Author, then assign them to a project." /></Section>
           <Section title="Projects and release status"><ProjectStatusTable projects={o.data.projects} empty="Create your first project." /></Section>
@@ -116,7 +116,7 @@ function AuthorOverview() {
         </div>
       ) : null}
 
-      <div className="v2-grid v2-split">
+      <div className="v2-grid v2-cols-main">
         <Section title="Recent projects">
           {recent.length === 0
             ? <div className="v2-card"><Empty title="No projects yet">Create your first project, or ask your Project Manager to assign you to one.</Empty></div>
