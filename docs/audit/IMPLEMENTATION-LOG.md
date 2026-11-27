@@ -496,3 +496,70 @@ verified, and what is left or blocked.
 * Limits: a full backend, vitest and e2e run of this branch is still to do (the lead's machine time); the three consecutive full runs of
   G-Q-5 therefore stand for the subsets above only. The `layout` text of pdf.js is close to `pdftotext -layout` but not identical (column
   spacing is estimated from glyph widths); the converted tests passed unchanged in their assertions, except where noted above.
+
+## Phase 3
+
+### WP-33 S1000D FO-stage scaling, the vendored stylesheet (PERF-003, P0) - done
+
+* Cause, measured here (`xsltproc --profile` at 50 and 500 modules, then by removing one piece at a time): the List of Illustrations
+  evaluated `generate-id((//dmodule//figure[title])[1])` once per figure, and libxml2 evaluates `//dmodule//figure[title]` with a
+  quadratic merge (it rewrites `//x` to `descendant::x` only when the step has no predicate, so every node of every module went through
+  a duplicate-checked merge): about 25 s at 500 modules even when evaluated ONCE. Next, `unique-id`'s `count(preceding::*[@id = ...])`
+  for every repeated id (about 8 s at 500 modules), `internalRef`'s fallback `//*[@id = $target][not($dm)]` (a book walk per reference
+  even when it is thrown away), `dm-occurrence-suffix` (a `preceding::dmodule` intersection per id of a reprinted module), the
+  abbreviation de-duplication (`preceding::acronym` per acronym), `footnoteRef` and `@warningRefs`/`@cautionRefs` (`//footnote[...]`,
+  `//warning[...]` per reference).
+* Changed (vendor exception "FO-stage scaling", recorded in `docs/JSS_VENDOR_EXCEPTIONS.md` and `docs/S1000D_COMPLETE_IMPLEMENTATION.md`
+  section 10): `s1000dtofo/frontmatter-s1000d.xsl` (first titled figure once, on `//dmodule/descendant::figure[title]`; key
+  `acronym-by-term`), `s1000dtofo.xsl` (`unique-id`: position in the existing `by-id` key minus same-id ancestors; `dm-occurrence-suffix`:
+  position in `dm-by-code`; the old expressions stay as fallbacks for a node a key does not hold), `refs.xsl` (`internalRef` fallback
+  as `(/)[not($dm)]//*[...]`, evaluated only without an enclosing module; `footnoteRef` by key), `warnings.xsl` (warning/caution
+  references by key). XSLT 1.0 only, libxslt 1.1.28 checked to support keys on result tree fragments in document order.
+* Equivalence. libxslt builds `generate-id()` from memory addresses: the UNCHANGED stylesheet run twice on the same 3 modules gives
+  different bytes. Byte identity is therefore impossible even before/before; the criterion is byte identity after renaming generated
+  ids in order of first appearance (`test/helpers-fo-compare.js`, accepts a one-to-one renaming only; a changed authored id or a link
+  moved to another element is a difference). Evidence:
+  - `test/wp33-fo-equivalence.test.js` (new, pdf-smoke stage, 40 s): pre-WP-33 stylesheets (kept in `test/fixtures/wp33-old`) against the
+    current ones, default and Xignal profiles: cloned publications (3 and 25 modules, ids repeated, a reprint), edge cases (warning and
+    caution references with one and two ids, footnotes, an id inside an element with the same id, repeated acronyms with spacing
+    variants, cross-references to repeated ids, a reprint), no titled figure, one module with 200 figures, the 21-type fixtures of
+    issues 4.2 / 5.0 / 6 / 7 and the rich set: 5/5 pass. It was shown to fail: with the duplicate count off by one it reports `dup00`
+    against `dup01`.
+  - Every FO the relevant suites built through the product was captured (a `--require` hook on `execFile`, scratch only) and re-run
+    with the old stylesheets on the same input and driver: 104 builds, 104 equivalent, 0 different (`golden-xignal` 1 = the 218-module
+    Xignal sample, `pdf-reference` 2 = the 20 Nov customer publications, `pdf21` 84, `applic-publish` 10, `pdf-furniture` 3,
+    `publisher-logo` 3, `pdf-multi-ipd` 1); 6 more from a first `applic-publish` run could not be replayed (the test deletes its
+    build folders) and were covered by a second run with folder snapshots.
+* Timings on this host (shared 8-core Windows machine, other work running; bundled 32-bit libxslt 1.1.28; FO stage only, `xsltproc
+  --xinclude --nonet`; clones of the e2e description module, two titled figures each, Xignal profile):
+
+  | modules | before | after |
+  |---|---|---|
+  | 3 | 0.12 s | 0.13 s |
+  | 25 | 1.06 s | 0.30 s |
+  | 50 | 7.80 s | 0.46 s |
+  | 100 | 61.5 s | 0.90 s |
+  | 200 | 535 s | 2.8 s |
+  | 500 | not run (extrapolated over an hour) | 9.3 s |
+
+  Default profile after: 0.48 / 0.97 / 1.89 / 9.18 s for 50 / 100 / 200 / 500. Growth now about n^1.3 (100 to 500), 50 to 100 ratio
+  about 2. Acceptance of the roadmap: 100 modules at most 10 s (0.9 s), 50 to 100 at most 2.5x (1.9-2.1x). The remaining super-linear
+  part at 500 is the duplicate-id position search (a key of 500 same-id figures walked per figure, about 2 s at 500): it only grows
+  with the number of copies of ONE id.
+* `test/wp33-fo-scaling.test.js` (benchmark B6, new, heavy stage, 14 s): 50/100/200/500 modules; limits 100 modules < 15 s, 500 < 90 s,
+  each doubling < 3x, growth 100 to 500 below n^2. Two runs here: 0.40/0.86/2.13/7.99 s (n^1.38) and 0.42/0.80/1.81/6.89 s (n^1.34).
+* Other paths checked: the JSS pipeline (s1000dtojss + jsstofo) on the same inputs is linear already (stage 1 0.34 / 1.11 s, stage 2
+  0.95 / 4.36 s for 100 / 500 modules; stage 1 reads each module with `document()`, so its `//` are per module); not changed. Left
+  as they are, by decision (no measured cost in the product's paths, output-identity risk not worth it): `xsl:number level="any"`
+  without a module boundary (footnotes in `common.xsl`, figures under the opt-in `figure.numbering = continuous`, chapter numbers under
+  `document.format = JSS`), which walk back to the start of the book per number; the JSG stylesheets
+  (`schemas/jsg/engine/*.xsl`, `xsl:number level="any"` per figure/table, one Word-derived book per build); the
+  `//identAndStatusSection` lookups of `descript.xsl` under `document.format = JSS` (they read the first module's title; a global
+  variable would change the result inside the support-view node-set).
+* Regression tests run, each alone, with the new stylesheets: `golden-xignal` 4/4 (with the sample via a read-only junction to the main
+  checkout's `SAMPLE PROJECTS/S1000D`), `pdf-reference` 2/2, `pdf21` 8/8 (804 s), `applic-publish` 12/12 (twice), `pdf-furniture` 2/2,
+  `pdf-multi-ipd` 1/1, `xignal-cover` 12/12, `xignal-prelim-marking` 5/5, `repeated-dm-ids` 6/6, `publisher-logo` 2/2,
+  `s1000d-reference` 18/18, `wp33-fo-equivalence` 5/5, `wp33-fo-scaling` 1/1 (twice). Not run: `publish-gate`, `brex-gate`, the full
+  suites. `scripts/ci/lint.mjs` reports `any.backend` 282 against a baseline of 280: not from this package (no TypeScript changed here).
+* Not done: the end-to-end acceptance "full 100-module publish at most 40 s" was not measured through the server (the FO stage it was
+  dominated by is now under 1 s); a re-check on a newer libxslt if the toolchain changes.
