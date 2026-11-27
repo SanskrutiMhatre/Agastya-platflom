@@ -95,6 +95,22 @@ test('disable ends the live session and refuses sign-in; enable lets the person 
   assert.ok(trail.some((e) => e.action === 'user.disabled' && e.targetId === c.id) && trail.some((e) => e.action === 'user.enabled' && e.targetId === c.id));
 });
 
+test('administrator reset: ends the person\'s sessions, the temporary password opens only the change gate (onboarded) or onboarding (never onboarded)', async () => {
+  const c = await person('resetme');
+  const r = await admin.post(`/api/admin/users/${c.id}/reset`, {});
+  assert.equal(r.status, 200); assert.match(r.json.tempPassword, /^resetme-[a-hjkmnp-z2-9]{8}$/);
+  const me = await c.get('/api/auth/me'); assert.equal(me.status, 401, 'the live session ended'); assert.equal(me.json.code, 'SESSION_REVOKED');
+  assert.equal((await c.post('/api/auth/login', { username: 'resetme', password: PW })).status, 401, 'the old password is gone');
+  assert.equal((await c.post('/api/auth/login', { username: 'resetme', password: r.json.tempPassword })).status, 200);
+  assert.equal((await c.get('/api/projects')).json.code, 'PASSWORD_CHANGE_REQUIRED');
+  const fresh = await admin.post('/api/team/users', { username: 'neverin', fullName: 'Never In', role: 'author' });
+  const r2 = await admin.post(`/api/admin/users/${fresh.json.user.id}/reset`, {});
+  const n = new h.Client('neverin'); assert.equal((await n.post('/api/auth/login', { username: 'neverin', password: r2.json.tempPassword })).status, 200);
+  assert.equal((await n.get('/api/projects')).json.code, 'ONBOARDING_REQUIRED', 'never onboarded: back through onboarding');
+  assert.equal((await c.post(`/api/admin/users/${fresh.json.user.id}/reset`, {})).status, 403, 'only an administrator');
+  assert.equal((await admin.post('/api/admin/users/zz-none/reset', {})).status, 404);
+});
+
 test('sessions: the administrator lists live sessions and revokes one; the person is told why; nobody else can', async () => {
   const c = await person('revokee');
   const list = await admin.get('/api/admin/sessions');

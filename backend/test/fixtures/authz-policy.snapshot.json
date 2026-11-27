@@ -104,7 +104,7 @@
   "GET /api/projects/:id/objects/:file": "requireProject(viewer,param) :: 401 403 403 404 404 ok | ok ok ok ok ok",
   "GET /api/projects/:id/objects/:file/html": "requireProject(viewer,param) :: 401 403 403 404 404 ok | ok ok ok ok ok",
   "GET /api/projects/:id/packages/import-reports": "requireProject(viewer,param) :: 401 403 403 404 404 ok | ok ok ok ok ok",
-  "GET /api/projects/:id/packages/import-reports/:id": "requireProject(viewer,param) :: 401 403 403 404 404 ok | ok ok ok ok ok",
+  "GET /api/projects/:id/packages/import-reports/:reportId": "requireProject(viewer,param) :: 401 403 403 404 404 ok | ok ok ok ok ok",
   "GET /api/projects/:id/packages/project": "requireProject(viewer,param) :: 401 403 403 404 404 ok | ok ok ok ok ok",
   "GET /api/projects/:id/pmc": "requireProject(viewer,param) :: 401 403 403 404 404 ok | ok ok ok ok ok",
   "GET /api/projects/:id/pmc/export": "requireProject(viewer,param) :: 401 403 403 404 404 ok | ok ok ok ok ok",
