@@ -1263,6 +1263,14 @@ Branch `worktree-agent-ae54629ef365272f3` (from `fdfbc27`). Nothing was removed:
   preference (GAP-008: no per-user preference store yet, the switch stays per project); imported-fixture browser tests of comments (GAP-006 beyond
   the sample); new screen captures for the user guide (UX-029); comment markers in the editing surface margin (only the panel list); ellipsis on
   Activity card titles (UX-025 rest); the full e2e suite, the full vitest and the gate were not run (port 4050 belongs to the lead).
+* Fix after the merges (2026-11-27): `e2e/doc-pages.spec.ts` "a section is dragged into another chapter..." failed from ce025dc on (its second
+  drag changed nothing, Save never appeared, the serial spec stopped there). Bisected on frontend/src only: passes at f514f38 (WP-11), fails at
+  7c2d9ea (this WP-22 merge). Cause: the 40 px project bar (the row sits 62 px lower in all) pushes the moved section, last in chapter 2, below the
+  950 px window, so Playwright's `dragTo` presses on it after scrolling it into view and then scrolls back to the target before the first move;
+  Edge/Chromium start no drag when the page scrolls between press and move (no `dragstart` was fired). Not a product fault: the WP-11 frontend
+  fails the same way at an 850 px window, and the current frontend passes at 1150 px. The test now scrolls the moved row to the bottom edge and
+  asserts both rows are fully in view before the same `dragTo`; its assertions are unchanged. doc-pages 14/14, wp22-navigation 7/7,
+  wp21-editor-chrome 12/12 alone on port 4103 (Edge); frontend `tsc`, vitest `src/parity`, `check.mjs` and `lint.mjs` clean.
 
 ## Phase 8
 
