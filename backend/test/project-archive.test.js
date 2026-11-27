@@ -6,10 +6,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const path = require('node:path'); const os = require('node:os');
-const { boot } = require('./helpers');
+const { boot, DM21, tmp } = require('./helpers');
 
 const PW = 'Correct-Horse-9!';
-const FIX = path.resolve(__dirname, '..', '..', 'frontend', 'e2e', 'fixtures', 'dm21', '5-0');
+const FIX = path.join(DM21, '5-0');
 const DM = fs.readdirSync(FIX).find((f) => /-040A-D_/.test(f));
 let h; let admin; let w; let ZipFileReader; let ZipStreamWriter;
 
@@ -21,7 +21,7 @@ test.before(async () => {
 });
 test.after(async () => { if (h) await h.close(); });
 
-const tmpFile = (buf, name = 'a.zip') => { const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'archive-')), name); fs.writeFileSync(f, buf); return f; };
+const tmpFile = (buf, name = 'a.zip') => { const f = path.join(tmp('archive-'), name); fs.writeFileSync(f, buf); return f; };
 const form = (file, name, fields = {}) => { const fd = new FormData(); fd.append('file', new Blob([fs.readFileSync(file)]), name); for (const [k, v] of Object.entries(fields)) fd.append(k, v); return fd; };
 const names = (buf) => { const r = ZipFileReader.open(tmpFile(buf)); try { return r.entries.filter((e) => !e.isDirectory).map((e) => e.name); } finally { r.close(); } };
 const read = async (buf, name) => { const r = ZipFileReader.open(tmpFile(buf)); try { const e = r.entries.find((x) => x.name === name); return e ? (await r.readBuffer(e)).toString('utf8') : null; } finally { r.close(); } };
@@ -114,7 +114,7 @@ test('what an archive is imported as must be what it holds; a ZIP that is not an
   const wrongSource = await importAs(ex.buf, 'jss', { target: 'jss' });
   assert.equal(wrongSource.status, 400); assert.match(JSON.stringify(wrongSource.json), /WRONG_SOURCE|not JSS/);
 
-  const build = async (fn) => { const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'archive-')), 'x.zip'); const z = new ZipStreamWriter(fs.createWriteStream(f)); await fn((n, t) => z.addBuffer(n, Buffer.from(t, 'utf8'))); await z.finish(); return fs.readFileSync(f); };
+  const build = async (fn) => { const f = path.join(tmp('archive-'), 'x.zip'); const z = new ZipStreamWriter(fs.createWriteStream(f)); await fn((n, t) => z.addBuffer(n, Buffer.from(t, 'utf8'))); await z.finish(); return fs.readFileSync(f); };
   const manifest = (extra = {}) => JSON.stringify({ manifestVersion: 1, generator: 'Agastya', id: 'x', name: 'X', type: 'UHB', templateRef: 'default', format: 'jsg', domain: 'land', manualType: 'uhb', ...extra });
   const evil = await build(async (add) => { await add('manifest.json', manifest()); await add('project/project.json', '{"name":"x"}'); await add('project/xx/escape.txt', 'no'); });
   // the writer will not make an unsafe name, so the bytes are changed afterwards (the name is in the local header and in the central directory)

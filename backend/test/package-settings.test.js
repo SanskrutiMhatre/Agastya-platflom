@@ -4,16 +4,16 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path');
-const { boot } = require('./helpers');
+const { boot, DM21, tmp: helperTmp } = require('./helpers');
 
 const PW = 'Correct-Horse-9!';
-const FIX = path.resolve(__dirname, '..', '..', 'frontend', 'e2e', 'fixtures', 'dm21', '5-0');
+const FIX = path.join(DM21, '5-0');
 const pick = (code) => fs.readdirSync(FIX).find((f) => f.includes(`-${code}A-D_`));
 const ICN = path.resolve(FIX, '..', 'ICN-S1KSTUDIO-A-291000-A-00001-00001-A-001-01.svg');
 const CODES = ['040', '520', '421'];
 
 let h; let w; let Z; let src; let pkg;
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'pkgset-'));
+const tmp = () => helperTmp('pkgset-');           // removed when the file's process ends (QA-010)
 
 async function unpack(buf) {
   const f = path.join(tmp(), 'x.zip'); fs.writeFileSync(f, buf);

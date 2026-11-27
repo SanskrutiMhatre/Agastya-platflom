@@ -7,10 +7,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const path = require('node:path'); const os = require('node:os');
-const { boot } = require('./helpers');
+const { boot, DM21, tmp } = require('./helpers');
 
 const PW = 'Correct-Horse-9!';
-const FIX = path.resolve(__dirname, '..', '..', 'frontend', 'e2e', 'fixtures', 'dm21', '5-0');
+const FIX = path.join(DM21, '5-0');
 const DM = fs.readdirSync(FIX).find((f) => /-040A-D_/.test(f));
 let h; let admin; let w; let ZipStreamWriter;
 
@@ -49,7 +49,7 @@ const PM = `<?xml version="1.0" encoding="utf-8"?>
 </pm>`;
 
 async function makeZip(layout) {
-  const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'wizard-')), 'x.zip'); const z = new ZipStreamWriter(fs.createWriteStream(f));
+  const f = path.join(tmp('wizard-'), 'x.zip'); const z = new ZipStreamWriter(fs.createWriteStream(f));
   const add = (n, t) => z.addBuffer(n, Buffer.from(t, 'utf8'));
   if (layout === 'flat') { for (const [c, t, i, b] of MODULES) await add(`Pkg/${nameOf(c)}`, dm(c, t, i, b)); await add('Pkg/PMC-RDR-1671Y-00061-00_000-01_EN-IN.xml', PM); }
   else if (layout === 'older-tool') {
@@ -60,7 +60,7 @@ async function makeZip(layout) {
 }
 const form = (file, name, fields = {}) => { const fd = new FormData(); fd.append('file', new Blob([fs.readFileSync(file)]), name); for (const [k, v] of Object.entries(fields)) fd.append(k, v); return fd; };
 const detect = (file, name) => w.req('POST', '/api/projects/import/detect', form(file, name));
-const textFile = (text) => { const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'wizard-')), 'doc.xml'); fs.writeFileSync(f, text); return f; };
+const textFile = (text) => { const f = path.join(tmp('wizard-'), 'doc.xml'); fs.writeFileSync(f, text); return f; };
 
 test('the first look says what an upload is: a package, the older tool\'s export, a JSS or JSG document, or nothing it knows', async () => {
   const flat = (await detect(await makeZip('flat'), 'a.zip')).json;
@@ -107,7 +107,7 @@ test('an enterprise the Administrator has not registered does not stop an import
   assert.match((cfg.json.config.origin?.notes ?? []).join(' '), /2 different model identification codes \(.*(X1.*RDR|RDR.*X1)/, JSON.stringify(cfg.json.config.origin));
 
   // the S1000D package import into a JSS project keeps the data and says what it did not check; into an S1000D project it is refused, as designed
-  const keep = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'wizard-')), 'p.zip'); fs.writeFileSync(keep, exported);
+  const keep = path.join(tmp('wizard-'), 'p.zip'); fs.writeFileSync(keep, exported);
   const viaWizard = async (name, format, extra = {}) => { const det = await detect(keep, 'p.zip'); assert.equal(det.status, 200); return w.post('/api/projects/import', { token: det.json.token, name, format, ...extra }); };
   const kept = await viaWizard('Legacy JSS', 'jss', { domain: 'land', manualType: 'uhb' });
   assert.equal(kept.status, 201, JSON.stringify(kept.json).slice(0, 500)); assert.equal(kept.json.report.applied, true);

@@ -21,6 +21,11 @@
     "test:verify:elements": "node scripts/verify-elements.mjs",
     "test:verify:e2e": "node scripts/verify-e2e.mjs",
     "verify:report": "node scripts/verify-report.mjs",
-    "verify": "npm run test:verify && npm run test:verify:elements && npm run test:verify:e2e && npm run verify:report"
+    "verify": "npm run test:verify && npm run test:verify:elements && npm run test:verify:e2e && npm run verify:report",
+    "gate": "node scripts/ci/gate.mjs --profile pr",
+    "gate:nightly": "node scripts/ci/gate.mjs --profile nightly --keep-going",
+    "gate:release": "node scripts/ci/gate.mjs --profile release --keep-going",
+    "lint": "node scripts/ci/lint.mjs",
+    "readiness": "node scripts/ci/readiness.mjs"
   }
 }

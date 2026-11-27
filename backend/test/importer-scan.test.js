@@ -16,7 +16,8 @@ const { readZip, scanPackage, placeholderPng, pngInfo, isPlaceholderPng } = impo
 const ROOT = path.resolve(__dirname, '..', '..');
 const SAMPLE_XIGNAL = path.join(ROOT, 'SAMPLE PROJECTS', 'S1000D', 'PMC-RDR-1671Y-00039-00_001-01.xml (2)');
 const SAMPLE_JSS = path.join(ROOT, 'SAMPLE PROJECTS', 'JSS-0251', 'PMC-RDR-1671Y-00061-00_000-01.xml');
-const SAMPLE_VEKTRA = path.resolve(ROOT, '..', 'RWI');
+const SAMPLE_VEKTRA = process.env.VEKTRA_SAMPLE || path.join(ROOT, 'SAMPLE PROJECTS', 'RWI');   // in the repository (git-ignored) unless the variable says otherwise (QA-014)
+const absent = (what, where) => `${what} is not in this checkout (customer material, git-ignored; looked in ${where})`;
 
 function readTree(dir) {
   const out = [];
@@ -244,7 +245,7 @@ test('flavour: a Xignal generator comment and a DOCTYPE declarations block mean 
 
 // ── the real sample sets ──────────────────────────────────────────────────
 
-test('sample: Xignal S1000D export (1 master PMC, 218 modules, 491 graphics)', { skip: !fs.existsSync(SAMPLE_XIGNAL) }, () => {
+test('sample: Xignal S1000D export (1 master PMC, 218 modules, 491 graphics)', { skip: !fs.existsSync(SAMPLE_XIGNAL) && absent('the Xignal S1000D export', SAMPLE_XIGNAL) }, () => {
   const entries = readTree(SAMPLE_XIGNAL);
   const before = sha(entries.find((e) => /^PMC-/.test(e.name)).bytes);
   const r = scanPackage(entries);
@@ -259,7 +260,7 @@ test('sample: Xignal S1000D export (1 master PMC, 218 modules, 491 graphics)', {
   assert.equal(sha(entries.find((e) => /^PMC-/.test(e.name)).bytes), before, 'input untouched');
 });
 
-test('sample: Xignal JSS export is told apart from the S1000D one', { skip: !fs.existsSync(SAMPLE_JSS) }, () => {
+test('sample: Xignal JSS export is told apart from the S1000D one', { skip: !fs.existsSync(SAMPLE_JSS) && absent('the Xignal JSS export', SAMPLE_JSS) }, () => {
   const r = scanPackage(readTree(SAMPLE_JSS));
   assert.equal(r.flavour.id, 'xignal-jss');
   assert.equal(r.counts.dms, 26);
@@ -267,7 +268,7 @@ test('sample: Xignal JSS export is told apart from the S1000D one', { skip: !fs.
   assert.equal(r.models.JSS0251, 19, 'the JSS model code carries the front-matter modules');
 });
 
-test('sample: Vektra plugin output (loose folders AND the zips of the same files)', { skip: !fs.existsSync(SAMPLE_VEKTRA) }, () => {
+test('sample: Vektra plugin output (loose folders AND the zips of the same files)', { skip: !fs.existsSync(SAMPLE_VEKTRA) && absent('the Vektra plugin output', `${SAMPLE_VEKTRA} (set VEKTRA_SAMPLE)`) }, () => {
   const r = scanPackage(readTree(SAMPLE_VEKTRA));
   assert.equal(r.flavour.id, 'vektra');
   assert.equal(r.counts.dms, 33);

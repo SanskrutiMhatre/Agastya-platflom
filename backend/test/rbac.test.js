@@ -8,13 +8,13 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
-const { boot } = require('./helpers');
+const { boot, tmp } = require('./helpers');
 
 const PW = 'Correct-Horse-9!';
 const DM = 'DMC-S1KSTUDIO-A-29-10-00-00A-040A-D_001-00_EN-US.XML';
 
 test('migration 013: an existing database keeps its people and memberships, and old users become authors', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'agastya-v2-mig-'));
+  const dir = tmp('agastya-v2-mig-');
   const db = new DatabaseSync(path.join(dir, 'old.db'));
   db.exec(`CREATE TABLE projects (id TEXT PRIMARY KEY, name TEXT NOT NULL, type TEXT NOT NULL DEFAULT 'JSS', template TEXT DEFAULT 'default',
     created_at TEXT NOT NULL, updated_at TEXT NOT NULL, last_opened TEXT);`);

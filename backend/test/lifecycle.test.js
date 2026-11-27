@@ -4,10 +4,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const path = require('node:path');
-const { boot } = require('./helpers');
+const { boot, DM21 } = require('./helpers');
 
 const PW = 'Correct-Horse-9!';
-const FIX = path.resolve(__dirname, '..', '..', 'frontend', 'e2e', 'fixtures', 'dm21', '5-0');
+const FIX = path.join(DM21, '5-0');
 const pick = (c) => fs.readdirSync(FIX).find((f) => f.includes(`-${c}A-D_`));
 let h; let owner; let pid; let dir; let admin;
 const U = () => `/api/projects/${pid}`;

@@ -16,7 +16,8 @@ export const PUB = path.resolve(__dirname, '../../../../public');
 export const RICH = path.resolve(__dirname, '../rich');
 export const DATA = path.resolve(__dirname, 'data');
 /** Where the suites write their result files. NOT test-results/: Playwright empties that folder at the start of every run. */
-export const RESULTS = path.resolve(__dirname, '../../../../verification-results');
+// AGASTYA_TEST_RESULTS (set by scripts/ci/gate.mjs to its evidence folder) wins, so a gate run does not overwrite the developer's results (QA-010).
+export const RESULTS = process.env.AGASTYA_TEST_RESULTS || path.resolve(__dirname, '../../../../verification-results');
 /** The issues the New data module wizard offers (4.1 is hidden there; see the report). */
 export const ISSUES = ['4-2', '5-0', '6', '7'] as const;
 export type Issue = (typeof ISSUES)[number];

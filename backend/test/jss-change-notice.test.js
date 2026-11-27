@@ -6,12 +6,13 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { boot } = require('./helpers');
+const { boot, tmp } = require('./helpers');
+const { readPdf } = require('./pdftools');
 
 const PW = 'Correct-Horse-9!';
 const VENDOR = path.resolve(__dirname, '..', 'vendor', 'pipeline');
 
-const pageText = (pdf, n) => { const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'chn-')), 'x.pdf'); fs.writeFileSync(f, pdf); return spawnSync('pdftotext', ['-f', String(n), '-l', String(n), '-layout', f, '-'], { encoding: 'utf8' }).stdout; };
+const pageText = async (pdf, n) => (await readPdf(pdf)).text({ first: n, last: n });    // pdf.js (test/pdftools.js); the PDF is parsed once
 
 test('the stylesheet: classic by default (3 rows), grid = the pro-forma (15 rows), the rest of the book is the same', () => {
   const { XSLTPROC } = require('../vendor/engine/paths');
@@ -19,7 +20,7 @@ test('the stylesheet: classic by default (3 rows), grid = the pro-forma (15 rows
     <publishers><publisher><logo src="pub-logo.png"/><name>L&amp;T Defence,</name></publisher></publishers></bookmeta>
     <frontmatter><changeNotice rows="3"/></frontmatter>
     <body><chapter number="1"><title>A</title><section><title>B</title><para>x</para></section></chapter></body></jssbook>`;
-  const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'chn-')), 'book.xml'); fs.writeFileSync(f, book);
+  const f = path.join(tmp('chn-'), 'book.xml'); fs.writeFileSync(f, book);
   const run = (...params) => { const r = spawnSync(XSLTPROC, ['--nonet', ...params, path.join(VENDOR, 'jsstofo', 'jsstofo.xsl'), f], { encoding: 'utf8', cwd: path.join(VENDOR, 'jsstofo') }); assert.equal(r.status, 0, r.stderr.slice(0, 400)); return r.stdout.replace(/(internal-destination|id)="[^"]*"/g, '$1="#"'); };   // the generated ids differ from run to run
   const rows = (fo) => (fo.match(/<fo:table-row /g) || []).length;
   const dflt = run(); const off = run('--stringparam', 'changenotice.layout', 'classic'); const grid = run('--stringparam', 'changenotice.layout', 'grid');
@@ -56,12 +57,12 @@ test('a JSS-authored UHB prints the Change Notice as the pro-forma: fifteen rule
   assert.ok(fo.includes('CODES FOR INCORPORATION OF CHANGES:'), 'the build used the grid layout');
   // find its page: the one that has the codes box
   let page = 0; let text = '';
-  for (let n = 1; n <= 40 && !page; n++) { const t = pageText(pdf, n); if (/CODES FOR INCORPORATION OF CHANGES:/.test(t)) { page = n; text = t; } }
+  for (let n = 1; n <= 40 && !page; n++) { const t = await pageText(pdf, n); if (/CODES FOR INCORPORATION OF CHANGES:/.test(t)) { page = n; text = t; } }
   assert.ok(page > 0, 'the Change Notice page is in the PDF');
   for (const s of ['CHANGE NOTICE', 'TITLE OF PUBLICATION', 'PREVIOUS', 'No. of Pages:', 'Enclosures:', 'Sheets:', 'NOTE:', 'By Hand-correction', 'By pasting the enclosed matter']) assert.ok(text.includes(s), `${s} is on the page`);
   assert.match(text, /\(R\)\s+By Replacement\/addition of sheet\(s\)/); assert.match(text, /\(A\)\s+Additional information/);
   assert.ok(/CONTENTS\s+Page/.test(text) && /Record\s+of/.test(text), 'the note is complete');
   assert.ok(!/L&T Defence/.test(text), 'the letterhead is the logo alone: no publisher name');
   assert.ok(!/Change Notice[\s\S]{0,40}No\. of Sheets/.test(text), 'and the classic arrangement is gone');
-  assert.ok(!/CODES FOR INCORPORATION OF CHANGES:/.test(pageText(pdf, page + 1)), 'the whole pro-forma is on one page');
+  assert.ok(!/CODES FOR INCORPORATION OF CHANGES:/.test(await pageText(pdf, page + 1)), 'the whole pro-forma is on one page');
 });

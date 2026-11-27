@@ -3,16 +3,16 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path'); const zlib = require('node:zlib');
-const { boot } = require('./helpers');
+const { boot, DM21, tmp: helperTmp } = require('./helpers');
 const Z = require('../dist/services/zipio');
 
 const PW = 'Correct-Horse-9!';
-const FIX = path.resolve(__dirname, '..', '..', 'frontend', 'e2e', 'fixtures', 'dm21', '5-0');
+const FIX = path.join(DM21, '5-0');
 const pick = (code) => fs.readdirSync(FIX).find((f) => f.includes(`-${code}A-D_`));
 const ICN = path.resolve(FIX, '..', 'ICN-S1KSTUDIO-A-291000-A-00001-00001-A-001-01.svg');
 let h; let w; let pid; let dir; let admin; let other;
 const U = () => `/api/projects/${pid}`;
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'pkgtest-'));
+const tmp = () => helperTmp('pkgtest-');           // removed when the file's process ends (QA-010)
 async function download(client, method, url, body) {
   const r = await client.req(method, url, body); return r;
 }

@@ -8,14 +8,16 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path');
-const { spawnSync } = require('node:child_process');
-const { boot } = require('./helpers');
+const { boot, tmp } = require('./helpers');
+const { pdfText } = require('./pdftools');
 const { docxPart } = require('./helpers-stencil');
 
 const PW = 'Correct-Horse-9!';
-const NAVAL = process.env.NAVAL_STENCILS || path.resolve(__dirname, '..', '..', '..', 'Sampels', 'NAval_stencil');
+// The customer's Naval stencils are not committed. They are read from NAVAL_STENCILS, else from manual format/NAval_stencil (git-ignored, like the Land
+// stencils); nothing outside the repository is read unless the environment variable names it (QA-014).
+const NAVAL = process.env.NAVAL_STENCILS || path.resolve(__dirname, '..', '..', 'manual format', 'NAval_stencil');
 const haveStencils = fs.existsSync(path.join(NAVAL, '1_User_Handbook', '1_User_Handbook.docx'));
-const SKIP = !haveStencils && 'the Naval stencils (Sampels/NAval_stencil) are not on this machine';
+const SKIP = !haveStencils && `the Naval stencils are not on this machine (looked in ${NAVAL}; set NAVAL_STENCILS or copy them to manual format/NAval_stencil)`;
 const LAND = path.resolve(__dirname, '..', '..', 'manual format', 'JSS0251-stencils');
 
 /** type id -> the stencil's file */
@@ -52,11 +54,11 @@ const create = async (type, name) => {
 };
 /** The PDF as a file. With NAVAL_KEEP_DIR set, every PDF the tests build is also kept there (named after its project), to look at. */
 const pdfOf = (buf, name) => {
-  const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'naval-')), 'x.pdf'); fs.writeFileSync(f, buf);
+  const f = path.join(tmp('naval-'), 'x.pdf'); fs.writeFileSync(f, buf);
   if (process.env.NAVAL_KEEP_DIR && name) { fs.mkdirSync(process.env.NAVAL_KEEP_DIR, { recursive: true }); fs.copyFileSync(f, path.join(process.env.NAVAL_KEEP_DIR, `${name}.pdf`)); }
   return f;
 };
-const text = (f) => spawnSync('pdftotext', ['-layout', f, '-'], { encoding: 'utf8' }).stdout;
+const text = (f) => pdfText(f);                                       // pdf.js (test/pdftools.js), no external program (async)
 /** The size of every page, from the PDF's page dictionaries (the page tree is not compressed in FOP's output). */
 const pageSizes = (f) => [...fs.readFileSync(f).toString('latin1').matchAll(/\/MediaBox\s*\[\s*0\s+0\s+([\d.]+)\s+([\d.]+)\s*\]/g)].map((m, i) => ({ page: i + 1, wMm: Number(m[1]) / 72 * 25.4, hMm: Number(m[2]) / 72 * 25.4 }));
 const build = async (U) => { const b = await w.post(`${U}/publish`, {}); assert.equal(b.status, 200, JSON.stringify(b.json).slice(0, 600)); return pdfOf((await w.get(`${U}/publish/pdf`)).buf, made[U.split('/').pop()]); };
@@ -281,7 +283,7 @@ for (const id of IDS) {
   test(`${id}: validates, builds a PDF with its cover, frame and body`, async () => {
     const p = await create(id, `PDF ${id}`); const d = (await w.get(`${p.U}/jss`)).json;
     const saved = await w.put(`${p.U}/jss`, { xml: fill(d.xml), baseHash: d.hash }); assert.equal(saved.status, 200); assert.equal(saved.json.report.errors, 0, JSON.stringify(errors(saved.json.report)));
-    const pdf = await build(p.U); const t = text(pdf); const sizes = pageSizes(pdf);
+    const pdf = await build(p.U); const t = await text(pdf); const sizes = pageSizes(pdf);
     assert.ok(sizes.length >= 12, `${id}: ${sizes.length} pages`);
     const type = (await w.get(`/api/jss/types/${id}`)).json;
     for (const line of type.coverTitle) assert.ok(key(t).includes(key(line)), `${id}: cover line "${line}"`);
@@ -310,7 +312,7 @@ const hasHead = (t, phrase) => phrase.split(/\s+/).every((word) => t.includes(wo
 
 test('the handbook family (User Handbook, TM Parts I-III, Design Specification) keeps the Record of Changes, Associated Handbooks and Change Notice pages and the chapter divider', async () => {
   for (const id of ['naval-uhb', 'naval-tm-2']) {
-    const t = flat(text(await build((await create(id, `F ${id}`)).U)));
+    const t = flat(await text(await build((await create(id, `F ${id}`)).U)));
     assert.match(t, /ASSOCIATED HANDBOOKS/); assert.match(t, /CHANGE NOTICE/); assert.match(t, /RECORD OF CHANGES/); assert.ok(hasHead(t, 'Change Notice No.'), `${id}: Record of Changes column head`); assert.ok(hasHead(t, 'Initials with Date'), `${id}: Record of Changes column head`);
     assert.match(t, /LIST OF ABBREVIATIONS/); assert.match(t, /This chapter covers the following topics/, `${id}: the chapter divider`);
     assert.match(t, /FOR FIRST AID IN CASE OF ELECTRIC SHOCK SEE (OVERLEAF|THE FOLLOWING PAGE)/, `${id}: the safety warning keeps its first-aid line`);
@@ -321,7 +323,7 @@ test('the handbook family (User Handbook, TM Parts I-III, Design Specification) 
 
 test('the list stencils (MRLS, Complete Equipment Schedule, List of SMT / STE) have the Amendments table, numbered abbreviations, no first-aid line and no chapter divider', async () => {
   for (const id of ['naval-mrls', 'naval-ces', 'naval-smt-ste']) {
-    const f = await build((await create(id, `F ${id}`)).U); const raw = text(f); const t = flat(raw);
+    const f = await build((await create(id, `F ${id}`)).U); const raw = await text(f); const t = flat(raw);
     assert.match(t, /AMENDMENTS/); for (const h of ['Sr. No.', 'Page No.', 'Para Reference', 'Amendment / Required', 'Authority with Ref No. & Date']) assert.ok(hasHead(t, h), `${id}: Amendments column "${h}"`);
     assert.ok(!/Change Notice No\./.test(t) && !/Initials with Date/.test(t), `${id}: not the Change Notice table`);
     assert.match(t, /ABBREVIATIONS/); assert.ok(hasHead(t, 'Abbreviations issued') && /\bFor\b/.test(t) && !/Abbreviations Description/.test(t), `${id}: numbered abbreviations (Sr. No. | Abbreviations issued | For)`);
@@ -334,13 +336,13 @@ test('the list stencils (MRLS, Complete Equipment Schedule, List of SMT / STE) h
     assert.ok(first >= 0, `${id}: the chapter's first page`); assert.match(flat(pages[first]), /Page \| 1-1/, `${id}: it is page 1-1`);
   }
   // MRLS: that first page is the A3 landscape page, with the section heading and the table on it
-  const t = text(await build((await create('naval-mrls', 'F mrls A3')).U)); const pages = t.split('\f'); const i = pages.findIndex((p) => /Chapter 1/.test(p) && /MECHANICAL SECTION/i.test(p) && /Sr\./.test(p));
+  const t = await text(await build((await create('naval-mrls', 'F mrls A3')).U)); const pages = t.split('\f'); const i = pages.findIndex((p) => /Chapter 1/.test(p) && /MECHANICAL SECTION/i.test(p) && /Sr\./.test(p));
   assert.ok(i >= 0, 'MRLS: heading, section and table on the first body page');
 });
 
 test('the Part IV volumes keep the handbook frame but have no chapter divider', async () => {
   for (const id of ['naval-tm-4-1', 'naval-tm-4-2']) {
-    const raw = text(await build((await create(id, `F ${id}`)).U)); const t = flat(raw);
+    const raw = await text(await build((await create(id, `F ${id}`)).U)); const t = flat(raw);
     assert.match(t, /RECORD OF CHANGES/); assert.ok(hasHead(t, 'Change Notice No.'), `${id}: Record of Changes column head`); assert.ok(!/This chapter covers the following topics/.test(t), `${id}: no divider`);
     const pages = raw.split('\f'); assert.ok(pages.some((p) => /Chapter 1/.test(p) && /Page \| 1-1/.test(flat(p))), `${id}: the chapter opens on page 1-1`);
   }
@@ -359,7 +361,7 @@ test('ancillary pages of the Naval types: the editor lists the pages the stencil
   assert.equal(by(after.json.pages).demolition.enabled, false, 'the page that was chosen');
   for (const id of ['associatedHandbooks', 'cautionsNotes', 'changeNotice', 'listOfFigures']) assert.equal(by(after.json.pages)[id].enabled, false, `${id}: still off after choosing another page`);
   assert.equal(by(after.json.pages).recordOfChanges.title, 'AMENDMENTS', "the stencil's heading is kept"); assert.deepEqual(after.json.pages.map((x) => x.id), before.map((x) => x.id), 'the print order is unchanged');
-  const flat = text(await build(p.U)).replace(/s+/g, ' ');
+  const flat = (await text(await build(p.U))).replace(/\s+/g, ' ');
   assert.ok(!/ASSOCIATED HANDBOOKS/.test(flat) && !/CHANGE NOTICE/.test(flat), 'the pages the stencil does not have are still not printed'); assert.match(flat, /AMENDMENTS/); assert.ok(!/DEMOLITION OF EQUIPMENT/.test(flat), 'the page that was switched off');
 
   // a page the stencil does not have is not offered at all (the same list the build uses)

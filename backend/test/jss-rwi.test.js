@@ -5,12 +5,13 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const path = require('node:path'); const os = require('node:os'); const { createHash } = require('node:crypto');
-const { boot } = require('./helpers');
+const { boot, tmp } = require('./helpers');
 const { ZipFileReader } = require('../dist/services/zipio');
 
 const PW = 'Correct-Horse-9!';
 const SAMPLE = path.resolve(__dirname, '..', '..', 'SAMPLE PROJECTS', 'JSS-0251', 'RWI.zip');
 const haveSample = fs.existsSync(SAMPLE);
+const NO_SAMPLE = !haveSample && `the RWI sample is not in this checkout (customer material, git-ignored; looked in ${SAMPLE})`;
 let h; let w;
 const sha = (b) => createHash('sha256').update(b).digest('hex');
 
@@ -35,13 +36,13 @@ const upload = async (U, file, name = 'RWI.zip') => {
   return { status: r.status, json: await r.json() };
 };
 async function unzip(buf) {
-  const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'rwi-')), 'x.zip'); fs.writeFileSync(f, buf);
+  const f = path.join(tmp('rwi-'), 'x.zip'); fs.writeFileSync(f, buf);
   const z = ZipFileReader.open(f); const out = new Map();
   for (const e of z.entries) if (!e.isDirectory) out.set(e.name, await z.readBuffer(e));
   z.close(); return out;
 }
 
-test('sample: import maps every document and reports what it found', { skip: !haveSample }, async () => {
+test('sample: import maps every document and reports what it found', { skip: NO_SAMPLE }, async () => {
   const p = await create('RWI import');
   const r = await upload(p.U, SAMPLE);
   assert.equal(r.status, 200, JSON.stringify(r.json).slice(0, 400));
@@ -57,7 +58,7 @@ test('sample: import maps every document and reports what it found', { skip: !ha
   for (const m of g.json.xml.matchAll(/src="Media\/([^"]+)"/g)) assert.ok(fs.existsSync(path.join(p.dir, 'Media', m[1])), `Media/${m[1]}`);
 });
 
-test('sample: an unchanged import exports the original documents byte for byte, and the same files', { skip: !haveSample }, async () => {
+test('sample: an unchanged import exports the original documents byte for byte, and the same files', { skip: NO_SAMPLE }, async () => {
   const p = await create('RWI round trip');
   assert.equal((await upload(p.U, SAMPLE)).status, 200);
   const chk = await w.get(`${p.U}/jss/export-check`); assert.equal(chk.status, 200);
@@ -73,7 +74,7 @@ test('sample: an unchanged import exports the original documents byte for byte, 
   assert.ok([...out.keys()].some((n) => /EXPORT-REPORT\.txt$/.test(n)));
 });
 
-test('sample: editing a section changes only that document; the others stay identical and the contents list names all of them', { skip: !haveSample }, async () => {
+test('sample: editing a section changes only that document; the others stay identical and the contents list names all of them', { skip: NO_SAMPLE }, async () => {
   const p = await create('RWI edit');
   assert.equal((await upload(p.U, SAMPLE)).status, 200);
   const g = await w.get(`${p.U}/jss`);
@@ -114,7 +115,7 @@ test('native project: export needs a project code, then writes new documents tha
 test('a file that is not a project package is refused in plain words, and the document is left alone', async () => {
   const p = await create('Refusals');
   const before = (await w.get(`${p.U}/jss`)).json.hash;
-  const junk = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'rwi-')), 'x.zip'); fs.writeFileSync(junk, 'this is not a zip');
+  const junk = path.join(tmp('rwi-'), 'x.zip'); fs.writeFileSync(junk, 'this is not a zip');
   const a = await upload(p.U, junk); assert.equal(a.status, 400); assert.match(a.json.error, /ZIP/i);
   const txt = path.join(path.dirname(junk), 'x.txt'); fs.writeFileSync(txt, 'x');
   const b = await upload(p.U, txt, 'x.txt'); assert.equal(b.status, 400); assert.equal(b.json.code, 'NOT_ZIP');
@@ -128,7 +129,7 @@ test('the new routes are guarded: no session, no access', async () => {
   assert.equal((await anon.post('/api/projects/x/jss/import-project', {})).status, 401);
 });
 
-test('sample: a project whose document file was overwritten by the package contents list is recovered by Import project', { skip: !haveSample }, async () => {
+test('sample: a project whose document file was overwritten by the package contents list is recovered by Import project', { skip: NO_SAMPLE }, async () => {
   const p = await create('RWI overwritten');
   const src = await unzip(fs.readFileSync(SAMPLE));
   fs.writeFileSync(path.join(p.dir, 'publication.xml'), src.get([...src.keys()].find((n) => /PMC-IETM\.xml$/.test(n))));

@@ -312,8 +312,9 @@ test('the pipeline: an empty rule list changes nothing at all', () => {
 
 // ── the Vektra sample: every defect the brief names, fixed, once ─────────
 
-const VEKTRA = path.resolve(__dirname, '..', '..', '..', 'RWI');
-test('Vektra sample: DM32 cols 3 -> 8, 13 placeholders, BREX H -> F on 33 modules, rebuilt header, idempotent', { skip: !fs.existsSync(path.join(VEKTRA, 'XML')) }, () => {
+// The customer's Vektra plugin output: VEKTRA_SAMPLE, else SAMPLE PROJECTS/RWI (git-ignored). Nothing outside the repository is read by default (QA-014).
+const VEKTRA = process.env.VEKTRA_SAMPLE || path.resolve(__dirname, '..', '..', 'SAMPLE PROJECTS', 'RWI');
+test('Vektra sample: DM32 cols 3 -> 8, 13 placeholders, BREX H -> F on 33 modules, rebuilt header, idempotent', { skip: !fs.existsSync(path.join(VEKTRA, 'XML')) && `the Vektra sample is not in this checkout (looked in ${VEKTRA}; set VEKTRA_SAMPLE)` }, () => {
   const entries = [];
   for (const d of ['XML', 'ICN']) for (const f of fs.readdirSync(path.join(VEKTRA, d))) entries.push({ name: `${d}/${f}`, bytes: fs.readFileSync(path.join(VEKTRA, d, f)) });
   entries.push({ name: 'PMC-IETM.xml', bytes: fs.readFileSync(path.join(VEKTRA, 'PMC-IETM.xml')) });

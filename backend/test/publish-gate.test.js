@@ -10,10 +10,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const { boot } = require('./helpers');
+const { boot, RESULTS, DM21 } = require('./helpers');
 
 const PW = 'Correct-Horse-9!';
-const FIX = (issue) => path.join(__dirname, '..', '..', 'frontend', 'e2e', 'fixtures', 'dm21', issue);
+const FIX = (issue) => path.join(DM21, issue);
 const ICN = 'ICN-S1KSTUDIO-A-291000-A-00001-00001-A-001-01.svg';
 const TYPES = ['descript', 'proced', 'fault', 'crew', 'ipd', 'brex', 'comrep', 'appliccrossreftable', 'condcrossreftable', 'prdcrossreftable', 'brdoc', 'checklist', 'container', 'frontmatter', 'learning', 'process', 'sb', 'schedul', 'scocontent', 'wrngdata', 'wrngflds'];
 const REC = {};
@@ -30,7 +30,7 @@ test.before(async () => {
   await w.post('/api/auth/onboarding', { username: 'wanda', password: PW });
 });
 test.after(async () => {
-  const out = path.join(__dirname, '..', '..', 'frontend', 'verification-results');
+  const out = RESULTS;                                    // AGASTYA_TEST_RESULTS, else frontend/verification-results (helpers.js)
   fs.mkdirSync(out, { recursive: true });
   // merge: the everyday run covers issue 5-0 only and must not erase the four-issue record of the full verification run
   const file = path.join(out, 'publish-gate.json');
@@ -65,7 +65,11 @@ const pdfMtime = (id) => { const f = path.join(process.env.AGASTYA_WORKSPACE_DIR
 // everyday run: issue 5-0 (all 21 types); VERIFY_FULL=1 (npm run test:verify) runs all four issues - each request really validates, so it is slow
 const ISSUES = process.env.VERIFY_FULL ? ['4-2', '5-0', '6', '7'] : ['5-0'];
 for (const issue of ISSUES) {
-  test(`issue ${issue}: all 21 types - a schema-invalid draft saves but blocks every PDF and release path; fixing it unblocks`, { timeout: 600000 }, async () => {
+  // QA-002 (WP-08): this was ONE test of 21 types with a 600 s limit, and it was cancelled at that limit on a loaded machine. It is now a setup
+  // test and one test per type, each with its own limit, so a slow machine shows which type is slow and a hang stops at one type. The checks are
+  // the same, in the same order, on the same project.
+  let gate = null;
+  test(`issue ${issue}: all 21 types - setup: the valid publication builds, previews and can be requested for release`, { timeout: 300000 }, async () => {
     const { id, names } = await projectWith(issue, `Gate ${issue}`);
     const pdf0 = pdfMtime(id);
 
@@ -74,10 +78,14 @@ for (const issue of ISSUES) {
     assert.equal(ok.status, 200, `a valid publication must build: ${JSON.stringify(ok.json).slice(0, 300)}`);
     assert.ok(pdfMtime(id) > pdf0);
     assert.equal((await w.req('POST', `/api/projects/${id}/publish/preview/${names[0]}`, {})).status, 200);
+    gate = { id, names };
+  });
 
-    // 2. per type: break that one module; a stale "valid" report must not matter
-    for (const [i, f] of names.entries()) {
-      const type = TYPES[i];
+  // 2. per type: break that one module; a stale "valid" report must not matter
+  for (const [i, type] of TYPES.entries()) {
+    test(`issue ${issue}: ${type} - a schema-invalid draft saves but blocks every PDF and release path; fixing it unblocks`, { timeout: 120000 }, async () => {
+      assert.ok(gate, 'the setup test of this issue failed, so there is no project to check');
+      const { id, names } = gate; const f = names[i];
       await w.post(`/api/projects/${id}/validation`, { issue: 'auto', brex: false });                    // a cached, VALID report exists
       const cur = (await w.get(`/api/projects/${id}/dms/${f}`)).json;
       assert.equal((await w.put(`/api/projects/${id}/dms/${f}`, { xml: breakSchema(cur.xml), baseHash: cur.hash })).status, 200, `${type}: the draft must be saved`);
@@ -101,8 +109,8 @@ for (const issue of ISSUES) {
       assert.equal((await w.put(`/api/projects/${id}/dms/${f}`, { xml: cur.xml, baseHash: bad.hash })).status, 200);
       if (i === 0) assert.equal((await w.post(`/api/projects/${id}/publish`, {})).status, 200, 'fixing the module unblocks the build');
       rec(type, issue, 'draftSavedThenFixed', true);
-    }
-  });
+    });
+  }
 
   test(`issue ${issue}: release approval needs fresh validation too; a draft outside the publication does not block`, { timeout: 300000 }, async () => {
     const { id, names } = await projectWith(issue, `Gate approve ${issue}`, false);

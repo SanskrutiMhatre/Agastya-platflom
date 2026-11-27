@@ -13,9 +13,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path');
+const { boot, DM21 } = require('./helpers');     // reads TEMP only when boot() runs, so it may load before TEMP is moved below
 
 const PW = 'Correct-Horse-9!';
-const FIX = path.resolve(__dirname, '..', '..', 'frontend', 'e2e', 'fixtures', 'dm21', '5-0');
+const FIX = path.join(DM21, '5-0');
 const DM = fs.readdirSync(FIX).find((f) => /-040A-D_/.test(f));
 const WIN = process.platform === 'win32';
 
@@ -28,7 +29,6 @@ const TARGET_SHORT_PROJECT_DIR = 150;
   const deep = path.join(os.tmpdir(), 'd'.repeat(pad)); fs.mkdirSync(deep, { recursive: true });
   process.env.TEMP = deep; process.env.TMP = deep; process.env.TMPDIR = deep;
 }
-const { boot } = require('./helpers');
 
 let h; let w;
 test.before(async () => {

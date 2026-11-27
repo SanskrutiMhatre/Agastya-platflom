@@ -223,4 +223,113 @@ verified, and what is left or blocked.
 
 * `pdfinfo` and `pdfimages` (poppler) are not installed on this machine; only `pdftotext` is. Four existing print tests need them
   (`jsg-engine` "a new User Handbook prints the stencil", `jsg-word` two sample tests, `jss-authoring` "default artwork") and fail at that
-  call, after their FO assertions pass. Recorded for WP-08: the CI gate declares and checks its tools.
+  call, after their FO assertions pass. Recorded for WP-08: the CI gate declares and checks its tools. (Resolved by WP-08: no test needs
+  poppler or xpdf any more; the four tests pass.)
+
+## Phase 1B
+
+### WP-08 Offline quality gate: CI, deterministic tests, tool provisioning (QA-001, QA-002, QA-003, QA-007, QA-010, QA-011, QA-014, QA-015, QA-017, QA-018, QA-019, QA-022, UX-011, ARC-023, ARC-014, PLT-026, RES-011, GAP-007) - done in part (see limits)
+
+* QA-003 (`backend/test/pdftools.js`): one PDF reader for the tests, built on the pdf.js already in `frontend/node_modules` (found the way
+  `services/importer/recover/pdfjs.ts` finds it, or `AGASTYA_PDFJS_DIR`). `readPdf(file|buffer)` gives `pageCount`, `pageSize(n)`,
+  `text({first,last,mode})` (modes `layout` like `pdftotext -layout`, `plain`, `raw` like `-raw`; pages end with `\f`) and, with
+  `{ images: true }`, `imageCount(n?)` = pictures painted (was `pdfimages -list`). Parsed once per buffer/file. All 17 backend files that
+  spawned `pdftotext`/`pdfinfo`/`pdfimages` use it (`applic-publish`, `dmtypes`, `jsg-engine`, `jsg-word`, `jss-authoring`,
+  `jss-change-notice`, `jss-cover-foot`, `jss-cover-isolation`, `jss-naval`, `jss-stencil-corrections`, `object-docs`, `pdf-furniture`,
+  `pdf-long-doctype`, `pdf-multi-ipd`, `pdf-reference`, `pdf21`, `wp02-routes`), and so does the e2e `jss-editor.spec.ts`, whose two PDF
+  checks were silently skipped whenever pdftotext was missing (`if (!t.error)`). One extractor on every machine: the xpdf/poppler difference
+  of QA-003 is gone. `pdf-furniture`'s fallback (count `/Subtype /Image` in the file bytes) is replaced by the painted-picture count, which is
+  stronger. No test spawns a PDF program any more (`grep -rn "'pdftotext'\|'pdfinfo'\|'pdfimages'" backend/test frontend/e2e`: none);
+  `backend/scripts/sample-compare.js` and `extract-sns-presets.js` (developer tools, not tests) still need poppler and say so.
+* Canary (`backend/test/tools-canary.test.js`, first stage of the gate): dist built and not older than src; pdf.js reads a vendored PDF (page
+  count, size, text, pictures); Java starts (bundled JRE or `JSS_JAVA`) and FOP's folders exist; xsltproc starts; xmllint-wasm validates;
+  Liberation Sans present (Arial reported). Each failure names the tool, where it looked and how to provide it; the versions are printed
+  and land in the evidence (`meta.json`). Shown: `JSS_JAVA=C:/nope/java.exe` gives `not ok 3 - Java runs ... 'Java could not be started as
+  "C:/nope/java.exe" (ENOENT). The bundled JRE belongs at ...\vendor\tools\jre\bin; set JSS_JAVA to use another.'`, the others pass.
+* QA-001 / QA-017 / QA-019 (`scripts/ci/gate.mjs`, `test-plan.json`, `skip-budget.json`, `.github/workflows/gate.yml`, root scripts
+  `npm run gate | gate:nightly | gate:release | lint | readiness`): the pipeline as a repository script. Stages build -> frontend-build ->
+  typecheck -> lint -> tools -> security -> backend -> pdf-smoke -> backend-heavy -> frontend -> frontend-verify -> e2e -> package ->
+  readiness; profiles pr / nightly / release. Every backend file runs in its own `node --test` process with a default per-test limit
+  (15 min unless the test sets one) and a wall limit per file (20 min; 60 min for the heavy shard), after which the process tree is killed
+  and reported TIMEOUT; an exit with 0xC0000005 (or another native status) is reported as NATIVE CRASH with its file; nothing is retried.
+  The heavy shard (`pdf21`, `brex-gate`, `publish-gate`, `dmtypes`, `golden-xignal`, `jss-naval`, `jss-stencil-corrections`,
+  `pdf-reference`, `wp32-validation-scale`, `jsg-word`, `jss-authoring`) runs one file at a time. Evidence per run
+  (`verification-results/ci/<time>-<commit>/`, git-ignored): commit and dirty flag, Node, OS, tool versions, one TAP file per test file,
+  vitest/Playwright junit, `skips.json`, `summary.json`, `summary.md`. The workflow file runs the same script on a self-hosted Windows runner
+  (offline `npm ci`, evidence uploaded); `scripts/ci/hooks/pre-push` is a quick local gate (not installed: `git config core.hooksPath
+  scripts/ci/hooks` in a checkout that wants it). `backend npm test` now builds (`pretest: tsc`) and runs the gate's backend stages; the old
+  all-parallel run is `npm run test:parallel`. `backend/scripts/test-verify.js` runs its three heavy files with `--test-concurrency=1`.
+* QA-007 (skip policy): the gate reads every `# SKIP` from the TAP output and fails when a skip has no reason, when a file not in
+  `scripts/ci/skip-budget.json` skips, or when a file skips more than its budget. The budget (16 files, 46 on a clean checkout without the
+  customer material; Windows-only tests on other platforms) is counted from the skip sites; every skip is listed with its reason in
+  `summary.md`. The skips that had no reason now carry one (importer-scan 3, importer-structure 6, importer-repairs 1, jss-rwi 4).
+  Not done: synthetic stand-ins for the customer material (decision D10); the customer suites still run only where the material is.
+* QA-002: vitest `testTimeout`/`hookTimeout` 30 s (`frontend/vite.config.ts`). The heavy verification suites (`rules`, `controls`, `editor`,
+  `editor-controls`, `elements`, `brex-parity`, `brex-xpath`) are left out of a bare `vitest run` unless `AGASTYA_VERIFY=1`; `npm run
+  test:verify` (`frontend/scripts/run-verify.mjs`) runs them one file at a time, `scripts/verify-elements.mjs` sets the variable. This
+  answers the lead's full-vitest run of 2026-11-27 (5 s timeouts in `naval.test.ts` and `objects.test.ts`, and a tinypool worker lost,
+  "onUnexpectedExit", during `controls`, `brex-xpath`, `editor-controls`): those heavy files ran in the parallel pool beside everything
+  else. `publish-gate.test.js`: the one 21-type test with a 600 s limit is a setup test plus one test per type (120 s each), same checks.
+* QA-010: `helpers.boot().close()` closes the database and removes the workspace; `helpers.tmp(prefix)` makes a folder that is removed when
+  the file's process ends (37 `mkdtempSync` sites in 25 files moved to it, and the local `tmp()` of 4 more; 13 files without the helpers import keep theirs). The per-file
+  PDF temp files of the PDF tests are gone (pdf.js reads the buffer). The gate gives every test process its own TEMP/TMP under a gate
+  folder and counts what is left. `AGASTYA_TEST_RESULTS` (gate: the evidence folder) receives the result tables that went into
+  `frontend/verification-results` (backend `publish-gate`, `brex-gate`, `dmtypes`, `pdf21`, `pdf-reference`; frontend `verify/lib.ts`;
+  `scripts/verify-report.mjs` reads it); the default is unchanged so the report keeps working. `AGASTYA_KEEP_TEMP=1` keeps everything.
+* QA-015: `helpers.boot()` refuses to start when a `src/*.ts` is newer than `dist/app.js` ("rebuild with `npx tsc -p .`"); the canary
+  checks the same; `pretest: tsc`.
+* QA-011 / QA-022 / UX-011 / GAP-007 (`frontend/playwright.config.ts`): port from `E2E_PORT` (default 4050) for the base URL, the health
+  URL and the server (`PORT` passed to `serve.mjs`); output folder `test-results-<port>` off 4050; a lock file per port
+  (`%TEMP%/agastya-e2e-<port>.lock`) refuses a second runner on the same port with the holder's pid; default browser `msedge` (D18, Chrome
+  with `E2E_CHANNEL=chrome`); junit via `E2E_JUNIT`. The stale "SNS defaults" assertion is the lead's fix in the main checkout (not
+  touched here). Not done: per-worker servers, a crash-labelling fixture (`page.on('crash')`), the Chrome crash root cause (UX-011 stays
+  open; the reference browser is Edge).
+* QA-014 / ARC-023: one `DM21` constant in `helpers.js` for the 21-type fixtures (every such path, in 30 files), so moving them is one line; the
+  fixtures still live under `frontend/e2e/fixtures/dm21` (not moved: the e2e suite reads them too). Paths that left the repository now need
+  an environment variable: `jss-naval` (`NAVAL_STENCILS`, default `manual format/NAval_stencil`, was `../../../Sampels/NAval_stencil`),
+  `importer-repairs`/`importer-scan` (`VEKTRA_SAMPLE`, default `SAMPLE PROJECTS/RWI`, was `../RWI`), `jss-rwi-verify` (`RWI_ZIP`; the
+  Downloads folder is no longer searched). On the owner's machine those tests now skip, with the reason, until the material is placed there
+  or the variable is set. Phase-named files (`phase13`, `phase17-security`, `pdf21`) are not renamed.
+* QA-018: `catalog-race-concurrent` asserts that the catalogue exists instead of passing with no assertion; `jsg-word` ISPL checked
+  `!includes('C E R T I F I C A T E')` after a helper that joins letter-spaced titles, so it could never fail: it checks `CERTIFICATE`;
+  `jss-naval` collapsed `/s+/g` (the letter s) instead of `/\s+/g` before checking that two pages are absent. Not done: font embedding via
+  a font list (the substring check of `jss-stencil-corrections:80` stays), baseline-review rule.
+* ARC-014 (`scripts/ci/lint.mjs`, `lint-baseline.json`): no dependency (no ESLint is installed and the gate is offline). Hard rules: no
+  `.only(` in any test, no `debugger`. Ratchets: explicit `any` backend 280 / frontend 50, `require(` in TypeScript backend 48 / frontend 4;
+  growth fails. Not done: a real ESLint set (`react-hooks/exhaustive-deps`).
+* RES-011 (`scripts/ci/readiness.mjs`, read-only): G-SEC-5 route guard (runs `routes-guarded.test.js`), G-SEC-5b audit coverage (NOT RUN: no
+  such test yet), QA-001 artefact commit (`release/BUILD-INFO.json`, now written by `package-windows.mjs` with the commit, dirty flag and
+  artefact hashes; `version.json` in the package carries the commit too), G-SEC-11a Authenticode, G-SEC-11b Node end-of-life margin, RES-005
+  SBOM, G-SEC-6 ACL of an installed copy and G-DEP-6 doctor (`--install DIR`), G-OFF-2 (NOT RUN: not automated). Exit non-zero on FAIL and on
+  NOT RUN unless `--allow-not-run`; `readiness.md/json` in the evidence. Today: G-SEC-5 PASS; **G-SEC-11b FAIL: Node 22 reaches end of life
+  on 2027-04-30, 5.1 months from now** (input to the runtime decision of WP-13); seven NOT RUN (no release folder or installed copy here).
+* QA-019 (the native crash): not reproduced and not fixed. What changed: no gate stage runs the heavy files in parallel any more, each file
+  is its own process, a crash is reported with the file and its status instead of a silent cancellation, and a hang ends at the file limit.
+  Hypothesis worth testing on the runner (not measured): since WP-32 a schema batch asks for WebAssembly memory sized to the batch (up to
+  4 GiB), so parallel heavy files can commit far more memory than before; the 2026-11-23 investigation already saw 69 MB free at one crash.
+  The 50-run soak of the recommendation needs the machine alone.
+* Clean-checkout failures found by the gate itself: `xml-guard` "every XML ... shipped in the repository" required more than 500 files,
+  a number reached only with the git-ignored customer material (272 here); it now requires every git-tracked XML/DTD/ENT file to be
+  scanned (stronger: a file the walk misses fails it). `wp03-auth` "security headers" reads the served client's CSP and fails without
+  `frontend/dist` (the API answers `default-src 'none'`); the pr profile therefore builds the frontend before the security stage.
+* PLT-026: not addressed here (platform-core regression tests are WP-09 work).
+* Verified (each file alone, `--test-concurrency=1`, this machine shared with two other agents): `jsg-engine` 7/7 (was 6/7, TypeError at
+  `pdfinfo`), `jsg-word` 3/3 (the sample test reached `pdfinfo` and failed), `jss-authoring` 12/12 + 1 skip (stencils absent; "default
+  artwork" failed at `pdfimages`); gate run 1 (`tools,lint,pdf-smoke`, 9 PDF files): 11/11 steps green, 0 skips, 13 temp entries left (the
+  test files' own temp folders, since moved to `helpers.tmp`); vitest `naval.test.ts` + `verify/objects.test.ts` 34/34 in 41 s; a bare
+  `vitest run` of `brex-xpath.test.ts` reports it excluded; frontend `tsc --noEmit` 0 errors; backend `tsc` 0 errors; lint green.
+  A wider run found three failures (the two clean-checkout ones above and a helpers import inside a function in `wp07-jsg-deep-path`,
+  introduced by the `tmp` change, fixed). Then three consecutive gate runs of the same 40 files (build + frontend-build in the first; lint,
+  tools, security 9 files, pdf-smoke 9, backend 21), `--jobs 2`: each 221 tests, 206 pass, 15 skips (all with reasons, within the budget),
+  0 fail, about 7 minutes each; 9-10 temporary entries left per run, all written by the product or the JVM (`agastya-uploads`,
+  `jss-fop-warmup.pdf`, `jsspub-s1000d-catalog.xml`, `hsperfdata_*`, `imageio*.tmp`) or by two files without the helpers import
+  (`wp04-reset-admin`, `deep-workspace`'s padding folder); no `agastya-v2-test-*` workspace. Skip policy shown failing: a budget without
+  `jss-rwi` and with `importer-scan` at 2 gives "jss-rwi.test.js: 4 skip(s) but the file has no entry" and "importer-scan.test.js: 3 skips,
+  the budget allows 2", gate FAILED.
+  Heavy shard, one file at a time (customer stencils via `NAVAL_STENCILS` and the main checkout's `manual format`, read only): `pdf21` 8/8
+  (577 s), `publish-gate` 24/24 in its new per-type form (634 s, 25-47 s per type), `dmtypes` 32/32, `jss-naval` 26/26,
+  `jss-stencil-corrections` 15/15, 0 skips: the pdf.js conversions of these files and the two QA-018 fixes hold on the real material.
+  Not run here: `pdf-reference`, `golden-xignal`, `brex-gate`, `wp32-validation-scale`.
+* Limits: a full backend, vitest and e2e run of this branch is still to do (the lead's machine time); the three consecutive full runs of
+  G-Q-5 therefore stand for the subsets above only. The `layout` text of pdf.js is close to `pdftotext -layout` but not identical (column
+  spacing is estimated from glyph widths); the converted tests passed unchanged in their assertions, except where noted above.

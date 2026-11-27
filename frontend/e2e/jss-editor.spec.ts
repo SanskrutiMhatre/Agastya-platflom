@@ -2,10 +2,13 @@
 // the PDF from that XML. Nothing here is mocked: the sheet, the toolbar, the dialogs, the save, the schema check and the FOP render are all the real ones.
 
 import { test, expect, request as pwRequest, type Page, type APIRequestContext } from '@playwright/test';
-import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+
+// The PDF is read with the backend tests' pdf.js helper (backend/test/pdftools.js): no pdftotext needed. The checks below used to be skipped
+// silently when pdftotext was missing (`if (!t.error)`), which on Windows was always (WP-08, QA-003).
+const { pdfText } = createRequire(import.meta.url)('../../backend/test/pdftools.js') as { pdfText: (src: Buffer) => Promise<string> };
 
 const PW = 'Correct-Horse-9!';
 const SHOTS = path.join('test-results', 'jss-shots');
@@ -134,10 +137,8 @@ test('Generate PDF builds the publication from the saved XML on the server, and 
   await expect(page.getByTestId('jss-note')).toContainText(/Built in/, { timeout: 120_000 });
   const res = await api.get(`${U}/publish/pdf`); expect(res.ok()).toBeTruthy();
   const buf = await res.body(); expect(buf.subarray(0, 5).toString()).toBe('%PDF-');
-  const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'jss-e2e-')), 'out.pdf'); fs.writeFileSync(f, buf);
-  const t = spawnSync('pdftotext', ['-layout', f, '-'], { encoding: 'utf8' });
-  if (!t.error) {
-    const flat = t.stdout.replace(/\s+/g, ' ');
+  {
+    const flat = (await pdfText(buf)).replace(/\s+/g, ' ');
     expect(flat).toContain('The system gives early warning of low-level threats'); expect(flat).toContain('Table 1-1: Technical Specifications'); expect(flat).toMatch(/low-level threats\.\s*Table 1-1/);                 // the cross-reference resolved to the table's number
     expect(flat).toMatch(/\(a\) Search radar/); expect(flat).toMatch(/\(i\) in all weather/); expect(flat).toContain('2400 kg'); expect(flat).toMatch(/keep the plate clean/i);
     expect(flat).toContain('USER HANDBOOK');
@@ -180,8 +181,7 @@ test('merging cells: Merge right and Merge down in the browser, saved as colspan
   const d = await saved(); expect(d.report.errors).toBe(0);
   expect(d.xml).toContain('colspan="2"'); expect(d.xml).toContain('rowspan="2"');
   await page.getByTestId('jss-generate').click(); await expect(page.getByTestId('jss-note')).toContainText(/Built in/, { timeout: 120_000 });
-  const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'jss-e2e-')), 'm.pdf'); fs.writeFileSync(f, await (await api.get(`${U}/publish/pdf`)).body());
-  const t = spawnSync('pdftotext', ['-layout', f, '-'], { encoding: 'utf8' }); if (!t.error) expect(t.stdout).toContain('Sl. No.');
+  expect(await pdfText(await (await api.get(`${U}/publish/pdf`)).body())).toContain('Sl. No.');
   // the structure buttons say why they are off, and Split cell puts the grid back (the table's tools show while a cell has focus)
   await sheet().locator('tbody tr').first().locator('td').first().locator('[data-edit]').click();
   await expect(page.getByRole('button', { name: '+ Row below', exact: true })).toBeDisabled();

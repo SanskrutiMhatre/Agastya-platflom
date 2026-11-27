@@ -4,7 +4,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const path = require('node:path');
-const { boot } = require('./helpers');
+const { boot, DM21 } = require('./helpers');
 
 const PW = 'Correct-Horse-9!';
 const SAMPLE = path.resolve(__dirname, '..', '..', 'SAMPLE PROJECTS', 'S1000D', '20_Nov _2026', 'PMC-RDR-1671Y-00033-00_000-01.xml (1).zip');
@@ -105,7 +105,7 @@ test('change the model code: a preview first, then every file name, identificati
 });
 
 test('importing a data module of ANOTHER model code is a choice, not a dead end: keep its code, or change it to the project\'s', async () => {
-  const FIX = path.resolve(__dirname, '..', '..', 'frontend', 'e2e', 'fixtures', 'dm21', '5-0');
+  const FIX = path.join(DM21, '5-0');
   const pr = await w.post('/api/projects', { name: 'Foreign import', format: 's1000d', s1000d: { mic: 'EXAMPLE', issue: '5.0', responsiblePartner: { code: '00000', name: 'Example Company' } } });
   const U = `/api/projects/${pr.json.project.id}`; const dir = path.join(h.ws, 'projects', pr.json.project.id, 'csdb');
   const f = fs.readdirSync(FIX).find((x) => /-040A-D_/.test(x)); const xml = fs.readFileSync(path.join(FIX, f), 'utf8');
@@ -123,7 +123,7 @@ test('importing a data module of ANOTHER model code is a choice, not a dead end:
 });
 
 test('a new data module joins the publication automatically (BREX and applicability tables do not); the project can switch that off', async () => {
-  const FIX = path.resolve(__dirname, '..', '..', 'frontend', 'e2e', 'fixtures', 'dm21', '5-0');
+  const FIX = path.join(DM21, '5-0');
   const pr = await w.post('/api/projects', { name: 'Auto add', format: 's1000d', s1000d: { mic: 'EXAMPLE', issue: '5.0', responsiblePartner: { code: '00000', name: 'Example Company' } } });
   const id = pr.json.project.id; const U = `/api/projects/${id}`; assert.equal(pr.json.project.autoAddToPublication, true);
   const pick = (c) => fs.readdirSync(FIX).find((x) => new RegExp(`-${c}A-D_`).test(x));

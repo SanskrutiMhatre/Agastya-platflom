@@ -9,7 +9,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const RES = path.join(ROOT, 'frontend', 'verification-results');
+const RES = process.env.AGASTYA_TEST_RESULTS || path.join(ROOT, 'frontend', 'verification-results');      // the gate's evidence folder when it runs this
 const OUT = path.join(ROOT, 'docs', 'DM_TYPE_VERIFICATION.md');
 const read = (f) => { try { return JSON.parse(fs.readFileSync(path.join(RES, f), 'utf8')); } catch { return null; } };
 

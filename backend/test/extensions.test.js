@@ -4,10 +4,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const path = require('node:path');
-const { boot } = require('./helpers');
+const { boot, DM21 } = require('./helpers');
 
 const PW = 'Correct-Horse-9!';
-const FIX = path.resolve(__dirname, '..', '..', 'frontend', 'e2e', 'fixtures', 'dm21', '5-0');
+const FIX = path.join(DM21, '5-0');
 const f040 = fs.readdirSync(FIX).find((f) => f.includes('-040A-D_'));
 const NS = 'http://example.com/ns/maint';
 const XSD = `<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="${NS}" xmlns="${NS}" elementFormDefault="qualified"><xs:element name="tag"><xs:complexType><xs:sequence><xs:element name="owner" type="xs:string"/></xs:sequence><xs:attribute name="level" type="xs:integer" use="required"/></xs:complexType></xs:element></xs:schema>`;

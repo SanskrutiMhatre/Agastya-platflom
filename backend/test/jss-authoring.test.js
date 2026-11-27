@@ -9,8 +9,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path');
-const { spawnSync } = require('node:child_process');
-const { boot } = require('./helpers');
+const { boot, tmp } = require('./helpers');
+const { pdfText, pdfImageCount } = require('./pdftools');
 
 const PW = 'Correct-Horse-9!';
 const STENCILS = path.resolve(__dirname, '..', '..', 'manual format', 'JSS0251-stencils');
@@ -34,8 +34,8 @@ const create = async (type, name) => {
   const id = r.json.project.id; made[id] = type;
   return { id, U: `/api/projects/${id}`, dir: path.join(h.ws, 'projects', id), card: r.json.project };
 };
-const pdfOf = (buf) => { const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'jss-')), 'x.pdf'); fs.writeFileSync(f, buf); return f; };
-const text = (f) => spawnSync('pdftotext', ['-layout', f, '-'], { encoding: 'utf8' }).stdout;
+const pdfOf = (buf) => { const f = path.join(tmp('jss-'), 'x.pdf'); fs.writeFileSync(f, buf); return f; };
+const text = (f) => pdfText(f);                                       // test/pdftools.js: pdf.js, no external program (async)
 const build = async (U) => { const b = await w.post(`${U}/publish`, {}); assert.equal(b.status, 200, JSON.stringify(b.json).slice(0, 500)); return pdfOf((await w.get(`${U}/publish/pdf`)).buf); };
 /** Put `inner` right after the heading `title` (the first one), inside its section. */
 const into = (xml, title, inner) => { const t = `<title>${title}</title>`; assert.ok(xml.includes(t), `no heading ${title}`); return xml.replace(t, t + inner); };
@@ -220,7 +220,7 @@ test('UHB end to end: what the author writes is what the PDF prints, in the sten
   const saved = await w.put(`${p.U}/jss`, { xml: authored });
   assert.equal(saved.status, 200); assert.equal(saved.json.report.errors, 0, JSON.stringify(saved.json.report.findings.filter((f) => f.severity === 'error')));
 
-  const f = await build(p.U); const t = text(f); const flat = t.replace(/\s+/g, ' ');
+  const f = await build(p.U); const t = await text(f); const flat = t.replace(/\s+/g, ' ');
   if (process.env.JSS_DUMP) fs.writeFileSync(process.env.JSS_DUMP, t);                     // debugging aid: the text of the PDF
   // the XML is the source of truth: the PDF was built from the file as saved, and the composed book carries the frame and the body unchanged
   const composed = fs.readFileSync(path.join(p.dir, '_jss-book.xml'), 'utf8');
@@ -284,7 +284,7 @@ test('MM and ORM build from their own stencil chapters, with their own cover tit
     const p = await create(id, `${id} e2e`); const g = (await w.get(`${p.U}/jss`)).json;
     const body = into(g.xml, firstChapter, '<para>Authored paragraph for ' + id + '.</para>');
     assert.equal((await w.put(`${p.U}/jss`, { xml: body })).status, 200);
-    const flat = text(await build(p.U)).replace(/\s+/g, ' ');
+    const flat = (await text(await build(p.U))).replace(/\s+/g, ' ');
     assert.match(flat, cover, `${id} cover title`);
     assert.ok(flat.includes(firstChapter), `${id}: the first chapter title is printed`);
     assert.match(flat, /Chapter 1\b/); assert.match(flat, new RegExp(`Authored paragraph for ${id}\\.`));
@@ -323,7 +323,7 @@ test('six heading levels, a notice holding nested lists, and full-width notices 
     if (n > 4 && items.some((i) => /intentionally left blank/.test(i.str))) blanks.push({ n, head: items.filter((i) => size(i) === 10).length, y: items.filter((i) => size(i) === 10).map((i) => Math.round(mm(vp.height - i.transform[5]))) });
   }
   assert.ok(sawNotice && sawTable, 'the deep notice and table were found in the PDF');
-  const flat = text(f).replace(/\s+/g, ' ');
+  const flat = (await text(f)).replace(/\s+/g, ' ');
   assert.match(flat, /first/i); assert.match(flat, /nested a/i); assert.match(flat, /nested b/i); assert.match(flat, /second/i);      // a notice prints in capitals
   if (process.env.JSS_DUMP_BLANKS) console.log(JSON.stringify(blanks));
   assert.ok(blanks.length > 0, 'the document has blank pad pages');
@@ -348,7 +348,7 @@ test('ancillary pages: choose which are printed, edit one by hand, keep the edit
   const off = await w.put(A, { pages: [{ id: 'demolition', enabled: false }, { id: 'firstAid', enabled: false }, { id: 'foreword', title: 'PREFACE' }] });
   assert.equal(off.status, 200); assert.deepEqual(off.json.pages.map((x) => x.id), ids, 'choosing a page does not change the order the pages print in');
   assert.equal(off.json.pages.find((x) => x.id === 'demolition').enabled, false); assert.equal(off.json.pages.find((x) => x.id === 'foreword').customTitle, 'PREFACE');
-  let flat = text(await build(p.U)).replace(/\s+/g, ' ');
+  let flat = (await text(await build(p.U))).replace(/\s+/g, ' ');
   assert.ok(!/DEMOLITION OF MATERIAL/.test(flat) && !/FIRST AID IN CASE/.test(flat.replace(/FOR FIRST AID IN CASE OF ELECTRIC SHOCK SEE OVERLEAF/, '')), 'a page that is switched off is not printed');
   assert.match(flat, /PREFACE/); assert.match(flat, /RECORD OF CHANGES/, 'the others still are');
   assert.ok(flat.indexOf('USER HANDBOOK FOR') < flat.indexOf('PREFACE'), 'the title page still comes first');
@@ -358,14 +358,14 @@ test('ancillary pages: choose which are printed, edit one by hand, keep the edit
   const edited = page.xml.replace('Every care has been taken', 'ANCILLARYEDIT care has been taken');
   assert.equal((await w.put(`${A}/foreword`, { xml: edited })).status, 200);
   assert.equal((await w.get(A)).json.pages.find((x) => x.id === 'foreword').edited, true);
-  flat = text(await build(p.U)).replace(/\s+/g, ' '); assert.match(flat, /ANCILLARYEDIT care has been taken/, 'the edit is printed');
+  flat = (await text(await build(p.U))).replace(/\s+/g, ' '); assert.match(flat, /ANCILLARYEDIT care has been taken/, 'the edit is printed');
   // a change to Settings must not overwrite a page that was edited by hand
   const s = (await w.get(`${p.U}/settings`)).json.project; s.frontMatter = { ...(s.frontMatter ?? {}), foreword: { ...(s.frontMatter?.foreword ?? {}), text: 'SETTINGSTEXT replaced' } };
   assert.equal((await w.put(`${p.U}/settings`, { project: s })).status, 200);
-  flat = text(await build(p.U)).replace(/\s+/g, ' '); assert.match(flat, /ANCILLARYEDIT/, 'the hand edit survives a rebuild'); assert.ok(!/SETTINGSTEXT/.test(flat));
+  flat = (await text(await build(p.U))).replace(/\s+/g, ' '); assert.match(flat, /ANCILLARYEDIT/, 'the hand edit survives a rebuild'); assert.ok(!/SETTINGSTEXT/.test(flat));
   // reset gives the page back to Settings
   const reset = await w.post(`${A}/foreword/reset`, {}); assert.equal(reset.status, 200); assert.equal(reset.json.page.edited, false); assert.match(reset.json.xml, /SETTINGSTEXT replaced/);
-  flat = text(await build(p.U)).replace(/\s+/g, ' '); assert.match(flat, /SETTINGSTEXT/); assert.ok(!/ANCILLARYEDIT/.test(flat));
+  flat = (await text(await build(p.U))).replace(/\s+/g, ' '); assert.match(flat, /SETTINGSTEXT/); assert.ok(!/ANCILLARYEDIT/.test(flat));
 
   // what a page may not be
   assert.equal((await w.put(`${A}/foreword`, { xml: '<foreword><para>unclosed</foreword>' })).status, 400, 'malformed XML is refused');
@@ -376,7 +376,7 @@ test('ancillary pages: choose which are printed, edit one by hand, keep the edit
 });
 
 test('default artwork: a project with no emblem, logo or first-aid picture of its own prints the stencil\'s; its own files win', { timeout: 600000 }, async () => {
-  const images = (f) => spawnSync('pdfimages', ['-list', f], { encoding: 'utf8' }).stdout.split('\n').slice(2).filter((l) => l.trim()).length;
+  const images = (f) => pdfImageCount(f);          // pictures painted on the pages (test/pdftools.js; was pdfimages -list)
   const fo = (p) => fs.readFileSync(path.join(p.dir, 'jss-output.fo'), 'utf8');
 
   const bare = await create('uhb', 'UHB artwork bare');
@@ -385,7 +385,7 @@ test('default artwork: a project with no emblem, logo or first-aid picture of it
   const srcs = [...f1.matchAll(/src="([^"]*)"/g)].map((m) => m[1]);
   assert.match(f1, /artwork\/emblem\.png/, `the emblem (pictures in the FO: ${srcs.join(' | ')})`); assert.match(f1, /assets\/default-publisher-logo\.png/, 'the L&T Precision Engineering logo the owner supplied'); assert.match(f1, /artwork\/first-aid\.png/, 'the first-aid figures');
   assert.ok(!fs.existsSync(path.join(bare.dir, 'Media', 'default-emblem.png')) && !fs.readdirSync(path.join(bare.dir)).includes('artwork'), 'nothing is copied into the project');
-  const bareImages = images(pdf); assert.ok(bareImages >= 3, `the PDF carries the pictures (${bareImages})`);
+  const bareImages = await images(pdf); assert.ok(bareImages >= 3, `the PDF carries the pictures (${bareImages})`);
 
   const own = await create('uhb', 'UHB artwork own');
   fs.mkdirSync(path.join(own.dir, 'Media'), { recursive: true });

@@ -6,12 +6,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path'); const http = require('node:http');
-const { boot } = require('./helpers');
+const { boot, DM21, tmp: helperTmp } = require('./helpers');
 const { confineFo, localPathOf, BLANK_PNG } = require('../vendor/engine/foGuard');
 
 const PW = 'Correct-Horse-9!';
-const FIX = path.resolve(__dirname, '..', '..', 'frontend', 'e2e', 'fixtures', 'dm21', '5-0');
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'foguard-'));
+const FIX = path.join(DM21, '5-0');
+const tmp = () => helperTmp('foguard-');           // removed when the file's process ends (QA-010)
 const fo = (body) => `<?xml version="1.0"?><fo:root xmlns:fo="http://www.w3.org/1999/XSL/Format" xmlns:svg="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><fo:page-sequence><fo:flow>${body}</fo:flow></fo:page-sequence></fo:root>`;
 
 test('allowed references are left alone and the file is not rewritten (byte-identical)', () => {

@@ -6,11 +6,13 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const path = require('node:path'); const os = require('node:os'); const { createHash } = require('node:crypto');
-const { boot } = require('./helpers');
+const { boot, tmp } = require('./helpers');
 const { ZipFileReader } = require('../dist/services/zipio');
 
 const PW = 'Correct-Horse-9!';
-const CANDIDATES = [process.env.RWI_ZIP, path.join(os.homedir(), 'Downloads', 'agastya docs', 'RWI.zip'), path.resolve(__dirname, '..', '..', 'SAMPLE PROJECTS', 'JSS-0251', 'RWI.zip')].filter(Boolean);
+// RWI_ZIP, else SAMPLE PROJECTS/JSS-0251/RWI.zip (git-ignored). The developer's Downloads folder is no longer searched: nothing outside the
+// repository is read unless the variable names it (QA-014).
+const CANDIDATES = [process.env.RWI_ZIP, path.resolve(__dirname, '..', '..', 'SAMPLE PROJECTS', 'JSS-0251', 'RWI.zip')].filter(Boolean);
 const ZIP = CANDIDATES.find((f) => fs.existsSync(f));
 let h; let w;
 const sha = (b) => createHash('sha256').update(b).digest('hex');
@@ -118,7 +120,7 @@ test('the real RWI package: Import -> Edit -> Save -> Validate -> Generate PDF -
   // ── Export ──
   const chk = await w.get(`${p.U}/jss/export-check`); assert.equal(chk.json.ok, true, JSON.stringify(chk.json.report.findings.filter((f) => f.severity === 'error')));
   const exp = await w.get(`${p.U}/jss/export`); assert.equal(exp.status, 200);
-  const zf = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'rwi-verify-')), 'out.zip'); fs.writeFileSync(zf, exp.buf);
+  const zf = path.join(tmp('rwi-verify-'), 'out.zip'); fs.writeFileSync(zf, exp.buf);
   const out = await unzip(zf);
   const outNames = [...out.keys()]; const outRoot = outNames[0].split('/')[0]; assert.equal(outRoot, rootDir, 'the package keeps its top folder');
   const rel = (n) => n.slice(n.indexOf('/') + 1);

@@ -8,7 +8,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { boot } = require('./helpers');
+const { boot, tmp } = require('./helpers');
 
 const PW = 'Correct-Horse-9!';
 let h; let w; let G; let seq = 0;
@@ -25,7 +25,7 @@ const build = async (domain, manualType) => {
   const r = await w.post('/api/projects', { name: `Ref ${domain} ${++seq}`, format: 'jss', domain, manualType }); assert.equal(r.status, 201, JSON.stringify(r.json));
   const id = r.json.project.id; const U = `/api/projects/${id}`;
   const b = await w.post(`${U}/publish`, {}); assert.equal(b.status, 200, JSON.stringify(b.json).slice(0, 400));
-  const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'reflay-')), 'x.pdf'); fs.writeFileSync(f, (await w.get(`${U}/publish/pdf`)).buf);
+  const f = path.join(tmp('reflay-'), 'x.pdf'); fs.writeFileSync(f, (await w.get(`${U}/publish/pdf`)).buf);
   const { doc } = await G.openPdf(f);
   const pages = [];
   for (let n = 1; n <= doc.numPages; n++) {

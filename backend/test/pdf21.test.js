@@ -13,11 +13,11 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { spawnSync } = require('node:child_process');
-const { boot } = require('./helpers');
+const { boot, RESULTS: RESULTS_DIR, DM21 } = require('./helpers');
+const { readPdf } = require('./pdftools');
 
 const PW = 'Correct-Horse-9!';
-const FIXROOT = path.resolve(__dirname, '..', '..', 'frontend', 'e2e', 'fixtures', 'dm21');
+const FIXROOT = DM21;
 const ISSUES = ['4-2', '5-0', '6', '7'];
 const PIPES = ['s1000dtofo', 's1000dtojss'];
 const DATA_IN_ATTRIBUTES = new Set(['brex', 'comrep', 'appliccrossreftable', 'condcrossreftable', 'prdcrossreftable', 'brdoc', 'schedul', 'scocontent', 'wrngdata', 'wrngflds']);
@@ -28,12 +28,10 @@ const KIND = { descript: 'narrative', proced: 'narrative', fault: 'narrative', c
 const schemaOf = (xml) => (/xml_schema_flat\/(\w+)\.xsd/.exec(xml) || [])[1];
 // A word is its letters: whitespace, hyphens, soft hyphens and zero-width spaces are not part of it (a word wrapped inside a narrow table cell is two pieces on two lines).
 const flat = (s) => s.toLowerCase().replace(/[\s­​-]+/g, '');
-function pdfText(buf) {
-  const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pdf21-')), 'x.pdf');
-  fs.writeFileSync(f, buf);
-  // -raw: the text in the order the PDF draws it. In page-layout order a narrow column's wrapped word is interleaved with its neighbours' text
+async function pdfText(buf) {
+  // raw: the text in the order the PDF draws it (test/pdftools.js, pdf.js; was pdftotext -raw). In page-layout order a narrow column's wrapped word is interleaved with its neighbours' text
   // ("area occupi" ... "R Caution" ... "ed."), so a word that IS printed looks missing.
-  return spawnSync('pdftotext', ['-raw', f, '-'], { encoding: 'utf8', maxBuffer: 1 << 28 }).stdout;
+  return (await readPdf(buf)).text({ mode: 'raw' });
 }
 function tokensOf(xml, schema) {
   const raw = xml.split('<content')[1] ?? '';
@@ -53,7 +51,7 @@ test.before(async () => {
   await w.post('/api/auth/onboarding', { username: 'pia', password: PW });
 });
 test.after(async () => {
-  const out = path.join(__dirname, '..', '..', 'frontend', 'verification-results');
+  const out = RESULTS_DIR;                                  // AGASTYA_TEST_RESULTS, else frontend/verification-results (helpers.js)
   fs.mkdirSync(out, { recursive: true });
   fs.writeFileSync(path.join(out, 'pdf-content.json'), JSON.stringify(RESULTS, null, 1));
   await h.close();
@@ -77,7 +75,7 @@ for (const pipeline of PIPES) {
         assert.equal((await w.post(`/api/projects/${pid}/dms`, { file: f, xml })).status, 201, f);
         const pdf = await w.req('POST', `/api/projects/${pid}/publish/preview/${f}`, {});
         assert.equal(pdf.status, 200, `${schema}: preview ${pdf.status} ${JSON.stringify(pdf.json ?? '').slice(0, 200)}`);
-        const text = flat(pdfText(pdf.buf));
+        const text = flat(await pdfText(pdf.buf));
         const toks = tokensOf(xml, schema);
         const missing = toks.filter((t) => !text.includes(t));
         (RESULTS[`${schema}/${issue}/${pipeline}`] ??= {}).printed = `${toks.length - missing.length}/${toks.length}`;

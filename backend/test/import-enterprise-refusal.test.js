@@ -8,10 +8,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const path = require('node:path');
-const { boot } = require('./helpers');
+const { boot, DM21 } = require('./helpers');
 
 const PW = 'Correct-Horse-9!';
-const FIX = path.resolve(__dirname, '..', '..', 'frontend', 'e2e', 'fixtures', 'dm21', '5-0');
+const FIX = path.join(DM21, '5-0');
 const DM = fs.readdirSync(FIX).find((f) => /-040A-D_/.test(f));
 let h; let admin; let w;
 

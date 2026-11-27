@@ -1,0 +1,42 @@
+# The offline quality gate on a SELF-HOSTED Windows runner (WP-08, QA-001). No step downloads anything: the runner image holds Node 22, the
+# repository's node_modules (npm ci from a local mirror or a pre-filled cache) and Microsoft Edge. Every step calls scripts/ci/gate.mjs, so the
+# same gate runs by hand on any machine:  npm run gate  |  npm run gate:nightly  |  npm run gate:release
+# GitHub Actions syntax; Gitea and Forgejo Actions read the same file.
+name: gate
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 1 * * *'          # nightly
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: pr, nightly or release
+        default: pr
+jobs:
+  gate:
+    runs-on: [self-hosted, windows]
+    timeout-minutes: 300
+    env:
+      E2E_CHANNEL: msedge        # decision D18: Edge is the reference browser
+      E2E_PORT: '4050'
+    steps:
+      - uses: actions/checkout@v4
+        with: { lfs: false }
+      - name: dependencies (offline)
+        shell: pwsh
+        run: |
+          npm ci --prefix backend --offline --no-audit --no-fund
+          npm ci --prefix frontend --offline --no-audit --no-fund
+      - name: gate
+        shell: pwsh
+        run: |
+          $p = if ('${{ github.event_name }}' -eq 'schedule') { 'nightly' } elseif ('${{ inputs.profile }}') { '${{ inputs.profile }}' } else { 'pr' }
+          node scripts/ci/gate.mjs --profile $p --keep-going --evidence "verification-results/ci/run-${{ github.run_id }}"
+      - name: evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-evidence-${{ github.run_id }}
+          path: verification-results/ci/run-${{ github.run_id }}

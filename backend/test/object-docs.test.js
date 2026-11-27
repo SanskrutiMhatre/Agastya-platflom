@@ -3,14 +3,15 @@
 // file naming, XSD validation of the saved file, HTML and PDF rendering, DML references - and the honest refusals where a schema is missing (7.0).
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path'); const { spawnSync } = require('node:child_process');
-const { boot } = require('./helpers');
+const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path');
+const { boot, DM21, tmp } = require('./helpers');
+const { pdfText: readPdfText } = require('./pdftools');
 
 const PW = 'Correct-Horse-9!';
-const ROOT = path.resolve(__dirname, '..', '..', 'frontend', 'e2e', 'fixtures', 'dm21');
+const ROOT = DM21;
 const ISSUES = [['4-2', '4.2'], ['5-0', '5.0'], ['6', '6.0'], ['7', '7.0']];
 let h; let w; let admin;
-const pdfText = (buf) => { const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'od-')), 'x.pdf'); fs.writeFileSync(f, buf); return spawnSync('pdftotext', [f, '-'], { encoding: 'utf8' }).stdout.replace(/[\s­-]+/g, '').toLowerCase(); };
+const pdfText = async (buf) => { return (await readPdfText(buf, { mode: 'plain' })).replace(/[\s­-]+/g, '').toLowerCase(); };
 
 test.before(async () => {
   h = await boot(); admin = new h.Client('admin'); await admin.post('/api/auth/setup', { username: 'admin', password: PW, fullName: 'A' });
@@ -30,7 +31,7 @@ for (const [key, label] of ISSUES) {
     // DDN: only where a DDN schema is bundled
     const pkg = await w.post(`${U}/packages/delivery`, { files, sender: { code: '00000' }, receiver: { code: 'U8025', name: 'Receiver', city: 'X', country: 'Y' } });
     assert.equal(pkg.status, 200, pkg.buf?.toString().slice(0, 200));
-    const names = (() => { const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'od-')), 'p.zip'); fs.writeFileSync(f, pkg.buf); const Z = require('../dist/services/zipio'); const r = Z.ZipFileReader.open(f); const n = r.entries.map((e) => e.name); r.close(); return n; })();
+    const names = (() => { const f = path.join(tmp('od-'), 'p.zip'); fs.writeFileSync(f, pkg.buf); const Z = require('../dist/services/zipio'); const r = Z.ZipFileReader.open(f); const n = r.entries.map((e) => e.name); r.close(); return n; })();
     assert.equal(names.some((n) => /^DDN-/.test(n)), key !== '7', `DDN present exactly where a DDN schema is bundled (${label})`);
     // Comment + Update: bundled for 4.2 / 5.0 / 6.0 only
     for (const [kind, params] of [['comment', { refDm: ref, text: 'The torque value looks wrong', title: 'Torque query' }], ['update', { refDm: ref, partNumber: 'PN-AB-12' }]]) {
@@ -52,7 +53,7 @@ for (const [key, label] of ISSUES) {
     }
     const pdfF = saved.find((f) => /^COM-/.test(f) || /^IMF-/.test(f));
     const pdf = await w.post(`${U}/objects/${pdfF}/pdf`, {}); assert.equal(pdf.status, 200, pdf.buf?.toString().slice(0, 200));
-    const text = pdfText(pdf.buf); assert.ok(text.includes(/^COM-/.test(pdfF) ? 'torquevaluelookswrong' : 'rearhubexplodedview'), 'PDF carries the content');
+    const text = await pdfText(pdf.buf); assert.ok(text.includes(/^COM-/.test(pdfF) ? 'torquevaluelookswrong' : 'rearhubexplodedview'), 'PDF carries the content');
     // the DML lists the data modules (DML references)
     const dx = fs.readFileSync(path.join(h.ws, 'projects', mk.json.project.id, 'csdb', dml.json.file), 'utf8'); assert.equal((dx.match(/<dmlEntry /g) || []).length, files.length);
   });

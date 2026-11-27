@@ -6,8 +6,8 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { spawnSync } = require('child_process');
-const { boot } = require('./helpers');
+const { boot, RESULTS, DM21 } = require('./helpers');
+const { readPdf } = require('./pdftools');
 
 const FIX = path.join(__dirname, 'fixtures', 'rich');
 const PW = 'Correct-Horse-9!';
@@ -26,13 +26,9 @@ const TYPES = {
   'DMC-EXAMPLE-A-00-00-00-00A-00LA-D_001-00_EN-US.XML': ['common repository', 'Hot surface'],
 };
 
-function pdfText(buf, first, last) {
-  const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pdf-')), 'x.pdf');
-  fs.writeFileSync(f, buf);
-  const args = ['-layout'];
-  if (first) args.push('-f', String(first), '-l', String(last ?? first));
-  const r = spawnSync('pdftotext', [...args, f, '-'], { encoding: 'utf8' });
-  return r.stdout;
+// pdf.js (test/pdftools.js): no external program, no temp file
+async function pdfText(buf, first, last) {
+  return (await readPdf(buf)).text(first ? { first, last: last ?? first } : {});
 }
 
 // per type x issue results of the issue-wide tests below, written for the verification report
@@ -57,7 +53,7 @@ test.before(async () => {
   assert.equal((await w.req('POST', `/api/projects/${pid}/media`, fd)).status, 200);
 });
 test.after(async () => {
-  const out = path.join(__dirname, '..', '..', 'frontend', 'verification-results');
+  const out = RESULTS;                                    // AGASTYA_TEST_RESULTS, else frontend/verification-results (helpers.js)
   fs.mkdirSync(out, { recursive: true });
   fs.writeFileSync(path.join(out, 'backend.json'), JSON.stringify(REC, null, 1));
   await h.close();
@@ -120,13 +116,13 @@ for (const [file, [label, marker]] of Object.entries(TYPES)) {
     const pv = await w.req('POST', `/api/projects/${pid}/publish/preview/${file}`, {});
     assert.equal(pv.status, 200, pv.json ? JSON.stringify(pv.json).slice(0, 600) : '');
     assert.equal(pv.buf.subarray(0, 5).toString(), '%PDF-');
-    assert.ok(pdfText(pv.buf).replace(/\s+/g, '').toLowerCase().includes('examplesystem'), 'module title in the PDF');
+    assert.ok((await pdfText(pv.buf)).replace(/\s+/g, '').toLowerCase().includes('examplesystem'), 'module title in the PDF');
   });
   test(`${label}: server PDF contains its real content`, { timeout: 120000, todo: SUPPORT.has(label) ? 'support module: body not rendered by the FOP stylesheets' : false }, async () => {
     const pv = await w.req('POST', `/api/projects/${pid}/publish/preview/${file}`, {});
     assert.equal(pv.status, 200, pv.json ? JSON.stringify(pv.json).slice(0, 600) : '');
     assert.equal(pv.buf.subarray(0, 5).toString(), '%PDF-');
-    const text = pdfText(pv.buf);
+    const text = await pdfText(pv.buf);
     assert.ok(text.toLowerCase().includes(marker.toLowerCase()), `"${marker}" missing from the ${label} PDF. Text was:\n${text.slice(0, 1500)}`);
   });
 }
@@ -140,7 +136,7 @@ test('full publication of all seven types builds one PDF containing all of them'
   assert.equal(build.status, 200, JSON.stringify(build.json).slice(0, 800));
   const pdf = await w.get(`/api/projects/${pid}/publish/pdf`);
   assert.equal(pdf.buf.subarray(0, 5).toString(), '%PDF-');
-  const text = pdfText(pdf.buf);
+  const text = await pdfText(pdf.buf);
   const missing = Object.values(TYPES).filter(([l, m]) => !SUPPORT.has(l) && !text.toLowerCase().includes(m.toLowerCase())).map(([l, m]) => `${l}: "${m}"`);
   assert.deepEqual(missing, []);
 });
@@ -149,7 +145,7 @@ test('full publication of all seven types builds one PDF containing all of them'
 // (S1000D_6 / S1000D_7, no minor number) was not understood and no Issue 7 schema set was installed.
 for (const issue of ['4-2', '5-0', '6', '7']) {
   test(`server XSD validation covers all 21 types on issue ${issue} (none skipped)`, { timeout: 120000 }, async () => {
-    const dir = path.join(__dirname, '..', '..', 'frontend', 'e2e', 'fixtures', 'dm21', issue);
+    const dir = path.join(DM21, issue);
     const p = await w.post('/api/projects', { name: `All 21 on ${issue}`, pipeline: 's1000dtofo' });
     assert.equal(p.status, 201);
     const id = p.json.project.id;
@@ -173,7 +169,7 @@ for (const issue of ['4-2', '5-0', '6', '7']) {
 // editor asked "save anyway?"). Well-formed but schema-invalid XML is still saved (work in progress) and is reported by validation.
 for (const issue of ['4-2', '5-0', '6', '7']) {
   test(`malformed XML is refused and schema-invalid XML is reported, for all 21 types on issue ${issue}`, { timeout: 180000 }, async () => {
-    const dir = path.join(__dirname, '..', '..', 'frontend', 'e2e', 'fixtures', 'dm21', issue);
+    const dir = path.join(DM21, issue);
     const p = await w.post('/api/projects', { name: `Malformed ${issue}`, pipeline: 's1000dtofo' });
     const id = p.json.project.id;
     const names = SCHEMAS21.map((t) => JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8'))[t]);

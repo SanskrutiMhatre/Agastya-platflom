@@ -2,10 +2,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs'); const os = require('os'); const path = require('path'); const zlib = require('zlib');
-const { verifyZip } = require('./helpers');
+const { verifyZip, tmp: helperTmp } = require('./helpers');
 const Z = require('../dist/services/zipio');
 
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'zipio-'));
+const tmp = () => helperTmp('zipio-');           // removed when the file's process ends (QA-010)
 async function build(file, files, opts) {
   const w = new Z.ZipStreamWriter(fs.createWriteStream(file), opts);
   for (const [n, d] of Object.entries(files)) await w.addBuffer(n, Buffer.from(d));

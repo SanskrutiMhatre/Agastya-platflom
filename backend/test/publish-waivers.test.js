@@ -8,10 +8,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const { boot } = require('./helpers');
+const { boot, DM21 } = require('./helpers');
 
 const PW = 'Correct-Horse-9!';
-const FIX = path.join(__dirname, '..', '..', 'frontend', 'e2e', 'fixtures', 'dm21', '5-0');
+const FIX = path.join(DM21, '5-0');
 const ICN = 'ICN-S1KSTUDIO-A-291000-A-00001-00001-A-001-01.svg';
 const NAMED = 'modelIdentCode="EXAMPLE" systemDiffCode="A" systemCode="00" subSystemCode="0" subSubSystemCode="0" assyCode="00" disassyCode="00" disassyCodeVariant="A" infoCode="022" infoCodeVariant="Z" itemLocationCode="D"';
 const useBrex = (xml, codeAttrs) => xml.replace(/(<brexDmRef>[\s\S]*?<dmCode )[^>]*?(\/>[\s\S]*?<\/brexDmRef>)/, `$1${codeAttrs}$2`);

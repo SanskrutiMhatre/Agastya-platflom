@@ -6,11 +6,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const path = require('node:path');
-const { boot } = require('./helpers');
+const { boot, DM21 } = require('./helpers');
 
 const PW = 'Correct-Horse-9!';
 const FX = path.resolve(__dirname, '..', '..', 'frontend', 'src', 'studio', '__tests__', 'rich', 'objects');
-const DM = path.resolve(__dirname, '..', '..', 'frontend', 'e2e', 'fixtures', 'dm21');
+const DM = DM21;
 let h; let w;
 
 test.before(async () => {

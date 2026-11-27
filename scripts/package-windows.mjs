@@ -276,9 +276,14 @@ for (const r of rows) for (const f of r.files) {
 fs.writeFileSync(path.join(stage, 'THIRD-PARTY-NOTICES.txt'), notices.join('\r\n') + '\r\n');
 log(`  notices: ${rows.length} components, ${seen.size} distinct licence texts`);
 
+// The commit the build was made from (QA-001, WP-08): scripts/ci/readiness.mjs refuses artefacts whose commit is not the verified one, or that
+// were built from a tree with uncommitted changes.
+const gitOut = (...a) => { const r = spawnSync('git', a, { cwd: root, encoding: 'utf8' }); return r.status === 0 ? r.stdout.trim() : ''; };
+const buildCommit = gitOut('rev-parse', 'HEAD') || 'unknown';
+const buildDirty = gitOut('status', '--porcelain', '--untracked-files=no') !== '';
 fs.writeFileSync(path.join(stage, 'version.json'), JSON.stringify({
   product: product.name, version, platform: 'win-x64', builtAt: new Date().toISOString(),
-  node: nodeVer, java: jreVer, fop: '2.10', packages: npmPackages.length,
+  node: nodeVer, java: jreVer, fop: '2.10', packages: npmPackages.length, commit: buildCommit, dirty: buildDirty,
 }, null, 2) + '\n');
 
 // ---- 8. signing (optional) -----------------------------------------------------------------------------------------------------------------
@@ -321,6 +326,10 @@ if (!flag('--no-installer')) {
 // ---- 11. checksums -------------------------------------------------------------------------------------------------------------------------
 const sums = outputs.map((f) => `${sha256(f)} *${path.basename(f)}`);
 fs.writeFileSync(path.join(outDir, 'SHA256SUMS.txt'), sums.join('\n') + '\n');
+fs.writeFileSync(path.join(outDir, 'BUILD-INFO.json'), JSON.stringify({
+  version, commit: buildCommit, dirty: buildDirty, builtAt: new Date().toISOString(), node: nodeVer, signed: !!signCmd,
+  outputs: outputs.map((f) => ({ file: path.basename(f), sha256: sha256(f) })),
+}, null, 2) + '\n');
 log('done:');
 for (const f of outputs) log(`  ${path.basename(f)}   ${(fs.statSync(f).size / 1048576).toFixed(1)} MB`);
 log(`  staged folder: ${stage}`);

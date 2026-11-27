@@ -10,10 +10,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const { boot } = require('./helpers');
+const { boot, RESULTS, DM21 } = require('./helpers');
 
 const PW = 'Correct-Horse-9!';
-const FIX = (issue) => path.join(__dirname, '..', '..', 'frontend', 'e2e', 'fixtures', 'dm21', issue);
+const FIX = (issue) => path.join(DM21, issue);
 const ICN = 'ICN-S1KSTUDIO-A-291000-A-00001-00001-A-001-01.svg';
 const TYPES = ['descript', 'proced', 'fault', 'crew', 'ipd', 'brex', 'comrep', 'appliccrossreftable', 'condcrossreftable', 'prdcrossreftable', 'brdoc', 'checklist', 'container', 'frontmatter', 'learning', 'process', 'sb', 'schedul', 'scocontent', 'wrngdata', 'wrngflds'];
 const ISSUES = process.env.VERIFY_FULL ? ['4-2', '5-0', '6', '7'] : ['5-0'];
@@ -33,7 +33,7 @@ test.before(async () => {
   await w.post('/api/auth/onboarding', { username: 'wanda', password: PW });
 });
 test.after(async () => {
-  const out = path.join(__dirname, '..', '..', 'frontend', 'verification-results');
+  const out = RESULTS;                                    // AGASTYA_TEST_RESULTS, else frontend/verification-results (helpers.js)
   fs.mkdirSync(out, { recursive: true });
   const file = path.join(out, 'brex-gate.json');
   let prev = {};

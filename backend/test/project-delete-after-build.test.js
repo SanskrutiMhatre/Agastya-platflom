@@ -9,7 +9,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const path = require('node:path'); const os = require('node:os');
-const { boot } = require('./helpers');
+const { boot, tmp } = require('./helpers');
 
 const PW = 'Correct-Horse-9!';
 let h; let w; let fopd; let R; let placeholderPng;
@@ -39,7 +39,7 @@ test('what the removal does: waits out a file in use, passes other errors on at 
 });
 
 test('the renderer keeps a built picture open; removing it releases the renderer, and the renderer builds again afterwards', { skip: process.platform !== 'win32' && 'file locks of this kind are a Windows behaviour' }, async () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'built-')); const pic = path.join(dir, 'ICN-1.png');
+  const dir = tmp('built-'); const pic = path.join(dir, 'ICN-1.png');
   await build(dir, 'ICN-1.png');
   assert.equal(inUse(pic), true, 'after a build the picture is held open by the renderer (the cause of the "Internal error")');
   R.removeReleasingRenderer(() => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 0 }), 'The project');
@@ -47,7 +47,7 @@ test('the renderer keeps a built picture open; removing it releases the renderer
   // The vendored fopd.js has a quirk: the OLD process's exit handler calls cleanup(), which kills whichever process is current. A request ends and the event loop turns before the
   // next build, so the old exit has been delivered by then; this test removes and builds in one go, so it lets the loop turn first, as the server does.
   await new Promise((r) => setTimeout(r, 400));
-  const again = fs.mkdtempSync(path.join(os.tmpdir(), 'built-')); await build(again, 'ICN-2.png');      // the next build starts the renderer again by itself
+  const again = tmp('built-'); await build(again, 'ICN-2.png');      // the next build starts the renderer again by itself
   assert.ok(fs.statSync(path.join(again, 'x.pdf')).size > 1000, 'and it still renders');
   R.removeReleasingRenderer(() => fs.rmSync(again, { recursive: true, force: true, maxRetries: 0 }), 'The project');
 });

@@ -3,13 +3,13 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const path = require('node:path'); const os = require('node:os');
-const { boot, verifyZip } = require('./helpers');
+const { boot, verifyZip, DM21 } = require('./helpers');
 // The services open the workspace store when first required, so they are required AFTER boot() has pointed it at a throwaway workspace.
 let h; let H;
 test.before(async () => { h = await boot(); H = require('../dist/services/htmlPublish'); });
 test.after(async () => { await h.close(); });
 
-const FIXROOT = path.resolve(__dirname, '..', '..', 'frontend', 'e2e', 'fixtures', 'dm21');
+const FIXROOT = DM21;
 const DATA_IN_ATTRIBUTES = new Set(['brex', 'comrep', 'appliccrossreftable', 'condcrossreftable', 'prdcrossreftable', 'brdoc', 'schedul', 'scocontent', 'wrngdata', 'wrngflds']);
 const schemaOf = (xml) => (/xml_schema_flat\/(\w+)\.xsd/.exec(xml) || [])[1];
 const flat = (s) => s.toLowerCase().replace(/[\s­-]+/g, '');
