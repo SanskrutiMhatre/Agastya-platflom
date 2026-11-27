@@ -18,9 +18,12 @@ vi.mock('../../api/client', () => ({
   del: async (url: string) => { api.dels.push(url); api.leases = []; return {}; },
 }));
 const toasts: string[] = [];
+// WP-35 (GAP-002): breaking a check-out asks through the app's dialog service; the test answers yes as the browser confirm used to
+vi.mock('../../lib/dialogs', () => ({ confirmDialog: vi.fn(async () => true) }));
 vi.mock('../../store/ui', () => ({ useUi: (sel: (s: { toast: (m: string) => void }) => unknown) => sel({ toast: (m: string) => { toasts.push(m); } }) }));
 
 import { TeamChip } from './TeamChip';
+import { confirmDialog } from '../../lib/dialogs';
 import { WorkingNow } from '../../components/WorkingNow';
 import { activityText, baseName, initials, noticeIsFor } from '../../lib/presence';
 
@@ -63,7 +66,7 @@ describe('team chip', () => {
 
   it('shows another author\'s check-out, breaks it for an owner, and tells the author when it is given back', async () => {
     api.leases = [{ part: '', holderId: 'u2', holder: 'ada', expiresAt: '2026-11-27T15:00:00Z', mine: false }];
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const confirm = vi.mocked(confirmDialog); confirm.mockClear();
     const r = render(<TeamChip projectId={P} doc={doc} writable canBreak editing={false} />); await settle();
     expect(r.$('[data-testid="lease-other"]').textContent).toContain('Checked out by ada');
     expect(r.$$('[data-testid="lease-checkout"]')).toHaveLength(0);
@@ -80,7 +83,6 @@ describe('team chip', () => {
     click(r.$('[data-testid="lease-break"]')); await settle();
     expect(confirm).toHaveBeenCalled();
     expect(api.dels).toEqual([`${doc.checkout}?break=1`]);
-    confirm.mockRestore();
   });
 });
 

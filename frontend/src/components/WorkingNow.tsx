@@ -4,6 +4,7 @@
 import { useState } from 'react';
 import { del } from '../api/client';
 import { errText } from './ui';
+import { confirmDialog } from '../lib/dialogs';
 import { useUi } from '../store/ui';
 import { activityText, baseName, initials, untilText, useAnnouncePresence, useTeam, type ProjectLease } from '../lib/presence';
 
@@ -24,7 +25,8 @@ export function WorkingNow({ projectId, format, canBreak }: { projectId: string;
     const url = /^DMC-/i.test(b)
       ? `/api/projects/${projectId}/dms/${encodeURIComponent(b)}/checkout?break=1`
       : `/api/projects/${projectId}/${format}/checkout?part=${encodeURIComponent(l.part)}&break=1`;
-    if (!window.confirm(`Break ${l.holder ?? 'the other author'}'s check-out of ${docName(l)}?`)) return;
+    // WP-35 (GAP-002): the app's own dialog, not the browser's
+    if (!await confirmDialog({ title: 'Break the check-out?', message: `Break ${l.holder ?? 'the other author'}'s check-out of ${docName(l)}?`, confirmLabel: 'Break check-out', danger: true })) return;
     setBusy(l.documentId + l.part);
     try { await del(url); team.reload(); } catch (e) { toast(errText(e), 'error'); } finally { setBusy(''); }
   };
