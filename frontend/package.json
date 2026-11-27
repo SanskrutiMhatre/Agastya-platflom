@@ -17,7 +17,9 @@
     "tokens": "node scripts/tokens/build-tokens.mjs",
     "check:parity": "node scripts/parity/check.mjs",
     "parity:update": "node scripts/parity/check.mjs --update",
-    "parity:scan": "node scripts/parity/scan.mjs"
+    "parity:scan": "node scripts/parity/scan.mjs",
+    "check:cleanup": "node scripts/cleanup/check.mjs",
+    "test:cleanup": "node --test scripts/cleanup/scan.test.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.4",
