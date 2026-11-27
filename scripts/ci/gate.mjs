@@ -209,7 +209,7 @@ const STAGES = {
     const [n, a] = npmCli(FRONTEND, 'vitest', 'vitest.mjs');
     return simpleStage('frontend', n, [...a, 'run', '--reporter=default', '--reporter=junit', `--outputFile.junit=${path.join(EVIDENCE, 'frontend-junit.xml')}`], { cwd: FRONTEND, limitMs: 30 * 60_000 });
   },
-  'frontend-verify': () => simpleStage('frontend-verify', nodeBin, [path.join(FRONTEND, 'scripts', 'run-verify.mjs')], { cwd: FRONTEND, limitMs: 90 * 60_000 }),
+  'frontend-verify': () => simpleStage('frontend-verify', nodeBin, [path.join(FRONTEND, 'scripts', 'run-verify.mjs')], { cwd: FRONTEND, limitMs: 240 * 60_000 }),   // release only; editor + rules alone took over 75 min on the 8-core host (2026-11-27)
   e2e: () => {
     const [n, a] = npmCli(FRONTEND, '@playwright', 'test', 'cli.js');
     return simpleStage('e2e', n, [...a, 'test'], { cwd: FRONTEND, limitMs: 90 * 60_000, env: { E2E_JUNIT: path.join(EVIDENCE, 'e2e-junit.xml'), E2E_CHANNEL: process.env.E2E_CHANNEL || 'msedge' } });
