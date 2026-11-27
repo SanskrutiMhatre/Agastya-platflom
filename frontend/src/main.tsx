@@ -6,7 +6,6 @@ import './styles/tokens/tokens.css';
 // ahead of these (studio/styles/load.ts); base.css is the app-wide part they used to carry.
 import './styles/base.css';
 import './styles/platform.css';
-import './styles/pdf.css';
 import './styles/states.css';
 import { App } from './App';
 import { applyTheme, useUi } from './store/ui';

@@ -22,8 +22,8 @@ export function GraphicsPage() {
       {all.error ? <Alert tone="bad">{all.error}</Alert> : null}
       {all.loading && !all.data ? <Loading /> : projects.length === 0 ? <Empty title="No projects yet">Graphics belong to projects. Create or open a project first.</Empty> : projects.map((p) => (
         <section key={p.id} className="v2-card v2-card-pad" aria-label={`Graphics of ${p.name}`} data-testid="graphics-project">
-          <div className="v2-row v2-spread" style={{ marginBottom: 10 }}>
-            <h3 style={{ margin: 0 }}>{p.name}</h3>
+          <div className="v2-gfx-project-head">
+            <h3 title={p.name}>{p.name}</h3>
             <button className="btn btn-sm" onClick={() => nav(`/projects/${p.id}/graphics`)}><Icon name="external" size={13} />Manage in project</button>
           </div>
           <GraphicsView projectId={p.id} graphics={p.graphics} empty="No graphics in this project." />

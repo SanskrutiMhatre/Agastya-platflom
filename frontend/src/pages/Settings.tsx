@@ -9,6 +9,7 @@ import { globalLabel } from '../lib/roles';
 import { Icon } from '../components/Icon';
 import { ThemeChoiceControl } from '../components/ThemeToggle';
 import { Alert, Badge, ConfirmModal, Empty, Field, Loading, Modal, ago, errText, fmtDate, useAsync } from '../components/ui';
+import '../styles/pages/admin.css';   // WP-35 second pass: Users and Audit logs share the administrator styles
 import { useSession } from '../store/session';
 import { useUi } from '../store/ui';
 import { BackupButton } from '../components/Oversight';
@@ -35,9 +36,9 @@ function Account() {
   };
 
   return (
-    <div className="v2-stack" style={{ maxWidth: 560 }}>
+    <div className="v2-stack v2-maxw-560">
       <div className="v2-card v2-card-pad">
-        <h3 style={{ marginTop: 0 }}>Profile</h3>
+        <h3 className="v2-mt0">Profile</h3>
         <div className="v2-stack">
           <Field label="Name"><input className="v2-input" value={user?.fullName ?? ''} readOnly /></Field>
           <Field label="Username"><input className="v2-input" value={user?.username ?? ''} readOnly /></Field>
@@ -45,7 +46,7 @@ function Account() {
         </div>
       </div>
       <div className="v2-card v2-card-pad">
-        <h3 style={{ marginTop: 0 }}>Change password</h3>
+        <h3 className="v2-mt0">Change password</h3>
         <form className="v2-stack" onSubmit={(e) => { e.preventDefault(); void change(); }}>
           <Field label="Current password"><PasswordInput value={cur} onChange={(e) => setCur(e.target.value)} autoComplete="current-password" /></Field>
           <Field label="New password" hint="At least 15 characters (a few words make a good one), and not a common password or your name."><PasswordInput value={p} onChange={(e) => setP(e.target.value)} autoComplete="new-password" /></Field>
@@ -55,8 +56,8 @@ function Account() {
         </form>
       </div>
       <div className="v2-card v2-card-pad" data-testid="appearance">
-        <h3 style={{ marginTop: 0 }}>Appearance</h3>
-        <p className="v2-sub" style={{ marginTop: 0 }}>Theme on this computer. "Follow the system" uses your organisation's default, or else the Windows setting.</p>
+        <h3 className="v2-mt0">Appearance</h3>
+        <p className="v2-sub v2-mt0">Theme on this computer. "Follow the system" uses your organisation's default, or else the Windows setting.</p>
         <ThemeChoiceControl />
       </div>
       <div><button className="btn" onClick={() => void logout()}><Icon name="logout" />Sign out</button></div>
@@ -67,8 +68,8 @@ function Account() {
 function Backup() {
   const role = useSession((s) => s.user?.role);
   return (
-    <div className="v2-card v2-card-pad" style={{ maxWidth: 560 }}>
-      <h3 style={{ marginTop: 0 }}>Backup</h3>
+    <div className="v2-card v2-card-pad v2-maxw-560">
+      <h3 className="v2-mt0">Backup</h3>
       <p className="v2-sub">{role === 'admin' ? 'Every project, the people and memberships, and the activity log, as one ZIP file.' : role === 'project_manager' ? 'Every project you can open, as one ZIP file.' : 'Every project you can open, as one ZIP file.'}</p>
       <BackupButton label={role === 'admin' ? 'Back up the platform' : 'Back up my projects'} />
     </div>
@@ -78,7 +79,7 @@ function Backup() {
 function TempPassword({ title, name, password, onClose }: { title: string; name: string; password: string; onClose: () => void }) {
   return (
     <Modal title={title} onClose={onClose} width={480} buttons={<button className="btn btn-primary" onClick={onClose}>Done</button>}>
-      <p style={{ marginTop: 0 }}>Temporary password for <strong>{name}</strong>. It works for the first sign-in only.</p>
+      <p className="v2-mt0">Temporary password for <strong>{name}</strong>. It works for the first sign-in only.</p>
       <div className="v2-row"><input className="v2-input v2-mono" readOnly value={password} onFocus={(e) => e.currentTarget.select()} aria-label="Temporary password" /><button className="btn" onClick={() => void navigator.clipboard?.writeText(password)}><Icon name="copy" />Copy</button></div>
     </Modal>
   );
@@ -99,7 +100,7 @@ export function Users() {
 
   return (
     <>
-      <div className="v2-row v2-spread" style={{ marginBottom: 14 }}>
+      <div className="v2-row v2-spread v2-mb14">
         <span />
         <button className="btn btn-primary" onClick={() => setCreating(true)}><Icon name="invite" />New user</button>
       </div>
@@ -111,14 +112,14 @@ export function Users() {
               <tr key={u.id}>
                 <td><strong>{u.fullName}</strong></td><td className="v2-mono">@{u.username}</td>
                 <td>
-                  <select className="v2-select" style={{ width: 190 }} value={u.role} disabled={u.id === me?.id} aria-label={`Role of ${u.username}`}
+                  <select className="v2-select v2-w-190" value={u.role} disabled={u.id === me?.id} aria-label={`Role of ${u.username}`}
                     onChange={(e) => setRoleChange({ user: u, role: e.target.value })}>
                     <option value="author">Author</option><option value="project_manager">Project Manager</option><option value="admin">Software administrator</option>
                   </select>
                 </td>
                 <td>{u.disabled ? <Badge tone="bad" title={u.disabledReason === 'directory' ? 'Disabled by the directory (removed from its groups or disabled there)' : undefined}>{u.disabledReason === 'directory' ? 'Offboarded by the directory' : 'Disabled'}</Badge> : u.onboardingPending ? <Badge tone="warn">Awaiting first sign-in</Badge> : u.mustChangePassword ? <Badge tone="warn">Must change password</Badge> : <Badge tone="ok">Active</Badge>}
                   {u.authSource === 'directory' ? <> <Badge title="Signs in with the domain password">Directory</Badge></> : null}{u.auditor ? <> <Badge tone="accent" title="Reads every project and the audit log, changes nothing">Auditor</Badge></> : null}</td>
-                <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                <td className="v2-td-end">
                   {u.role !== 'admin' ? <><button className="btn btn-sm" data-testid={`auditor-${u.username}`} onClick={() => act(() => adminApi.updateUser(u.id, { auditor: !u.auditor }), u.auditor ? 'No longer read-only' : 'Now a read-only auditor')}>{u.auditor ? 'End auditor' : 'Make auditor'}</button>{' '}</> : null}
                   {u.authSource !== 'directory' ? <><button className="btn btn-sm" onClick={() => setConfirm({ user: u, action: 'reset' })}><Icon name="key" size={13} />Reset password</button>{' '}</> : null}
                   {u.disabled
@@ -182,7 +183,7 @@ function Authors() {
   const [temp, setTemp] = useState<{ name: string; password: string } | null>(null);
   return (
     <>
-      <div className="v2-row v2-spread" style={{ marginBottom: 14 }}>
+      <div className="v2-row v2-spread v2-mb14">
         <span />
         <button className="btn btn-primary" onClick={() => setCreating(true)} data-testid="new-author"><Icon name="invite" />New author</button>
       </div>
@@ -214,7 +215,7 @@ function Approvals() {
           <table className="v2-table"><thead><tr><th>Project</th><th>Requested by</th><th>Takes effect</th><th>Note</th><th /></tr></thead>
             <tbody>{releases.data.map((r) => (
               <tr key={r.id}><td><strong>{r.projectName}</strong></td><td>{r.requestedBy ?? '—'}</td><td>{fmtDate(r.scheduledAt)}</td><td>{r.note ?? ''}</td>
-                <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                <td className="v2-td-end">
                   <button className="btn btn-sm btn-primary" onClick={() => run(() => adminApi.approveRelease(r.id), 'Release approved', releases.reload)}>Approve</button>{' '}
                   <button className="btn btn-sm" onClick={() => run(() => adminApi.rejectRelease(r.id), 'Release rejected', releases.reload)}>Reject</button></td></tr>))}</tbody></table>
         )}
@@ -225,7 +226,7 @@ function Approvals() {
           <table className="v2-table"><thead><tr><th>Person</th><th>Requested</th><th /></tr></thead>
             <tbody>{resets.data.map((r) => (
               <tr key={r.id}><td><strong>{r.fullName}</strong> <span className="v2-hint">@{r.username}</span></td><td>{ago(r.requestedAt)}</td>
-                <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                <td className="v2-td-end">
                   <button className="btn btn-sm btn-primary" onClick={async () => { try { const x = await adminApi.approveReset(r.id); setTemp({ name: r.fullName, password: x.tempPassword }); resets.reload(); } catch (e) { toast(errText(e), 'error'); } }}>Approve</button>{' '}
                   <button className="btn btn-sm" onClick={() => run(() => adminApi.rejectReset(r.id), 'Request rejected', resets.reload)}>Reject</button></td></tr>))}</tbody></table>
         )}
@@ -244,7 +245,7 @@ function Sessions() {
         <table className="v2-table"><thead><tr><th>User</th><th>Signed in</th><th>Last seen</th><th>From</th><th /></tr></thead>
           <tbody>{(s.data ?? []).map((x) => (
             <tr key={x.id}><td><strong>{x.fullName}</strong> <span className="v2-hint">@{x.username}</span></td><td>{fmtDate(x.createdAt)}</td><td>{ago(x.lastSeenAt)}</td><td className="v2-mono">{x.ip ?? ''}</td>
-              <td style={{ textAlign: 'right' }}><button className="btn btn-sm" onClick={async () => { try { await adminApi.revokeSession(x.id); toast('Session ended', 'success'); s.reload(); } catch (e) { toast(errText(e), 'error'); } }}>End session</button></td></tr>))}</tbody></table>
+              <td className="v2-td-end"><button className="btn btn-sm" onClick={async () => { try { await adminApi.revokeSession(x.id); toast('Session ended', 'success'); s.reload(); } catch (e) { toast(errText(e), 'error'); } }}>End session</button></td></tr>))}</tbody></table>
       )}
     </div>
   );
@@ -276,15 +277,15 @@ export function Audit() {
   const enter = (e: React.KeyboardEvent) => { if (e.key === 'Enter') setFilter(typed); };
   return (
     <div className="v2-stack">
-      <div className="v2-row" style={{ flexWrap: 'wrap', gap: 8 }}>
-        <input className="v2-input" style={{ width: 220 }} placeholder="Action, e.g. release.approved" value={typed.action ?? ''} onChange={set('action')} onKeyDown={enter} aria-label="Filter audit log by action" />
-        <input className="v2-input" style={{ width: 140 }} placeholder="Person" value={typed.actor ?? ''} onChange={set('actor')} onKeyDown={enter} aria-label="Filter audit log by person" data-testid="audit-actor" />
-        <input className="v2-input" style={{ width: 180 }} placeholder="Project id" value={typed.project ?? ''} onChange={set('project')} onKeyDown={enter} aria-label="Filter audit log by project" data-testid="audit-project" />
-        <label className="v2-row" style={{ gap: 4 }}>From <input className="v2-input" type="date" value={typed.from ?? ''} onChange={set('from')} aria-label="Entries from this date" data-testid="audit-from" /></label>
-        <label className="v2-row" style={{ gap: 4 }}>To <input className="v2-input" type="date" value={typed.to ?? ''} onChange={set('to')} aria-label="Entries up to this date" data-testid="audit-to" /></label>
+      <div className="v2-row wrap v2-gap-8">
+        <input className="v2-input v2-w-220" placeholder="Action, e.g. release.approved" value={typed.action ?? ''} onChange={set('action')} onKeyDown={enter} aria-label="Filter audit log by action" />
+        <input className="v2-input v2-w-140" placeholder="Person" value={typed.actor ?? ''} onChange={set('actor')} onKeyDown={enter} aria-label="Filter audit log by person" data-testid="audit-actor" />
+        <input className="v2-input v2-w-180" placeholder="Project id" value={typed.project ?? ''} onChange={set('project')} onKeyDown={enter} aria-label="Filter audit log by project" data-testid="audit-project" />
+        <label className="v2-row v2-gap-4">From <input className="v2-input" type="date" value={typed.from ?? ''} onChange={set('from')} aria-label="Entries from this date" data-testid="audit-from" /></label>
+        <label className="v2-row v2-gap-4">To <input className="v2-input" type="date" value={typed.to ?? ''} onChange={set('to')} aria-label="Entries up to this date" data-testid="audit-to" /></label>
         <button className="btn" onClick={a.reload}><Icon name="refresh" />Refresh</button>
       </div>
-      <div className="v2-row" style={{ flexWrap: 'wrap', gap: 8 }}>
+      <div className="v2-row wrap v2-gap-8">
         <a className="btn" href={auditApi.exportUrl('csv', filter)} download data-testid="audit-export-csv"><Icon name="download" />Export CSV</a>
         <a className="btn" href={auditApi.exportUrl('jsonl', filter)} download data-testid="audit-export-jsonl"><Icon name="download" />Export JSON Lines</a>
         <button className="btn" onClick={verify} disabled={verifying} data-testid="audit-verify"><Icon name="check" />{verifying ? 'Verifying…' : 'Verify chain'}</button>
@@ -294,7 +295,7 @@ export function Audit() {
       {report ? (
         <Alert tone={report.ok ? 'ok' : 'bad'}>
           <span data-testid="audit-verify-result">{report.ok ? 'Intact' : 'Problems found'}: {report.summary}.</span>
-          {!report.ok ? <ul style={{ margin: '6px 0 0' }}>{report.problems.slice(0, 20).map((p, i) => <li key={i}>{p.message}</li>)}{report.problemCount > 20 ? <li>… and {report.problemCount - 20} more (run AgastyaCtl --verify-audit for the full list)</li> : null}</ul> : null}
+          {!report.ok ? <ul className="v2-mt6">{report.problems.slice(0, 20).map((p, i) => <li key={i}>{p.message}</li>)}{report.problemCount > 20 ? <li>… and {report.problemCount - 20} more (run AgastyaCtl --verify-audit for the full list)</li> : null}</ul> : null}
         </Alert>
       ) : null}
       <div className="v2-card">

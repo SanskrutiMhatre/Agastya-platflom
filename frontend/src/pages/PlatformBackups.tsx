@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { backupApi, type BackupItem, type RestoreReport } from '../api';
 import { Icon } from '../components/Icon';
 import { Alert, Badge, ConfirmModal, Empty, Loading, Modal, PromptModal, errText, fmtDate, fmtSize, useAsync } from '../components/ui';
+import '../styles/pages/admin.css';   // WP-35 second pass
 import { useUi } from '../store/ui';
 
 const KIND: Record<BackupItem['kind'], string> = { manual: 'Made here', scheduled: 'Scheduled', 'pre-update': 'Before an update', cli: 'Command line' };
@@ -29,7 +30,7 @@ export function PlatformBackups() {
   const s = st.data;
 
   return (
-    <div className="v2-card v2-card-pad" data-testid="platform-backups" style={{ gridColumn: '1 / -1' }}>
+    <div className="v2-card v2-card-pad v2-grid-full" data-testid="platform-backups">
       {copying ? <PromptModal title="Copy the backup to another folder" label="Folder (full path)" hint="A second disk or a USB stick, for example E:\Backups. The copy is checked byte for byte; nothing there is overwritten." confirmLabel="Copy"
         onClose={() => setCopying(null)} onSubmit={async (folder) => { const r = await backupApi.copy(copying, folder); toast(`Copied to ${r.file}`, 'success'); }} /> : null}
       {restoring ? <PromptModal title="Restore into a new folder" label="New folder (full path)" hint="A folder that does not exist yet, or is empty, outside the current data folder. Everything is checked before it is put in place; the running platform is not changed." confirmLabel="Restore"
@@ -38,16 +39,16 @@ export function PlatformBackups() {
         onClose={() => setDeleting(null)} onConfirm={() => { const n = deleting; setDeleting(null); void act(`del-${n}`, async () => { await backupApi.remove(n); return 'Backup deleted'; }); }} /> : null}
       {restored ? (
         <Modal title="Restored" onClose={() => setRestored(null)} width={560} buttons={<button className="btn btn-primary" onClick={() => setRestored(null)}>Done</button>}>
-          <p style={{ marginTop: 0 }}>The backup of {fmtDate(restored.report.createdAt)} is in <strong className="v2-mono">{restored.report.target}</strong>: {restored.report.files} files and {restored.report.rows} database rows in {restored.report.tables} tables, each checked against the backup.</p>
+          <p className="v2-mt0">The backup of {fmtDate(restored.report.createdAt)} is in <strong className="v2-mono">{restored.report.target}</strong>: {restored.report.files} files and {restored.report.rows} database rows in {restored.report.tables} tables, each checked against the backup.</p>
           <p>To switch the platform over to it:</p>
-          <ol style={{ paddingLeft: 18 }}>{restored.next.map((n) => <li key={n}>{n}</li>)}</ol>
+          <ol className="v2-list-indent">{restored.next.map((n) => <li key={n}>{n}</li>)}</ol>
         </Modal>
       ) : null}
 
-      <div className="v2-row v2-spread" style={{ alignItems: 'flex-start' }}>
+      <div className="v2-row v2-spread v2-align-start">
         <div>
-          <h4 style={{ margin: 0 }}>Platform backup</h4>
-          <p className="v2-sub" style={{ margin: '2px 0 0' }}>Everything needed to bring the platform back: accounts and passwords, history, releases, settings and every project file.</p>
+          <h4 className="v2-m0">Platform backup</h4>
+          <p className="v2-sub v2-mt2">Everything needed to bring the platform back: accounts and passwords, history, releases, settings and every project file.</p>
         </div>
         <button className="btn btn-primary" disabled={!!busy || !!s?.running} aria-busy={busy === 'create' || undefined} data-testid="backup-now"
           onClick={() => void act('create', async () => { const r = await backupApi.create(); return `Backup written: ${r.name} (${fmtSize(r.bytes)})`; })}>
@@ -56,11 +57,11 @@ export function PlatformBackups() {
       </div>
 
       {st.loading && !s ? <Loading /> : st.error ? <Alert tone="bad">{st.error}</Alert> : s ? (
-        <div className="v2-stack" style={{ marginTop: 12 }}>
+        <div className="v2-stack v2-mt12">
           {s.stale ? <Alert tone="warn" >{s.latest ? `The newest backup is ${s.latest.ageDays} days old.` : 'There is no platform backup yet.'} Back up now, and keep a copy on another disk.</Alert> : null}
           {s.state.lastBackup && !s.state.lastBackup.ok ? <Alert tone="bad">The last backup failed ({fmtDate(s.state.lastBackup.at)}): {s.state.lastBackup.message}</Alert> : null}
           {s.state.lastRestoreTest && !s.state.lastRestoreTest.ok ? <Alert tone="bad">The last restore test of {s.state.lastRestoreTest.name} failed ({fmtDate(s.state.lastRestoreTest.at)}): {s.state.lastRestoreTest.message}</Alert> : null}
-          <p className="v2-hint" style={{ margin: 0 }} data-testid="backup-schedule">
+          <p className="v2-hint v2-m0" data-testid="backup-schedule">
             {s.intervalHours > 0 ? `Scheduled every ${s.intervalHours} hours, keeping ${s.keep.daily} daily, ${s.keep.weekly} weekly and ${s.keep.monthly} monthly backups.` : 'No scheduled backup (AGASTYA_BACKUP_INTERVAL_HOURS is 0).'}
             {' '}{s.state.lastRestoreTest?.ok ? `Last restore test: ${fmtDate(s.state.lastRestoreTest.at)}, passed.` : ''} Folder: <span className="v2-mono">{s.dir}</span>
           </p>
@@ -73,19 +74,19 @@ export function PlatformBackups() {
                     <td title={b.name}>{fmtDate(b.createdAt)}</td>
                     <td><Badge tone={b.kind === 'scheduled' ? undefined : 'accent'}>{KIND[b.kind]}</Badge></td>
                     <td>{fmtSize(b.bytes)}</td>
-                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    <td className="v2-td-end">
                       <a className="btn btn-sm" href={backupApi.downloadUrl(b.name)} download>Download</a>{' '}
                       <button className="btn btn-sm" disabled={!!busy} aria-busy={busy === `v-${b.name}` || undefined} onClick={() => void act(`v-${b.name}`, async () => { const r = await backupApi.verify(b.name); return `Verified: ${r.report.files} files and ${r.report.rows} rows restore exactly`; })}>{busy === `v-${b.name}` ? 'Checking…' : 'Verify'}</button>{' '}
                       <button className="btn btn-sm" disabled={!!busy} onClick={() => setCopying(b.name)}>Copy to…</button>{' '}
                       <button className="btn btn-sm" disabled={!!busy} onClick={() => setRestoring(b.name)}>Restore…</button>{' '}
-                      <button className="btn btn-sm" disabled={!!busy} onClick={() => setDeleting(b.name)} aria-label={`Delete ${b.name}`}><Icon name="trash" /></button>
+                      <button className="btn btn-sm" disabled={!!busy} onClick={() => setDeleting(b.name)} aria-label={`Delete ${b.name}`} title={`Delete ${b.name}`}><Icon name="trash" /></button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
-          <p className="v2-hint" style={{ margin: 0 }}>A backup holds every account's password hash: keep it where only administrators can read it.</p>
+          <p className="v2-hint v2-m0">A backup holds every account's password hash: keep it where only administrators can read it.</p>
         </div>
       ) : null}
     </div>

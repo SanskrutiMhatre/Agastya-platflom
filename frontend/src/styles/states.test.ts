@@ -13,7 +13,7 @@ const SRC = path.resolve(__dirname, '..');
 const read = (p: string): string => fs.readFileSync(path.join(SRC, p), 'utf8');
 const TOKENS = read('styles/tokens/tokens.css');
 // in cascade order: the Studio sheets are linked ahead of the entry sheets (studio/styles/load.ts), base.css heads the entry
-const SHEETS = ['studio/styles/app.css', 'studio/styles/document.css', 'styles/base.css', 'styles/platform.css', 'styles/pdf.css', 'styles/states.css', 'styles/pages/structure.css', 'styles/pages/editor-host.css'].map(read).join('\n') + BASE_CSS + JSS_CSS;
+const SHEETS = ['studio/styles/app.css', 'studio/styles/document.css', 'styles/base.css', 'styles/platform.css', 'styles/pdf.css', 'styles/states.css', 'styles/pages/structure.css', 'styles/pages/editor-host.css', 'styles/pages/graphics.css', 'styles/pages/validation.css', 'styles/pages/admin.css', 'styles/pages/notifications.css', 'styles/pages/home.css', 'styles/pages/preview.css'].map(read).join('\n') + BASE_CSS + JSS_CSS;
 
 interface Rule { media: string; selectors: string[]; decls: Record<string, string> }
 /** Split a selector list on the commas that are not inside parentheses (:where(a, b), :is(...)). */

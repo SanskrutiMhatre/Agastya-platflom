@@ -1,0 +1,16 @@
+/* =========================================================================
+   WP-35 second pass: page-only rules moved out of platform.css unchanged (the entry stylesheet's 30 KB advisory budget, FE-033).
+   Loaded with this page's chunk only. Colours are tokens only.
+   ========================================================================= */
+
+/* ------------------------------------------------ WP-35 second pass: moved from platform.css unchanged (used only in this chunk) */
+.v2-note { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.v2-note:last-child { border-bottom: 0; }
+.v2-note.unread { background: var(--accent-soft); }
+.v2-note-icon { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--bg-active); color: var(--accent); }
+.v2-note-icon.ok { color: var(--success); }
+.v2-note-icon.warn { color: var(--warning); }
+.v2-note-icon.bad { color: var(--danger); }
+.v2-note-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; text-align: left; background: none; border: 0; padding: 0; cursor: pointer; color: var(--text); font: inherit; }
+.v2-note-title { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.v2-note-body { color: var(--text-muted); font-size: 12.5px; }

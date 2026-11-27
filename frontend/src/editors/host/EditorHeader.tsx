@@ -9,6 +9,7 @@
 import type { ReactNode } from 'react';
 import { Icon } from '../../components/Icon';
 import { ThemeToggle } from '../../components/ThemeToggle';
+import '../../styles/pages/editor-host.css';   // WP-35 second pass: the header's styles load with the editor chunks
 import { saveStateLabel, type SaveStateInput } from './saveState';
 import type { EditorLayout } from './useEditorLayout';
 import type { TestId } from './testIds';
@@ -42,7 +43,7 @@ export function EditorHeader({ layout, title, lead, crumb, state, actions, extra
   return (
     <header className={`v2-top v2-edhead${focus ? ' is-focus' : ''}`} data-testid="editor-header">
       {focus ? null : lead}
-      <h1 style={{ fontSize: 14 }} className="v2-trunc">{title}</h1>
+      <h1 className="v2-trunc v2-edtitle" title={title}>{title}</h1>
       {crumb}
       {state}
       <span className="spacer" />

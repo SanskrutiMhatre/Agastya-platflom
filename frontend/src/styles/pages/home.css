@@ -1,0 +1,15 @@
+/* =========================================================================
+   WP-35 second pass: page-only rules moved out of platform.css unchanged (the entry stylesheet's 30 KB advisory budget, FE-033).
+   Loaded with this page's chunk only. Colours are tokens only.
+   ========================================================================= */
+
+/* ------------------------------------------------ WP-35 second pass: moved from platform.css unchanged (used only in this chunk) */
+.v2-home-card { display: flex; flex-direction: column; min-height: 132px; }
+.v2-home-card-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px 4px; }
+.v2-home-card-head h2, .v2-card-title { font-size: 13px; font-weight: 650; margin: 0; }
+.v2-home-ic { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); flex: none; }
+.v2-home-card-body { padding: 4px 14px; flex: 1; min-width: 0; }
+.v2-home-card-act { padding: 8px 14px 12px; display: flex; gap: 6px; flex-wrap: wrap; }
+.v2-home-list { list-style: none; margin: 0; padding: 4px 0; }
+.v2-home-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 16px; min-width: 0; }
+.v2-home-list li + li { border-top: 1px solid var(--border); }

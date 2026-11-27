@@ -41,7 +41,7 @@ Source files: `layouts/AppShell.tsx`, `pages/Overview.tsx`, `pages/Workspace.tsx
 | Activity page for monitors only (`activity-feed`, `activity-people`, `activity-project(s)`, `approvals-queue`) | WP-35: a long project title on an Activity card ends in an ellipsis and keeps clear of the Open button (UX-025 rest) | `00-platform.spec` roles | |
 | Team and status oversight (`team-table`, `team-row`, `status-row`, `project-status`, `backup`) | | `00-platform.spec` | |
 | Notification bell, unread count, feed, mark all read (`bell`, `unread-count`, `notifications`, `notification`, `mark-all-read`) | | `00-platform.spec` | |
-| Account menu (`account-menu`), theme toggle and choice (`theme-toggle`, `theme-choice`) | WP-35: same items and keys; the menu also shows the person's name above the role | `zz-theme-states.spec` | |
+| Account menu (`account-menu`), theme toggle and choice (`theme-toggle`, `theme-choice`) | WP-35: same items and keys; the menu also shows the person's name above the role. WP-35 second pass: the menu again shows only the role, not the person's name (the first pass added the name; 00-platform's owner rule forbids it) | `zz-theme-states.spec` | |
 | Focus tooltip (`focus-tooltip`) | | `zz-theme-states.spec` | |
 
 ## 3. Create project, import a package, export or archive, convert, delete
@@ -114,8 +114,8 @@ Source files: `pages/project/ValidationPage.tsx`, `components/PublishRefusal.tsx
 
 | Old control | New home | Guarding test | Sign-off |
 |---|---|---|---|
-| Run validation, findings by severity, detail, jump to the editor (`run-validation`, `issue-list`, `issue`, `issue-detail`, `validation-issue`) | | `00-platform.spec` validation | |
-| Mark reviewed, CSV export | WP-22: same button (`issue-mark-reviewed`); the mark is now the team's, on the server (`/api/projects/:id/problems/reviewed`), shows who and when (`issue-reviewed-by`); reviewers and up may mark (`problems.review`), a viewer sees the button disabled; old browser marks are moved to the server once. CSV unchanged | `00-platform.spec`; `wp22-navigation.spec` (team marks seen by a second person); backend `wp22-problems` | |
+| Run validation, findings by severity, detail, jump to the editor (`run-validation`, `issue-list`, `issue`, `issue-detail`, `validation-issue`) | WP-35 second pass: same controls and ids; filters on one bar (each severity chip shows its count; "n of m shown"), list beside a sticky detail panel, file group headings, the detail as a term list; reviewed findings carry a Reviewed badge besides the dimming. Data flow untouched (presentational only) | `00-platform.spec` validation | |
+| Mark reviewed, CSV export | WP-22: same button (`issue-mark-reviewed`); the mark is now the team's, on the server (`/api/projects/:id/problems/reviewed`), shows who and when (`issue-reviewed-by`); reviewers and up may mark (`problems.review`), a viewer sees the button disabled; old browser marks are moved to the server once. CSV unchanged. WP-35 second pass: unchanged buttons and ids; `issue-reviewed-by` is now a <dd> of the detail list | `00-platform.spec`; `wp22-navigation.spec` (team marks seen by a second person); backend `wp22-problems` | |
 | Publish refusal and waiver offer (`publish-refusal`, `refusal-*`, `waiver-offer`, `waiver-reason`, `waiver-record`, `waiver-subjects`) | | `publish-gate.spec`, `publish-waivers.spec` | |
 
 ## 9. Release and review
@@ -135,9 +135,9 @@ Source files: `pages/Graphics.tsx`, `pages/project/GraphicsPage.tsx`, `component
 
 | Old control | New home | Guarding test | Sign-off |
 |---|---|---|---|
-| List per project and main list, pager, preview (`graphics-list`, `graphic`, `graphic-preview`, `graphics-pager`, `graphics-project`) | | `00-platform.spec` graphics | |
-| Upload by file or drop, ICN names (`graphics-add`, `graphics-drop`, `graphics-file`) | | `00-platform.spec` graphics | |
-| Delete a graphic | | `00-platform.spec` graphics | |
+| List per project and main list, pager, preview (`graphics-list`, `graphic`, `graphic-preview`, `graphics-pager`, `graphics-project`) | WP-35 second pass: same controls and ids; no inline styles (toolbar, tiles, list, pager, preview); the tile thumbnail shows the transparency checkerboard again; the zoom buttons carry a tooltip and a focus ring | `00-platform.spec` graphics | |
+| Upload by file or drop, ICN names (`graphics-add`, `graphics-drop`, `graphics-file`) | WP-35 second pass: unchanged; drop zone laid out with classes | `00-platform.spec` graphics | |
+| Delete a graphic | WP-35 second pass: unchanged | `00-platform.spec` graphics | |
 
 ## 11. CIR repository
 
@@ -164,7 +164,7 @@ Source files: `jss/**`, `pages/project/JssEditorPage.tsx`. Baseline keys `jss ..
 | Old control | New home | Guarding test | Sign-off |
 |---|---|---|---|
 | Stencil outline, add chapter, paper, source view, problems (`jss-editor`, `jss-paper`, `jss-source`, `jss-problems`, `jss-add-chapter`) | WP-22: unchanged; the problems list is at most 25% of the window high and closes with Escape | `jss-editor.spec` (12), `jss/*.test.ts` | |
-| Save, check, generate PDF, download, split, state (`jss-save`, `jss-check`, `jss-generate`, `jss-download`, `jss-split`, `jss-state`, `jss-note`) | WP-21: the shared editor header (`editor-header`, DocEditorShell) carries Check, Save, packages, Convert, Export project and Generate PDF with the same ids; `jss-state` uses the host's words; `jss-split`, `jss-host`, `jss-download`, `jss-note` are drawn by the host (`editors/host/testIds.ts`); Generate opens the PDF pane | `jss-editor.spec`, `wp21-editor-chrome.spec` | |
+| Save, check, generate PDF, download, split, state (`jss-save`, `jss-check`, `jss-generate`, `jss-download`, `jss-split`, `jss-state`, `jss-note`) | WP-21: the shared editor header (`editor-header`, DocEditorShell) carries Check, Save, packages, Convert, Export project and Generate PDF with the same ids; `jss-state` uses the host's words; `jss-split`, `jss-host`, `jss-download`, `jss-note` are drawn by the host (`editors/host/testIds.ts`); Generate opens the PDF pane. WP-35 second pass: the shared header's title and comments panel lose inline styles; header/focus/comments CSS loads with the editor chunk; every id kept | `jss-editor.spec`, `wp21-editor-chrome.spec` | |
 | Package import and export (`jss-import`, `jss-import-file`, `jss-import-confirm`, `jss-export`, `jss-package-findings`) | | backend `jssdm`, `jssdm-http`; no browser test uses the ids (gap) | |
 | Drafts and conflict (`draft-*`, `conflict-*`, `jss-conflict`) | WP-21: the host's banners (useDocEditor), same ids; the conflict banner adds `conflict-compare` (Compare and merge…) | `wp05-dataloss.spec`, `wp21-editor-chrome.spec` | |
 | Every key of the JSS registry (Mod+S/Z/Y, Tab, Shift+Tab, Enter, Shift+Enter, Backspace, arrows, dialog Enter/Escape) | WP-21: all kept in `jss/editor.ts`; the host adds Ctrl+K / Ctrl+Shift+P (palette), F1 (shortcuts dialog), Ctrl+. (focus), Ctrl+F / Ctrl+H (find), Esc (`host.*` in the registry). WP-22: Mod+S saves wherever the focus is on the page (it used to need the focus inside the paper: Esc then Ctrl+S did nothing); Escape in the problems list; host Alt+Shift+N/P (comments) | `editorShortcuts.test.ts`, `jss/editor.test.ts`, `wp21-editor-chrome.spec` | |
@@ -178,7 +178,7 @@ Source files: `jsg/**`, `pages/project/JsgEditorPage.tsx`. Baseline keys `jsg ..
 |---|---|---|---|
 | Handbook editor: sheet, find and replace bar, status (`jsg-sheet`, `jsg-find`, `jsg-status`) | WP-35: same; "− Last chapter" asks in the application's dialog, naming the chapter (GAP-002) | `jsg-editor.spec` (11), `jsg/*.test.ts` | |
 | ISPL plates and parts, preview toggle (`jsg-preview`, `jsg-preview-toggle`) | WP-35: same; Delete plate, Delete appendix and Remove view (only view) ask in the application's dialog with the exact consequence ("removes plate I-A with its 2 views and 14 parts"); the two Paste rows prompts are the application's dialog with a multi-line box (`app-dialog-input`) and the column order as the hint. `jsg-editor.spec` fills the dialog instead of accepting a browser prompt; `wp35-redesign.spec` (Delete plate: message, Cancel keeps, focus on Cancel) | `jsg-editor.spec` | |
-| Save, autosave, check, generate, download, Word import, split (`jsg-save`, `jsg-autosave`, `jsg-check`, `jsg-generate`, `jsg-download`, `jsg-import-word`, `jsg-word-input`, `jsg-split`, `jsg-state`, `jsg-note`) | WP-21: the shared editor header (DocEditorShell) with the same ids; the Word import's browser confirm became a ConfirmModal "Replace this handbook?" (GAP-002 in passing); `jsg-state` uses the host's words; Generate opens the PDF pane | `jsg-editor.spec`, `wp21-editor-chrome.spec`; backend `jsg-word`, `jsg-engine` | |
+| Save, autosave, check, generate, download, Word import, split (`jsg-save`, `jsg-autosave`, `jsg-check`, `jsg-generate`, `jsg-download`, `jsg-import-word`, `jsg-word-input`, `jsg-split`, `jsg-state`, `jsg-note`) | WP-21: the shared editor header (DocEditorShell) with the same ids; the Word import's browser confirm became a ConfirmModal "Replace this handbook?" (GAP-002 in passing); `jsg-state` uses the host's words; Generate opens the PDF pane. WP-35 second pass: the autosave switch on a class (same label, title and id) | `jsg-editor.spec`, `wp21-editor-chrome.spec`; backend `jsg-word`, `jsg-engine` | |
 | Drafts and conflict (`draft-*`, `conflict-*`, `jsg-conflict`) | WP-21: the host's banners, same ids, plus `conflict-compare` | `wp05-dataloss.spec` | |
 | Every key of the JSG registry (Mod+S/F/H/Z/Y, Escape, Enter/Shift+Enter in the find box and in text) | WP-21: all kept (Ctrl+F/H stay the JSG editor's own find bar); the host adds Ctrl+K / Ctrl+Shift+P, F1, Ctrl+., Esc. WP-22: host Alt+Shift+N/P (comments) | `editorShortcuts.test.ts`, `wp21-editor-chrome.spec` | |
 
@@ -204,7 +204,7 @@ Source files: `pages/Settings.tsx`, `pages/BackupPage.tsx`. Routes `/settings/*`
 | Account, password, appearance/theme (`appearance`) | WP-35: same; the three password fields are PasswordInputs; a mismatch is the Repeat field's error with focus (`wp35-redesign.spec`) | `00-platform.spec`, `zz-theme-states.spec` | |
 | Backup of own projects (`backup-scope`) | | none by id (gap); backend backup tests | |
 | Authors (managers: `/settings/authors [if isManager]`, `new-author`) | | `00-platform.spec` roles | |
-| Users, approvals, sessions, audit (administrators: `/settings/users|approvals|sessions|audit [if isAdmin]`) | WP-22: unchanged; the audit log adds filters by user (`audit-who`) and day (`audit-day`) and shows an IPv4 address without its `::ffff:` wrapper (UX-025) | `00-platform.spec` administrator; backend `wp03-auth` | |
+| Users, approvals, sessions, audit (administrators: `/settings/users|approvals|sessions|audit [if isAdmin]`) | WP-22: unchanged; the audit log adds filters by user (`audit-who`) and day (`audit-day`) and shows an IPv4 address without its `::ffff:` wrapper (UX-025). WP-35 second pass: Users and Audit logs on the administrator classes (no inline styles); every filter, export, Verify chain and id kept | `00-platform.spec` administrator; backend `wp03-auth` | |
 
 ## 17. Administrator
 
@@ -212,13 +212,13 @@ Source files: `pages/Administrator.tsx`, `pages/AdminS1000d.tsx`. Routes under `
 
 | Old control | New home | Guarding test | Sign-off |
 |---|---|---|---|
-| Users and roles (`roles`) | | `00-platform.spec` administrator | |
-| Reference data tables, eleven collections (`config-row`, `config-add`, `config-save`) | | `00-platform.spec` administrator | |
-| S1000D catalogue, SNS presets, extensions, coverage (`s1000d-catalogue`, `cat-*`, `sns-presets`, `preset-*`, `ext-admin`, `coverage`, `default-evidence`, `impact`) | | `s1000d-config.spec` 4 | |
-| JSS and JSG manual types and stencils (`format-jss`, `format-jsg`) | | `00-platform.spec` | |
-| Audit logs with export (`audit-export`) | | `00-platform.spec`; backend audit tests | |
-| Security policy: idle, absolute, password minimum, single session, separation of duties (`security-policy`, `sec-*`) | | backend `wp03-auth` | |
-| Maintenance, visual settings with accent preview, platform settings, licence (`maintenance`, `visual-settings`, `visual-save`, `accent-*`, `platform-settings`, `settings-save`, `licence`) | | `00-platform.spec` administrator | |
+| Users and roles (`roles`) | WP-35 second pass: the section navigation is a card with an accent bar on the current section; Roles, Users, Groups and Directory sign-on (WP-27) on the shared section heading; every control and id kept | `00-platform.spec` administrator | |
+| Reference data tables, eleven collections (`config-row`, `config-add`, `config-save`) | WP-35 second pass: same table, filter, add/edit/delete (icon buttons with tooltips); classes instead of inline styles | `00-platform.spec` administrator | |
+| S1000D catalogue, SNS presets, extensions, coverage (`s1000d-catalogue`, `cat-*`, `sns-presets`, `preset-*`, `ext-admin`, `coverage`, `default-evidence`, `impact`) | WP-35 second pass: same controls; Edit/Delete icon buttons now carry tooltips (UID-003); classes instead of inline styles | `s1000d-config.spec` 4 | |
+| JSS and JSG manual types and stencils (`format-jss`, `format-jsg`) | WP-35 second pass: unchanged | `00-platform.spec` | |
+| Audit logs with export (`audit-export`) | WP-35 second pass: WP-29's viewer (filters by action, person, project and dates, CSV/JSON Lines export, Verify chain) restyled only; ids kept | `00-platform.spec`; backend audit tests | |
+| Security policy: idle, absolute, password minimum, single session, separation of duties (`security-policy`, `sec-*`) | WP-35 second pass: unchanged fields and ids; classes instead of inline styles | backend `wp03-auth` | |
+| Maintenance, visual settings with accent preview, platform settings, licence (`maintenance`, `visual-settings`, `visual-save`, `accent-*`, `platform-settings`, `settings-save`, `licence`) | WP-35 second pass: maintenance cards put the action at the foot; platform backups (Delete has a tooltip) and the accent colour input on classes; ids kept | `00-platform.spec` administrator | |
 
 ## 18. Preview windows, PDF viewer
 
@@ -227,7 +227,7 @@ Source files: `pages/PreviewWindow.tsx`, `components/pdf/*`. Route `/preview/:id
 | Old control | New home | Guarding test | Sign-off |
 |---|---|---|---|
 | Quick preview and Generate windows, synchronised (`popout-run`, `popout-pdf`) | | `00-platform.spec` | |
-| PDF viewer: page input (Enter), search (Enter), zoom, dark-theme viewer | | `00-platform.spec` | |
+| PDF viewer: page input (Enter), search (Enter), zoom, dark-theme viewer | WP-35 second pass: the glyph buttons (outline, previous/next page, zoom out/in, previous/next match, outline twisty) have names and tooltips (UID-003); pdf.js text-layer CSS loads with the viewer chunk | `00-platform.spec` | |
 
 ---
 
@@ -239,4 +239,5 @@ One line per redesign batch: which groups, the parity report (`verification-resu
 |---|---|---|---|---|
 | WP-22 (2026-11-27) | 1, 2, 3, 4, 5, 7, 8, 9, 13, 14, 16 | `check:parity` PASS, nothing removed | e2e `wp22-navigation.spec` 7/7; visual/a11y suite (6 baselines updated: light+dark publication, validation, release) | |
 | WP-35 (2026-11-27, branch `wp35-redesign`) | 1, 2, 3, 6, 9, 11, 12, 14, 16 | `check:parity` PASS, nothing removed (only additions); baseline re-captured with `parity:update` | before (e6f486c): visual/a11y run with the WP-35 changes 48 passed / 19 failed (the layout-class clash, then intended pictures); after: visual/a11y/keyboard 67 passed, 7 skipped (keyboard spec's own dark-theme skip); e2e `wp35-redesign` 4/4, `jsg-editor` 11/11, `wp05-dataloss` 10/10, `zz-core-routes` 5/5; 15 baselines updated (light+dark administrator, overview, projects, publication, release, sign-in, workspace; light settings) | pending |
+| WP-35 second pass (2026-11-27) | 2, 8, 10, 13, 14, 16, 17, 18 | `check:parity` PASS, nothing removed (no explanation row) | vitest 33 files; visual/a11y 61 passed + 6 re-baselined; e2e alone: 00-platform 41/41, others listed in IMPLEMENTATION-LOG | |
 | | | | | |

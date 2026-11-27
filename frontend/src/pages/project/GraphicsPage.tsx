@@ -50,26 +50,26 @@ export function ProjectGraphicsPage() {
         stats={[{ label: 'ICNs', value: all.filter((g) => g.kind === 'icn').length }, { label: 'Symbols', value: all.filter((g) => g.kind === 'symbol').length }, { label: 'Not used', value: all.filter((g) => !g.usedBy.length).length }]} />
       {writable ? (
         <div className={`v2-card v2-card-pad v2-drop ${over ? 'over' : ''}`} onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)} onDrop={drop} data-testid="graphics-drop">
-          <div className="v2-row" style={{ flexWrap: 'wrap', gap: 10 }}>
+          <div className="v2-drop-row">
             <Icon name="upload" size={18} />
             <span>Drop images here, or</span>
             <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => input.current?.click()} data-testid="graphics-add">Add graphics…</button>
             <input ref={input} type="file" hidden multiple accept=".png,.jpg,.jpeg,.gif,.svg,.bmp,.webp" onChange={(e) => void upload(e.target.files)} data-testid="graphics-file" />
-            <label className="v2-row" style={{ gap: 6, marginLeft: 'auto' }}>As
-              <select className="v2-select" style={{ height: 30 }} value={kind} onChange={(e) => setKind(e.target.value as typeof kind)} aria-label="Add as">
+            <label className="v2-drop-as">As
+              <select className="v2-select" value={kind} onChange={(e) => setKind(e.target.value as typeof kind)} aria-label="Add as">
                 <option value="auto">Detect from the name</option><option value="icn">ICN artwork</option><option value="symbol">Symbol (icon)</option>
               </select>
             </label>
           </div>
-          <p className="v2-hint" style={{ marginBottom: 0 }}>An ICN is named <b>ICN-…</b> and sits beside the data modules, where the figure's entity finds it. A symbol is any other image and is kept in the project's media folder.</p>
+          <p className="v2-hint">An ICN is named <b>ICN-…</b> and sits beside the data modules, where the figure's entity finds it. A symbol is any other image and is kept in the project's media folder.</p>
         </div>
       ) : null}
-      {problems.length ? <Alert tone="bad"><b>Nothing was added.</b><ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>{problems.map((p) => <li key={p}>{p}</li>)}</ul></Alert> : null}
+      {problems.length ? <Alert tone="bad"><b>Nothing was added.</b><ul className="v2-gfx-problems">{problems.map((p) => <li key={p}>{p}</li>)}</ul></Alert> : null}
       {list.error ? <Alert tone="bad">{list.error}</Alert> : null}
       {list.loading && !list.data ? <Loading /> : <GraphicsView projectId={id} graphics={all} onDelete={writable ? setDel : undefined} empty="This project has no graphics yet." />}
       {del ? (
         <ConfirmModal title="Delete graphic?" danger confirmLabel={del.usedBy.length ? 'Delete anyway' : 'Delete'} onClose={() => setDel(null)}
-          body={<><p style={{ marginTop: 0 }}><strong>{del.name}</strong> is removed from this project.</p>{del.usedBy.length ? <p className="v2-error">It is used by {del.usedBy.length} data module{del.usedBy.length === 1 ? '' : 's'} ({del.usedBy.slice(0, 3).join(', ')}{del.usedBy.length > 3 ? ', …' : ''}); those figures will be blank.</p> : null}</>}
+          body={<><p className="v2-mt0"><strong>{del.name}</strong> is removed from this project.</p>{del.usedBy.length ? <p className="v2-error">It is used by {del.usedBy.length} data module{del.usedBy.length === 1 ? '' : 's'} ({del.usedBy.slice(0, 3).join(', ')}{del.usedBy.length > 3 ? ', …' : ''}); those figures will be blank.</p> : null}</>}
           onConfirm={() => remove(del, del.usedBy.length > 0)} />
       ) : null}
     </div>

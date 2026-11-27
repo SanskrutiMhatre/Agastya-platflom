@@ -26,6 +26,7 @@ import { lastDoc } from '../../lib/continueDoc';
 import { countLabel } from '../../lib/problems';
 import { PROJECT_LABEL, may } from '../../lib/roles';
 import { useUi } from '../../store/ui';
+import '../../styles/pages/home.css';   // WP-35 second pass: the Home cards' styles (and WorkingNow's title) load with this chunk
 import { useSession } from '../../store/session';
 import { WorkingNow } from '../../components/WorkingNow';
 

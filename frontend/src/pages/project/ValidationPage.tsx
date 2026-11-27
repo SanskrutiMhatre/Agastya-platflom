@@ -7,6 +7,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import '../../styles/pages/structure.css';   // WP-35: this page's styles load with its chunk
+import '../../styles/pages/validation.css';  // WP-35 second pass: the report layout (mockup validation.html)
 import { useNavigate } from 'react-router-dom';
 import { contentApi, problemsApi, type ReviewMark, type ValidationIssue, type ValidationRun } from '../../api';
 import { forgetLegacyReviewed, issueKey, legacyReviewedKeys, severityLabel } from '../../lib/problems';
@@ -116,63 +117,68 @@ export function ValidationPage() {
         sub={run ? `Last run ${ago(run.ranAt)} · ${run.checked} files read, ${run.schemaChecked} checked against a schema${run.brexChecked ? `, ${run.brexChecked} against BREX` : ''}.` : 'Check the project against the S1000D schemas and your business rules, then review every finding.'}
         stats={run ? [{ label: 'Errors', value: run.summary.error, tone: run.summary.error ? 'bad' : 'ok' }, { label: 'Warnings', value: run.summary.warn, tone: run.summary.warn ? 'warn' : undefined }, { label: 'Notes', value: run.summary.info }] : undefined}
         actions={<div className="v2-row wrap">
-          <select className="v2-select" style={{ width: 210 }} value={issue} onChange={(e) => void chooseIssue(e.target.value)} aria-label="S1000D issue" data-testid="validation-issue" title="Which S1000D issue the checks use: the schema and the default business rules (BREX). Saved with the project; the build and release checks use it too.">
+          <select className="v2-select v2-val-issue-sel" value={issue} onChange={(e) => void chooseIssue(e.target.value)} aria-label="S1000D issue" data-testid="validation-issue" title="Which S1000D issue the checks use: the schema and the default business rules (BREX). Saved with the project; the build and release checks use it too.">
             <option value="auto">S1000D issue: as declared</option>
             {(last.data?.schemaIssues ?? []).map((i) => <option key={i} value={i}>S1000D issue {i}</option>)}
           </select>
-          <label className="v2-row" style={{ gap: 6 }}><input type="checkbox" checked={brex} onChange={(e) => setBrex(e.target.checked)} />Include BREX</label>
+          <label className="v2-val-check"><input type="checkbox" checked={brex} onChange={(e) => setBrex(e.target.checked)} />Include BREX</label>
           <button className="btn btn-primary" onClick={start} disabled={busy || !may(can, 'validate.run')} data-testid="run-validation">{busy ? <Spinner /> : <Icon name="play" />}Run validation</button>
         </div>} />
-      {!may(can, 'validate.run') ? <div style={{ marginBottom: 12 }}><Alert tone="warn">Viewers can review the last run but cannot start a new one.</Alert></div> : null}
+      {!may(can, 'validate.run') ? <div className="v2-val-notes"><Alert tone="warn">Viewers can review the last run but cannot start a new one.</Alert></div> : null}
 
       {!run ? <div className="v2-card"><Empty title="Not validated yet">{may(can, 'validate.run') ? 'Press “Run validation” to check every data module and the publication.' : 'Nobody has run validation on this project yet.'}</Empty></div> : (
         <>
-          {run.notes.length ? <div style={{ marginBottom: 12 }}><Alert>{run.notes.slice(0, 3).join(' · ')}</Alert></div> : null}
+          {run.notes.length ? <div className="v2-val-notes"><Alert>{run.notes.slice(0, 3).join(' · ')}</Alert></div> : null}
 
-          <div className="v2-row wrap" style={{ marginBottom: 10 }}>
-            {(['error', 'warn', 'info'] as const).map((s) => <label key={s} className="v2-row" style={{ gap: 5 }}><input type="checkbox" checked={sev[s]} onChange={(e) => setSev({ ...sev, [s]: e.target.checked })} /><span className={`v2-sev ${s}`} style={{ marginTop: 0 }} />{s === 'warn' ? 'Warnings' : s === 'error' ? 'Errors' : 'Notes'}</label>)}
-            <select className="v2-select" style={{ width: 200 }} value={source} onChange={(e) => setSource(e.target.value)} aria-label="Filter by check"><option value="all">All checks</option>{sources.map((s) => <option key={s} value={s}>{SOURCE_LABEL[s]}</option>)}</select>
-            <input className="v2-input" style={{ width: 220 }} placeholder="Search findings…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search findings" />
-            <label className="v2-row" style={{ gap: 5 }}><input type="checkbox" checked={hideReviewed} onChange={(e) => setHideReviewed(e.target.checked)} />Hide reviewed</label>
+          {/* WP-35 second pass: the filters on one bar (mockup validation.html); each severity chip shows how many findings it holds */}
+          <div className="v2-val-bar" role="group" aria-label="Filter findings">
+            {(['error', 'warn', 'info'] as const).map((s) => <label key={s} className="v2-val-sev"><input type="checkbox" checked={sev[s]} onChange={(e) => setSev({ ...sev, [s]: e.target.checked })} /><span className={`v2-sev ${s}`} />{s === 'warn' ? 'Warnings' : s === 'error' ? 'Errors' : 'Notes'}<span className="n">{run.summary[s]}</span></label>)}
+            <select className="v2-select" value={source} onChange={(e) => setSource(e.target.value)} aria-label="Filter by check"><option value="all">All checks</option>{sources.map((s) => <option key={s} value={s}>{SOURCE_LABEL[s]}</option>)}</select>
+            <input className="v2-input" placeholder="Search findings…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search findings" />
+            <label className="v2-val-check"><input type="checkbox" checked={hideReviewed} onChange={(e) => setHideReviewed(e.target.checked)} />Hide reviewed</label>
             <span className="spacer" />
+            <span className="v2-hint" aria-live="polite">{shown.length} of {run.issues.length} shown</span>
             <button className="btn btn-sm" onClick={() => { const url = URL.createObjectURL(new Blob([toCsv(shown)], { type: 'text/csv' })); const a = document.createElement('a'); a.href = url; a.download = 'validation.csv'; a.click(); URL.revokeObjectURL(url); }}><Icon name="download" size={13} />Export CSV</button>
           </div>
 
-          <div className="v2-grid" style={{ gridTemplateColumns: 'minmax(0, 3fr) minmax(300px, 2fr)', alignItems: 'start' }}>
-            <div className="v2-card" data-testid="issue-list">
+          <div className="v2-val-layout">
+            <div className="v2-card v2-val-list" data-testid="issue-list">
               {shown.length === 0 ? <Empty title={run.issues.length ? 'Nothing matches these filters' : 'No problems found'}>{run.issues.length ? 'Adjust the filters above.' : 'Every check passed.'}</Empty> : groups.map(([file, list, count]) => (
                 <div key={file}>
-                  <div style={{ padding: '8px 12px', background: 'var(--bg-sunken)', borderBottom: '1px solid var(--border)', fontWeight: 600, display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <Icon name="xml" size={14} /><span className="v2-trunc v2-mono">{file}</span><span className="spacer" /><Badge tone={list.some((x) => x.sev === 'error') ? 'bad' : 'warn'}>{count}</Badge>
+                  <div className="v2-val-group">
+                    <Icon name="xml" size={14} /><span className="v2-trunc v2-mono" title={file}>{file}</span><Badge tone={list.some((x) => x.sev === 'error') ? 'bad' : 'warn'}>{count}</Badge>
                   </div>
-                  {list.map((i) => (
-                    <div key={i.id} className={`v2-issue ${selId === i.id ? 'sel' : ''}`} onClick={() => setSelId(i.id)} role="button" tabIndex={0} aria-pressed={selId === i.id} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelId(i.id); } }} data-testid="issue">
-                      <span className={`v2-sev ${i.sev}`} aria-label={i.sev} />
-                      <div style={{ minWidth: 0, flex: 1, opacity: reviewed.has(issueKey(i)) ? .5 : 1 }}>
-                        <div style={{ fontWeight: 600 }}>{i.title}{i.line > 1 ? <span className="v2-hint"> · line {i.line}</span> : null}</div>
-                        <div className="v2-hint" style={{ whiteSpace: 'normal' }}>{i.detail.length > 140 ? `${i.detail.slice(0, 140)}…` : i.detail}</div>
+                  {list.map((i) => {
+                    const done = reviewed.has(issueKey(i));
+                    return (
+                      <div key={i.id} className={`v2-issue ${selId === i.id ? 'sel' : ''}`} onClick={() => setSelId(i.id)} role="button" tabIndex={0} aria-pressed={selId === i.id} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelId(i.id); } }} data-testid="issue">
+                        <span className={`v2-sev ${i.sev}`} aria-label={i.sev} />
+                        <div className={`v2-issue-body${done ? ' done' : ''}`}>
+                          <div className="v2-issue-title">{i.title}{i.line > 1 ? <span className="v2-hint"> · line {i.line}</span> : null}</div>
+                          <div className="v2-hint v2-issue-detail">{i.detail.length > 140 ? `${i.detail.slice(0, 140)}…` : i.detail}</div>
+                        </div>
+                        <span className="v2-issue-tags"><Badge>{SOURCE_LABEL[i.source]}</Badge>{done ? <Badge tone="ok">Reviewed</Badge> : null}</span>
                       </div>
-                      <Badge>{SOURCE_LABEL[i.source]}</Badge>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ))}
               {shown.length ? <MoreRows shown={drawn.limit} total={shown.length} onMore={drawn.more} onAll={drawn.all} /> : null}
             </div>
 
-            <aside className="v2-card v2-card-pad" aria-label="Finding" style={{ position: 'sticky', top: 0 }}>
+            <aside className="v2-card v2-card-pad v2-val-detail" aria-label="Finding">
               {selected ? (
                 <div className="v2-stack" data-testid="issue-detail">
                   <div className="v2-row"><Badge tone={sevTone(selected.sev)}>{severityLabel(selected.sev)}</Badge><Badge>{SOURCE_LABEL[selected.source]}</Badge></div>
-                  <h3 style={{ margin: 0 }}>{selected.title}</h3>
-                  <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{selected.detail}</p>
-                  <table className="v2-table" style={{ fontSize: 12.5 }}><tbody>
-                    <tr><td className="v2-hint">File</td><td className="v2-mono" style={{ wordBreak: 'break-all' }}>{selected.rel}</td></tr>
-                    <tr><td className="v2-hint">Line</td><td>{selected.line}</td></tr>
-                    {selected.loc ? <tr><td className="v2-hint">Where</td><td className="v2-mono">{selected.loc}</td></tr> : null}
-                    <tr><td className="v2-hint">Run</td><td>{fmtDate(run.ranAt)}</td></tr>
-                    {reviewed.get(issueKey(selected)) ? <tr><td className="v2-hint">Reviewed</td><td data-testid="issue-reviewed-by">{reviewed.get(issueKey(selected))!.byName ?? reviewed.get(issueKey(selected))!.by} · {fmtDate(reviewed.get(issueKey(selected))!.at)}</td></tr> : null}
-                  </tbody></table>
+                  <h3>{selected.title}</h3>
+                  <p className="v2-val-text">{selected.detail}</p>
+                  <dl className="v2-kv">
+                    <dt>File</dt><dd className="v2-mono">{selected.rel}</dd>
+                    <dt>Line</dt><dd>{selected.line}</dd>
+                    {selected.loc ? <><dt>Where</dt><dd className="v2-mono">{selected.loc}</dd></> : null}
+                    <dt>Run</dt><dd>{fmtDate(run.ranAt)}</dd>
+                    {reviewed.get(issueKey(selected)) ? <><dt>Reviewed</dt><dd data-testid="issue-reviewed-by">{reviewed.get(issueKey(selected))!.byName ?? reviewed.get(issueKey(selected))!.by} · {fmtDate(reviewed.get(issueKey(selected))!.at)}</dd></> : null}
+                  </dl>
                   <div className="v2-row wrap">
                     {editable ? <button className="btn btn-primary" onClick={() => nav(`../editor?file=${encodeURIComponent(selected.file)}&line=${selected.line}`)}><Icon name="editor" />Open at line {selected.line}</button>
                       : selected.source === 'pm' ? <button className="btn btn-primary" onClick={() => nav('../publication')}><Icon name="book" />Open Publication</button> : null}

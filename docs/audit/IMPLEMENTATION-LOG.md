@@ -1848,6 +1848,57 @@ D20 (take the audit's recommendations and mockups) applied where the change is s
   left to WP-27); entry stylesheet still 63.1 KB against the 30 KB advisory (the remaining bulk is shared shell/component CSS);
   Caps Lock e2e uses events carrying the modifier state (headless browsers do not toggle Caps Lock); owner sign-off pending.
 
+**Second pass (2026-11-27, branch `worktree-agent-a178eccaa8b3d75e5` from `ce025dc`, main `b173829` merged in).** Rule kept: nothing lost;
+`check:parity` PASS with nothing removed and no explanation row; baseline re-captured with `npm run parity:update` (routes 76, rail 26,
+commands 115, keys 162, test ids 486, tests 344: the additions are WP-28's ids and the new unit test).
+
+* **UID-003 (5184de1)**: `IconButton` in `components/ui.tsx` (aria-label + title; `FocusTooltip` shows the title on keyboard focus).
+  Nineteen icon or glyph buttons completed (Modal close, toast dismiss, the PDF viewer's outline/page/zoom/match/twisty, S1000D
+  catalogue Edit/Delete, preset node delete, backups delete, JSG ancillary remove, team remove, folder access remove, publish settings
+  remove). Architecture test `components/iconButtons.test.ts` parses every `.tsx` with the TypeScript compiler and fails on an icon-only
+  `<button>` (no letter or digit in its children) without both `aria-label`/`aria-labelledby` and `title`; it has its own non-vacuity
+  cases. The framework-free editors build buttons with DOM calls, so the runtime rule `icon-button-tooltip` (serious) joins
+  `e2e/visual/a11y-audit.ts`: it runs on the ten named routes in both themes (the Studio, JSS and JSG editors among them) and is proven by a
+  planted defect in `a11y.spec.ts`. No allow-list entry.
+* **Graphics (9cc7ae1)**: both Graphics pages without inline styles; the tile thumbnail shows its transparency checkerboard again (an
+  inline `background: none` had hidden it); zoom buttons carry a tooltip and a focus ring; `styles/pages/graphics.css` with the chunks.
+* **Validation (2a7e0fe, presentational only, separate commit for WP-14)**: mockup `validation.html`: one filter bar (each severity chip
+  shows its count, "n of m shown"), list beside a sticky detail panel, file group headings, a Reviewed badge on reviewed findings (the
+  dimming stays), the detail as a term list. Run, issue choice, WP-22's problems model and server marks, CSV and the jump are untouched.
+* **Administrator (a297dc9)**: Administrator, Users and Audit logs (Settings.tsx), Groups, Directory sign-on and Project Access
+  (AccessAdmin, WP-27), S1000D catalogue and Numbering, platform backups: over a hundred inline styles replaced by
+  `styles/pages/admin.css` (section heading, layout helpers, maintenance cards with the action at the foot); the section navigation is a
+  card with an accent bar on the current section. Every control, route and test id kept; WP-29's audit viewer only restyled.
+* **Editor chrome (b516b29)**: inside WP-21's host, the header title, comments panel, merge dialog and JSG autosave switch lose their
+  inline styles; the header/focus-mode/comments CSS loads with the editor chunks. TeamChip (WP-28) untouched. A header separator was tried
+  and dropped (it led the wrapped second row).
+* **UX-014 and the Structure page: not merged (recorded decision).** The conditions of the brief cannot all hold: `00-platform.spec`
+  asserts the sidebar links Overview, Workspace and Projects (line 109) and that sign-in lands on `/overview` (`toHaveURL(/\/overview$/)`,
+  lines 541 and 1000), and it asserts the rail items Editor, Explore, Publication, ... (line 155); `doc-pages.spec` asserts the rail links
+  Explore and Publication and the headings "Explore"/"Publication" (lines 48, 172). A merged page behind redirects changes those
+  assertions, which the brief forbids; keeping them all would make the merge two tabs that are the same two pages. Rail labels not renamed.
+* **Entry stylesheet (44a7af3)**: 62.0 KB (63.1 at the first pass, plus WP-28) -> 55.1 KB. Editor-only rules (split, divider, data-module
+  panel, PDF bar and placeholder, import dialog tiles/diff/progress, embedded Studio containment and the narrow-window media block that
+  overrides them) into `editor-host.css`; Notifications, Project Home and the preview pop-out get page sheets; `pdf.css` (pdf.js text layer)
+  is imported by the viewer. Rules that `states.css` styles at equal specificity (`v2-dm`, `v2-chap`, `v2-filter`, `v2-link`) stay in the
+  entry so the state rules keep winning; admin gap/margin helpers carry the extra class so they never depend on sheet order. The rest of
+  the entry is tokens.css (18.7 KB, both themes, must stay) and the shell/shared component CSS: the 30 KB advisory is not reachable without
+  splitting the shell itself; `check:bundle` PASS (advisory only).
+* **Found and fixed on the way**: the first pass put the person's name in the account menu, against `00-platform`'s owner rule (the menu
+  shows only the role) - restored (00-platform had not been run by the first pass). The merge of main brought two `window.confirm`
+  calls (WP-28: break a check-out in TeamChip and WorkingNow) that the GAP-002 architecture test refuses: both now use `confirmDialog`
+  (danger); `TeamChip.test` answers the dialog service and still asserts it was asked.
+* Tests run (this branch, after the merge): frontend `tsc --noEmit` clean; vitest `src/editors src/parity src/components src/styles src/lib
+  src/pages` 33 files, 359 tests passed (after the confirm fix); `lint:theme` 0 literals; `scripts/ci/lint.mjs` ratchets unchanged;
+  `vite build` OK; `check:bundle` PASS; visual/a11y/keyboard (port 4096, msedge): 61 passed, 7 skipped (the keyboard spec's dark copy, by
+  design), 6 failed on intended changes, re-baselined, then those 6 passed; a11y and keyboard all pass, none allow-listed. e2e alone on port
+  4095 (msedge): `00-platform` 41/41; one runner, --workers=1, 13 specs (wp35-redesign, wp22-navigation, publish-gate, wp21-editor-chrome, jss-editor, jsg-editor, doc-pages, s1000d-config, zz-core-routes, wp05-dataloss, zz-layout-strict, zz-responsive-layout, zz-theme-states) 144 passed, 1 failed, 10 not run: doc-pages "a section is dragged into another chapter ... keeps its code" fails at its second drag (drop back before the first row of chapter 1 leaves the page unchanged, so Save never appears); it fails the same way with the frontend of ce025dc (checked out, built and run on the same backend), so it predates this pass and is NOT fixed here; doc-pages without that test: 13/13 passed.
+* Baselines updated after looking at each diff (6): light+dark `administrator` (navigation card, this pass), `jss-editor` and
+  `jsg-editor` (WP-22's Home rail item and pin and WP-28's Check out button, never re-baselined there: the older diffs stayed under the
+  0.2 % threshold).
+* Not done: the merges above (decision); the 30 KB advisory; owner sign-off of the CHECKLIST rows; the full e2e suite, full vitest,
+  backend suite and gate (not run, by the brief).
+
 ## Phase 8 (Mode B team server)
 
 ### WP-28 Mode B team server: install path, multi-user operation, load acceptance, availability position (PRD-003, PRD-007, G-REL-4 under load, G-PERF-4 at the addendum's assumed scale; gates measured on a shared machine, see conditions) - done, with the limits listed

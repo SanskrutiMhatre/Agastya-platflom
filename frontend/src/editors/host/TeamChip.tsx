@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { del, get, post } from '../../api/client';
 import { errText } from '../../components/ui';
+import { confirmDialog } from '../../lib/dialogs';
 import { useUi } from '../../store/ui';
 import { activityText, baseName, initials, noticeIsFor, untilText, useAnnouncePresence, useTeam, type PresenceDoc } from '../../lib/presence';
 import type { ProgressMsg } from '../../lib/progress';
@@ -57,7 +58,8 @@ export function TeamChip({ projectId, doc, writable, canBreak, editing }: TeamCh
 
   const act = async (what: 'take' | 'give' | 'break') => {
     if (!doc) return;
-    if (what === 'break' && !window.confirm(`Break ${whole?.holder ?? 'the other author'}'s check-out of ${doc.title || baseName(doc.path)}? Their unsaved work stays with them, but their next save may be refused.`)) return;
+    // WP-35 (GAP-002): the app's own dialog, not the browser's
+    if (what === 'break' && !await confirmDialog({ title: 'Break the check-out?', message: `Break ${whole?.holder ?? 'the other author'}'s check-out of ${doc.title || baseName(doc.path)}? Their unsaved work stays with them, but their next save may be refused.`, confirmLabel: 'Break check-out', danger: true })) return;
     setBusy(true);
     try {
       if (what === 'take') await post(doc.checkout, {});

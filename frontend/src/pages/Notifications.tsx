@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { Icon, type IconName } from '../components/Icon';
 import { PageHeader } from '../components/PageHeader';
 import { Empty, Loading, ago, fmtDate } from '../components/ui';
+import '../styles/pages/notifications.css';   // WP-35 second pass: this page's styles load with its chunk
 import { useInbox } from '../store/inbox';
 import { useSession } from '../store/session';
 

@@ -1,0 +1,60 @@
+/* =========================================================================
+   WP-35 second pass: the Administrator (and the screens it shares with Settings and Project settings > Access: Users, Audit logs,
+   Groups, Directory sign-on, S1000D catalogue, Numbering, platform backups) on the design system (mockup docs/audit/mockups/admin.html).
+   The section navigation moved here from platform.css unchanged; the rest replaces the inline styles these screens had (over a hundred)
+   with a small set of layout classes. Imported by Administrator, Settings, AccessAdmin, AdminS1000d and PlatformBackups, so it loads with
+   their chunks only. Colours are tokens only.
+   ========================================================================= */
+
+/* ------------------------------------------------------------ section navigation */
+.v2-admin { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 18px; align-items: start; }
+.v2-admin-nav { display: flex; flex-direction: column; gap: 10px; position: sticky; top: 8px; padding: 8px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 10px; }
+.v2-admin-group { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); padding: 4px 10px; }
+.v2-admin-nav a { display: block; padding: 6px 10px; border-radius: 6px; color: var(--text); font-size: 13px; text-decoration: none; position: relative; }
+.v2-admin-nav a:hover { background: var(--bg-hover); }
+.v2-admin-nav a.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.v2-admin-nav a.active::before { content: ''; position: absolute; left: -8px; top: 6px; bottom: 6px; width: 3px; border-radius: 0 2px 2px 0; background: var(--accent); }
+.v2-admin-nav a:focus-visible, .v2-admin-more:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.v2-admin-more { cursor: pointer; padding: 4px 12px; border-radius: 6px; }
+.v2-admin-more:hover { background: var(--bg-hover); color: var(--text); }
+.v2-admin-body { min-width: 0; }
+@media (max-width: 860px) { .v2-admin { grid-template-columns: minmax(0, 1fr); } .v2-admin-nav { position: static; flex-flow: row wrap; gap: 4px 16px; } .v2-admin-nav a.active::before { display: none; } }
+
+/* ------------------------------------------------------------ section heading: title, one line of purpose, actions on the right */
+.v2-admin-head h3, .v2-admin-head h4 { margin: 0; font-size: 16px; font-weight: 650; }
+.v2-admin-head .v2-sub { margin: 2px 0 0; max-width: 72ch; }
+
+/* ------------------------------------------------------------ layout helpers (replacing inline styles) */
+.v2-m0, .v2-sub.v2-m0, .v2-hint.v2-m0 { margin: 0; }
+.v2-mb0 { margin-bottom: 0; }
+.v2-mb14 { margin-bottom: 14px; }
+.v2-mt2 { margin: 2px 0 0; }
+.v2-mt6 { margin: 6px 0 0; }
+.v2-mt8 { margin-top: 8px; }
+.v2-mt12 { margin-top: 12px; }
+.v2-gap-4, .v2-row.v2-gap-4 { gap: 4px; }
+.v2-gap-6, .v2-row.v2-gap-6 { gap: 6px; }
+.v2-gap-8, .v2-row.v2-gap-8 { gap: 8px; }
+.v2-align-start { align-items: flex-start; }
+.v2-grid-full { grid-column: 1 / -1; }
+.v2-list-indent { padding-left: 18px; }
+.v2-grow-320 { flex: 1 1 320px; }
+.v2-td-end { text-align: right; white-space: nowrap; }
+.v2-scroll-460 { max-height: 460px; overflow: auto; }
+.v2-scroll-520 { max-height: 520px; overflow: auto; }
+.v2-maxw-280 { max-width: 280px; }
+.v2-maxw-520 { max-width: 520px; }
+.v2-maxw-560 { max-width: 560px; }
+.v2-maxw-900 { max-width: 900px; }
+.v2-w-44 { width: 44px; } .v2-w-90 { width: 90px; } .v2-w-140 { width: 140px; } .v2-w-150 { width: 150px; } .v2-w-160 { width: 160px; }
+.v2-w-180 { width: 180px; } .v2-w-190 { width: 190px; } .v2-w-200 { width: 200px; } .v2-w-210 { width: 210px; } .v2-w-220 { width: 220px; }
+.v2-w-230 { width: 230px; } .v2-w-260 { width: 260px; } .v2-w-280 { width: 280px; }
+.v2-color-input { width: 44px; height: 32px; padding: 2px; border: 1px solid var(--border-control); border-radius: 6px; background: var(--bg-elev); cursor: pointer; }
+.v2-color-input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+
+/* ------------------------------------------------------------ maintenance tool cards: the action sits at the foot of each card */
+.v2-maint-card { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.v2-maint-card h4 { margin: 0; }
+.v2-maint-card .v2-sub { margin: 0; }
+.v2-maint-card .v2-hint { margin: 0; }
+.v2-maint-card > .btn:first-of-type, .v2-maint-card > a.btn { margin-top: auto; }

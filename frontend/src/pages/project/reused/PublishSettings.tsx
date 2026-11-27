@@ -99,7 +99,7 @@ const LineList: React.FC<{ value: any; onChange: (v: string[]) => void; placehol
             placeholder={placeholder}
             onChange={e => onChange(arr.map((x, j) => (j === i ? e.target.value : x)))}
           />
-          <button className="x-btn" onClick={() => onChange(arr.filter((_, j) => j !== i))} title="Remove">✕</button>
+          <button className="x-btn" onClick={() => onChange(arr.filter((_, j) => j !== i))} title="Remove" aria-label="Remove">✕</button>
         </div>
       ))}
       <button className="x-btn" style={{ alignSelf: 'flex-start' }} onClick={() => onChange([...arr, ''])}>+ Add line</button>

@@ -12,6 +12,7 @@ import { Icon } from '../../components/Icon';
 import { Badge, ago, errText, fmtDate } from '../../components/ui';
 import { may, type Can } from '../../lib/roles';
 import { useUi } from '../../store/ui';
+import '../../styles/pages/editor-host.css';   // WP-35 second pass: the comments panel's styles load with the editor chunks
 
 export interface EditorCommentsState {
   comments: ReviewComment[];
@@ -87,9 +88,9 @@ export function CommentsPanel({ projectId, state, activeFile, onOpen }: { projec
         <button className="icon-btn" onClick={() => state.step(1)} title="Next comment (Alt+Shift+N)" aria-label="Next comment" data-testid="comment-next" disabled={!state.open.length}><Icon name="down" size={14} /></button>
         <button className="icon-btn" onClick={() => state.setShown(false)} title="Close" aria-label="Close the comments" data-testid="comments-close"><Icon name="close" size={14} /></button>
       </div>
-      <label className="v2-row v2-hint" style={{ gap: 6, padding: '0 12px 6px' }}><input type="checkbox" checked={done} onChange={(e) => setDone(e.target.checked)} />Show the comments marked done</label>
+      <label className="v2-row v2-hint v2-edcomments-done"><input type="checkbox" checked={done} onChange={(e) => setDone(e.target.checked)} />Show the comments marked done</label>
       <div className="v2-edcomments-list">
-        {list.length === 0 ? <p className="v2-hint" style={{ padding: '0 12px' }}>No open comments.</p> : list.map((c) => (
+        {list.length === 0 ? <p className="v2-hint v2-edcomments-empty">No open comments.</p> : list.map((c) => (
           <div key={c.id} className={`v2-rv ${c.kind === 'changes' ? 'changes' : ''} ${c.resolved ? 'done' : ''}${current?.id === c.id ? ' is-current' : ''}`} data-testid="editor-comment" data-current={current?.id === c.id || undefined}>
             <div className="v2-rv-head">
               <b>{c.byName ?? c.by ?? 'Someone'}</b>
@@ -98,7 +99,7 @@ export function CommentsPanel({ projectId, state, activeFile, onOpen }: { projec
             </div>
             {c.dmFile ? <div className="v2-hint v2-trunc" title={c.dmFile}>{c.dmFile === activeFile ? 'This data module' : c.dmFile}{c.anchor ? ` · on “${c.anchor.text.slice(0, 50)}${c.anchor.text.length > 50 ? '…' : ''}”` : ''}</div> : null}
             <p className="v2-rv-body">{c.body}</p>
-            <div className="v2-row" style={{ gap: 6, marginTop: 6 }}>
+            <div className="v2-row v2-edcomment-acts">
               {c.dmFile && onOpen && c.dmFile !== activeFile ? <button className="btn btn-sm" onClick={() => onOpen(c)} data-testid="editor-comment-open"><Icon name="editor" size={12} />Open the data module</button> : null}
               {state.canResolve ? <button className="btn btn-sm" disabled={busy} onClick={() => void resolve(c, !c.resolved)} data-testid="editor-comment-done"><Icon name="check" size={12} />{c.resolved ? 'Reopen' : 'Done'}</button> : null}
             </div>

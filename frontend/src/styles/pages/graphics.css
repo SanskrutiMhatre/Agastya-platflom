@@ -1,0 +1,42 @@
+/* =========================================================================
+   WP-35 second pass: Graphics (the project's Graphics page and the main Graphics management page) on the design system. The tile and
+   drop-zone rules moved here from platform.css unchanged; the toolbar, list and preview rules replace inline styles. Imported by
+   components/GraphicsView.tsx, so it loads with the two graphics chunks only. Colours are tokens only.
+   ========================================================================= */
+.v2-gfx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.v2-gfx { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-elev); display: flex; flex-direction: column; transition: border-color .12s; }
+.v2-gfx:hover, .v2-gfx:focus-within { border-color: var(--border-strong); }
+.v2-gfx-thumb { height: 120px; display: grid; place-items: center; background: repeating-conic-gradient(var(--bg-hover) 0 25%, transparent 0 50%) 0 0 / 16px 16px; }
+.v2-gfx-thumb img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.v2-gfx-meta { padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; }
+.v2-gfx-tags { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.v2-gfx-tags .icon-btn { margin-left: auto; }
+.v2-drop { border-style: dashed; }
+.v2-drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.v2-drop-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.v2-drop-row .v2-drop-as { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
+.v2-drop .v2-hint { margin-bottom: 0; }
+
+/* the toolbar above the set: kind filter on the left; search, filters, sort and view on the right */
+.v2-gfx-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.v2-gfx-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.v2-gfx-tools .v2-input { width: 200px; height: 30px; }
+.v2-gfx-bar .v2-select, .v2-gfx-pager .v2-select, .v2-drop .v2-select { height: 30px; }
+.v2-gfx-pager { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.v2-gfx-pager > div { display: flex; align-items: center; gap: 6px; }
+
+/* the zoom buttons around a thumbnail: an image is the content, the button only takes the click */
+.v2-zoom { background: none; border: 0; padding: 0; cursor: zoom-in; border-radius: 4px; }
+.v2-zoom:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.v2-gfx-thumb.v2-zoom { width: 100%; border-radius: 0; background: repeating-conic-gradient(var(--bg-hover) 0 25%, transparent 0 50%) 0 0 / 16px 16px; }
+.v2-gfx-list-thumb { width: 54px; }
+.v2-gfx-list-thumb img { max-height: 36px; max-width: 100%; }
+
+.v2-gfx-preview { text-align: center; max-height: 55vh; overflow: auto; }
+.v2-gfx-preview img { max-height: 480px; max-width: 100%; }
+.v2-gfx-uses { margin: 4px 0 0; padding-left: 18px; max-height: 160px; overflow: auto; }
+.v2-gfx-problems { margin: 4px 0 0; padding-left: 18px; }
+
+/* the main Graphics management page: one card per project */
+.v2-gfx-project-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.v2-gfx-project-head h3 { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

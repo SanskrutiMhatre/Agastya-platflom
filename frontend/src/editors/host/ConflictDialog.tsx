@@ -63,20 +63,20 @@ export function ConflictDialog({ base, mine, theirs, check, save, onClose }: Con
         title={merged === null ? 'Choose a version for every place you both changed' : 'Check the merged document, then save it'}>{busy ? <Spinner /> : <Icon name="check" size={12} />}Check and save</button>
     </>}>
       <div className="v2-merge" data-testid="merge-dialog">
-        <p style={{ marginTop: 0 }}>
+        <p className="v2-mt0">
           Someone else saved this document after you opened it. {mineCount} change{mineCount === 1 ? '' : 's'} of yours and {theirCount} of theirs do not touch each other and are all kept unless you untick them.
           {conflicts.length ? <> In <strong>{conflicts.length} place{conflicts.length === 1 ? '' : 's'}</strong> you both changed the same text: choose which version stays.</> : null}
           {' '}The result is checked before it is saved.
         </p>
         {undecided ? <Alert tone="warn"><span data-testid="merge-undecided">{undecided} place{undecided === 1 ? '' : 's'} still to decide.</span></Alert> : null}
         {problems ? <Alert tone="bad"><div data-testid="merge-invalid"><strong>The merged document has {problems.errors} error{problems.errors === 1 ? '' : 's'}, so it was not saved.</strong> Change your choices, or cancel and download your version from the banner.
-          {problems.messages.length ? <ul style={{ margin: '6px 0 0' }}>{problems.messages.slice(0, 8).map((m, k) => <li key={k}>{m}</li>)}</ul> : null}</div></Alert> : null}
+          {problems.messages.length ? <ul className="v2-merge-msgs">{problems.messages.slice(0, 8).map((m, k) => <li key={k}>{m}</li>)}</ul> : null}</div></Alert> : null}
         {error ? <Alert tone="bad">{error}</Alert> : null}
         {!shown.length ? <p className="v2-hint">Both versions are the same: saving keeps it as it is.</p> : null}
         <ol className="v2-merge-list">
           {shown.map(({ c, i }, n) => c.kind === 'change' ? (
             <li key={i} className={`v2-merge-item ${c.side}`} data-testid="merge-change" data-side={c.side}>
-              <label className="v2-row" style={{ gap: 6 }}>
+              <label className="v2-row v2-merge-row">
                 <input type="checkbox" checked={choices[i] !== false} onChange={(e) => set(i, e.target.checked)} aria-label={`Keep change ${n + 1}: ${SIDE[c.side].toLowerCase()}`} />
                 <strong>{SIDE[c.side]}</strong><span className="v2-hint">keep it</span>
               </label>
@@ -84,10 +84,10 @@ export function ConflictDialog({ base, mine, theirs, check, save, onClose }: Con
             </li>
           ) : c.kind === 'conflict' ? (
             <li key={i} className="v2-merge-item conflict" data-testid="merge-conflict" role="radiogroup" aria-label={`Place ${n + 1} you both changed`}>
-              <div className="v2-row" style={{ gap: 6 }}><Icon name="warn" size={14} /><strong>You both changed this</strong>{c.base.length ? <span className="v2-hint">(it was: {c.base.join(' ').slice(0, 120)})</span> : null}</div>
+              <div className="v2-row v2-merge-row"><Icon name="warn" size={14} /><strong>You both changed this</strong>{c.base.length ? <span className="v2-hint">(it was: {c.base.join(' ').slice(0, 120)})</span> : null}</div>
               <div className="v2-merge-cols">
-                <label className={`v2-merge-pick${choices[i] === 'mine' ? ' on' : ''}`}><span className="v2-row" style={{ gap: 6 }}><input type="radio" name={`merge-${i}`} checked={choices[i] === 'mine'} onChange={() => set(i, 'mine')} data-testid="merge-pick-mine" />Keep yours</span><Lines lines={c.mine} tone="plain" /></label>
-                <label className={`v2-merge-pick${choices[i] === 'theirs' ? ' on' : ''}`}><span className="v2-row" style={{ gap: 6 }}><input type="radio" name={`merge-${i}`} checked={choices[i] === 'theirs'} onChange={() => set(i, 'theirs')} data-testid="merge-pick-theirs" />Keep theirs</span><Lines lines={c.theirs} tone="plain" /></label>
+                <label className={`v2-merge-pick${choices[i] === 'mine' ? ' on' : ''}`}><span className="v2-row v2-merge-row"><input type="radio" name={`merge-${i}`} checked={choices[i] === 'mine'} onChange={() => set(i, 'mine')} data-testid="merge-pick-mine" />Keep yours</span><Lines lines={c.mine} tone="plain" /></label>
+                <label className={`v2-merge-pick${choices[i] === 'theirs' ? ' on' : ''}`}><span className="v2-row v2-merge-row"><input type="radio" name={`merge-${i}`} checked={choices[i] === 'theirs'} onChange={() => set(i, 'theirs')} data-testid="merge-pick-theirs" />Keep theirs</span><Lines lines={c.theirs} tone="plain" /></label>
               </div>
             </li>
           ) : null)}

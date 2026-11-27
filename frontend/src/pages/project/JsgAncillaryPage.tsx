@@ -272,7 +272,7 @@ function IsplPreface({ front, ro, touch }: { front: Front; ro: boolean; touch: (
                     <span className="v2-hint" style={{ width: 22, paddingTop: 7, flex: 'none' }}>({String.fromCharCode(97 + k)})</span>
                     <textarea className="v2-input" rows={2} style={{ flex: 1 }} disabled={ro} value={first ? toText(first.inline) : ''} aria-label={`List item ${k + 1}`}
                       onChange={(e) => { if (first) first.inline = fromText(e.target.value, first.inline); else it.parts.unshift({ k: 'text', inline: fromText(e.target.value) }); touch(); }} />
-                    {!ro ? <button type="button" className="icon-btn" aria-label="Remove item" onClick={() => { b.items.splice(k, 1); touch(); }}><Icon name="trash" size={13} /></button> : null}
+                    {!ro ? <button type="button" className="icon-btn" aria-label="Remove item" title="Remove item" onClick={() => { b.items.splice(k, 1); touch(); }}><Icon name="trash" size={13} /></button> : null}
                   </div>
                 );
               })}
@@ -292,7 +292,7 @@ function IsplPreface({ front, ro, touch }: { front: Front; ro: boolean; touch: (
               onChange={(e) => { b.inline = fromText(e.target.value, b.inline); touch(); }} />
             {!ro ? <span className="v2-row" style={{ gap: 2, flex: 'none' }}>
               <button type="button" className="icon-btn" aria-label={numbered ? 'Make a continuation paragraph' : 'Make a numbered paragraph'} title={numbered ? 'Continuation paragraph (no number)' : 'Numbered paragraph'} onClick={() => { b.indent = numbered ? 3 : 2; touch(); }}>{numbered ? '→' : '←'}</button>
-              <button type="button" className="icon-btn" aria-label="Remove" onClick={() => { blocks.splice(i, 1); touch(); }}><Icon name="trash" size={13} /></button>
+              <button type="button" className="icon-btn" aria-label="Remove" title="Remove" onClick={() => { blocks.splice(i, 1); touch(); }}><Icon name="trash" size={13} /></button>
             </span> : null}
           </div>
         );
