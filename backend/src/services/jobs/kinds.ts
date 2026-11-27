@@ -31,8 +31,9 @@ export async function runKind(kind: JobKind, projectId: string | null, p: Record
     case 'validate': {
       // The Validation page: answered from the stored run when nothing it reads has changed (PERF-012); otherwise a full run, as before.
       const opts = { issue: str(p.issue), brex: !!p.brex };
-      const hash = config.jobs.validationCache && p.fresh !== true ? validationFingerprint(pid(), opts) : null;
-      const prev = hash ? lastRun(pid()) : null;
+      // `fresh`: judge again even when unchanged (the stored run is still replaced and fingerprinted, so the next request can use it)
+      const hash = config.jobs.validationCache ? validationFingerprint(pid(), opts) : null;
+      const prev = hash && p.fresh !== true ? lastRun(pid()) : null;
       if (hash && prev && prev.inputHash === hash) return { result: { run: { ...prev, cached: true } }, inputHash: hash };
       const run = await runValidation(pid(), { ...opts, inputHash: hash ?? undefined });
       return { result: { run }, inputHash: hash };

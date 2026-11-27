@@ -172,7 +172,7 @@ function start(j: Job, viaWorkers: boolean): void {
     (out) => {
       if (j.inlineAbort) return;                                     // inline work cannot be killed; its late answer is dropped
       if (out.ok) finish(j, 'succeeded', out.result, null, out.inputHash ?? null);
-      else finish(j, 'failed', null, out.error);
+      else finish(j, 'failed', null, memoryHint(out.error));
     },
     (e: Error) => {
       if (j.inlineAbort) return;
@@ -184,6 +184,13 @@ function start(j: Job, viaWorkers: boolean): void {
       else { counters.crashed++; void crashMessage(e.message).then((m) => finish(j, 'failed', null, { name: 'HttpError', status: 500, code: 'JOB_WORKER_CRASHED', message: m })); }
     },
   );
+}
+
+/** An allocation the job object refused surfaces in the worker as an ordinary error: say which limit it met. */
+function memoryHint(e: WireError): WireError {
+  const lim = config.jobs.limits;
+  if (e.status || !lim.enabled || pool?.holder.status.state !== 'active' || !/allocation failed|out of memory|ENOMEM/i.test(e.message)) return e;
+  return { ...e, name: 'HttpError', status: 507, code: 'JOB_MEMORY_LIMIT', message: `The job needed more memory than its limit (${lim.processMb} MB per process, ${lim.jobMb} MB for all jobs together) and was refused it (${e.message}). Only this job failed.` };
 }
 
 async function crashMessage(base: string): Promise<string> {
@@ -301,4 +308,4 @@ export async function poolDiagnostics(): Promise<{ status: ReturnType<WorkerPool
 }
 
 /** The error codes a job adds to those of the work itself. */
-export const JOB_ERROR_CODES = ['JOB_CANCELLED', 'JOB_TIMEOUT', 'JOB_WORKER_CRASHED', 'JOB_INTERRUPTED'] as const;
+export const JOB_ERROR_CODES = ['JOB_CANCELLED', 'JOB_TIMEOUT', 'JOB_WORKER_CRASHED', 'JOB_MEMORY_LIMIT', 'JOB_INTERRUPTED'] as const;
