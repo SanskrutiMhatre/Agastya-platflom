@@ -1,0 +1,57 @@
+{
+  "_comment": "WP-36 (CLN-004): what each feature the owner removed was made of. scripts/cleanup/check.mjs fails if a file comes back, or if an identifier, string (endpoint, test id, label), CSS class prefix, rail label or code pattern reappears in the non-test front-end source. keptRoutes: the server routes the owner kept ('backend, data and API stay', 2026-11-26) - each must stay listed in docs/API-ONLY-ROUTES.md. Routes and redirects of the removed screens are checked by scripts/parity/check.mjs (removedByOwner). allow: { file, text, reason } for a legitimate occurrence (an old address that is now a redirect). Sources: commits e85fa94 (2026-11-26) and c61ec89 (2026-11-27), WP-13 (b76b4e3).",
+  "features": [
+    {
+      "feature": "Files (CSDB) page of a project",
+      "removed": "2026-11-26",
+      "files": ["src/pages/project/CsdbPage.tsx"],
+      "identifiers": ["CsdbPage"],
+      "strings": ["objects/new", "dml/generate"],
+      "railLabels": ["Files", "CSDB"],
+      "keptRoutes": ["/api/projects/:id/objects", "objects/new", "dml/generate"]
+    },
+    {
+      "feature": "Second SNS screen (System 2 SNS: project SNS rows and the Administrator's SNS defaults)",
+      "removed": "2026-11-26",
+      "files": [
+        "src/api/sns.ts", "src/components/SnsRows.tsx", "src/lib/sns.ts", "src/pages/SnsDefaultsAdmin.tsx",
+        "src/pages/project/sns/SnsDeriveTab.tsx", "src/pages/project/sns/SnsImportTab.tsx", "src/pages/project/sns/SnsLearnTab.tsx",
+        "src/pages/project/sns/SnsOrderingTab.tsx", "src/pages/project/sns/SnsSettings.tsx", "src/pages/project/sns/StructureView.tsx"
+      ],
+      "identifiers": ["snsApi", "snsDefaultsApi", "SnsRowsEditor", "SnsDefaultsAdmin", "SnsSettings", "SnsDeriveTab", "SnsImportTab", "SnsLearnTab", "SnsOrderingTab", "canEditSns", "canEditSnsDefaults"],
+      "strings": ["sns-rows", "sns/defaults", "sns-defaults", "SNS defaults"],
+      "allow": [{ "file": "src/pages/Administrator.tsx", "text": "sns-defaults", "reason": "the old address is a redirect to Numbering (SNS); parity removedByOwner checks it stays one" }],
+      "keptRoutes": ["sns-rows", "/api/sns/defaults"]
+    },
+    {
+      "feature": "Brand pack screen of a project",
+      "removed": "2026-11-26",
+      "files": ["src/api/brand.ts", "src/lib/brandPack.ts", "src/pages/project/BrandPackSettings.tsx"],
+      "identifiers": ["BrandPackSettings", "brandApi", "canChooseBrandPack"],
+      "strings": ["brand-packs", "Brand pack"],
+      "classPrefixes": ["v2-brandprev"],
+      "keptRoutes": ["/api/brand-packs"]
+    },
+    {
+      "feature": "Applicability UI (settings section, Configuration... beside Generate, the editor picker)",
+      "removed": "2026-11-26",
+      "files": ["src/pages/project/editor/ConfigurationDialog.tsx", "src/studio/ui/applicPicker.ts"],
+      "identifiers": ["ConfigurationDialog", "applicPicker", "applicXml", "actRef", "saveApplicability", "configuredUrl", "planConfigured", "buildConfigured"],
+      "strings": ["/applicability", "publish/configur", "Configuration…", "Configuration...", "applic-new"],
+      "classPrefixes": ["applic-"],
+      "keptRoutes": ["/applicability", "publish/configured", "publish/configurations"]
+    },
+    {
+      "feature": "Codes strip and Codes button of the JSS and JSG editors",
+      "removed": "2026-11-27",
+      "strings": ["doc-codes-strip", "doc-codes-switches", "doc-codes-table"],
+      "exactStrings": ["doc-codes"]
+    },
+    {
+      "feature": "PMC, ICN and contents code switches",
+      "removed": "2026-11-27",
+      "strings": ["doc-codes-show-pmc", "doc-codes-show-icn", "doc-codes-show-toc"],
+      "codePatterns": ["show\\??\\.(pmc|icn|toc)\\b", "show\\s*:\\s*\\{[^}]*\\b(pmc|icn|toc)\\s*[:?]"]
+    }
+  ]
+}

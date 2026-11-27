@@ -156,4 +156,3 @@ export function newId(doc: JssDoc, prefix: 's' | 't' | 'f' | 'c'): string {
   }
 }
 
-export const cloneDoc = (doc: JssDoc): JssDoc => JSON.parse(JSON.stringify(doc)) as JssDoc;

@@ -17,7 +17,9 @@
     "tokens": "node scripts/tokens/build-tokens.mjs",
     "check:parity": "node scripts/parity/check.mjs",
     "parity:update": "node scripts/parity/check.mjs --update",
-    "parity:scan": "node scripts/parity/scan.mjs"
+    "parity:scan": "node scripts/parity/scan.mjs",
+    "check:cleanup": "node scripts/cleanup/check.mjs",
+    "test:cleanup": "node --test scripts/cleanup/scan.test.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.4",
@@ -29,7 +31,6 @@
     "@codemirror/state": "^6.7.6",
     "@codemirror/view": "^6.43.15",
     "@lezer/highlight": "^1.2.5",
-    "codemirror": "^6.0.2",
     "lucide": "^1.69.0",
     "pdfjs-dist": "^4.10.38",
     "pdfmake": "^0.3.13",

@@ -308,13 +308,6 @@
 .picker-hint { color: var(--text-faint); font-size: 11px; white-space: nowrap; }
 
 /* new DM */
-.type-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
-.type-card { text-align: left; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-elev); cursor: pointer; }
-.type-card:hover { border-color: var(--border-strong); background: var(--bg-hover); }
-.type-card.active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); background: var(--accent-soft); }
-.type-card-title { font-weight: 600; margin-bottom: 3px; }
-.type-card-desc { font-size: 11.5px; color: var(--text-muted); line-height: 1.35; }
-.type-card-code { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-faint); margin-top: 6px; }
 .dmc-row { display: flex; gap: 6px; flex-wrap: wrap; }
 .dmc-row .field { flex: none; }
 .w-mic { width: 120px; } .w-s { width: 70px; } .w-xs { width: 52px; }
@@ -385,14 +378,9 @@ kbd { font-family: var(--font-mono); font-size: 11px; padding: 1px 6px; border: 
 button.fm-recent-item { width: 100%; border: 0; background: none; text-align: left; cursor: pointer; }
 button.fm-recent-item:hover { background: var(--bg-hover); }
 
-/* New data module: project applicability picker and SNS-driven fields */
+/* New data module: SNS-driven fields */
 .dmc-row .field.w-m { width: 190px; }
 .dmc-row select.input { text-transform: none; }
-.applic-rows { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
-.applic-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.applic-row .input { width: auto; min-width: 160px; }
-.applic-vals { display: inline-flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-.applic-tools { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
 
 /* Cascade order (WP-18): base.css loads with the entry, so it now comes AFTER this sheet. These rules overrode a base rule
    of the same specificity only by coming later; they are restated one step more specific so they still win. */

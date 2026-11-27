@@ -10,6 +10,9 @@
 //   lint             scripts/ci/lint.mjs: ratchets (`any`, lazy require, .only) against scripts/ci/lint-baseline.json
 //   parity           frontend/scripts/parity/check.mjs (WP-34, GAP-009): no route, rail item, command, key, test id or test removed without a row
 //                    in docs/audit/baseline/parity-explanations.json; the report is parity.md in the evidence folder
+//   cleanup          frontend/scripts/cleanup (WP-36, CLN-004): its own tests, then check.mjs - no file, export or CSS class that nothing references
+//                    outside allowlist.json, and no debris (files, identifiers, endpoints, test ids, classes, rail labels) of a feature the owner
+//                    removed (removed-features.json); the report is cleanup.md in the evidence folder
 //   theme            frontend token checks (WP-19/WP-20): tokens.css current, contrast pairs, token coverage, colour-literal lint
 //   tools            backend/test/tools-canary.test.js: every tool the tests need, by name; the gate stops here when one is missing
 //   security         the security matrix files (authorisation, routes, hostile input)
@@ -28,7 +31,7 @@
 //                    data present, or it refuses), verify:package, and scripts/release/verify-release.mjs over the result
 //   readiness        scripts/ci/readiness.mjs (RES-011): the static release gates
 //
-// Profiles: pr = build, frontend-build, lint, parity, theme, tools, security, backend, pdf-smoke, frontend (about the PR budget of QA-001); nightly = everything
+// Profiles: pr = build, frontend-build, lint, parity, cleanup, theme, tools, security, backend, pdf-smoke, frontend (about the PR budget of QA-001); nightly = everything
 // up to e2e, then visual and perf; release = nightly + frontend-verify + package + readiness.
 //
 // Evidence (QA-017): DIR (default verification-results/ci/<UTC time>-<commit>) gets meta.json (commit, dirty tree, Node, OS, tool versions),
@@ -56,9 +59,9 @@ const BUDGET_FILE = path.resolve(opt('skip-budget', path.join(ROOT, 'scripts', '
 const BUDGET = JSON.parse(fs.readFileSync(BUDGET_FILE, 'utf8'));
 const flag = (name) => argv.includes(`--${name}`);
 const PROFILES = {
-  pr: ['build', 'frontend-build', 'lint', 'parity', 'theme', 'tools', 'security', 'backend', 'pdf-smoke', 'frontend'],      // frontend-build: the security headers test reads the served client
-  nightly: ['build', 'frontend-build', 'typecheck', 'lint', 'parity', 'theme', 'tools', 'security', 'backend', 'pdf-smoke', 'backend-heavy', 'frontend', 'e2e', 'visual', 'perf'],
-  release: ['build', 'frontend-build', 'typecheck', 'lint', 'parity', 'theme', 'tools', 'security', 'backend', 'pdf-smoke', 'backend-heavy', 'frontend', 'frontend-verify', 'e2e', 'visual', 'perf', 'package', 'readiness'],
+  pr: ['build', 'frontend-build', 'lint', 'parity', 'cleanup', 'theme', 'tools', 'security', 'backend', 'pdf-smoke', 'frontend'],      // frontend-build: the security headers test reads the served client
+  nightly: ['build', 'frontend-build', 'typecheck', 'lint', 'parity', 'cleanup', 'theme', 'tools', 'security', 'backend', 'pdf-smoke', 'backend-heavy', 'frontend', 'e2e', 'visual', 'perf'],
+  release: ['build', 'frontend-build', 'typecheck', 'lint', 'parity', 'cleanup', 'theme', 'tools', 'security', 'backend', 'pdf-smoke', 'backend-heavy', 'frontend', 'frontend-verify', 'e2e', 'visual', 'perf', 'package', 'readiness'],
 };
 const profile = opt('profile', 'pr');
 if (!PROFILES[profile]) { console.error(`unknown profile ${profile} (pr, nightly, release)`); process.exit(2); }
@@ -191,6 +194,12 @@ const STAGES = {
   typecheck: () => { const [n, a] = npmCli(FRONTEND, 'typescript', 'bin', 'tsc'); return simpleStage('typecheck', n, [...a, '--noEmit', '-p', '.'], { cwd: FRONTEND, limitMs: 10 * 60_000 }); },
   lint: () => simpleStage('lint', nodeBin, [path.join(ROOT, 'scripts', 'ci', 'lint.mjs')], { limitMs: 5 * 60_000 }),
   parity: () => simpleStage('parity', nodeBin, [path.join(FRONTEND, 'scripts', 'parity', 'check.mjs'), '--report', path.join(EVIDENCE, 'parity.md')], { cwd: FRONTEND, limitMs: 10 * 60_000 }),
+  // WP-36: the scan's own tests, then the dead-code and removal-completeness report (the lint stage holds the same counts at zero)
+  cleanup: async () => {
+    const tests = await simpleStage('cleanup-tests', nodeBin, ['--test', '--test-concurrency=1', path.join(FRONTEND, 'scripts', 'cleanup', 'scan.test.mjs')], { cwd: FRONTEND, limitMs: 5 * 60_000 });
+    const check = await simpleStage('cleanup', nodeBin, [path.join(FRONTEND, 'scripts', 'cleanup', 'check.mjs'), '--report', path.join(EVIDENCE, 'cleanup.md')], { cwd: FRONTEND, limitMs: 5 * 60_000 });
+    return tests && check;
+  },
   // WP-20: the four token checks one after the other (seconds each); all of them run, so the evidence shows every failure at once
   theme: async () => {
     let ok = true;

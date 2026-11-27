@@ -74,7 +74,6 @@ export function shared<T>(key: string, load: (signal: AbortSignal) => Promise<T>
 /** Every caller gets its own copy: a page that sorts or edits what it was given cannot change what another page (or the cache) holds. */
 const own = (v: unknown): unknown => (v !== null && typeof v === 'object' ? structuredClone(v) : v);
 
-export const isAbort =(e: unknown): boolean => e instanceof DOMException && e.name === 'AbortError';
 const abortError = () => new DOMException('Aborted', 'AbortError');
 
 /** For tests. */

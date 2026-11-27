@@ -29,7 +29,6 @@ export const SHIFT = (INSIDE - OUTSIDE) / 2;
 export const MARGIN_TOP = 84.6;
 export const MARGIN_BOTTOM = 72;
 export const CONTENT_W = PAGE_W - INSIDE - OUTSIDE; // 473.39 pt
-export const CONTENT_H = PAGE_H - MARGIN_TOP - MARGIN_BOTTOM;
 /**
  * Landscape pages (S1000D `orient="land"` / `foldout`): the same A4 sheet turned, with the same mirrored margins and
  * header/footer distances. `LAND_IMG_H` is the tallest picture that still leaves room for its ICN line and caption.

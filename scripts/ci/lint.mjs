@@ -2,14 +2,15 @@
 // A small, dependency-free lint step for the offline gate (ARC-014, WP-08). There is no ESLint in the repository and the gate must run without
 // a network, so this checks the few things that catch real defects and ratchets the rest:
 //
-//   hard rules (must be 0):   test.only / describe.only / it.only (a focused test silently skips the rest of its file), `debugger;`
+//   hard rules (must be 0):   test.only / describe.only / it.only (a focused test silently skips the rest of its file), `debugger;`,
+//                             and (WP-36) frontend dead code and removal debris: frontend/scripts/cleanup/scan.mjs, see check.mjs there
 //   ratchets (must not grow):  explicit `any` in backend/src and frontend/src, `require(` in TypeScript sources (escapes the type checker)
 //
 //   node scripts/ci/lint.mjs            check against scripts/ci/lint-baseline.json
 //   node scripts/ci/lint.mjs --update   write the current counts as the new baseline (only ever downwards in review)
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const BASELINE = path.join(ROOT, 'scripts', 'ci', 'lint-baseline.json');
@@ -37,9 +38,19 @@ const counts = {
   'require.backend-ts': count(backendTs, /\brequire\(/g),
   'require.frontend-ts': count(frontendTs, /\brequire\(/g),
 };
+// WP-36 (CLN-004): dead code stays at zero outside frontend/scripts/cleanup/allowlist.json, and the features the owner removed leave no debris
+const cleanup = await import(pathToFileURL(path.join(ROOT, 'frontend', 'scripts', 'cleanup', 'scan.mjs')).href);
+const cleanupJson = (f) => JSON.parse(fs.readFileSync(path.join(ROOT, 'frontend', 'scripts', 'cleanup', f), 'utf8'));
+const dead = cleanup.applyAllowList(cleanup.scanDeadCode(), cleanupJson('allowlist.json'));
 const hard = {
   'focused tests (.only)': testFiles.filter((f) => /\b(?:test|it|describe)\.only\(/.test(strip(fs.readFileSync(f, 'utf8')))).map((f) => path.relative(ROOT, f)),
   'debugger statements': [...backendTs, ...frontendTs, ...testFiles].filter((f) => /^\s*debugger;?\s*$/m.test(strip(fs.readFileSync(f, 'utf8')))).map((f) => path.relative(ROOT, f)),
+  'frontend files nothing imports': dead.files,
+  'frontend exports referenced nowhere': dead.exports.map((e) => `${e.file}::${e.name}`),
+  'frontend CSS classes no source names': dead.classes.map((c) => `.${c.name} (${c.file})`),
+  'frontend runtime dependencies nothing imports': dead.deps,
+  'cleanup allow-list entries without a reason': dead.problems,
+  'debris of features the owner removed': cleanup.scanRemovalDebris(cleanupJson('removed-features.json').features),
 };
 
 if (process.argv.includes('--update')) {

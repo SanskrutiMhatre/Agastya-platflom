@@ -556,10 +556,6 @@ export function adjacentCell(entry: Element, dir: 1 | -1): Element | null {
   return n ? n.entry : null;
 }
 
-export function cellStart(entry: Element, g: Grammar | null): ModelPos {
-  return startOf(entry, g);
-}
-
 /**
  * Applies a drag of the boundary between column `i` and `i + 1` (new rendered widths in CSS pixels) without disturbing the
  * rest of the table and without changing how a width is written: proportional columns ("2*") trade weight with each other,

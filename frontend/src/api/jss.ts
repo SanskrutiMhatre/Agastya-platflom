@@ -21,7 +21,6 @@ export interface JssDocument {
   /** the first chapter of the stencil, what a new chapter of a free-chapter type starts from */
   chapterStarter?: OutlineNode | null;
 }
-export interface JssType { id: string; label: string; stencil: string; bodyKind: string; domain?: string; ready: boolean; notReady?: string; chapters: string[]; maxDepth: number }
 
 const P = (id: string) => `/api/projects/${id}/jss`;
 

@@ -35,10 +35,6 @@ export const draftKey = (userId: string, projectId: string, kind: string) => `${
 export const getDraft = (key: string): Promise<LocalDraft | null> => tx('readonly', (s) => s.get(key)).then((r) => (r as LocalDraft) ?? null).catch(() => null);
 export const putDraft = (d: LocalDraft): Promise<void> => tx('readwrite', (s) => s.put(d)).then(() => undefined).catch(() => undefined);
 export const delDraft = (key: string): Promise<void> => tx('readwrite', (s) => s.delete(key)).then(() => undefined).catch(() => undefined);
-export async function delDraftsOf(userId: string): Promise<void> {
-  const all = await tx('readonly', (s) => s.getAll()).catch(() => [] as LocalDraft[]);
-  for (const d of all as LocalDraft[]) if (d.key.startsWith(`${userId}/`)) await delDraft(d.key);
-}
 
 // A sign-out the person chose removes their drafts (store/session.ts, through lib/draftPurge.ts, whatever page they were on); an
 // ended session keeps them for when they come back.

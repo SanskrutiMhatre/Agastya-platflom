@@ -4,8 +4,6 @@
  * Public entry points:
  *  - `exportPdfBlob`     renders data modules to a PDF Blob ("preview": data module pages only; "publication":
  *                        title page, contents lists and every data module on a right-hand page).
- *  - `buildPdfDocDefinition` / `buildCombinedPdfDocDefinition`  the pdfmake document definition only (first
- *                        layout pass, without measured page numbers), for tests and inspection.
  *
  * The implementation is split by concern:
  *  - `pdf-theme.ts`        measured page geometry, typography and spacing
@@ -21,7 +19,7 @@
  *  - `pdf-mirror.ts`       mirrored inside/outside margins by page parity
  */
 import type { EditorDocument } from '../core/document';
-import { buildPublicationDefinition, renderPublication, type ImageResolver, type PdfBuildOptions, type PdfBuildResult, type PdfRenderResult } from './pdf-publication';
+import { renderPublication, type ImageResolver, type PdfBuildOptions, type PdfRenderResult } from './pdf-publication';
 
 export type { PNode } from './pdf-metrics';
 export { DEFAULT_SETTINGS } from './pdf-publication';
@@ -32,14 +30,3 @@ export function exportPdfBlob(docs: EditorDocument[], images: ImageResolver, opt
   return renderPublication(docs, images, opts);
 }
 
-/** pdfmake definition of one data module's publication (first layout pass). */
-export async function buildPdfDocDefinition(doc: EditorDocument, images: ImageResolver, opts: PdfBuildOptions = {}): Promise<PdfBuildResult> {
-  const { def, warnings } = await buildPublicationDefinition([doc], images, opts);
-  return { def, warnings };
-}
-
-/** pdfmake definition of several data modules combined into one publication (first layout pass). */
-export async function buildCombinedPdfDocDefinition(docs: EditorDocument[], images: ImageResolver, opts: PdfBuildOptions = {}): Promise<PdfBuildResult> {
-  const { def, warnings } = await buildPublicationDefinition(docs, images, opts);
-  return { def, warnings };
-}

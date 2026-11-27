@@ -150,39 +150,4 @@ export function dropTarget(entries: PmEntry[], path: Path, where: DropWhere): { 
   return { parentPath: path.slice(0, -1), index: where === 'after' ? idx + 1 : idx };
 }
 
-/** Every module in document order — the invariant a rearrange must preserve. */
-export function moduleIds(entries: PmEntry[]): string[] {
-  const out: string[] = [];
-  const walk = (list: PmEntry[]) => (list ?? []).forEach(e => {
-    if (isFolder(e)) walk(e.children);
-    else if (e.type === 'include') out.push('href:' + e.href);
-    else out.push('dmc:' + JSON.stringify(Object.entries(e.dmCode ?? {}).sort()));
-  });
-  walk(entries);
-  return out;
-}
 
-/** Reconstruct the display DMC string from a dmCode. */
-export function dmcOf(e: PmEntry): string {
-  if (e.type !== 'dm' || !e.dmCode) return '';
-  const c = e.dmCode;
-  const seg = [
-    c.modelIdentCode, c.systemDiffCode, c.systemCode,
-    (c.subSystemCode ?? '') + (c.subSubSystemCode ?? ''),
-    c.assyCode,
-    (c.disassyCode ?? '') + (c.disassyCodeVariant ?? ''),
-    (c.infoCode ?? '') + (c.infoCodeVariant ?? ''),
-    c.itemLocationCode,
-  ];
-  return seg.every(s => s === undefined) ? '' : 'DMC-' + seg.join('-');
-}
-
-/** Label for a row. Modules carry titles; an include only has a filename. */
-export function labelFor(e: PmEntry): string {
-  if (e.type === 'folder') return e.title || '(untitled chapter)';
-  if (e.type === 'include') {
-    return e.title?.trim() || e.href.replace(/^.*\//, '');
-  }
-  const parts = [e.techName?.trim(), e.infoName?.trim()].filter(Boolean);
-  return parts.length ? parts.join(' — ') : (dmcOf(e) || '(module)');
-}
