@@ -6,10 +6,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const path = require('node:path');
 const { monitorEventLoopDelay, performance } = require('node:perf_hooks');
-const { boot } = require('./helpers');
+const { boot, DM21 } = require('./helpers');
 
 const PW = 'Correct-Horse-9!';
-const FIX = path.resolve(__dirname, '..', '..', 'frontend', 'e2e', 'fixtures', 'dm21', '5-0');
+const FIX = path.join(DM21, '5-0');
 
 test('a 200-module validation with BREX does not hold the event loop: its longest stall stays under 100 ms and a second client is answered', { timeout: 600000 }, async () => {
   const h = await boot();

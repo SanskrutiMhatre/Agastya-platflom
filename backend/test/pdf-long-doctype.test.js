@@ -6,13 +6,13 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path');
-const { spawnSync } = require('node:child_process');
-const { boot } = require('./helpers');
+const { boot, DM21 } = require('./helpers');
+const { pdfText } = require('./pdftools');
 
 const PW = 'Correct-Horse-9!';
-const FIX = path.resolve(__dirname, '..', '..', 'frontend', 'e2e', 'fixtures', 'dm21', '5-0');
+const FIX = path.join(DM21, '5-0');
 const MARK = 'LONGDOCTYPEMARKERWORD';
-const text = (buf) => { const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ld-')), 'x.pdf'); fs.writeFileSync(f, buf); return spawnSync('pdftotext', [f, '-'], { encoding: 'utf8' }).stdout.replace(/\s+/g, '').toUpperCase(); };
+const text = async (buf) => { return (await pdfText(buf, { mode: 'plain' })).replace(/\s+/g, '').toUpperCase(); };
 let h; let w;
 
 test.before(async () => {
@@ -43,5 +43,5 @@ test('a data module with a very long DOCTYPE (identification beyond 8 KiB) is re
   fs.writeFileSync(pmFile, fs.readFileSync(pmFile, 'utf8').replace(/<content[\s\S]*<\/content>|<content\s*\/>/, `<content><pmEntry><pmEntryTitle>Plain</pmEntryTitle>${ref(x1)}</pmEntry><pmEntry><pmEntryTitle>Long</pmEntryTitle>${ref(x2)}</pmEntry></content>`));
   const built = await w.post(`${U}/publish`, {});
   assert.equal(built.status, 200, JSON.stringify(built.json).slice(0, 400));
-  assert.ok(text((await w.get(`${U}/publish/pdf`)).buf).includes(MARK), 'the content of the module with the long DOCTYPE is in the PDF');
+  assert.ok((await text((await w.get(`${U}/publish/pdf`)).buf)).includes(MARK), 'the content of the module with the long DOCTYPE is in the PDF');
 });

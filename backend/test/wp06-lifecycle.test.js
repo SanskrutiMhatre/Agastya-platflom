@@ -7,7 +7,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path'); const net = require('node:net');
 const { spawn } = require('node:child_process');
-const { boot } = require('./helpers');
+const { boot, tmp } = require('./helpers');
 
 const PW = 'Correct-Horse-9!';
 const DM = 'DMC-S1KSTUDIO-A-29-10-00-00A-040A-D_001-00_EN-US.XML';
@@ -145,7 +145,7 @@ function holdDb(ws, ms) {
 }
 
 test('one server per data folder; a clean stop drains a running request and checkpoints the database (DEP-017, REL-003)', { timeout: 120000 }, async () => {
-  const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'agastya-wp06-'));
+  const ws = tmp('agastya-wp06-');
   const port = await freePort();
   const a = serve(ws, port); await a.ready;
   const lock = JSON.parse(fs.readFileSync(path.join(ws, '.agastya-server.lock'), 'utf8'));
@@ -179,7 +179,7 @@ test('one server per data folder; a clean stop drains a running request and chec
 });
 
 test('a database held by another process: a short hold is waited for, a long one is a 503 with Retry-After and leaves no folder (PLT-002)', { timeout: 120000 }, async () => {
-  const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'agastya-wp06-busy-'));
+  const ws = tmp('agastya-wp06-busy-');
   const port = await freePort(); const base = `http://127.0.0.1:${port}`;
   const s = serve(ws, port); await s.ready;
   const call = async (method, url, body, cookie) => {

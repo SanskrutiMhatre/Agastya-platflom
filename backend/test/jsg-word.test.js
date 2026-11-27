@@ -4,8 +4,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const path = require('node:path'); const os = require('node:os');
-const { spawnSync } = require('node:child_process');
-const { boot } = require('./helpers');
+const { boot, tmp } = require('./helpers');
+const { readPdf, pdfText } = require('./pdftools');
 const { ZipStreamWriter } = require('../dist/services/zipio');
 
 const PW = 'Correct-Horse-9!';
@@ -49,7 +49,7 @@ const docxBody = [
   para('', run('APPENDIX ‘H’'), '<w:jc w:val="right"/>'), para('', run('SYSTEM SPECIFICATION'), '<w:jc w:val="center"/>'), para('L2-Para', run('Appendix text.')),
 ].join('');
 const makeDocx = async () => {
-  const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'wordtest-')), 'handbook.docx'); const z = new ZipStreamWriter(fs.createWriteStream(f));
+  const f = path.join(tmp('wordtest-'), 'handbook.docx'); const z = new ZipStreamWriter(fs.createWriteStream(f));
   await z.addBuffer('word/document.xml', Buffer.from(`<?xml version="1.0" encoding="UTF-8"?><w:document ${NS}><w:body>${docxBody}</w:body></w:document>`));
   await z.addBuffer('word/_rels/document.xml.rels', Buffer.from('<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId9" Type="image" Target="media/plate.png"/></Relationships>'));
   await z.addBuffer('word/media/plate.png', PNG); await z.finish(); return f;
@@ -60,12 +60,11 @@ const create = async (name, body = {}) => {
   return { id: r.json.project.id, U: `/api/projects/${r.json.project.id}`, dir: path.join(h.ws, 'projects', r.json.project.id) };
 };
 // The stencil sets some titles letter-spaced as literal text ("C E R T I F I C A T E" in jsg-uhb.xsl and jsg-ispl.xsl); the order checks
-// read such a title as one word, so they look for the page and not for a spelling. xpdf's pdftotext (Git for Windows ships it) writes the
-// curly quotes of "APPX ‘A’" as `A'; poppler keeps them: both read the same.
-const text = (pdf) => spawnSync('pdftotext', ['-layout', pdf, '-'], { encoding: 'utf8' }).stdout
-  .replace(/\b(?:[A-Z] ){3,}[A-Z]\b/g, (m) => m.replace(/ /g, ''))
-  .replace(/`([A-Z])'/g, '‘$1’');
-const pages = (pdf) => Number(/Pages:\s+(\d+)/.exec(spawnSync('pdfinfo', [pdf], { encoding: 'utf8' }).stdout)[1]);
+// read such a title as one word, so they look for the page and not for a spelling. The PDF is read with pdf.js (test/pdftools.js), which keeps
+// the curly quotes of "APPX ‘A’" as they are printed.
+const text = async (pdf) => (await pdfText(pdf))
+  .replace(/\b(?:[A-Z] ){3,}[A-Z]\b/g, (m) => m.replace(/ /g, ''));
+const pages = async (pdf) => (await readPdf(pdf)).pageCount;
 
 test('Import from Word: the JSG styles become chapters, sections, clauses, paragraphs with marks, lists, a table with a merged cell, a captioned figure, a landscape section and an appendix', async () => {
   const p = await create('Word in');
@@ -98,10 +97,10 @@ test('the JSG sample project: a real filled handbook that validates, builds, pri
   const doc = (await w.get(`${U}/jsg`)).json; assert.equal(doc.report.errors, 0, JSON.stringify(doc.report.findings.slice(0, 3)));
   assert.match(doc.xml, /<associated intro="Modular Bridge System has following associated handbooks:">/); assert.match(doc.xml, /<certificate>/);
   assert.equal((await w.post(`${U}/jsg/build`, {})).status, 200);
-  const pdf = path.join(dir, 'jsg-output.pdf'); const t = text(pdf).replace(/\s+/g, ' ');
+  const pdf = path.join(dir, 'jsg-output.pdf'); const t = (await text(pdf)).replace(/\s+/g, ' ');
   const at = (s) => t.indexOf(s);
   assert.ok(at('CERTIFICATE') > 0 && at('CERTIFICATE') < at('ASSOCIATED HANDBOOKS') && at('ASSOCIATED HANDBOOKS') < at('AMENDMENTS') && at('AMENDMENTS') < at('WARNING') && at('WARNING') < at('FIRST AID IN CASE OF ELECTRICAL SHOCK') && at('FIRST AID IN CASE OF ELECTRICAL SHOCK') < at('ABBREVIATIONS') && at('ABBREVIATIONS') < at('PREFACE') && at('PREFACE') < at('LIST OF FIGURES'), 'the real handbook\'s order');
-  const total = pages(pdf);
+  const total = await pages(pdf);
   assert.match(t, new RegExp(`contains ${total} pages which have been serially numbered from \\(i\\) to \\([ivxlc]+\\) as ancillary pages and from 1 to \\d+ as main content`), 'the certificate cites the page count the build printed');
   assert.match(t, /CQAE\/UH\/E2\/24\/1A contains/, 'and the document number');
   assert.match(t, /Sr\. Document Title Document No\. Remark/, 'the associated handbooks table');
@@ -109,7 +108,7 @@ test('the JSG sample project: a real filled handbook that validates, builds, pri
   const off = doc.xml.replace('<front>', '<front omit="demolition associated listOfTables">');
   assert.equal((await w.put(`${U}/jsg`, { xml: off })).json.report.errors, 0);
   assert.equal((await w.post(`${U}/jsg/build`, {})).status, 200);
-  const t2 = text(pdf).replace(/\s+/g, ' ');
+  const t2 = (await text(pdf)).replace(/\s+/g, ' ');
   assert.ok(!t2.includes('DEMOLITION OF EQUIPMENT') && !t2.includes('ASSOCIATED HANDBOOKS') && !t2.includes('LIST OF TABLES'), 'pages switched off are not printed');
   assert.ok(t2.includes('CERTIFICATE') && t2.includes('AMENDMENTS') && t2.includes('LIST OF FIGURES'), 'the others still are');
   assert.match((await w.get(`${U}/jsg`)).json.xml, /<associated /, 'the content of a switched-off page is kept');
@@ -123,7 +122,7 @@ test('the ISPL sample: a real filled spare parts list that validates, prints the
   const doc = (await w.get(`${U}/jsg`)).json; assert.equal(doc.docType, 'ispl'); assert.equal(doc.report.errors, 0, JSON.stringify(doc.report.findings.slice(0, 3)));
   assert.ok((doc.xml.match(/<plate /g) || []).length >= 15 && (doc.xml.match(/<appendix /g) || []).length === 7 && /<note><b>Note:?<\/b>:? Above mentioned quantity/.test(doc.xml), 'plates, appendices A-G and the notes under the tables');
   assert.equal((await w.post(`${U}/jsg/build`, {})).status, 200);
-  const pdf = path.join(dir, 'jsg-output.pdf'); const t = text(pdf).replace(/\s+/g, ' ');
+  const pdf = path.join(dir, 'jsg-output.pdf'); const t = (await text(pdf)).replace(/\s+/g, ' ');
   const at = (s) => t.indexOf(s);
   assert.ok(at('CERTIFICATE') > 0 && at('CERTIFICATE') < at('PREFACE') && at('PREFACE') < at('AMENDMENTS') && at('AMENDMENTS') < at('ABBREVIATIONS') && at('ABBREVIATIONS') < at('LIST OF EQUIPMENT ALREADY') && at('LIST OF EQUIPMENT ALREADY') < at('CONTENTS') && at('CONTENTS') < at('APPENDICES'), 'the stencil\'s order');
   assert.ok(at('APPX ‘A’') > at('APPENDICES') && at('APPX ‘G’') > at('APPX ‘F’'), 'the appendices');
@@ -132,8 +131,8 @@ test('the ISPL sample: a real filled spare parts list that validates, prints the
   const off = doc.xml.replace('<front>', '<front omit="certificate preface supplied">');
   assert.equal((await w.put(`${U}/jsg`, { xml: off })).json.report.errors, 0);
   assert.equal((await w.post(`${U}/jsg/build`, {})).status, 200);
-  const t2 = text(pdf).replace(/\s+/g, ' ');
-  assert.ok(!t2.includes('C E R T I F I C A T E') && !t2.includes('PREFACE') && !t2.includes('LIST OF EQUIPMENT ALREADY'), 'pages switched off are not printed');
+  const t2 = (await text(pdf)).replace(/\s+/g, ' ');
+  assert.ok(!t2.includes('CERTIFICATE') && !t2.includes('PREFACE') && !t2.includes('LIST OF EQUIPMENT ALREADY'), 'pages switched off are not printed');
   assert.ok(t2.includes('AMENDMENTS') && t2.includes('ABBREVIATIONS') && t2.includes('CONTENTS'), 'the others still are');
   assert.match((await w.get(`${U}/jsg`)).json.xml, /<preface>/, 'the content of a switched-off page is kept');
 });

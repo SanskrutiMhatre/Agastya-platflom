@@ -9,8 +9,36 @@ const path = require('path');
 const http = require('http');
 
 const SAMPLES = path.resolve(__dirname, '..', '..', 'frontend', 'public', 'samples');
+// The 21-type x 4-issue data modules the e2e suite also uses (QA-014, ARC-023). Every backend test reaches them through this one constant, so
+// moving the folder (to a neutral test-fixtures/ at the root) is a one-line change here.
+const DM21 = path.resolve(__dirname, '..', '..', 'frontend', 'e2e', 'fixtures', 'dm21');
+
+// Where suites write their result files (per type x issue tables for docs/DM_TYPE_VERIFICATION.md). The CI gate points this at its evidence folder
+// (QA-010, QA-017); by default it is the git-ignored frontend/verification-results that scripts/verify-report.mjs reads.
+const RESULTS = process.env.AGASTYA_TEST_RESULTS || path.resolve(__dirname, '..', '..', 'frontend', 'verification-results');
+
+// Temporary folders made by a test file, removed when its process ends (QA-010: the suite used to leave thousands of folders in %TEMP%).
+// AGASTYA_KEEP_TEMP=1 keeps them for debugging.
+const temps = new Set();
+function rmQuiet(d) { try { fs.rmSync(d, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); return true; } catch { return false; } }
+process.on('exit', () => { if (process.env.AGASTYA_KEEP_TEMP) return; for (const d of temps) rmQuiet(d); });
+/** A new temporary folder that is removed when the test process ends. */
+function tmp(prefix = 'agastya-test-') { const d = fs.mkdtempSync(path.join(os.tmpdir(), prefix)); temps.add(d); return d; }
+
+// QA-015: the tests run the compiled dist/. Editing src/ and running a test file without rebuilding used to test the old code silently.
+let freshChecked = false;
+function assertDistFresh() {
+  if (freshChecked || process.env.AGASTYA_SKIP_DIST_CHECK) return; freshChecked = true;
+  const root = path.resolve(__dirname, '..'); const app = path.join(root, 'dist', 'app.js');
+  if (!fs.existsSync(app)) throw new Error('backend/dist is missing: build first (`npx tsc -p .` in backend/, or `npm run build`)');
+  const built = fs.statSync(app).mtimeMs; const newer = [];
+  const walk = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const f = path.join(d, e.name); if (e.isDirectory()) walk(f); else if (e.name.endsWith('.ts') && fs.statSync(f).mtimeMs > built + 1000) newer.push(path.relative(root, f)); } };
+  walk(path.join(root, 'src'));
+  if (newer.length) throw new Error(`backend/dist is older than src/ (${newer.slice(0, 3).join(', ')}${newer.length > 3 ? ', ...' : ''}): the tests would run stale code. Rebuild with \`npx tsc -p .\` in backend/.`);
+}
 
 async function boot() {
+  assertDistFresh();
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'agastya-v2-test-'));
   process.env.AGASTYA_WORKSPACE_DIR = ws;
   // The workspace is read from the environment ONCE, when dist/config is first loaded. A test that required anything from dist/ before calling
@@ -52,11 +80,17 @@ async function boot() {
   }
 
   const sample = (n) => fs.readFileSync(path.join(SAMPLES, n), 'utf8');
-  const close = () => new Promise((r) => { try { require('../dist/services/publisher').stopRenderer(); } catch { /* none */ } server.close(r); });
+  // close(): stop the renderer and the server, close the database, and remove the throwaway workspace (QA-010). On Windows a file still held by
+  // a child process cannot be removed at once; the exit handler tries again. AGASTYA_KEEP_TEMP=1 keeps the workspace.
+  const close = () => new Promise((r) => { try { require('../dist/services/publisher').stopRenderer(); } catch { /* none */ } server.close(r); })
+    .then(() => {
+      try { require('../dist/context').registryDb.close(); } catch { /* already closed */ }
+      temps.add(ws); if (!process.env.AGASTYA_KEEP_TEMP && rmQuiet(ws)) temps.delete(ws);
+    });
   return { base, ws, Client, sample, SAMPLES, close };
 }
 
-module.exports = { boot, SAMPLES };
+module.exports = { boot, SAMPLES, DM21, RESULTS, tmp };
 
 /**
  * Check a ZIP with a tool that is NOT this project's own reader (a verifier that shares the writer's mistakes proves nothing):

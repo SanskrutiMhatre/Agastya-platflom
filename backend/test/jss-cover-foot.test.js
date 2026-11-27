@@ -6,19 +6,20 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { boot } = require('./helpers');
+const { boot, tmp } = require('./helpers');
+const { readPdf } = require('./pdftools');
 
 const PW = 'Correct-Horse-9!';
 const VENDOR = path.resolve(__dirname, '..', 'vendor', 'pipeline');
 
-const pageText = (pdf, n) => { const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'cvf-')), 'x.pdf'); fs.writeFileSync(f, pdf); return spawnSync('pdftotext', ['-f', String(n), '-l', String(n), '-layout', f, '-'], { encoding: 'utf8' }).stdout; };
+const pageText = async (pdf, n) => (await readPdf(pdf)).text({ first: n, last: n });    // pdf.js (test/pdftools.js); the PDF is parsed once
 
 test('the stylesheet: off by default (the block stays in the body), on = the foot region of the cover master with the taller foot', () => {
   const { XSLTPROC } = require('../vendor/engine/paths');
   const book = `<?xml version="1.0"?><jssbook xmlns:xi="http://www.w3.org/2001/XInclude"><bookmeta><bookName>B</bookName><systemName>S</systemName><security>RESTRICTED</security><month>November</month><year>2026</year></bookmeta>
     <frontmatter><titlePage><documentType>USER HANDBOOK</documentType><disclosureNotice><para>NOTICE</para></disclosureNotice><repairNotice><para>REPAIR</para></repairNotice></titlePage></frontmatter>
     <body><chapter number="1"><title>A</title><section><title>B</title><para>x</para></section></chapter></body></jssbook>`;
-  const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'cvf-')), 'book.xml'); fs.writeFileSync(f, book);
+  const f = path.join(tmp('cvf-'), 'book.xml'); fs.writeFileSync(f, book);
   const run = (...params) => { const r = spawnSync(XSLTPROC, ['--nonet', ...params, path.join(VENDOR, 'jsstofo', 'jsstofo.xsl'), f], { encoding: 'utf8', cwd: path.join(VENDOR, 'jsstofo') }); assert.equal(r.status, 0, r.stderr.slice(0, 400)); return r.stdout; };
   // the cover is the first page sequence; its foot region is what comes before its flow
   const cover = (fo) => { const i = fo.indexOf('<fo:page-sequence '); const j = fo.indexOf('</fo:page-sequence>', i); const seq = fo.slice(i, j); const k = seq.indexOf('<fo:flow'); return { foot: seq.slice(0, k), flow: seq.slice(k), head: seq.slice(0, 200) }; };
@@ -53,7 +54,7 @@ test('a JSS-authored UHB: page 1 is one page, with the date and authority block 
   const pdf = (await w.get(`/api/projects/${id}/publish/pdf`)).buf;
   const fo = fs.readFileSync(path.join(h.ws, 'projects', id, 'jss-output.fo'), 'utf8');
   assert.match(fo, /master-reference="cover-lref"/, 'the build used the L&T reference cover master, whose foot region holds the block (cover-foot is the master of the old layout)');
-  const p1 = pageText(pdf, 1); const lines = p1.split('\n').map((l) => l.trim()).filter(Boolean);
+  const p1 = await pageText(pdf, 1); const lines = p1.split('\n').map((l) => l.trim()).filter(Boolean);
   const authority = lines.findIndex((l) => /Under the Authority of/.test(l));
   assert.ok(authority > 0, 'page 1 has the authority block: ' + p1.slice(0, 600));
   const block = `${lines[authority]} ${lines[authority + 1]}`;
@@ -63,5 +64,5 @@ test('a JSS-authored UHB: page 1 is one page, with the date and authority block 
   assert.equal(authority + 2, lines.length - 1, 'and the block is the line pair just above it');
   // what the body ends with is the publisher, not the block: the block comes after the publisher and the gap between them is the cover's free space
   assert.ok(lines.findIndex((l) => /Prepared & Published by/.test(l)) < authority);
-  assert.equal(pageText(pdf, 2).trim(), '', 'the cover is one page: page 2 is its blank back, with nothing on it (the reference)');
+  assert.equal((await pageText(pdf, 2)).trim(), '', 'the cover is one page: page 2 is its blank back, with nothing on it (the reference)');
 });

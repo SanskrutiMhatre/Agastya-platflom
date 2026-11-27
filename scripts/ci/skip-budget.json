@@ -1,0 +1,21 @@
+{
+  "_comment": "The approved skips (QA-007). scripts/ci/gate.mjs fails when a skip has no reason, when a file skips more tests than its 'max', or when a file not listed here skips at all. 'max' is the count on a clean checkout WITHOUT the customer material (git-ignored: SAMPLE PROJECTS/*, manual format/, the Arial Narrow files); with the material present the count is lower. Every entry says what is missing and where it is looked for. Counted from the skip sites on 2026-11-27 (WP-08); a full gate run on a clean runner confirms or lowers them. Growing a number needs a reviewed change to this file.",
+  "files": {
+    "golden-xignal.test.js":          { "max": 4, "why": "the Xignal S1000D sample (SAMPLE PROJECTS/S1000D, customer material) or GOLDEN_SAMPLE_DIR" },
+    "importer-repairs.test.js":       { "max": 1, "why": "the Vektra plugin output (SAMPLE PROJECTS/RWI or VEKTRA_SAMPLE)" },
+    "importer-scan.test.js":          { "max": 3, "why": "the Xignal S1000D and JSS exports and the Vektra output (SAMPLE PROJECTS)" },
+    "importer-structure.test.js":     { "max": 6, "why": "the Xignal S1000D export and its reference PDF (SAMPLE PROJECTS/S1000D)" },
+    "jss-authoring.test.js":          { "max": 1, "why": "the JSS-0251 Word stencils (manual format/JSS0251-stencils)" },
+    "jss-naval.test.js":              { "max": 5, "why": "the Naval Word stencils (manual format/NAval_stencil or NAVAL_STENCILS)" },
+    "jss-rwi.test.js":                { "max": 4, "why": "the RWI sample package (SAMPLE PROJECTS/JSS-0251/RWI.zip)" },
+    "jss-rwi-verify.test.js":         { "max": 1, "why": "the RWI sample package (RWI_ZIP or SAMPLE PROJECTS/JSS-0251/RWI.zip)" },
+    "jss-stencil-corrections.test.js":{ "max": 7, "why": "the JSS-0251 Word stencils (6 tests) and the licensed Arial Narrow font files (1 test)" },
+    "jssdm.test.js":                  { "max": 4, "why": "the JSS-0251 sample export (SAMPLE PROJECTS/JSS-0251)" },
+    "jssdm-http.test.js":             { "max": 1, "why": "the JSS-0251 sample export (SAMPLE PROJECTS/JSS-0251)" },
+    "pdf-reference.test.js":          { "max": 2, "why": "the 20 Nov sample publications and their reference PDFs (SAMPLE PROJECTS/S1000D/20_Nov _2026), one test per publication" },
+    "project-formats.test.js":        { "max": 4, "why": "the 20 Nov sample package (SAMPLE PROJECTS/S1000D/20_Nov _2026)" },
+    "sns.test.js":                    { "max": 1, "why": "the Xignal S1000D sample (SAMPLE PROJECTS/S1000D)" },
+    "deep-workspace.test.js":         { "max": 1, "why": "Windows-only path limit; skips on Linux/macOS runners" },
+    "project-delete-after-build.test.js": { "max": 1, "why": "Windows-only file locks; skips on Linux/macOS runners" }
+  }
+}

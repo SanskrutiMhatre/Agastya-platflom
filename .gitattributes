@@ -41,3 +41,6 @@
 *.dll   binary
 *.jar   binary
 *.node  binary
+
+# Git hooks are run by sh: always LF (WP-08)
+/scripts/ci/hooks/*          text eol=lf

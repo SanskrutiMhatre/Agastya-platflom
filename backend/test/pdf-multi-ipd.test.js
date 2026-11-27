@@ -5,12 +5,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path');
-const { spawnSync } = require('node:child_process');
-const { boot } = require('./helpers');
+const { boot, DM21 } = require('./helpers');
+const { pdfText } = require('./pdftools');
 
 const PW = 'Correct-Horse-9!';
-const FIX = path.resolve(__dirname, '..', '..', 'frontend', 'e2e', 'fixtures', 'dm21', '5-0');
-const text = (buf) => { const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ipd-')), 'x.pdf'); fs.writeFileSync(f, buf); return spawnSync('pdftotext', [f, '-'], { encoding: 'utf8' }).stdout; };
+const FIX = path.join(DM21, '5-0');
+const text = (buf) => pdfText(buf, { mode: 'plain' });                 // pdf.js (test/pdftools.js), no external program
 let h; let w;
 
 test.before(async () => {
@@ -35,7 +35,7 @@ for (const [pipeline, label] of [['s1000dtofo', 'direct S1000D engine']]) {
     fs.writeFileSync(pmFile, pm.replace(/<content[\s\S]*<\/content>|<content\s*\/>/, `<content><pmEntry><pmEntryTitle>Parts A</pmEntryTitle>${ref(x1)}</pmEntry><pmEntry><pmEntryTitle>Parts B</pmEntryTitle>${ref(x2)}</pmEntry></content>`));
     const built = await w.post(`${U}/publish`, {});
     assert.equal(built.status, 200, JSON.stringify(built.json).slice(0, 500));
-    const pdf = text((await w.get(`${U}/publish/pdf`)).buf);
+    const pdf = await text((await w.get(`${U}/publish/pdf`)).buf);
     assert.equal((pdf.match(/Illustrated Parts List/g) ?? []).length >= 2, true, 'each IPD module prints its own parts list entry');
   });
 }

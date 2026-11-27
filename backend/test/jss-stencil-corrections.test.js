@@ -8,7 +8,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { boot } = require('./helpers');
+const { boot, tmp } = require('./helpers');
+const { readPdf } = require('./pdftools');
 const S = require('./helpers-stencil');
 
 const PW = 'Correct-Horse-9!';
@@ -16,8 +17,8 @@ const FONTS = path.resolve(__dirname, '..', 'vendor', 'tools', 'fonts');
 const haveNarrow = fs.existsSync(path.join(FONTS, 'arialnb.ttf'));
 const SKIP_ST = !S.haveStencils && 'the stencils (manual format/JSS0251-stencils) are not in this checkout';
 const norm = (s) => s.replace(/>\s+</g, '><').replace(/\s+/g, ' ');
-const pdfFile = (buf) => { const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'jsc-')), 'x.pdf'); fs.writeFileSync(f, buf); return f; };
-const pdftext = (f, a, b) => spawnSync('pdftotext', ['-f', String(a), '-l', String(b), '-layout', f, '-'], { encoding: 'utf8' }).stdout;
+const pdfFile = (buf) => { const f = path.join(tmp('jsc-'), 'x.pdf'); fs.writeFileSync(f, buf); return f; };
+const pdftext = async (f, a, b) => (await readPdf(f)).text({ first: a, last: b });    // pdf.js (test/pdftools.js), no external program
 const into = (xml, title, inner) => { const t = `<title>${title}</title>`; assert.ok(xml.includes(t), `no heading ${title}`); return xml.replace(t, t + inner); };
 
 const TYPES = {
@@ -83,7 +84,7 @@ test('fonts: the PDF embeds Arial Narrow for the section headings (when the mach
 
 test('fonts: without the Arial Narrow files a build still works and the headings fall back to Arial / Liberation Sans', () => {
   const { fopConf } = require('../vendor/engine/fontconf');
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fnt-')); fs.mkdirSync(path.join(dir, 'fonts'));
+  const dir = tmp('fnt-'); fs.mkdirSync(path.join(dir, 'fonts'));
   for (const f of fs.readdirSync(FONTS)) if (/\.ttf$/i.test(f) && !/^arialn/i.test(f)) fs.copyFileSync(path.join(FONTS, f), path.join(dir, 'fonts', f));
   fs.copyFileSync(path.resolve(__dirname, '..', 'vendor', 'tools', 'fop.xconf'), path.join(dir, 'fop.xconf'));
   const msgs = []; const used = fopConf({ xconf: path.join(dir, 'fop.xconf'), outDir: dir, log: (m) => msgs.push(m) });
@@ -122,11 +123,11 @@ test('indent: text under a first-level heading starts at 7 mm, the heading text 
 // ── 4. the cover title ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 test('cover title: MM and ORM set it on two lines as their stencils do; UHB on one', { skip: SKIP_ST }, async () => {
-  const lines = (id) => pdftext(built[id].file, 1, 1).split('\n').map((l) => l.trim()).filter(Boolean);
+  const lines = async (id) => (await pdftext(built[id].file, 1, 1)).split('\n').map((l) => l.trim()).filter(Boolean);
   for (const [id, expect] of [['uhb', ['USER HANDBOOK']], ['mm', ['TECHNICAL MANUAL', 'PART II MAINTENANCE']], ['orm', ['TECHNICAL MANUAL', 'PART III OVERHAUL AND RECONDITIONING']]]) {
     const items = (await S.stencilFrontMatter(path.join(S.STENCILS, TYPES[id].stencil))).map((i) => i.text);
     for (const l of expect) assert.ok(items.includes(l), `${id}: the stencil cover has the line "${l}"`);
-    const ls = lines(id); const at = ls.indexOf(expect[0]); assert.ok(at >= 0, `${id}: "${expect[0]}" is a line of its own on the cover (${ls.slice(0, 12)})`);
+    const ls = await lines(id); const at = ls.indexOf(expect[0]); assert.ok(at >= 0, `${id}: "${expect[0]}" is a line of its own on the cover (${ls.slice(0, 12)})`);
     for (let k = 1; k < expect.length; k++) assert.equal(ls[at + k], expect[k], `${id}: then "${expect[k]}"`);
     if (expect.length > 1) assert.ok(norm(built[id].fo).includes(`<fo:block>${expect[0]}</fo:block><fo:block>${expect[1]}</fo:block>`), `${id}: one block per title line in the FO`);
   }
@@ -138,7 +139,7 @@ test('associated handbooks: "Sl. No. / Document Title / Code No." with the stenc
   for (const [id, t] of Object.entries(TYPES)) {
     const cells = (await S.stencilFrontMatter(path.join(S.STENCILS, t.stencil))).map((i) => i.text);
     for (const head of ['Sl. No.', 'Document Title', 'Code No.']) assert.ok(cells.includes(head), `${id}: the stencil table is headed "${head}"`);
-    const text = pdftext(built[id].file, 1, 40);
+    const text = await pdftext(built[id].file, 1, 40);
     assert.match(text, /Sl\. No\.\s+Document Title\s+Code No\./, `${id}: ours is headed the same`);
     assert.ok(!/Sr\. No\./.test(text) && !/INBR No/.test(text), `${id}: no Sr. No. and no INBR No. anywhere in the front matter`);
     const rows = norm(built[id].fo).split('Document Title')[1]?.split('SAFETY WARNING')[0] ?? ''; assert.ok((rows.match(/<fo:table-row/g) ?? []).length >= 11, `${id}: the table has its empty rows`);
@@ -157,14 +158,14 @@ const composedPages = (book) => {
   return out.filter(Boolean);
 };
 
-test('page set: the front-matter pages and their order are the stencil\'s, per type: UHB has a System Name page and no Cautions page; MM and ORM the reverse', () => {
+test('page set: the front-matter pages and their order are the stencil\'s, per type: UHB has a System Name page and no Cautions page; MM and ORM the reverse', async () => {
   const want = {
     uhb: ['titlePage', 'proprietary', 'foreword', 'recordOfChanges', 'associatedHandbooks', 'safetyWarning', 'firstAid', 'demolition', 'changeNotice', 'listOfAbbreviations', 'listOfContents', 'listOfFigures', 'listOfTables', 'systemNamePage', 'descriptionOfSymbols'],
     mm: ['titlePage', 'proprietary', 'foreword', 'recordOfChanges', 'associatedHandbooks', 'safetyWarning', 'firstAid', 'cautionsNotes', 'demolition', 'changeNotice', 'listOfAbbreviations', 'listOfContents', 'listOfFigures', 'listOfTables', 'descriptionOfSymbols'],
   };
   want.orm = want.mm;
   for (const id of Object.keys(TYPES)) assert.deepEqual(composedPages(built[id].book).filter((p) => p !== 'titlePageJoint'), want[id], id);
-  for (const id of ['mm', 'orm']) { assert.ok(!/Follow all standard/.test(pdftext(built[id].file, 1, 40)), `${id}: the Cautions page is a title, with no invented sample cautions`); assert.ok(!/<systemNamePage|14-system-name-page/.test(built[id].book), `${id}: no System Name page`); }
+  for (const id of ['mm', 'orm']) { assert.ok(!/Follow all standard/.test(await pdftext(built[id].file, 1, 40)), `${id}: the Cautions page is a title, with no invented sample cautions`); assert.ok(!/<systemNamePage|14-system-name-page/.test(built[id].book), `${id}: no System Name page`); }
   assert.ok(/<systemNamePage|14-system-name-page/.test(built.uhb.book) && !/09-cautions-notes/.test(built.uhb.book), 'uhb: System Name page, no Cautions page');
 });
 
@@ -237,7 +238,7 @@ test('content order: a file that lists content after a sub-section is an error e
   const ok = late.replace('<section id="zsub"><title>Zeta sub-section</title></section><para>After the sub-section</para>', '<para>After the sub-section</para><section id="zsub"><title>Zeta sub-section</title></section>');
   assert.equal((await w.put(`${b.U}/jss`, { xml: ok })).json.report.errors, 0);
   assert.equal((await w.post(`${b.U}/publish`, {})).status, 200);
-  const text = pdftext(pdfFile((await w.get(`${b.U}/publish/pdf`)).buf), 1, 80).replace(/\s+/g, ' ');
+  const text = (await pdftext((await w.get(`${b.U}/publish/pdf`)).buf, 1, 80)).replace(/\s+/g, ' ');
   assert.ok(text.indexOf('After the sub-section') > 0 && text.indexOf('After the sub-section') < text.lastIndexOf('Zeta sub-section'), 'own content before the sub-section in the PDF (the contents page also lists the sub-section, so the last mention is the heading)');
   await w.put(`${b.U}/jss`, { xml: g.xml });
 });
@@ -251,7 +252,7 @@ test('merged cells: a table with merged cells is valid and builds; a grid that d
   const withTable = (t) => into(g.xml, 'Importance of Routine Maintenance', t);
   const put = await w.put(`${b.U}/jss`, { xml: withTable(good) }); assert.equal(put.json.report.errors, 0, JSON.stringify(put.json.report.findings.filter((f) => f.severity === 'error')));
   assert.equal((await w.post(`${b.U}/publish`, {})).status, 200);
-  const text = pdftext(pdfFile((await w.get(`${b.U}/publish/pdf`)).buf), 1, 80);
+  const text = await pdftext((await w.get(`${b.U}/publish/pdf`)).buf, 1, 80);
   for (const s of ['Head merged', 'Tall cell', 'Wide cell']) assert.equal((text.match(new RegExp(s, 'g')) ?? []).length, 1, `"${s}" is printed once`);
   assert.match(norm(fs.readFileSync(path.join(b.dir, 'jss-output.fo'), 'utf8')), /number-columns-spanned="2"[^>]*>|number-rows-spanned="2"/, 'the spans reach the FO');
   const bad = {
@@ -270,7 +271,7 @@ test('merged cells: a table with merged cells is valid and builds; a grid that d
 // ── the template ships with a revision ───────────────────────────────────────────────────────────────────────────────────────────
 
 test('templates: a workspace copy of the stencil template with an older revision is replaced (the old one kept); templates without a revision are never touched', () => {
-  const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'rev-')); const tdir = path.join(ws, 'templates'); fs.mkdirSync(tdir, { recursive: true });
+  const ws = tmp('rev-'); const tdir = path.join(ws, 'templates'); fs.mkdirSync(tdir, { recursive: true });
   fs.writeFileSync(path.join(tdir, 'jss-stencil.house.json'), JSON.stringify({ id: 'jss-stencil', revision: 1, marker: 'old' }));
   fs.writeFileSync(path.join(tdir, 'default.house.json'), JSON.stringify({ id: 'default', marker: 'organisations own edit' }));
   const r = spawnSync(process.execPath, ['-e', "require('../dist/context')"], { cwd: __dirname, env: { ...process.env, AGASTYA_WORKSPACE_DIR: ws }, encoding: 'utf8' }); assert.equal(r.status, 0, r.stderr.slice(0, 300));

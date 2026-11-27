@@ -6,15 +6,16 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path');
 const { spawnSync, execFileSync } = require('node:child_process');
-const { boot } = require('./helpers');
+const { boot, tmp } = require('./helpers');
+const { pdfText: readPdfText } = require('./pdftools');
 
 const PW = 'Correct-Horse-9!';
 const XI = 'http://www.w3.org/2001/XInclude';
 const CANARY_TEXT = 'WP02-CANARY-7f3a91';
-const canaryDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wp02-canary-'));
+const canaryDir = tmp('wp02-canary-');
 const canary = path.join(canaryDir, 'secret.txt'); fs.writeFileSync(canary, CANARY_TEXT);
 const canaryUrl = `file:///${canary.replace(/\\/g, '/')}`;
-const pdfText = (buf) => { const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'wp02-')), 'x.pdf'); fs.writeFileSync(f, buf); return spawnSync('pdftotext', ['-layout', f, '-'], { encoding: 'utf8' }).stdout; };
+const pdfText = (buf) => readPdfText(buf);                              // pdf.js (test/pdftools.js), no external program
 
 let h; let w;
 test.before(async () => {
@@ -73,7 +74,7 @@ test('JSS: an xi:include in an ancillary page is refused when saved, and a page 
   assert.ok(fs.existsSync(file), file);
   fs.writeFileSync(file, hostile);
   const b = await w.post(`${p.U}/publish`, {}); assert.equal(b.status, 200, JSON.stringify(b.json).slice(0, 400));
-  const text = pdfText((await w.get(`${p.U}/publish/pdf`)).buf);
+  const text = await pdfText((await w.get(`${p.U}/publish/pdf`)).buf);
   assert.ok(text.length > 200, 'the book still printed');
   assert.ok(!text.includes('PROBE-START'), 'the poisoned page was left out (its default prints instead)');
   assert.ok(!text.includes(CANARY_TEXT), 'the local file did not reach the PDF');
@@ -87,14 +88,14 @@ test('JSS: book metadata with "$" replacement patterns and with both quote kinds
   const xml = /<bookName>[^<]*<\/bookName>/.test(g.xml) ? g.xml.replace(/<bookName>[^<]*<\/bookName>/, () => `<bookName>${esc(name)}</bookName>`) : g.xml.replace('<bookmeta>', () => `<bookmeta><bookName>${esc(name)}</bookName>`);
   const s = await w.put(`${p.U}/jss`, { xml, baseHash: g.hash }); assert.equal(s.status, 200, JSON.stringify(s.json).slice(0, 300));
   const b = await w.post(`${p.U}/publish`, {}); assert.equal(b.status, 200, JSON.stringify(b.json).slice(0, 400));
-  const text = pdfText((await w.get(`${p.U}/publish/pdf`)).buf).replace(/\s+/g, ' ');
+  const text = (await pdfText((await w.get(`${p.U}/publish/pdf`)).buf)).replace(/\s+/g, ' ');
   assert.ok(text.includes(`Pump $& Valve $$5 $'`), `the name is printed unchanged: ${text.slice(0, 600)}`);
   assert.ok(!text.includes('<bookName>'), 'no markup leaked into the page');
 });
 
 test('xsltproc receives a value with both quote kinds unchanged (PUB-025, the bundled xsltproc)', () => {
   const paths = require('../vendor/engine/paths');
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wp02-q-'));
+  const dir = tmp('wp02-q-');
   fs.writeFileSync(path.join(dir, 'p.xsl'), '<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform"><xsl:output method="text" encoding="UTF-8"/><xsl:param name="v"/><xsl:template match="/">[<xsl:value-of select="$v"/>]</xsl:template></xsl:stylesheet>');
   fs.writeFileSync(path.join(dir, 'd.xml'), '<d/>');
   for (const v of [`O'Brien "Mk 2"`, `a'b'c"d"`, `'"`, `"only double"`, `only 'single'`, 'plain', `x'`]) {

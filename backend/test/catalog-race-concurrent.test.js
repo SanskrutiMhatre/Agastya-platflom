@@ -13,7 +13,8 @@ const cat = require('../vendor/engine/catalog');
 
 test('an unchanged catalogue is not rewritten, and no temporary files are left behind', () => {
   const file = cat.writeCatalog();
-  if (!file) return;                                            // no schemas installed: nothing to map
+  // The schemas are part of the repository (backend/schemas): no catalogue means a broken checkout, not a reason to pass with no assertion (QA-018).
+  assert.ok(file, 'writeCatalog() found no schemas to map');
   const before = fs.statSync(file);
   const text = fs.readFileSync(file, 'utf8');
   for (let i = 0; i < 20; i++) assert.equal(cat.writeCatalog(), file);
@@ -28,7 +29,7 @@ test('an unchanged catalogue is not rewritten, and no temporary files are left b
 
 test('while other processes call it again and again (every tool launch does), a reader never sees it empty or partial', { timeout: 120000 }, async () => {
   const file = cat.writeCatalog();
-  if (!file) return;
+  assert.ok(file, 'writeCatalog() found no schemas to map');
   const full = fs.readFileSync(file, 'utf8');
   // what happens in production: many launches, each asking for the catalogue, while parsers read it
   const code = `const c=require(${JSON.stringify(path.resolve(__dirname, '..', 'vendor', 'engine', 'catalog'))});

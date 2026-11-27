@@ -4,20 +4,16 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path');
-const { spawnSync } = require('node:child_process');
-const { boot } = require('./helpers');
+const { boot, DM21, tmp } = require('./helpers');
+const { pdfText, pdfImageCount } = require('./pdftools');
 
 const PW = 'Correct-Horse-9!';
-const FIX = path.resolve(__dirname, '..', '..', 'frontend', 'e2e', 'fixtures', 'dm21', '5-0');
-const pdf = (buf) => { const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'fu-')), 'x.pdf'); fs.writeFileSync(f, buf); return f; };
-const text = (f) => spawnSync('pdftotext', [f, '-'], { encoding: 'utf8' }).stdout;
-// poppler's pdfimages is not on every machine (Git for Windows ships pdftotext only). FOP writes each picture as one uncompressed /Subtype /Image
-// dictionary, so counting them in the file answers what the tests ask: is a logo there, or is nothing there.
-const images = (f) => {
-  const r = spawnSync('pdfimages', ['-list', f], { encoding: 'utf8' });
-  if (!r.error && r.status === 0) return r.stdout.split('\n').slice(2).filter(Boolean).length;
-  return (fs.readFileSync(f).toString('latin1').match(/\/Subtype\s*\/Image/g) || []).length;
-};
+const FIX = path.join(DM21, '5-0');
+const pdf = (buf) => { const f = path.join(tmp('fu-'), 'x.pdf'); fs.writeFileSync(f, buf); return f; };
+// Read with pdf.js (test/pdftools.js), no external program. The picture count is the number of pictures PAINTED on the pages, not the number of
+// /Subtype /Image dictionaries in the file (the fallback this replaced counted the file, so an embedded but unpainted logo passed).
+const text = (f) => pdfText(f, { mode: 'plain' });
+const images = (f) => pdfImageCount(f);
 let h; let w; let U; let dir;
 
 test.before(async () => {
@@ -35,16 +31,16 @@ test.after(async () => { await h.close(); });
 const build = async () => { const b = await w.post(`${U}/publish`, {}); assert.equal(b.status, 200, JSON.stringify(b.json).slice(0, 400)); return pdf((await w.get(`${U}/publish/pdf`)).buf); };
 
 test('by default: the side text (draft note with the issue, the printing time, the publisher) and the header logo are on every build', async () => {
-  const f = await build(); const t = text(f).replace(/\s+/g, ' ');
+  const f = await build(); const t = (await text(f)).replace(/\s+/g, ' ');
   assert.match(t, /This is a draft copy of Issue 001-00/); assert.match(t, /Printed \d{4}-\d{2}-\d{2} \d{2}:\d{2}/); assert.match(t, /Example Company/);
-  assert.ok(images(f) >= 1, 'the default logo is printed in the header');
+  assert.ok(await images(f) >= 1, 'the default logo is printed in the header');
   assert.match(t, /EXAMPLE-00000-00001-00/, "the header carries the publication module's own code (model - issuer - number - volume), not a placeholder or a demo text"); assert.ok(!/160KVA/.test(t));
 });
 
 test('switched off: no side text and no logo; the publisher can be named in the settings', async () => {
   assert.equal((await w.patch(U, { sideText: { enabled: false }, headerLogo: false })).status, 200);
-  const off = await build(); const t = text(off).replace(/\s+/g, ' ');
-  assert.ok(!/This is a draft copy/.test(t) && !/Printed \d{4}-/.test(t), 'no side text'); assert.equal(images(off), 0, 'no logo');
+  const off = await build(); const t = (await text(off)).replace(/\s+/g, ' ');
+  assert.ok(!/This is a draft copy/.test(t) && !/Printed \d{4}-/.test(t), 'no side text'); assert.equal(await images(off), 0, 'no logo');
   assert.equal((await w.patch(U, { sideText: { enabled: true, publisher: 'Acme Rotor Works' }, headerLogo: true })).status, 200);
-  assert.match(text(await build()).replace(/\s+/g, ' '), /Acme Rotor Works/);
+  assert.match((await text(await build())).replace(/\s+/g, ' '), /Acme Rotor Works/);
 });

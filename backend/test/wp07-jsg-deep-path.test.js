@@ -5,6 +5,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path');
+const { tmp } = require('./helpers');            // helpers loads nothing from dist/ until boot() is called
 
 const PW = 'Correct-Horse-9!';
 
@@ -12,7 +13,7 @@ test('a JSG build succeeds in a deep data folder whose relative route to the eng
   // Many short folders: the build folder itself stays inside what the 32-bit tools can use as a working folder (248 characters), while the
   // "../" steps of a relative location (three characters per level) plus the engine path run far past 260. That is the case the audit
   // measured (S1000D and JSS built there, JSG did not).
-  let deep = fs.mkdtempSync(path.join(os.tmpdir(), 'agastya-deep-'));
+  let deep = tmp('agastya-deep-');
   while (deep.length < 150) deep = path.join(deep, 'd');
   fs.mkdirSync(deep, { recursive: true });
   const prev = process.env.TEMP; const prevTmp = process.env.TMP;

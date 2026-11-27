@@ -6,12 +6,12 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const { boot } = require('./helpers');
+const { boot, DM21, tmp } = require('./helpers');
 
 const PW = 'Correct-Horse-9!';
-const FIX = path.resolve(__dirname, '..', '..', 'frontend', 'e2e', 'fixtures', 'dm21', '5-0');
+const FIX = path.join(DM21, '5-0');
 const ASSET = path.resolve(__dirname, '..', 'assets', 'default-publisher-logo.png');
-const pdf = (buf) => { const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pl-')), 'x.pdf'); fs.writeFileSync(f, buf); return f; };
+const pdf = (buf) => { const f = path.join(tmp('pl-'), 'x.pdf'); fs.writeFileSync(f, buf); return f; };
 // FOP writes each picture as one /Subtype /Image dictionary (see pdf-furniture.test.js)
 const images = (f) => (fs.readFileSync(f).toString('latin1').match(/\/Subtype\s*\/Image/g) || []).length;
 let h; let w; let U; let dir;

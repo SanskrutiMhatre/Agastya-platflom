@@ -6,7 +6,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const path = require('node:path'); const os = require('node:os');
-const { boot } = require('./helpers');
+const { boot, tmp } = require('./helpers');
 
 const PW = 'Correct-Horse-9!';
 let h; let w; let ZipStreamWriter;
@@ -62,7 +62,7 @@ const PM = (prefix = '') => `<?xml version="1.0" encoding="utf-8"?>
 </pm>`;
 
 async function makeZip(layout) {
-  const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'legacy-')), 'x.zip'); const out = fs.createWriteStream(f); const z = new ZipStreamWriter(out);
+  const f = path.join(tmp('legacy-'), 'x.zip'); const out = fs.createWriteStream(f); const z = new ZipStreamWriter(out);
   const add = (n, t) => z.addBuffer(n, Buffer.from(t, 'utf8'));
   if (layout === 'flat') {
     for (const [c, t, i, b] of MODULES) await add(`Pkg/${nameOf(c)}`, dm(c, t, i, b));
@@ -151,7 +151,7 @@ test('an older tool\'s package goes out again with its front matter and chapter 
   const bad = chk.json.report.findings.filter((f) => f.severity === 'error'); assert.deepEqual(bad.map((f) => f.code), [], JSON.stringify(bad).slice(0, 300));
   assert.ok(!chk.json.report.findings.some((f) => f.code === 'pages-not-restored'), 'the pages were kept by this import, so they can be put back');
   const res = await fetch(`${h.base}${U}/jss/export`, { headers: { cookie: w.cookie } }); assert.equal(res.status, 200);
-  const out = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'rt-')), 'export.zip'); fs.writeFileSync(out, Buffer.from(await res.arrayBuffer()));
+  const out = path.join(tmp('rt-'), 'export.zip'); fs.writeFileSync(out, Buffer.from(await res.arrayBuffer()));
   const { ZipFileReader } = require('../dist/services/zipio'); const zr = ZipFileReader.open(out); const names = zr.entries.map((e) => e.name); zr.close();
   for (const c of [FRONT, HEAD1, HEAD3]) assert.ok(names.some((n) => n.includes(`DMC-${c.mic}-${c.diff}-${c.sys}-${c.sub}0-${c.assy}-${c.dis}A-${c.info}A-D`)), `${c.info} of system ${c.sys} is in the exported package: ` + names.join(', '));
   // import the export into a second project: the same chapters, the same sections, and the foreword and heading pages are again not sections

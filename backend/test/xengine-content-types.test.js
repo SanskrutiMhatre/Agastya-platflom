@@ -6,7 +6,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const path = require('node:path'); const os = require('node:os');
-const { boot } = require('./helpers');
+const { boot, tmp } = require('./helpers');
 
 const PW = 'Correct-Horse-9!';
 let h; let w; let ZipStreamWriter;
@@ -109,7 +109,7 @@ const UPLOAD = async (U, file, name) => {
 test('procedures, fault isolation, crew drills and parts lists are imported as sections, numbered lists and tables, in order, with nothing lost', async () => {
   const mods = [[PROCED, 'Replace the unit', 'Procedure', PROC_XML, 'proced'], [FAULT, 'Fuse fault', 'Fault isolation', FAULT_XML, 'fault'], [CREW, 'Engine start', 'Crew', CREW_XML, 'crew'], [IPD, 'Parts', 'Illustrated parts data', IPD_XML, 'ipd']];
   const pm = PM().replace(/<content>[\s\S]*<\/content>/, `<content>${entry('Content Types', entry('Chapter', entry('1', entry('LEADING PARTICULARS AND GENERAL DATA', ref(HEAD1, 'Chapter 1', 'Leading Particulars and General Data')) + entry('', mods.map(([c, t, i]) => ref(c, t, i)).join('')))))}</content>`);
-  const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ctypes-')), 'x.zip'); const z = new ZipStreamWriter(fs.createWriteStream(f));
+  const f = path.join(tmp('ctypes-'), 'x.zip'); const z = new ZipStreamWriter(fs.createWriteStream(f));
   await z.addBuffer(`Pkg/${nameOf(HEAD1)}`, Buffer.from(dm(HEAD1, 'Chapter 1', 'Leading Particulars and General Data', '<levelledPara><para>This chapter covers the following topics:</para></levelledPara>')));
   for (const [c, t, i, x, s] of mods) await z.addBuffer(`Pkg/${nameOf(c)}`, Buffer.from(mod(c, t, i, x, s)));
   await z.addBuffer('Pkg/PMC-RDR-1671Y-00061-00_000-01_EN-IN.xml', Buffer.from(pm)); await z.finish();
@@ -141,7 +141,7 @@ test('a kind of document that is not mapped keeps its text and is named in the r
   const odd = code('300', '01');
   const body = `<checkList><title>Walk round</title><checkListItem><para>Look at the tyres.</para></checkListItem></checkList>`;
   const pm = PM().replace(/<content>[\s\S]*<\/content>/, `<content>${entry('Odd', entry('Chapter', entry('1', entry('LEADING PARTICULARS AND GENERAL DATA', ref(HEAD1, 'Chapter 1', 'Leading Particulars and General Data')) + entry('', ref(odd, 'Walk round', 'Check')))))}</content>`);
-  const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ctypes-')), 'x.zip'); const z = new ZipStreamWriter(fs.createWriteStream(f));
+  const f = path.join(tmp('ctypes-'), 'x.zip'); const z = new ZipStreamWriter(fs.createWriteStream(f));
   await z.addBuffer(`Pkg/${nameOf(HEAD1)}`, Buffer.from(dm(HEAD1, 'Chapter 1', 'Leading Particulars and General Data', '<levelledPara><para>Topics:</para></levelledPara>')));
   await z.addBuffer(`Pkg/${nameOf(odd)}`, Buffer.from(mod(odd, 'Walk round', 'Check', body, 'checklist')));
   await z.addBuffer('Pkg/PMC-RDR-1671Y-00061-00_000-01_EN-IN.xml', Buffer.from(pm)); await z.finish();

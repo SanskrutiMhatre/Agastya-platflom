@@ -109,19 +109,20 @@ test('ISOLATION: no JSG logic in the JSS or S1000D engines, stylesheets, schemas
 });
 
 test('a new User Handbook prints the stencil: same pages, the red underlined RESTRICTED, the stencil\'s front matter and a landscape System Tree Chart', { timeout: 300000 }, async () => {
-  const { spawnSync } = require('node:child_process');
+  const { readPdf } = require('./pdftools');
   const r = await w.post('/api/projects', { name: 'Jsg UHB stencil', format: 'jsg', domain: 'land', manualType: 'uhb' });
   const pid = r.json.project.id; const d = path.join(h.ws, 'projects', pid);
   const b = await w.post(`/api/projects/${pid}/jsg/build`); assert.equal(b.status, 200, JSON.stringify(b.json).slice(0, 300));
   const fo = fs.readFileSync(path.join(d, 'jsg-output.fo'), 'utf8');
   const pdf = path.join(d, 'jsg-output.pdf');
-  const page = (n) => spawnSync('pdftotext', ['-layout', '-f', String(n), '-l', String(n), pdf, '-'], { encoding: 'utf8' }).stdout.replace(/\s+/g, ' ').trim();
+  const doc = await readPdf(pdf);
+  const page = (n) => doc.text({ first: n, last: n }).replace(/\s+/g, ' ').trim();
 
   // head and foot: RESTRICTED in red, 12 pt, underlined (JSG_UHB_Stencil headers and footers); the page number in brackets, 12 pt
   assert.match(fo, /<fo:inline font-size="12pt" color="#FF0000" text-decoration="underline"[^>]*>RESTRICTED<\/fo:inline>/);
   assert.ok(!/font-size="9pt"[^>]*>RESTRICTED/.test(fo), 'the old 9 pt black head is gone');
   // the stencil is 110 pages and this is the same book: front matter in the stencil's order, then the body
-  assert.equal(Number(/Pages:\s+(\d+)/.exec(spawnSync('pdfinfo', [pdf], { encoding: 'utf8' }).stdout)[1]), 110);
+  assert.equal(doc.pageCount, 110);
   assert.match(page(1), /DOCUMENT NO\..*USER HANDBOOK FOR PROJECT NAME|DOCUMENT NO\..*USER HANDBOOK FOR/);
   assert.match(page(3), /AMENDMENTS/); assert.match(page(5), /WARNING 1\. 2\. 3\. 4\. 5\. 6\./);
   assert.match(page(7), /DEMOLITION OF EQUIPMENT TO PREVENT ENEMY USE/); assert.match(page(10), /Figure\. 1.*SWITCH OFF/);
@@ -134,8 +135,7 @@ test('a new User Handbook prints the stencil: same pages, the red underlined RES
   assert.match(page(27), /CHAPTER 1 GENERAL DESCRIPTION/); assert.match(page(29), /SECTION 1 INTRODUCTION/);
   assert.match(page(31), /1\.1 GENERAL Figure 1: FIGURE NAME 1\.2 SPECIAL FEATURES AND SPECIFICATIONS \(a\) Table 1: Technical Specifications Sr\. No\. Parameter Value/);
   assert.match(page(32), /1\.3 SYSTEM TREE CHART Figure 2: System Tree Chart/);
-  const line = spawnSync('pdfinfo', ['-f', '32', '-l', '32', pdf], { encoding: 'utf8' }).stdout.split('\n').find((l) => /^Page\s+32 size/.test(l)) ?? '';
-  const size = /size:\s+([\d.]+) x ([\d.]+)/.exec(line);
-  assert.ok(size && Number(size[1]) > Number(size[2]), `page 32 is landscape (${line})`);
+  const size = doc.pageSize(32);
+  assert.ok(size.width > size.height, `page 32 is landscape (${size.width} x ${size.height} pt)`);
   assert.match(page(93), /APPENDIX ‘H’ SYSTEM SPECIFICATION/, 'the appendices start after their SECTION divider');
 });

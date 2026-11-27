@@ -9,7 +9,7 @@ const issues = process.argv.slice(2).length ? process.argv.slice(2) : ['4-2', '5
 let failed = false;
 for (const issue of issues) {
   console.log(`\n=== every element, issue ${issue} ===`);
-  const r = spawnSync('npx', ['vitest', 'run', 'src/studio/__tests__/verify/elements.test.ts'], { cwd: frontend, stdio: 'inherit', shell: process.platform === 'win32', env: { ...process.env, VERIFY_ONLY: issue, NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --max-old-space-size=16384`.trim() } });
+  const r = spawnSync('npx', ['vitest', 'run', 'src/studio/__tests__/verify/elements.test.ts'], { cwd: frontend, stdio: 'inherit', shell: process.platform === 'win32', env: { ...process.env, AGASTYA_VERIFY: '1', VERIFY_ONLY: issue, NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --max-old-space-size=16384`.trim() } });
   if (r.status !== 0) failed = true;
 }
 process.exit(failed ? 1 : 0);

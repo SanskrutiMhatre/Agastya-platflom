@@ -8,10 +8,12 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
-    "test": "node --test test/*.test.js",
+    "test": "node ../scripts/ci/gate.mjs --stages tools,security,backend,pdf-smoke,backend-heavy --keep-going",
     "reset-admin": "node scripts/reset-admin.js",
     "doctor": "node scripts/doctor.js",
-    "test:verify": "node scripts/test-verify.js"
+    "test:verify": "node scripts/test-verify.js",
+    "pretest": "tsc",
+    "test:parallel": "node --test test/*.test.js"
   },
   "engines": {
     "node": ">=22.5"

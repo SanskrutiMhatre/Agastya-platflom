@@ -85,7 +85,12 @@ test('every XML, DTD and entity file shipped in the repository passes', () => {
   const walk = (d) => { let es; try { es = fs.readdirSync(d, { withFileTypes: true }); } catch { return; } for (const e of es) { const p = path.join(d, e.name); if (skip.test(p)) continue; if (e.isDirectory()) walk(p); else if (/\.(xml|dtd|ent)$/i.test(e.name) && fs.statSync(p).size < 30e6) {
     n++; const r = checkXmlSafety(fs.readFileSync(p, 'utf8')); if (!r.ok && !/[\\/]fixtures[\\/].*(evil|xxe|unsafe)/i.test(p)) bad.push(`${path.relative(root, p)}: ${r.error}`); } } };
   walk(root);
-  assert.ok(n > 500, `scanned ${n} files`);
+  // Every such file git tracks must have been scanned (WP-08: the fixed "more than 500" counted the git-ignored customer material too, so a
+  // clean checkout scanned 272 and failed). Without git the old floor of the tracked files stays.
+  const { spawnSync } = require('node:child_process');
+  const ls = spawnSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8', maxBuffer: 1 << 28 });
+  const tracked = ls.status === 0 ? ls.stdout.split('\0').filter((f) => /\.(xml|dtd|ent)$/i.test(f) && !skip.test(path.join(root, f))).length : 250;
+  assert.ok(tracked > 200 && n >= tracked, `scanned ${n} files; git tracks ${tracked} of them`);
   assert.deepEqual(bad, []);
 });
 

@@ -1,0 +1,101 @@
+#!/usr/bin/env node
+// Release readiness (RES-011, WP-08): the static release gates in one read-only command.
+//
+//   node scripts/ci/readiness.mjs [--release DIR] [--install DIR] [--evidence DIR] [--allow-not-run]
+//
+// Each gate is PASS, FAIL or NOT RUN (its input is absent, or it is not automated yet). The script exits non-zero when any gate FAILs, and also when
+// any is NOT RUN unless --allow-not-run is given: a release needs every gate. It prints the gate ids and writes readiness.md / readiness.json into
+// the evidence folder (default verification-results/readiness/<date>) for the release record. It changes nothing.
+import { spawnSync } from 'node:child_process';
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const argv = process.argv.slice(2);
+const opt = (n, d) => { const i = argv.indexOf(`--${n}`); return i >= 0 ? argv[i + 1] : d; };
+const RELEASE = path.resolve(opt('release', path.join(ROOT, 'release')));
+const INSTALL = opt('install');
+const EVIDENCE = path.resolve(opt('evidence', path.join(ROOT, 'verification-results', 'readiness', new Date().toISOString().slice(0, 10))));
+fs.mkdirSync(EVIDENCE, { recursive: true });
+
+const gates = [];
+const gate = (id, name, fn) => { let r; try { r = fn(); } catch (e) { r = { status: 'FAIL', detail: e.message }; } gates.push({ id, name, ...r }); };
+const git = (...a) => { const r = spawnSync('git', a, { cwd: ROOT, encoding: 'utf8' }); return r.status === 0 ? r.stdout.trim() : ''; };
+const head = git('rev-parse', 'HEAD');
+const ps = (cmd) => spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', cmd], { encoding: 'utf8' });
+
+gate('G-SEC-5', 'every route is guarded (static route-guard test)', () => {
+  const r = spawnSync(process.execPath, ['--test', '--test-concurrency=1', 'test/routes-guarded.test.js'], { cwd: path.join(ROOT, 'backend'), encoding: 'utf8' });
+  const pass = /# pass (\d+)/.exec(r.stdout)?.[1]; const fail = /# fail (\d+)/.exec(r.stdout)?.[1];
+  return { status: r.status === 0 ? 'PASS' : 'FAIL', detail: `routes-guarded.test.js: ${pass ?? '?'} pass, ${fail ?? '?'} fail` };
+});
+gate('G-SEC-5b', 'every state-changing route writes an audit record (static audit-coverage test)', () => {
+  const f = path.join(ROOT, 'backend', 'test', 'audit-coverage.test.js');
+  if (!fs.existsSync(f)) return { status: 'NOT RUN', detail: 'backend/test/audit-coverage.test.js does not exist yet (WP-09 / G-SEC-5)' };
+  const r = spawnSync(process.execPath, ['--test', 'test/audit-coverage.test.js'], { cwd: path.join(ROOT, 'backend'), encoding: 'utf8' });
+  return { status: r.status === 0 ? 'PASS' : 'FAIL', detail: 'audit-coverage.test.js' };
+});
+gate('QA-001', 'the release artefacts were built from this commit, from a clean tree', () => {
+  const f = path.join(RELEASE, 'BUILD-INFO.json');
+  if (!fs.existsSync(f)) return { status: 'NOT RUN', detail: `${f} is absent (build with npm run package:win)` };
+  const b = JSON.parse(fs.readFileSync(f, 'utf8'));
+  const bad = [];
+  if (b.commit !== head) bad.push(`built from ${String(b.commit).slice(0, 12)}, HEAD is ${head.slice(0, 12)}`);
+  if (b.dirty) bad.push('built from a tree with uncommitted changes');
+  for (const o of b.outputs || []) {
+    const p = path.join(RELEASE, o.file);
+    if (!fs.existsSync(p)) bad.push(`${o.file} is missing`);
+    else if (crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex') !== o.sha256) bad.push(`${o.file} does not match its recorded hash`);
+  }
+  return { status: bad.length ? 'FAIL' : 'PASS', detail: bad.join('; ') || `commit ${head.slice(0, 12)}, ${(b.outputs || []).length} artefacts verified` };
+});
+gate('G-SEC-11a', 'the executables and the installer carry a valid Authenticode signature', () => {
+  if (process.platform !== 'win32') return { status: 'NOT RUN', detail: 'Windows only' };
+  const exes = fs.existsSync(RELEASE) ? fs.readdirSync(RELEASE).filter((n) => /\.exe$/i.test(n)) : [];
+  if (!exes.length) return { status: 'NOT RUN', detail: `no .exe in ${RELEASE}` };
+  const bad = [];
+  for (const e of exes) {
+    const r = ps(`(Get-AuthenticodeSignature -LiteralPath '${path.join(RELEASE, e).replace(/'/g, "''")}').Status`);
+    if (r.stdout.trim() !== 'Valid') bad.push(`${e}: ${r.stdout.trim() || r.stderr.trim()}`);
+  }
+  return { status: bad.length ? 'FAIL' : 'PASS', detail: bad.join('; ') || `${exes.length} signed` };
+});
+gate('G-SEC-11b', 'the Node runtime the product ships has at least 6 months of support left', () => {
+  // Node release schedule (nodejs.org/about/releases, as known on 2026-11-27): even majors are LTS for 30 months after their April release.
+  const EOL = { 20: '2026-04-30', 22: '2027-04-30', 24: '2028-04-30', 26: '2029-04-30' };
+  const major = Number(process.versions.node.split('.')[0]);
+  if (!EOL[major]) return { status: 'FAIL', detail: `Node ${process.version} is not an LTS line this script knows` };
+  const months = (new Date(EOL[major]) - new Date()) / (30.44 * 864e5);
+  return { status: months >= 6 ? 'PASS' : 'FAIL', detail: `Node ${process.version}: end of life ${EOL[major]}, ${months.toFixed(1)} months left (the product requires Node 22, scripts/package-windows.mjs)` };
+});
+gate('RES-005', 'a software bill of materials is shipped with the release', () => {
+  const sbom = fs.existsSync(RELEASE) ? fs.readdirSync(RELEASE).filter((n) => /sbom|\.cdx\.json$|\.spdx(\.json)?$/i.test(n)) : [];
+  return sbom.length ? { status: 'PASS', detail: sbom.join(', ') } : { status: 'NOT RUN', detail: `no SBOM in ${RELEASE} (RES-005 is not implemented yet)` };
+});
+gate('G-SEC-6', 'the installed copy grants write access to its data folder only to administrators and the service identity', () => {
+  if (!INSTALL) return { status: 'NOT RUN', detail: 'pass --install <folder of an installed copy>' };
+  const r = spawnSync('icacls', [INSTALL], { encoding: 'utf8' });
+  if (r.status !== 0) return { status: 'FAIL', detail: r.stderr.trim() || `icacls exit ${r.status}` };
+  const broad = r.stdout.split(/\r?\n/).filter((l) => /(Everyone|BUILTIN\\Users|Authenticated Users):.*\((?:[^)]*[FMW][^)]*)\)/.test(l));
+  return { status: broad.length ? 'FAIL' : 'PASS', detail: broad.join(' | ') || 'no write grant to Everyone, Users or Authenticated Users' };
+});
+gate('G-OFF-2', 'no Content-Security-Policy violation in the e2e run', () => ({ status: 'NOT RUN', detail: 'not automated yet: the e2e suite does not collect CSP reports (WP-09)' }));
+gate('G-DEP-6', 'doctor passes on a clean install', () => {
+  if (!INSTALL) return { status: 'NOT RUN', detail: 'pass --install <folder of an installed copy>' };
+  const ctl = path.join(INSTALL, 'AgastyaCtl.exe');
+  if (!fs.existsSync(ctl)) return { status: 'FAIL', detail: `${ctl} is missing` };
+  const r = spawnSync(ctl, ['doctor'], { encoding: 'utf8' });
+  return { status: r.status === 0 ? 'PASS' : 'FAIL', detail: (r.stdout || r.stderr).trim().split(/\r?\n/).slice(-1)[0] || `exit ${r.status}` };
+});
+
+const allowNotRun = argv.includes('--allow-not-run');
+const failed = gates.filter((g) => g.status === 'FAIL'); const notRun = gates.filter((g) => g.status === 'NOT RUN');
+const md = [`# Release readiness ${new Date().toISOString()}`, '', `Commit \`${head}\`; release folder \`${RELEASE}\`; installed copy ${INSTALL ? `\`${INSTALL}\`` : 'not given'}.`, '',
+  '| Gate | Check | Result | Detail |', '|---|---|---|---|', ...gates.map((g) => `| ${g.id} | ${g.name} | ${g.status === 'PASS' ? 'PASS' : `**${g.status}**`} | ${String(g.detail).replace(/\|/g, '/')} |`), ''].join('\n');
+fs.writeFileSync(path.join(EVIDENCE, 'readiness.md'), md);
+fs.writeFileSync(path.join(EVIDENCE, 'readiness.json'), JSON.stringify({ commit: head, gates }, null, 2) + '\n');
+for (const g of gates) console.log(`${g.status.padEnd(7)} ${g.id.padEnd(10)} ${g.name}: ${g.detail}`);
+console.log(`\nreadiness: ${failed.length} failed${failed.length ? ` (${failed.map((g) => g.id).join(', ')})` : ''}, ${notRun.length} not run${notRun.length ? ` (${notRun.map((g) => g.id).join(', ')})` : ''}; ${path.join(EVIDENCE, 'readiness.md')}`);
+process.exit(failed.length || (notRun.length && !allowNotRun) ? 1 : 0);

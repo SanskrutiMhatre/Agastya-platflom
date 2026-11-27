@@ -13,7 +13,8 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const os = require('node:os'); const path = require('node:path'); const crypto = require('node:crypto');
 const { spawnSync } = require('node:child_process');
-const { boot } = require('./helpers');
+const { boot, tmp } = require('./helpers');
+const { readPdf } = require('./pdftools');
 
 const PW = 'Correct-Horse-9!';
 const BASELINE_FILE = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'cover-baseline.json'), 'utf8'));
@@ -37,7 +38,7 @@ const canon = (s) => s.replace(/url\('(?:(?:\.\.\/)+|file:\/\/\/)[^']*?\/backend
   .replace(/<([\w:.-]+)((?:\s+[\w:.-]+="[^"]*")+)\s*(\/?)>/g, (m, tag, attrs, close) => `<${tag} ${[...attrs.matchAll(/([\w:.-]+)="([^"]*)"/g)].map((x) => `${x[1]}="${x[2]}"`).sort().join(' ')}${close}>`);
 const sha = (s) => crypto.createHash('sha256').update(s).digest('hex');
 const fingerprint = (fo) => sha(canon(norm(fo)));
-const pages = (pdf, from, to) => { const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'cov-')), 'x.pdf'); fs.writeFileSync(f, pdf); return spawnSync('pdftotext', ['-f', String(from), '-l', String(to), '-layout', f, '-'], { encoding: 'utf8' }).stdout; };
+const pages = async (pdf, from, to) => (await readPdf(pdf)).text({ first: from, last: to });    // pdf.js (test/pdftools.js), no external program
 const page1 = (pdf) => pages(pdf, 1, 1);
 
 // Every parameter the JSS authoring build sends, and the vendored stylesheet that declares it. Each is declared with the old behaviour as its default.
@@ -97,7 +98,7 @@ test('JSS-authored UHB, MM and ORM: the cover has Code No. and Rev No. and no IN
     const xml = g.xml.replace('</bookmeta>', '<codeNo>DT0042_U0100_0007</codeNo><revNo>R2</revNo></bookmeta>');
     assert.equal((await w.put(`${U}/jss`, { xml })).status, 200);
     const out = await build(r.json.project.id);
-    const cover = page1(out.pdf).replace(/\s+/g, ' ');
+    const cover = (await page1(out.pdf)).replace(/\s+/g, ' ');
     assert.match(cover, /Code No\.: DT0042_U0100_0007 Rev No\.: R2 THE INFORMATION GIVEN IN THIS DOCUMENT/, `${type}: the cover opens with Code No. and Rev No., then the notice`);
     assert.ok(!/INBR No/.test(cover), `${type}: no INBR No. line on the cover`);
     assert.match(cover, /Prepared & Published by/); assert.match(cover, /THIS HANDBOOK DOES NOT CONSTITUTE AUTHORITY/);
@@ -111,7 +112,7 @@ test('the stylesheet\'s default keeps the line (what UHB2 and every other build 
   const book = `<?xml version="1.0"?><jssbook xmlns:xi="http://www.w3.org/2001/XInclude"><bookmeta><bookName>B</bookName><systemName>S</systemName><security>RESTRICTED</security><inbrNo>INBR-777</inbrNo></bookmeta>
     <frontmatter><titlePage><documentType>USER HANDBOOK</documentType><disclosureNotice><para>NOTICE</para></disclosureNotice><repairNotice><para>REPAIR</para></repairNotice></titlePage></frontmatter>
     <body><chapter number="1"><title>A</title><section><title>B</title><para>x</para></section></chapter></body></jssbook>`;
-  const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'cov-')), 'book.xml'); fs.writeFileSync(f, book);
+  const f = path.join(tmp('cov-'), 'book.xml'); fs.writeFileSync(f, book);
   const run = (...params) => { const r = spawnSync(XSLTPROC, ['--nonet', ...params, path.join(VENDOR, 'jsstofo', 'jsstofo.xsl'), f], { encoding: 'utf8', cwd: path.join(VENDOR, 'jsstofo') }); assert.equal(r.status, 0, r.stderr.slice(0, 400)); return r.stdout; };
   const dflt = run(); assert.ok(dflt.includes('INBR No.:'), 'default: the INBR No. line is printed'); assert.ok(dflt.includes('INBR-777'), 'with its value');
   assert.ok(run('--stringparam', 'cover.inbr.show', '1').includes('INBR No.:'), 'an explicit 1 prints it');
@@ -126,7 +127,7 @@ test('S1000D and the old JSS User Handbook path: the XSL-FO is what it was befor
   const dm = fs.readdirSync(h.SAMPLES).find((f) => /-040A-D_/.test(f));
   assert.equal((await w.post(`/api/projects/${leg.json.project.id}/dms`, { file: dm, xml: h.sample(dm) })).status, 201);
   const legacy = await build(leg.json.project.id);
-  assert.match(pages(legacy.pdf, 1, 4), /INBR No\./, 'the old JSS User Handbook keeps its INBR cover (page 3, after the jointly-published cover)');
+  assert.match(await pages(legacy.pdf, 1, 4), /INBR No\./, 'the old JSS User Handbook keeps its INBR cover (page 3, after the jointly-published cover)');
   assert.equal(fingerprint(legacy.fo), BASELINE['legacy-jss-uhb'].sha256, 'old JSS path: FO as before');
   for (const n of Object.keys(PARAMS)) assert.ok(!fs.existsSync(path.join(legacy.dir, 'jss-run.xsl')) || !fs.readFileSync(path.join(legacy.dir, 'jss-run.xsl'), 'utf8').includes(n), `${n} is never sent on this path`);
 
@@ -142,7 +143,7 @@ test('S1000D and the old JSS User Handbook path: the XSL-FO is what it was befor
   assert.equal((await w.patch(`/api/projects/${sid}`, { pipeline: 's1000dtojss' })).status, 200);
   const viaJss = await build(sid);
   assert.equal(fingerprint(viaJss.fo), BASELINE['s1000d-via-jss'].sha256, 'S1000D through the JSS pipeline: FO as before');
-  assert.match(pages(viaJss.pdf, 1, 4), /INBR No\./, 'and it still prints INBR No. on its cover');
+  assert.match(await pages(viaJss.pdf, 1, 4), /INBR No\./, 'and it still prints INBR No. on its cover');
 });
 
 test('the S1000D engine reaches the JSS stylesheets through exactly one include: frontmatter-shared.xsl -> ../jsstofo/frontmatter.xsl', () => {

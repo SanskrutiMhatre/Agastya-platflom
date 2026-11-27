@@ -8,16 +8,15 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { spawnSync } = require('node:child_process');
 const { DOMParser } = require('@xmldom/xmldom');
-const { boot } = require('./helpers');
+const { boot, DM21 } = require('./helpers');
+const { pdfText } = require('./pdftools');
 
 const PW = 'Correct-Horse-9!';
-const FIX = path.resolve(__dirname, '..', '..', 'frontend', 'e2e', 'fixtures', 'dm21', '5-0');
+const FIX = path.join(DM21, '5-0');
 const pick = (code) => fs.readdirSync(FIX).find((f) => f.includes(`-${code}A-D_`));
-const text = (buf) => {
-  const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ap-')), 'x.pdf'); fs.writeFileSync(f, buf);
-  return spawnSync('pdftotext', [f, '-'], { encoding: 'utf8' }).stdout.replace(/[\s­-]+/g, '').toLowerCase();
+const text = async (buf) => {                                       // pdf.js (test/pdftools.js), no external program, no temp file
+  return (await pdfText(buf, { mode: 'plain' })).replace(/[\s­-]+/g, '').toLowerCase();
 };
 const has = (t, s) => t.includes(s.replace(/[\s-]+/g, '').toLowerCase());
 const sha = (f) => crypto.createHash('sha256').update(fs.readFileSync(f)).digest('hex');
@@ -149,7 +148,7 @@ test('mountain bicycle, maintenance level 1: the procedure and the Mk1 paragraph
   assert.equal(r.status, 201, JSON.stringify(r.json));
   assert.match(r.json.name, /MTB-MK1/, 'named after the product');
   const pdf = await w.get(`${URL()}/publish/configured/${encodeURIComponent(r.json.name)}`);
-  const t = text(pdf.buf);
+  const t = await text(pdf.buf);
   assert.ok(has(t, ALWAYS) && has(t, PROCED) && has(t, MK1) && has(t, ML), 'applicable content is printed');
   assert.ok(!has(t, FAULT), 'the road-bicycle fault module is not');
   assert.equal(plan.summary.entriesLeft, 1, 'the road-bicycle chapter is gone from the publication module, not just emptied');
@@ -166,7 +165,7 @@ test('road bicycle Mk2, level 3: the Mk1 and level-1/2 elements are removed, the
   assert.equal(plan.summary.elementsRemoved, 2);
   const r = await w.post(`${URL()}/publish/configured`, body);
   assert.equal(r.status, 201, JSON.stringify(r.json));
-  const t = text((await w.get(`${URL()}/publish/configured/${encodeURIComponent(r.json.name)}`)).buf);
+  const t = await text((await w.get(`${URL()}/publish/configured/${encodeURIComponent(r.json.name)}`)).buf);
   assert.ok(has(t, ALWAYS) && has(t, FAULT));
   assert.equal(plan.summary.entriesLeft, 2, 'both chapters remain (the maintenance chapter still holds the descriptive module)');
   assert.ok(!has(t, MK1) && !has(t, ML) && !has(t, PROCED), 'Mk1 paragraph, level 1/2 paragraph and the mountain procedure are not printed');
@@ -182,7 +181,7 @@ test('ad-hoc configuration without a product is named after its values; the unfi
   // the normal build still contains EVERYTHING
   const b = await w.post(`${URL()}/publish`, {});
   assert.equal(b.status, 200, JSON.stringify(b.json).slice(0, 300));
-  const full = text((await w.get(`${URL()}/publish/pdf`)).buf);
+  const full = await text((await w.get(`${URL()}/publish/pdf`)).buf);
   for (const m of [ALWAYS, PROCED, FAULT, MK1, ML]) assert.ok(has(full, m), `unfiltered build still prints ${m}`);
 });
 
@@ -193,7 +192,7 @@ test('configuration names cannot collide, and a configuration PDF never claims a
   assert.equal(a.status, 201, JSON.stringify(a.json)); assert.equal(b.status, 201, JSON.stringify(b.json));
   assert.notEqual(a.json.name, b.json.name, 'different values, different file');
   assert.equal(a.json.releaseLabel, '', 'derived content is not covered by a release');
-  assert.ok(has(text((await w.get(`${URL()}/publish/configured/${encodeURIComponent(a.json.name)}`)).buf), 'NOT RELEASED'), 'and is stamped NOT RELEASED');
+  assert.ok(has(await text((await w.get(`${URL()}/publish/configured/${encodeURIComponent(a.json.name)}`)).buf), 'NOT RELEASED'), 'and is stamped NOT RELEASED');
   // the same configuration is the same file (rebuilt in place)
   const again = await w.post(`${URL()}/publish/configured`, cfg('ml01'));
   assert.equal(again.json.name, a.json.name);
@@ -231,7 +230,7 @@ test('the JSS engine builds a configuration PDF too, with the same filtering', a
   const body = { productId: 'ROAD-MK2', values: [{ ident: 'mntlvl', value: 'ml03' }] };
   const r = await w.post(`${URL()}/publish/configured`, body);
   assert.equal(r.status, 201, JSON.stringify(r.json).slice(0, 400));
-  const t = text((await w.get(`${URL()}/publish/configured/${encodeURIComponent(r.json.name)}`)).buf);
+  const t = await text((await w.get(`${URL()}/publish/configured/${encodeURIComponent(r.json.name)}`)).buf);
   assert.ok(has(t, ALWAYS) && has(t, FAULT), 'applicable content is printed');
   assert.ok(!has(t, MK1) && !has(t, ML) && !has(t, PROCED), 'what does not apply is not');
   assert.equal((await w.patch(`/api/projects/${pid}`, { pipeline: 's1000dtofo' })).status, 200);

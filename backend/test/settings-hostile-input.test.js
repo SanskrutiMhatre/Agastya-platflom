@@ -5,7 +5,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs'); const path = require('node:path'); const os = require('node:os');
-const { boot } = require('./helpers');
+const { boot, tmp } = require('./helpers');
 
 const PW = 'Correct-Horse-9!';
 let h; let bob; let carol; let ctx; let P; let ZipStreamWriter;
@@ -91,7 +91,7 @@ test('a project.json already poisoned on disk cannot reach another project: the 
 });
 
 test('a forged project archive cannot point the new project at another project, nor change its kind', async () => {
-  const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'wp01-')), 'evil.zip');
+  const f = path.join(tmp('wp01-'), 'evil.zip');
   const z = new ZipStreamWriter(fs.createWriteStream(f));
   await z.addBuffer('manifest.json', Buffer.from(JSON.stringify({ manifestVersion: 1, generator: 'Agastya', id: 'x', name: 'Evil', type: 'S1000D', templateRef: 'default', format: 's1000d' })));
   await z.addBuffer('project/project.json', Buffer.from(JSON.stringify({ name: 'Evil', format: 'jss', authoring: 'jss-xml', type: 'JSS', input: { csdbDir: `../${victim}/csdb`, mediaDir: 'Media', pm: 'C:\\Windows\\win.ini' } })));

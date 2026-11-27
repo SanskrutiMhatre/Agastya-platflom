@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { boot } = require('./helpers');
+const { boot, tmp } = require('./helpers');
 const pmc = require('../vendor/engine/pmc');
 const { validateProjectSchema } = require('../vendor/engine/validateSchema');
 
@@ -281,7 +281,7 @@ test('derive into a project with no publication module writes a header that is v
   assert.equal(ap.json.pm.headerFrom, 'generated');
   assert.equal(ap.json.backup, null, 'there was nothing to back up');
   const out = await alice.get(`/api/projects/${fresh}/pmc/export`);
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sns-http-'));
+  const dir = tmp('sns-http-');
   try {
     fs.writeFileSync(path.join(dir, 'pm.xml'), out.buf);
     const v = await validateProjectSchema(dir, ['pm.xml']);

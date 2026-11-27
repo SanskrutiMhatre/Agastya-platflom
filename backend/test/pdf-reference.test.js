@@ -15,19 +15,19 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { spawnSync } = require('node:child_process');
-const { boot } = require('./helpers');
+const { boot, RESULTS: RESULTS_DIR, DM21, tmp } = require('./helpers');
+const { readPdf } = require('./pdftools');
 
 const PW = 'Correct-Horse-9!';
 const SAMPLES = path.resolve(__dirname, '..', '..', 'SAMPLE PROJECTS', 'S1000D', '20_Nov _2026');
-const FIX42 = path.resolve(__dirname, '..', '..', 'frontend', 'e2e', 'fixtures', 'dm21', '4-2');
+const FIX42 = path.join(DM21, '4-2');
 const PUBS = [
   { name: 'User Handbook (RDR-1671Y-00031)', zip: 'PMC-RDR-1671Y-00031-00_000-01.xml.zip', pdf: 'RDR-1671Y-00031-00 (1).pdf', skip: [/-B-A00-00-00-21A-001A-D_/] },
   { name: 'Maintenance Manual (RDR-1671Y-00033)', zip: 'PMC-RDR-1671Y-00033-00_000-01.xml (1).zip', pdf: 'RDR-1671Y-00033-00.pdf', skip: [] },
 ];
 const have = fs.existsSync(SAMPLES);
 const flat = (s) => s.toLowerCase().replace(/[\s­-]+/g, '');
-const pages = (pdf) => spawnSync('pdftotext', ['-raw', pdf, '-'], { encoding: 'utf8', maxBuffer: 1 << 28 }).stdout.split('\f').slice(0, -1);
+const pages = async (pdf) => (await readPdf(pdf)).text({ mode: 'raw' }).split('\f').slice(0, -1);    // pdf.js (test/pdftools.js); was pdftotext -raw
 // Setup, not verification: the sample ZIPs are unpacked with the platform's own reader, so the test needs no Info-ZIP `unzip` (absent on Windows).
 const unzip = async (zip, to) => { const r = require('../dist/services/zipio').ZipFileReader.open(zip); try { await r.extractTo(to); } finally { r.close(); } };
 const RESULTS = {};
@@ -44,7 +44,7 @@ test.before(async () => {
   await w.post('/api/auth/onboarding', { username: 'ref', password: PW });
 });
 test.after(async () => {
-  const out = path.join(__dirname, '..', '..', 'frontend', 'verification-results');
+  const out = RESULTS_DIR;                                  // AGASTYA_TEST_RESULTS, else frontend/verification-results (helpers.js)
   fs.mkdirSync(out, { recursive: true });
   fs.writeFileSync(path.join(out, 'pdf-reference.json'), JSON.stringify(RESULTS, null, 1));
   if (h) await h.close();
@@ -52,7 +52,7 @@ test.after(async () => {
 
 for (const pub of PUBS) {
   test(`${pub.name}: our PDF carries the same data modules, titles, dates and content as the reference`, { skip: !have && 'the 20 Nov samples are not in this checkout', timeout: 300000 }, async () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ref-'));
+    const dir = tmp('ref-');
     await unzip(path.join(SAMPLES, pub.zip), dir);
     const files = fs.readdirSync(dir);
     const dmFiles = files.filter((f) => /^DMC-.*\.xml$/i.test(f) && !pub.skip.some((re) => re.test(f)));
@@ -79,7 +79,7 @@ for (const pub of PUBS) {
     assert.equal(built.status, 200, JSON.stringify(built.json).slice(0, 600));
     const ours = path.join(dir, 'ours.pdf'); fs.writeFileSync(ours, (await w.get(`/api/projects/${pid}/publish/pdf`)).buf);
     const refPdf = path.join(SAMPLES, pub.pdf);
-    const refPages = pages(refPdf); const ourPages = pages(ours);
+    const refPages = await pages(refPdf); const ourPages = await pages(ours);
     const refText = flat(refPages.join(' ')); const ourText = flat(ourPages.join(' '));
 
     // what each data module is

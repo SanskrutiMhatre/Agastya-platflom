@@ -22,6 +22,7 @@ const XIGNAL_DIR = path.join(ROOT, 'SAMPLE PROJECTS', 'S1000D', 'PMC-RDR-1671Y-0
 const XIGNAL_PDF = path.join(ROOT, 'SAMPLE PROJECTS', 'S1000D', 'RDR-1671Y-00039-00 (9).pdf');
 const FIXTURES = path.join(__dirname, 'fixtures', 'importer', 'xignal-annexures');
 const hasXignal = fs.existsSync(XIGNAL_DIR);
+const NO_XIGNAL = !hasXignal && `the Xignal S1000D export is not in this checkout (customer material, git-ignored; looked in ${XIGNAL_DIR})`;
 
 const readTree = (dir) => fs.readdirSync(dir).filter((n) => /\.xml$/i.test(n) || /^ICN-/.test(n)).map((n) => ({ name: n, bytes: fs.readFileSync(path.join(dir, n)) }));
 const pm = (n) => ({ modelIdentCode: 'TST', pmIssuer: '1671Y', pmNumber: n, pmVolume: '00' });
@@ -30,7 +31,7 @@ const flat = (list, out = []) => { for (const e of list) { if (e.type === 'folde
 
 // ── pmRef and the anchor module: the verified mapping on the real Xignal export ────────────────
 
-test('sample: the nine pmRefs of the Xignal master resolve to their title-page modules (verified mapping)', { skip: !hasXignal }, () => {
+test('sample: the nine pmRefs of the Xignal master resolve to their title-page modules (verified mapping)', { skip: NO_XIGNAL }, () => {
   const r = scanPackage(readTree(XIGNAL_DIR));
   const want = {
     'RDR-1671Y-00010-00': 'RDR-A-A00-00-00-02A-001A-D',
@@ -52,7 +53,7 @@ test('sample: the nine pmRefs of the Xignal master resolve to their title-page m
   assert.equal(r.publications[0].pmCode, 'RDR-1671Y-00039-00');
 });
 
-test('sample: nothing the master places is called an orphan - including modules the standard reader drops (several dmRefs per pmEntry, dividers beside a pmRef)', { skip: !hasXignal }, () => {
+test('sample: nothing the master places is called an orphan - including modules the standard reader drops (several dmRefs per pmEntry, dividers beside a pmRef)', { skip: NO_XIGNAL }, () => {
   const text = fs.readFileSync(path.join(XIGNAL_DIR, 'PMC-RDR-1671Y-00039-00_001-01_EN-IN.xml'), 'utf8');
   const raw = parsePm(text);
   const full = parsePmComplete(text);
@@ -71,7 +72,7 @@ test('sample: nothing the master places is called an orphan - including modules 
   assert.equal(r.unassigned.filter((u) => u.infoCode === '001').length, 10, 'the nine sub-publication title pages and the master-adjacent one');
 });
 
-test('sample: the pool of the Xignal export is explained - modules of sub-publications whose PMC was never exported', { skip: !hasXignal }, () => {
+test('sample: the pool of the Xignal export is explained - modules of sub-publications whose PMC was never exported', { skip: NO_XIGNAL }, () => {
   const r = scanPackage(readTree(XIGNAL_DIR));
   assert.ok(r.unassigned.length > 150);
   assert.ok(r.unassigned.every((u) => u.reason === 'sub-publication-not-in-package'));
@@ -79,7 +80,7 @@ test('sample: the pool of the Xignal export is explained - modules of sub-public
   assert.ok(f && f.severity === 'info', 'generated front matter is information, not a problem');
 });
 
-test('sample: the Xignal PMC/DM title mismatch is found and the DM wins (Annexure E divider calls itself Annexure G)', { skip: !hasXignal }, () => {
+test('sample: the Xignal PMC/DM title mismatch is found and the DM wins (Annexure E divider calls itself Annexure G)', { skip: NO_XIGNAL }, () => {
   const r = scanPackage(readTree(XIGNAL_DIR));
   const f = r.findings.find((x) => x.id === 'pmc-title-mismatch');
   assert.ok(f && /41A/.test(f.message) && f.repairable);
@@ -333,7 +334,7 @@ test('fixtures: the generated annexure PMCs are valid, marked reconstructed, sma
   assert.deepEqual(names.map((n) => /-(\d{5})-00_/.exec(n)[1]).sort(), ['00009', '00010', '00014', '00018', '00023', '00025', '00028', '00039', '00041', '00043']);
 });
 
-test('fixtures: they line up with the real Xignal export (every module they name is a module of the package)', { skip: !hasXignal }, () => {
+test('fixtures: they line up with the real Xignal export (every module they name is a module of the package)', { skip: NO_XIGNAL }, () => {
   const have = new Set(inventoryFromEntries(readTree(XIGNAL_DIR)).map((d) => d.ident.dmc));
   const dmc = (c) => [c.modelIdentCode, c.systemDiffCode, c.systemCode, `${c.subSystemCode}${c.subSubSystemCode}`, c.assyCode, `${c.disassyCode}${c.disassyCodeVariant}`, `${c.infoCode}${c.infoCodeVariant}`, c.itemLocationCode].join('-');
   const seen = new Set();
@@ -348,7 +349,7 @@ test('fixtures: they line up with the real Xignal export (every module they name
   for (const e of flat(real.entries).filter((x) => x.type === 'dm')) assert.ok(got.has(dmc(e.dmCode)), `real master module ${dmc(e.dmCode)} is in the recovered master`);
 });
 
-test('real PDF: the 1502-page reference book yields the published structure (305 table rows, 218 distinct, master + 9 annexures)', { skip: !(hasXignal && fs.existsSync(XIGNAL_PDF)), timeout: 120000 }, async () => {
+test('real PDF: the 1502-page reference book yields the published structure (305 table rows, 218 distinct, master + 9 annexures)', { skip: NO_XIGNAL || (!fs.existsSync(XIGNAL_PDF) && `the Xignal reference PDF is not in this checkout (looked in ${XIGNAL_PDF})`), timeout: 120000 }, async () => {
   const entries = readTree(XIGNAL_DIR);
   const got = await recoverStructureFromPdf(XIGNAL_PDF, inventoryFromEntries(entries), { hints: hintsFromEntries(entries) });
   assert.equal(got.source.pages, 1502);
