@@ -48,6 +48,7 @@ const hard = {
   'frontend files nothing imports': dead.files,
   'frontend exports referenced nowhere': dead.exports.map((e) => `${e.file}::${e.name}`),
   'frontend CSS classes no source names': dead.classes.map((c) => `.${c.name} (${c.file})`),
+  'frontend runtime dependencies nothing imports': dead.deps,
   'cleanup allow-list entries without a reason': dead.problems,
   'debris of features the owner removed': cleanup.scanRemovalDebris(cleanupJson('removed-features.json').features),
 };

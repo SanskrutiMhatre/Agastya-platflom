@@ -17,7 +17,8 @@ function fixture(files) {
 after(() => { for (const r of roots) fs.rmSync(r, { recursive: true, force: true }); });
 
 const BASE = {
-  'frontend/src/main.tsx': "import { used } from './lib/a';\nimport './styles/app.css';\nconst Lazy = () => import('./pages/Lazy');\nused(); void Lazy;\n",
+  'frontend/package.json': JSON.stringify({ dependencies: { react: '1', '@scope/lib': '1', 'unused-meta': '1' }, devDependencies: { typescript: '1' } }),
+  'frontend/src/main.tsx': "import { createElement } from 'react';\nimport { x } from '@scope/lib/sub';\nimport { used } from './lib/a';\nimport './styles/app.css';\nconst Lazy = () => import('./pages/Lazy');\nused(); void Lazy; void createElement; void x;\n",
   'frontend/src/lib/a.ts': [
     'export function used(): void { own(); }',
     'export function ownOnly(): number { return 1; }',
@@ -77,6 +78,10 @@ describe('dead-code scan', () => {
     assert.deepEqual(s.classesGenerated.map((c) => c.name).sort(), ['sev-error', 'sev-info']);
     assert.ok(!dead.includes('png') && !dead.includes('5em') && !dead.includes('inComment'));
     assert.ok(!dead.includes('serverBuilt'));
+  });
+
+  test('a runtime dependency nothing imports is reported (scoped and deep imports count; devDependencies are not checked)', () => {
+    assert.deepEqual(s.deps, ['unused-meta']);
   });
 
   test('cssClasses keeps the line numbers across comments and ignores @keyframes steps', () => {

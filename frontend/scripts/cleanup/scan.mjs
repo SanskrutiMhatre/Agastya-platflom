@@ -10,6 +10,8 @@
 //   classes   a CSS class defined in src/**/*.css that no non-test source names: the words of string and template literals in src (JSX
 //             className, classList, the DOM-built Studio/JSS/JSG editors) and in backend/src (HTML built by the server). A template or a
 //             concatenation that ends in `prefix-` (`x-${name}`, 'sev-' + s) keeps every class with that prefix: those are generated
+//   deps      a runtime dependency (package.json `dependencies`) that no source, test, script or config file imports (devDependencies are
+//             tools that configs and scripts load by name, so they are not counted)
 //
 // The removal-completeness check (removed-features.json): for every feature the owner removed, the files that made it must stay deleted,
 // and its identifiers, its strings (endpoints, test ids, labels), its CSS class prefixes and its rail labels must not come back in the
@@ -230,9 +232,16 @@ export function scanDeadCode(o = {}) {
     classesDead.push({ name: c, ...where[0] });
   }
 
+  // -- runtime dependencies (package.json `dependencies`) that no source or config file imports
+  const pkgFile = path.join(fe, 'package.json');
+  const runtimeDeps = fs.existsSync(pkgFile) ? Object.keys(JSON.parse(fs.readFileSync(pkgFile, 'utf8')).dependencies ?? {}) : [];
+  const imported = new Set();
+  for (const f of codeFiles) for (const s of parseCode(f).specifiers) if (!s.startsWith('.') && !s.startsWith('/')) imported.add(s.startsWith('@') ? s.split('/').slice(0, 2).join('/') : s.split('/')[0]);
+  const deps = runtimeDeps.filter((d) => !imported.has(d));
+
   return {
     counts: { sourceFiles: srcFiles.length, classesDefined: defined.size, exportsTestOnly, exportsOwnFileOnly, classesGenerated: classesGenerated.length },
-    files, filesTestOnly, filesAmbient, exports: exportsDead, classes: classesDead, classesGenerated, prefixes: Object.fromEntries(prefixes),
+    files, filesTestOnly, filesAmbient, exports: exportsDead, classes: classesDead, classesGenerated, prefixes: Object.fromEntries(prefixes), deps,
   };
 }
 
@@ -240,7 +249,7 @@ export function scanDeadCode(o = {}) {
 export function applyAllowList(scan, allow) {
   const reasonOK = (x) => typeof x.reason === 'string' && x.reason.trim().length >= 10;
   const problems = [];
-  for (const k of ['files', 'exports', 'classes']) for (const x of allow[k] ?? []) if (!reasonOK(x)) problems.push(`allow-list ${k}: an entry without a reason (${JSON.stringify(x)})`);
+  for (const k of ['files', 'exports', 'classes', 'deps']) for (const x of allow[k] ?? []) if (!reasonOK(x)) problems.push(`allow-list ${k}: an entry without a reason (${JSON.stringify(x)})`);
   const classAllowed = (c) => (allow.classes ?? []).find((a) => (a.name && a.name === c) || (a.pattern && new RegExp(a.pattern).test(c)));
   const fileAllowed = (f) => (allow.files ?? []).find((a) => a.file === f);
   const exportAllowed = (e) => (allow.exports ?? []).find((a) => a.file === e.file && a.name === e.name);
@@ -248,13 +257,15 @@ export function applyAllowList(scan, allow) {
     files: scan.files.filter((f) => !fileAllowed(f)),
     exports: scan.exports.filter((e) => !exportAllowed(e)),
     classes: scan.classes.filter((c) => !classAllowed(c.name)),
+    deps: (scan.deps ?? []).filter((d) => !(allow.deps ?? []).some((a) => a.name === d)),
   };
   const stale = [
     ...(allow.files ?? []).filter((a) => !scan.files.includes(a.file)).map((a) => `file ${a.file}`),
     ...(allow.exports ?? []).filter((a) => !scan.exports.some((e) => e.file === a.file && e.name === a.name)).map((a) => `export ${a.file}::${a.name}`),
     ...(allow.classes ?? []).filter((a) => a.name && !scan.classes.some((c) => c.name === a.name)).map((a) => `class ${a.name}`),
   ];
-  return { ...out, allowed: { files: scan.files.length - out.files.length, exports: scan.exports.length - out.exports.length, classes: scan.classes.length - out.classes.length }, stale, problems };
+  stale.push(...(allow.deps ?? []).filter((a) => !(scan.deps ?? []).includes(a.name)).map((a) => `dependency ${a.name}`));
+  return { ...out, allowed: { files: scan.files.length - out.files.length, exports: scan.exports.length - out.exports.length, classes: scan.classes.length - out.classes.length, deps: (scan.deps ?? []).length - out.deps.length }, stale, problems };
 }
 
 // ---- removal completeness ---------------------------------------------------------------------------------------------------------------
