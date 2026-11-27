@@ -51,10 +51,11 @@ $o = G {
   $port_f = if ($rule) { ($rule | Get-NetFirewallPortFilter) } else { $null }
   $unin = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*' -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like 'Agastya Platform*' }
   [pscustomobject]@{
-    files = @('AgastyaPlatform.exe','AgastyaCtl.exe','runtime\node.exe','unins000.exe') | ForEach-Object { "{0}={1}" -f $_, (Test-Path (Join-Path $app $_)) }
+    # WP-25 (DEP-023): the program lives in versions\<current>\; the launcher and the "current" pointer sit beside it
+    files = @('AgastyaPlatform.exe', 'AgastyaCtl.exe', 'current', 'unins000.exe') + @(if (Test-Path (Join-Path $app 'current')) { 'versions\' + (Get-Content (Join-Path $app 'current') -Raw).Trim() + '\runtime\node.exe' }) | ForEach-Object { "{0}={1}" -f $_, (Test-Path (Join-Path $app $_)) }
     svcState = $svc.State; svcStart = $svc.StartMode; svcAccount = $svc.StartName; svcPath = $svc.PathName
     ruleEnabled = [string]$rule.Enabled; ruleDir = [string]$rule.Direction; ruleAction = [string]$rule.Action; ruleProfile = [string]$rule.Profile
-    ruleProgram = $app_f; ruleProto = $port_f.Protocol; ruleCount = (Get-NetFirewallRule -DisplayName 'Agastya Platform*' -ErrorAction SilentlyContinue | Measure-Object).Count
+    ruleProgram = $app_f; ruleProto = $port_f.Protocol; rulePort = [string]$port_f.LocalPort; ruleCount = (Get-NetFirewallRule -DisplayName 'Agastya Platform*' -ErrorAction SilentlyContinue | Measure-Object).Count
     uninstPublisher = $unin.Publisher; uninstVersion = $unin.DisplayVersion; uninstName = $unin.DisplayName
     ini = if (Test-Path 'C:\ProgramData\Agastya Platform\agastya.ini') { Get-Content 'C:\ProgramData\Agastya Platform\agastya.ini' -Raw } else { '' }
   }
@@ -65,7 +66,8 @@ Check 'service starts automatically' ($o.svcStart -eq 'Auto') $o.svcStart
 Check 'service runs as LocalService' ($o.svcAccount -match 'LocalService') $o.svcAccount
 Check 'firewall rule: one rule, enabled, inbound, allow' (($o.ruleCount -eq 1) -and ($o.ruleEnabled -eq 'True') -and ($o.ruleDir -eq 'Inbound') -and ($o.ruleAction -eq 'Allow')) "$($o.ruleCount) $($o.ruleEnabled) $($o.ruleDir) $($o.ruleAction)"
 Check 'firewall rule: private+domain only, never public' (($o.ruleProfile -match 'Private') -and ($o.ruleProfile -match 'Domain') -and ($o.ruleProfile -notmatch 'Public') -and ($o.ruleProfile -notmatch 'Any')) $o.ruleProfile
-Check 'firewall rule: bound to runtime\node.exe, TCP' (($o.ruleProgram -like '*\Agastya Platform\runtime\node.exe') -and ($o.ruleProto -eq 'TCP')) "$($o.ruleProgram) $($o.ruleProto)"
+# WP-25 (DEP-023): node.exe moves with each version folder, so the rule is bound to the port, no longer to a program path
+Check 'firewall rule: TCP port 4071, not bound to a program path' (($o.rulePort -eq '4071') -and ($o.ruleProto -eq 'TCP') -and ((-not $o.ruleProgram) -or ($o.ruleProgram -eq 'Any'))) "$($o.rulePort) $($o.ruleProto) $($o.ruleProgram)"
 Check 'Add/Remove Programs entry present' ($o.uninstName -like 'Agastya Platform*') "$($o.uninstName) / $($o.uninstPublisher) / $($o.uninstVersion)"
 Check 'agastya.ini written with Port=4071 and Bind=lan' (($o.ini -match '(?m)^\s*Port\s*=\s*4071') -and ($o.ini -match '(?im)^\s*Bind\s*=\s*lan')) ($o.ini -replace "`r?`n", ' | ')
 Say "  info  publisher in Add/Remove Programs: '$($o.uninstPublisher)'"

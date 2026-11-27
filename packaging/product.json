@@ -9,6 +9,10 @@
   "defaultPort": 4040,
   "defaultServiceName": "AgastyaPlatform",
   "firewallRuleName": "Agastya Platform (LAN access)",
+  "update": {
+    "minFromVersion": "2.0.0",
+    "notes": "WP-25: the oldest installed version the offline update package (.agupdate) of this release may update. Raise it when a release can no longer update an old one directly (the package then refuses with exit code 11 and the customer installs the intermediate release first)."
+  },
   "runtime": {
     "node": "24.22.3",
     "nodeEndOfLife": "2028-04-30",

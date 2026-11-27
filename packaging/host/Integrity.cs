@@ -140,28 +140,11 @@ namespace Agastya
             r.SignaturePresent = true;
             try
             {
-                Dictionary<string, string> f = new Dictionary<string, string>();
-                foreach (string line in File.ReadAllLines(sigFile))
-                {
-                    Match m = Regex.Match(line, @"^([a-z0-9-]+):\s?(.*)$");
-                    if (m.Success) f[m.Groups[1].Value] = m.Groups[2].Value.Trim();
-                }
-                string v;
-                if (!f.TryGetValue("format", out v) || v != "agastya-detached-signature/1") { r.SignatureProblem = "not an agastya-detached-signature/1 file"; return; }
-                foreach (string k in new string[] { "algorithm", "signed-file", "signed-sha256", "thumbprint", "certificate", "signature" })
-                    if (!f.ContainsKey(k)) { r.SignatureProblem = "the signature file has no " + k; return; }
-                X509Certificate2 cert = new X509Certificate2(Convert.FromBase64String(f["certificate"]));
-                r.Signer = cert.Subject; r.Thumbprint = cert.Thumbprint.ToUpperInvariant();
-                if (f["signed-file"] != ManifestName) { r.SignatureProblem = "the signature is for " + f["signed-file"]; return; }
-                if (r.Thumbprint != f["thumbprint"].ToUpperInvariant()) { r.SignatureProblem = "the thumbprint line does not match the certificate"; return; }
-                using (SHA256 sha = SHA256.Create())
-                    if (Hex(sha.ComputeHash(manifestBytes)) != f["signed-sha256"].ToLowerInvariant()) { r.SignatureProblem = "MANIFEST.sha256 was changed after it was signed"; return; }
-                byte[] sig = Convert.FromBase64String(f["signature"]);
-                bool ok;
-                if (f["algorithm"] == "RSA-PKCS1-SHA256") ok = cert.GetRSAPublicKey().VerifyData(manifestBytes, sig, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
-                else if (f["algorithm"] == "ECDSA-P1363-SHA256") ok = cert.GetECDsaPublicKey().VerifyData(manifestBytes, sig, HashAlgorithmName.SHA256);
-                else { r.SignatureProblem = "unknown algorithm " + f["algorithm"]; return; }
-                if (!ok) { r.SignatureProblem = "the signature does not match (the manifest or the signature was altered)"; return; }
+                // the format and the checks are shared with the update package (Update.cs, DetachedSig)
+                string signer, thumbprint;
+                string problem = DetachedSig.Verify(manifestBytes, File.ReadAllText(sigFile), ManifestName, out signer, out thumbprint);
+                r.Signer = signer; r.Thumbprint = thumbprint;
+                if (problem != null) { r.SignatureProblem = problem; return; }
                 r.SignatureValid = true;
                 r.SignerMatchesExe = r.ExeSignerThumbprint != null && r.ExeSignerThumbprint == r.Thumbprint && !r.ExeSignature.StartsWith("TAMPERED");
             }

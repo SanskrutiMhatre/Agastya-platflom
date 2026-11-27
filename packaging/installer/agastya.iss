@@ -6,6 +6,15 @@
 ;   Agastya-Platform-<ver>-win-x64-Setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART [/DIR="D:\Agastya"] [/DATADIR="D:\AgastyaData"]
 ;        [/STATEDIR="D:\AgastyaConfig"] [/PORT=4040] [/LAN] [/SVCNAME=AgastyaPlatform] [/NOSERVICE] [/TASKS="service,lan,autostart,desktopicon"]
 ;   /CURRENTUSER installs for the signed-in user only (no administrator rights; the service and LAN options are then unavailable).
+;   /ADMINUSER=<name> /ADMINPASSWORDFILE=<file>   create the first administrator unattended (the file's first line is a TEMPORARY password,
+;        changed at the first sign-in; it is read by AgastyaCtl.exe, never put on a command line; delete the file afterwards).
+; Uninstall:  unins000.exe /VERYSILENT [/PURGEDATA]   - the data folder is KEPT unless /PURGEDATA is given (interactive: a question, default No).
+; Exit codes: Inno Setup's (0 = done; 7 = "preparing to install" failed: the server could not be stopped or the pre-update backup failed -
+;        nothing was changed; see <state>\logs\setup-upgrade-*.log). docs/DEPLOYMENT-KIT.md has the table.
+;
+; Layout (WP-25, DEP-023): {app}\versions\<version>\ holds each version's program; {app}\AgastyaPlatform.exe and AgastyaCtl.exe are copies of
+; the current one's (the shortcuts and the service use them); {app}\current and {app}\previous name the folders. An upgrade adds a folder and
+; keeps the previous one, so "AgastyaCtl.exe --rollback" goes back without the old Setup. Offline updates (.agupdate) use the same layout.
 ; =============================================================================
 
 #ifndef AppVersion
@@ -94,7 +103,10 @@ Name: "service"; Description: "Run as a Windows service (starts with Windows, wh
 Name: "lan"; Description: "Allow other computers on the network to connect (opens the Windows Firewall for this program on private and domain networks)"; GroupDescription: "Network:"; Flags: unchecked; Check: IsAdminInstallMode
 
 [Files]
-Source: "{#SourceDir}\*"; DestDir: "{app}"; Excludes: "portable.flag,config\*,data\*,state.dir"; Flags: ignoreversion recursesubdirs
+; the launcher first: ExtractTemporaryFile('AgastyaCtl.exe') in PrepareToInstall takes the first entry of that name
+Source: "{#SourceDir}\AgastyaCtl.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\AgastyaPlatform.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\*"; DestDir: "{app}\versions\{#AppVersion}"; Excludes: "portable.flag,config\*,data\*,state.dir"; Flags: ignoreversion recursesubdirs
 
 [Icons]
 Name: "{autoprograms}\{#AppName}\{#AppName}"; Filename: "{app}\AgastyaPlatform.exe"; WorkingDir: "{app}"
@@ -111,6 +123,12 @@ Filename: "{app}\AgastyaPlatform.exe"; Description: "Start {#AppName} now"; Flag
 
 [UninstallDelete]
 Type: files; Name: "{app}\state.dir"
+; WP-25: version folders written by offline updates are not in Setup's own list; they hold program files only (never data)
+Type: filesandordirs; Name: "{app}\versions"
+Type: files; Name: "{app}\current"
+Type: files; Name: "{app}\previous"
+Type: files; Name: "{app}\update-history.txt"
+Type: files; Name: "{app}\*.exe.old-*"
 Type: dirifempty; Name: "{app}"
 
 [Code]
@@ -258,8 +276,9 @@ function ShouldSkipPage(PageID: Integer): Boolean;
 begin
   Result := False;
   // An administrator who passed the value on the command line is not asked again.
-  if Assigned(DataPage) and (PageID = DataPage.ID) then Result := SwitchGiven('DATADIR');
-  if Assigned(PortPage) and (PageID = PortPage.ID) then Result := SwitchGiven('PORT');
+  // WP-25 (G-DEP-2): an upgrade keeps the data folder and the port it has, so it asks for neither.
+  if Assigned(DataPage) and (PageID = DataPage.ID) then Result := SwitchGiven('DATADIR') or FileExists(IniPath);
+  if Assigned(PortPage) and (PageID = PortPage.ID) then Result := SwitchGiven('PORT') or FileExists(IniPath);
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
@@ -309,40 +328,24 @@ begin
   RunHidden(Icacls, '"' + Dir + '" /remove:g *S-1-5-32-545 *S-1-5-11 /T /C /Q');
 end;
 
-procedure StopRunningCopy;
+// WP-25 (DEP-001, G-DEP-5): before an upgrade changes anything, THIS release's AgastyaCtl.exe (extracted to Setup's temporary folder, so an old
+// installed one does not have to know the steps) stops the service and the tray application and waits until the server has really let go of
+// the data folder (no fixed wait), makes a platform backup with the installed version's own tool and verifies it by a restore into a scratch
+// folder, and moves a flat installation of an older release into versions\<its version>. When any of that fails Setup stops here and
+// nothing is changed (exit code 7 in a silent run). The host reads agastya.ini as UTF-8, so a data folder with non-Latin letters is found.
+function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   Ctl: String;
-begin
-  Ctl := ExpandConstant('{app}\AgastyaCtl.exe');
-  if FileExists(Ctl) then
-  begin
-    RunHidden(Ctl, '--stop');     // the Windows service, if there is one
-    RunHidden(Ctl, '--quit');     // the tray application, if it is running
-    Sleep(4000);                  // let the server finish and release publisher.db
-  end;
-end;
-
-// The host program does the copying: it reads agastya.ini as UTF-8, so a data folder with accented or non-Latin letters in its name is found
-// (Inno's own ini functions are ANSI-only, and a silent miss here would mean an upgrade without its safety copy).
-procedure BackupDatabaseBeforeUpgrade;
-var
-  Old, Ctl: String;
   Code: Integer;
 begin
-  Ctl := ExpandConstant('{app}\AgastyaCtl.exe');
-  if not FileExists(Ctl) then Exit;                                           // a first installation
-  Old := '';
-  RegQueryStringValue(HKA, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{{#AppGuid}}_is1', 'DisplayVersion', Old);
-  if Old = '' then Old := 'unknown';
-  Code := RunHidden(Ctl, '--backup-db "' + Old + '"');
-  if Code <> 0 then Log('The pre-upgrade database backup returned ' + IntToStr(Code));
-end;
-
-function PrepareToInstall(var NeedsRestart: Boolean): String;
-begin
   Result := '';
-  StopRunningCopy;
-  BackupDatabaseBeforeUpgrade;
+  if not (FileExists(ExpandConstant('{app}\AgastyaCtl.exe')) or FileExists(ExpandConstant('{app}\current'))) then Exit;   // a first installation
+  ExtractTemporaryFile('AgastyaCtl.exe');
+  Ctl := ExpandConstant('{tmp}\AgastyaCtl.exe');
+  Code := RunHidden(Ctl, '--install-dir "' + ExpandConstant('{app}') + '" --prepare-upgrade "{#AppVersion}"');
+  if Code = 13 then Result := 'Agastya Platform is still running and could not be stopped. Close it (and stop its Windows service), then run Setup again. Nothing was changed.'
+  else if Code = 14 then Result := 'The backup of your data before the upgrade failed, so Setup stopped. Nothing was changed. The reason is in the log folder (setup-upgrade-*.log).'
+  else if Code <> 0 then Result := 'Setup could not prepare the upgrade (code ' + IntToStr(Code) + '). Nothing was changed. See setup-upgrade-*.log in the log folder.';
 end;
 
 procedure WriteConfigurationIfNeeded;
@@ -362,7 +365,10 @@ begin
 
   if not FileExists(IniPath) then
   begin
-    if LoadStringFromFile(ExpandConstant('{app}\docs\agastya.ini.template'), Tpl) then
+    // WP-25: the template is in this version's folder (versions\<version>\docs); a missing one is logged, never silent
+    if not LoadStringFromFile(ExpandConstant('{app}\versions\{#AppVersion}\docs\agastya.ini.template'), Tpl) then
+      Log('agastya.ini.template is missing from the program folder: agastya.ini was not written (the defaults apply)')
+    else
     begin
       Text := String(Tpl);
       if LanWanted then Bind := 'lan' else Bind := 'loopback';
@@ -403,10 +409,54 @@ var
 begin
   Rule := '{#FirewallRule}';
   RunHidden(ExpandConstant('{sys}\netsh.exe'), 'advfirewall firewall delete rule name="' + Rule + '"');
+  // WP-25 (DEP-023): node.exe now lives in versions\<version>\runtime and moves with every update, so the rule is bound to the port, not
+  // to a program path (Mode B's own firewall handling belongs to WP-28)
   if LanWanted then
     RunHidden(ExpandConstant('{sys}\netsh.exe'),
       'advfirewall firewall add rule name="' + Rule + '" dir=in action=allow protocol=TCP localport=' + WantedPort +
-      ' program="' + ExpandConstant('{app}\runtime\node.exe') + '" profile=private,domain enable=yes');
+      ' profile=private,domain enable=yes');
+end;
+
+// WP-25 (PRD-005): the WebView2 runtime. When it is missing and the release carries Microsoft's offline installer (redist\), run it silently.
+function WebView2Installed: Boolean;
+var
+  V: String;
+begin
+  V := '';
+  if not RegQueryStringValue(HKLM64, 'SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}', 'pv', V) then
+    if not RegQueryStringValue(HKLM64, 'SOFTWARE\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}', 'pv', V) then
+      RegQueryStringValue(HKCU, 'Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}', 'pv', V);
+  Result := (V <> '') and (V <> '0.0.0.0');
+  Log('WebView2 runtime: ' + V);
+end;
+
+procedure ProvisionWebView2;
+var
+  Redist: String;
+begin
+  if WebView2Installed then Exit;
+  Redist := ExpandConstant('{app}\versions\{#AppVersion}\redist\MicrosoftEdgeWebView2RuntimeInstallerX64.exe');
+  if FileExists(Redist) then RunHidden(Redist, '/silent /install')
+  else Log('The WebView2 runtime is not installed and this release carries no offline installer: the interface opens in an Edge app window or the default browser.');
+end;
+
+// WP-25 (G-DEP-2): /ADMINUSER + /ADMINPASSWORDFILE create the first administrator, so a silent install needs nobody at the first screen.
+procedure CreateFirstAdministrator;
+var
+  User, PwFile: String;
+  Code: Integer;
+begin
+  User := ExpandConstant('{param:ADMINUSER|}');
+  PwFile := ExpandConstant('{param:ADMINPASSWORDFILE|}');
+  if User = '' then Exit;
+  if (PwFile = '') or (not FileExists(PwFile)) then
+  begin
+    Log('/ADMINUSER was given without a readable /ADMINPASSWORDFILE: no administrator created');
+    if not WizardSilent then MsgBox('/ADMINUSER needs /ADMINPASSWORDFILE=<file with the temporary password>. No administrator was created; the first person to open the application creates one.', mbError, MB_OK);
+    Exit;
+  end;
+  Code := RunHidden(ExpandConstant('{app}\AgastyaCtl.exe'), '--first-admin "' + User + '" --password-file "' + PwFile + '"');
+  if Code <> 0 then Log('The first administrator could not be created (code ' + IntToStr(Code) + '); see the host log');
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -416,7 +466,13 @@ begin
   if CurStep = ssPostInstall then
   begin
     WriteConfigurationIfNeeded;
+    // WP-25: "current" names the version just copied, the one it replaces becomes "previous" (AgastyaCtl.exe --rollback), older ones beyond
+    // [update] KeepVersions are removed
+    if RunHidden(ExpandConstant('{app}\AgastyaCtl.exe'), '--activate "{#AppVersion}"') <> 0 then
+      MsgBox('The new version could not be made current. Run "AgastyaCtl.exe --doctor" for details.', mbError, MB_OK);
     ConfigureFirewall;
+    ProvisionWebView2;
+    CreateFirstAdministrator;
     if ServiceWanted then
     begin
       Ctl := ExpandConstant('{app}\AgastyaCtl.exe');
@@ -429,6 +485,7 @@ end;
 
 var
   UninstStateDir: String;     // read while state.dir still exists: [UninstallDelete] removes it before the closing message
+  PurgeData, DataRemoved: Boolean;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
@@ -444,12 +501,25 @@ begin
       RunHidden(Ctl, '--uninstall-service');
       RunHidden(Ctl, '--quit');
       Sleep(3000);
+      // WP-25 (G-DEP-1): the data stays unless asked for - /PURGEDATA in a silent run, a question (default No) otherwise. AgastyaCtl checks
+      // that the folders are this product's (never a drive root, a profile or system folder, or one holding the program) before removing them.
+      PurgeData := SwitchGiven('PURGEDATA');
+      if (not PurgeData) and (not UninstallSilent) then
+        PurgeData := MsgBox('Also DELETE all projects and the database (the data folder named in ' + UninstStateDir + '\agastya.ini)?' + #13#10#13#10 +
+                            'Choose No to keep them (recommended): a later installation finds them again.', mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES;
+      if PurgeData then
+      begin
+        if RunHidden(Ctl, '--remove-data --confirm') = 0 then DataRemoved := True
+        else Log('The data folder was not removed (AgastyaCtl --remove-data refused; see above)');
+      end;
     end;
     RunHidden(ExpandConstant('{sys}\netsh.exe'), 'advfirewall firewall delete rule name="{#FirewallRule}"');
   end;
   if CurUninstallStep = usPostUninstall then
   begin
-    if not UninstallSilent then
+    if (not UninstallSilent) and DataRemoved then
+      MsgBox('Agastya Platform and its data were removed.', mbInformation, MB_OK)
+    else if not UninstallSilent then
       MsgBox('Agastya Platform was removed.' + #13#10#13#10 + 'Your projects and database were NOT deleted. The data folder is the one named in' + #13#10 +
              UninstStateDir + '\agastya.ini  (by default: ' + UninstStateDir + '\workspace).' + #13#10#13#10 +
              'Delete that folder yourself if you no longer need it.', mbInformation, MB_OK);

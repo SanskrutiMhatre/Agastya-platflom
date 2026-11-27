@@ -83,6 +83,12 @@ export interface Config {
   /** Strict-Transport-Security max-age in seconds on TLS answers (AGASTYA_HSTS_MAX_AGE; 0 = no header). No includeSubDomains, no preload. */
   hstsMaxAge: number;
   /**
+   * WP-25 (PRD-005): what the Windows host opened the interface in, reported by GET /api/version so support sees whether the WebView2 runtime is
+   * present (and how old it is) on an air-gapped machine. Set by packaging/host (AGASTYA_WEBVIEW2_VERSION, AGASTYA_SHELL_WINDOW); null in a
+   * source checkout or when the host found no runtime. A value that is not a version / a known window kind is dropped, never echoed.
+   */
+  shell: { webview2: string | null; window: 'app' | 'browser' | null };
+  /**
    * WP-12 (PLT-001, ENT-006, PLT-006): platform backups. `dir` (AGASTYA_BACKUP_DIR, default <workspace>/backups/platform) holds the archives;
    * put it on a second disk in production. `intervalHours` (AGASTYA_BACKUP_INTERVAL_HOURS, default 24, 0 = no scheduled backup);
    * `keep` (AGASTYA_BACKUP_KEEP "daily/weekly/monthly", default 7/4/12) applies to scheduled backups only; `keepMigrationSnapshots`
@@ -312,6 +318,10 @@ export function buildConfig(env: Env = process.env): Config {
     tls,
     serverNames: parseServerNames(env.AGASTYA_SERVER_NAMES),
     hstsMaxAge: parseHsts(env.AGASTYA_HSTS_MAX_AGE),
+    shell: {
+      webview2: /^\d{1,5}(\.\d{1,6}){1,3}$/.test(env.AGASTYA_WEBVIEW2_VERSION ?? '') ? String(env.AGASTYA_WEBVIEW2_VERSION) : null,
+      window: env.AGASTYA_SHELL_WINDOW === 'app' || env.AGASTYA_SHELL_WINDOW === 'browser' ? env.AGASTYA_SHELL_WINDOW : null,
+    },
     backup: {
       dir: env.AGASTYA_BACKUP_DIR || path.join(workspaceDir, 'backups', 'platform'),
       intervalHours: envCount('AGASTYA_BACKUP_INTERVAL_HOURS', 24, env),
