@@ -58,9 +58,6 @@ a:hover { text-decoration: underline; }
 .v2-row-link:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 2px; }
 .v2-top { display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 20px; background: var(--bg-elev); border-bottom: 1px solid var(--border); flex: none; }
 .v2-top h1 { font-size: 16px; margin: 0; font-weight: 650; }
-/* WP-07 (UX-006): the editors' header wraps onto a second row instead of pushing Split / PDF / Generate past the right edge (stop-gap before WP-22) */
-.v2-edhead { height: auto; min-height: 42px; flex-wrap: wrap; row-gap: 6px; padding-top: 5px; padding-bottom: 5px; }
-.v2-edhead > h1 { min-width: 0; flex: 0 1 auto; }
 .v2-crumbs { display: flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: 13px; min-width: 0; }
 .v2-crumbs strong { color: var(--text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .v2-page { flex: 1; min-height: 0; overflow: auto; padding: var(--page-pad); }
@@ -416,18 +413,9 @@ html.v2-compact .v2-table th { padding-top: 5px; padding-bottom: 5px; }
   background: var(--warning-soft); color: var(--warning); border: 1px solid currentColor; font-size: 13px; box-shadow: var(--shadow-banner); }
 
 /* ------------------------------------------------ WP-21: the editor host chrome (editors/host) */
-.v2-edactions { display: contents; }
-.v2-edstate { flex: none; }
-.v2-edcmd { gap: 6px; color: var(--text-muted); }
 .v2-kbd { display: inline-flex; align-items: center; height: 18px; padding: 0 5px; border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 4px; background: var(--bg-sunken); color: var(--text-muted); font: 600 10.5px/1 var(--font-mono); white-space: nowrap; }
 .v2-kbd + .v2-kbd { margin-left: 3px; }
 .icon-btn.is-on { background: var(--accent-soft); color: var(--accent); }
-/* focus mode: the page and a slim header (06 section 7.2); the project rail steps aside */
-.v2-edhead.is-focus { min-height: 34px; padding-top: 2px; padding-bottom: 2px; }
-html[data-editor-focus] .v2-pshell { grid-template-columns: 0 1fr !important; }
-html[data-editor-focus] .v2-pshell > .v2-rail { visibility: hidden; overflow: hidden; width: 0; padding: 0; border: 0; }
-@media (max-width: 1100px) { .v2-edcmd-label { display: none; } }
-@media (max-width: 760px) { .v2-edcmd .v2-kbd { display: none; } }
 
 /* ------------------------------------------------ WP-28: who is working where (editors/host/TeamChip, Project Home "Working now") */
 .v2-team { display: inline-flex; align-items: center; gap: 6px; flex: none; }
@@ -485,11 +473,6 @@ html[data-editor-focus] .v2-pshell > .v2-rail { visibility: hidden; overflow: hi
 .v2-home-list { list-style: none; margin: 0; padding: 4px 0; }
 .v2-home-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 16px; min-width: 0; }
 .v2-home-list li + li { border-top: 1px solid var(--border); }
-/* the review comments beside the document (editors) */
-.v2-edcomments { position: fixed; right: 12px; top: 104px; bottom: 16px; width: min(360px, calc(100vw - 24px)); display: flex; flex-direction: column; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-2); z-index: 40; }
-.v2-edcomments-head { display: flex; align-items: center; gap: 8px; padding: 8px 8px 6px 12px; }
-.v2-edcomments-list { flex: 1; min-height: 0; overflow: auto; padding: 0 10px 10px; display: flex; flex-direction: column; gap: 8px; }
-.v2-rv.is-current { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
 .btn.is-on { background: var(--accent-soft); color: var(--accent); }
 /* a page that failed to draw */
 .v2-errpanel { max-width: 640px; }
