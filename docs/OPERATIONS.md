@@ -6,7 +6,7 @@ For the person who installs, runs and looks after the server. Nothing here needs
 
 | What | Where (installed for all users) | Where (portable ZIP) |
 | --- | --- | --- |
-| The program | `C:\Program Files\Agastya Platform\` (never written to at run time) | the unzipped folder |
+| The program | `C:\Program Files\Agastya Platform\` (never written to at run time): the launcher, and `versions\<version>\` per version (section 8) | the unzipped folder |
 | Configuration `agastya.ini` | `C:\ProgramData\Agastya Platform\agastya.ini` | `config\agastya.ini` |
 | **Your data** (projects, templates, `publisher.db`) | `C:\ProgramData\Agastya Platform\workspace\` (or the folder chosen at install) | `data\workspace\` |
 | Logs | `C:\ProgramData\Agastya Platform\logs\` | `data\logs\` |
@@ -16,9 +16,11 @@ Upgrading and uninstalling never touch the data folder. **Back it up** (section 
 
 ## 2. Starting it
 
-* **Tray application** (default): Start menu → *Agastya Platform*. A tray icon appears, the server starts, and the browser opens at
-  `http://localhost:4040/`. Right-click the icon for *Open*, *Open data folder*, *Open log folder*, *Restart server*, *Exit*. It runs while the
-  user is signed in. The installer can start it at sign-in (*Start Agastya Platform when I sign in*).
+* **Tray application** (default): Start menu → *Agastya Platform*. A tray icon appears, the server starts, and the application opens at
+  `http://localhost:4040/` in its own window (an app window of Microsoft Edge, which shares the WebView2 engine) or - when Edge is not on the
+  computer, or `[app] Window=browser` - in the default browser, with a notice saying why. Right-click the icon for *Open*, *Open data folder*,
+  *Open log folder*, *Restart server*, *Exit*. It runs while the user is signed in. The installer can start it at sign-in (*Start Agastya
+  Platform when I sign in*).
 * **Windows service** (servers): starts with Windows whether or not anyone is signed in. Chosen in the installer (*Run as a Windows service*), or
   later from an elevated prompt:
 
@@ -231,17 +233,58 @@ the new data folder, start. Keep the installer of the version you run with your 
 * The *Backup* page and *Project files export* (Administrator) make an **export** of project files for reading or handing on - not a backup:
   no passwords, settings, history or release records, and it cannot be restored.
 
-## 8. Upgrading
+## 8. Upgrading, offline updates and rollback
 
-Run the new `Setup.exe` over the old one (same install folder is offered). It closes the running copy, backs up the database (section 7), replaces the
-program, keeps `agastya.ini` and the data, and starts the service again if one was installed. At its first start the new version takes a verified copy
-of the database before it changes anything (section 7). Migrations only ever add tables, columns and indexes; there are no "down" migrations - **the way
-back is a copy taken before the upgrade**.
+The program folder keeps **one folder per version** (WP-25): `versions\<version>\` holds that version's runtime and application, the launcher
+`AgastyaPlatform.exe` / `AgastyaCtl.exe` beside it is a copy of the current version's, and the files `current` and `previous` name the folders.
+An upgrade adds a folder and keeps the one it replaces (and up to `[update] KeepVersions` earlier ones, default 2), so going back needs no old
+Setup. `AgastyaCtl.exe --versions` lists them; an installation made before this layout is moved into it by its first upgrade.
 
-**To go back:** uninstall, install the older version, and restore the platform backup made before the upgrade (section 7), or put the `publisher.db`
-from `backups\publisher-before-...db` (or `backups\pre-upgrade-...`) back into the data folder. An older version **refuses to start** on a database a
-newer version has migrated ("This database was written by a newer version of Agastya Platform ...") instead of damaging it; it also refuses to restore
-a backup made by a newer version. Either install the newer version again or restore a copy taken with the older one.
+**With Setup.** Run the new `Setup.exe` over the old one. Before it copies anything it stops the service and the tray application (it waits until
+the server has really released the data folder - no fixed pause), makes a **platform backup** (section 7, kind `pre-update`) with the installed
+version's own tool and **verifies it by restoring it into a scratch folder**. If the server cannot be stopped or the backup fails, Setup stops
+there and nothing is changed (silent exit code 7; the reason is in `logs\setup-upgrade-*.log`). An installed 2.0.0, which predates the backup tool,
+gets a copy of the stopped database instead - make a platform backup after that upgrade. `agastya.ini` and the data are kept.
+
+**With an offline update package** (`Agastya-Platform-<version>-win-x64-Update.agupdate`, carried on removable media):
+
+```
+AgastyaCtl.exe --verify-update  E:\Agastya-Platform-2.1.0-win-x64-Update.agupdate     (checks only; changes nothing)
+AgastyaCtl.exe --apply-update   E:\Agastya-Platform-2.1.0-win-x64-Update.agupdate     (elevated for a per-machine installation)
+```
+
+`--apply-update` (1) checks the package before writing a byte: its signature, that the signer is the certificate that signed the installed
+program (or one listed in `[update] TrustedThumbprints`, for a certificate renewal), that it is for this product, **newer** than the installed
+version (an update never goes back) and allowed to update it (`min-from-version`), and the SHA-256 of every file against the signed manifest;
+(2) writes the new `versions\<version>\` and checks it again on disk, and the Authenticode signature of its `AgastyaCtl.exe`; (3) stops the server,
+makes and verifies the pre-update platform backup (refused = nothing changed), and copies the stopped database for a fast rollback
+(`backups\update-<from>-to-<to>-<time>\`); (4) switches `current`; (5) starts the new version and waits up to `[update] HealthSeconds` (default 60)
+for `/api/version` to report it with a compatible schema and `/api/ready` to answer 200. If it does not, it **rolls back by itself**: the previous
+version becomes current again, the database copy is put back (the database the failed version left is kept in `backups\failed-update-...`, never
+deleted), the failed version's folder is removed and the previous version is started and checked. Then whatever ran before (the service, the tray
+application) is started again. Every run writes `logs\update-<time>.log`; `update-history.txt` in the program folder lists them.
+
+| Exit code | Meaning |
+| --- | --- |
+| 0 | updated and healthy (`--verify-update`: the package would be applied) |
+| 1 | failed before anything changed (program folder not writable, portable copy) |
+| 2 | wrong arguments, or no such file |
+| 10 | package refused: signature, signer, integrity or format |
+| 11 | version refused: already installed, older, another product, or outside its `min-from-version` |
+| 12 | not enough disk space (program drive: the package; data drive: the pre-update backup) |
+| 13 | the running server could not be stopped |
+| 14 | the pre-update backup failed or did not verify; nothing changed |
+| 20 | the new version failed its health check; the previous one runs again with the database as it was |
+| 21 | the rollback itself failed: the log names the backup and the database copy; run `--doctor` |
+| 22 | (`--rollback`) the previous version cannot use this database: see below |
+
+An unsigned package (a development build) is refused unless `--allow-unsigned` is given; use that on test machines only.
+
+**To go back by hand:** `AgastyaCtl.exe --rollback` makes the previous version current again (and `--rollback` once more returns). Migrations only
+ever add tables, columns and indexes, and an older version **refuses to start** on a database a newer version has migrated, instead of damaging it;
+`--rollback` then returns to the newer version and says so (exit 22). `AgastyaCtl.exe --rollback --restore-db` goes back to the database copy taken
+before the update to the current version; the newer database is kept in `backups\rolled-back-from-<version>-...`, never deleted, so nothing
+written since the update is lost - it is only set aside. The platform backups (section 7) remain the complete way back for the project files too.
 
 The database is checked (`quick_check`) at every start. A damaged file stops the start with "The database failed its integrity check"; stop there,
 restore the newest backup into a new folder (section 7) and point the server at it.
@@ -273,13 +316,23 @@ Agastya-Platform-<version>-win-x64-Setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORE
 | `/TASKS=` | comma list from `service`, `lan`, `autostart`, `desktopicon` |
 | `/CURRENTUSER` | install for the signed-in user only, no administrator rights (no service, no firewall rule) |
 | `/ALLUSERS` | per-machine install (the default; needs an elevated prompt) |
+| `/ADMINUSER=` `/ADMINPASSWORDFILE=` | create the first administrator without anyone at the first screen. The file's first line is a **temporary** password (it must meet the password policy); it is read by `AgastyaCtl.exe` and handed to the server's tool on standard input, never on a command line; the administrator chooses their own password at the first sign-in. Delete the file afterwards. Ignored once an administrator exists. |
 
-The exit code is the standard Inno Setup one (0 = success; anything else is a failure or a cancellation); `/LOG=` has the details. Uninstall silently with `"<install folder>\unins000.exe" /VERYSILENT`. Data is kept.
+The exit code is the standard Inno Setup one (0 = success; 7 = the upgrade could not be prepared - the server did not stop or the pre-update backup
+failed, nothing changed; anything else is a failure or a cancellation); `/LOG=` has the details. A fresh installation asks one question (the licence,
+when the release carries one); an upgrade asks none of the data-folder and port questions. Uninstall silently with
+`"<install folder>\unins000.exe" /VERYSILENT` (data kept) or add `/PURGEDATA` to delete the data too.
+
+To check the WebView2 runtime the product's window relies on: `AgastyaCtl.exe --doctor` shows its version (or a warning), and `GET /api/version`
+reports it under `shell`. When a release carries Microsoft's offline runtime installer (`redist\`), Setup runs it on a machine without the runtime and
+every offline update runs it again; sites that block Windows Update patch the runtime that way.
 
 ## 10. Uninstalling
 
-*Settings → Apps → Agastya Platform → Uninstall.* It stops and removes the service and the firewall rule and deletes the program. **The data folder and
-`agastya.ini` stay.** Delete them yourself to remove everything.
+*Settings → Apps → Agastya Platform → Uninstall.* It stops and removes the service and the firewall rule and deletes the program, including every
+version folder an offline update added. It then asks whether to delete the projects and the database too - **the answer is No unless you choose Yes**;
+a silent uninstall keeps them unless `/PURGEDATA` is given. Before deleting, `AgastyaCtl.exe --remove-data` checks that the folders are this
+product's (never a drive root, a profile or system folder, or the program's own folder). Kept data is found again by a later installation.
 
 ## 11. Security notes
 

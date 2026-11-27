@@ -8,6 +8,8 @@
 //
 // Commands (AgastyaCtl.exe):  --console  --doctor [--deep]  --verify  --support-bundle [file]  --status  --start  --stop  --install-service
 //                             --uninstall-service  --version  --help   (--verify / --support-bundle / the start-up file check: Integrity.cs, SupportBundle.cs)
+//                             --verify-update  --apply-update  --rollback  --versions  --prune-versions  --repair-launcher  --first-admin
+//                             (WP-25 offline update, version folders, the window, first administrator: Update.cs)
 // Options:                    --home <dir>   keep config, data and logs under <dir> (tests and portable use)
 //                             --port <n>     --lan   (with --install-service: written to the configuration)
 //
@@ -37,21 +39,54 @@ namespace Agastya
     // ---------------------------------------------------------------------------------------------------------------
     internal static class Layout
     {
-        public static string ExeDir;      // the folder this program is in (the install folder, or the unpacked portable folder)
+        // WP-25 (DEP-023): an installation keeps each version in its own folder and a pointer to the one that runs:
+        //   <InstallDir>\AgastyaPlatform.exe, AgastyaCtl.exe   the launcher (a copy of the current version's; shortcuts and the service use it)
+        //   <InstallDir>\current, previous                       one line each: the folder name under versions\ (Update.cs writes them atomically)
+        //   <InstallDir>\versions\<version>\                     runtime\, app\, version.json, MANIFEST.sha256 ... of that version
+        // Without a "current" file (the portable ZIP, a development tree, an installation made before WP-25) the program files sit beside the
+        // launcher, as before ("flat" layout).
+        public static string InstallDir;  // the folder of the launcher (the install folder, or the unpacked portable folder)
+        public static string ExeDir;      // the program files of the running version: <InstallDir>\versions\<current>, or InstallDir (flat)
         public static string AppDir;      // <ExeDir>\app
         public static string NodeExe;     // <ExeDir>\runtime\node.exe
+        public static string CurrentVersion;  // the "current" pointer, or null in a flat layout
         public static string StateDir;    // config, data and logs live under here unless the configuration says otherwise
         public static string ConfigFile;
         public static string LogDir;
         public static bool Portable;
         public static string StateOverride;   // --home / AGASTYA_HOME, when given
+        public static string InstallOverride; // --install-dir, when given (Setup runs its own new AgastyaCtl.exe against the installed folder)
+
+        public static string VersionsDir { get { return Path.Combine(InstallDir, "versions"); } }
+
+        /// <summary>Re-read the "current" pointer (after Update.cs switched it).</summary>
+        public static void ResolveProgram()
+        {
+            ExeDir = InstallDir;
+            CurrentVersion = Versions.ReadPointer("current");
+            if (CurrentVersion != null)
+            {
+                string d = Path.Combine(VersionsDir, CurrentVersion);
+                if (Directory.Exists(d)) ExeDir = d; else CurrentVersion = null;
+            }
+            AppDir = Path.Combine(ExeDir, "app");
+            NodeExe = Path.Combine(Path.Combine(ExeDir, "runtime"), "node.exe");
+        }
 
         public static void Init(string homeOverride)
         {
-            ExeDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-            AppDir = Path.Combine(ExeDir, "app");
-            NodeExe = Path.Combine(Path.Combine(ExeDir, "runtime"), "node.exe");
-            Portable = File.Exists(Path.Combine(ExeDir, "portable.flag"));
+            string self = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            InstallDir = self;
+            if (!string.IsNullOrEmpty(InstallOverride)) InstallDir = Path.GetFullPath(InstallOverride);
+            else
+            {
+                // started from inside versions\<v>\ (by hand, or a shortcut of an older layout): the installation is two folders up
+                DirectoryInfo up = Directory.GetParent(self);
+                if (up != null && up.Name.Equals("versions", StringComparison.OrdinalIgnoreCase) && up.Parent != null && File.Exists(Path.Combine(up.Parent.FullName, "current")))
+                    InstallDir = up.Parent.FullName;
+            }
+            ResolveProgram();
+            Portable = File.Exists(Path.Combine(InstallDir, "portable.flag"));
             if (!string.IsNullOrEmpty(homeOverride))
             {
                 StateDir = Path.GetFullPath(homeOverride);
@@ -60,15 +95,15 @@ namespace Agastya
             }
             else if (Portable)
             {
-                StateDir = Path.Combine(ExeDir, "data");
-                ConfigFile = Path.Combine(Path.Combine(ExeDir, "config"), "agastya.ini");
+                StateDir = Path.Combine(InstallDir, "data");
+                ConfigFile = Path.Combine(Path.Combine(InstallDir, "config"), "agastya.ini");
                 LogDir = Path.Combine(StateDir, "logs");
             }
             else
             {
                 // The installer records where this installation keeps its configuration and logs (per-machine: C:\ProgramData\Agastya Platform;
                 // per-user: under the user's profile; or a folder an administrator chose) in state.dir beside the program.
-                string marker = Path.Combine(ExeDir, "state.dir");
+                string marker = Path.Combine(InstallDir, "state.dir");
                 string chosen = null;
                 try { if (File.Exists(marker)) { string[] l = File.ReadAllLines(marker); if (l.Length > 0 && l[0].Trim().Length > 0) chosen = l[0].Trim(); } } catch { }
                 StateDir = chosen != null ? Environment.ExpandEnvironmentVariables(chosen)
@@ -105,6 +140,14 @@ namespace Agastya
         public string Mode = "";
         public string ServerNames = "";
         public string TlsCert = "", TlsKey = "", TlsPfx = "", TlsPassphraseFile = "", HstsMaxAge = "";
+        // WP-25: where the interface opens (auto = an app window of Microsoft Edge when it is there, else the default browser with a notice)
+        public string Window = "auto";
+        // WP-25 (DEP-023): offline updates. KeepVersions = earlier versions kept for a rollback; HealthSeconds = how long a new version has to
+        // answer /api/version and /api/ready before it is rolled back; TrustedThumbprints = further signing certificates accepted for an update
+        // package (a certificate renewal), comma-separated SHA-1 thumbprints - the signer of the installed AgastyaCtl.exe is always accepted.
+        public int KeepVersions = 2;
+        public int HealthSeconds = 60;
+        public string TrustedThumbprints = "";
         public List<string> Problems = new List<string>();
 
         public bool TlsConfigured { get { return TlsCert.Length > 0 || TlsPfx.Length > 0; } }
@@ -176,6 +219,17 @@ namespace Agastya
                     case "tls.pfx": s.TlsPfx = val; break;
                     case "tls.passphrasefile": s.TlsPassphraseFile = val; break;
                     case "tls.hstsmaxage": s.HstsMaxAge = val; break;
+                    case "app.window":
+                        string w = val.ToLowerInvariant();
+                        if (w == "auto" || w == "app" || w == "browser") s.Window = w; else s.Problems.Add("line " + lineNo + ": Window must be auto, app or browser");
+                        break;
+                    case "update.keepversions":
+                        int kv; if (int.TryParse(val, out kv) && kv >= 1 && kv <= 10) s.KeepVersions = kv; else s.Problems.Add("line " + lineNo + ": KeepVersions must be 1-10");
+                        break;
+                    case "update.healthseconds":
+                        int hs; if (int.TryParse(val, out hs) && hs >= 15 && hs <= 900) s.HealthSeconds = hs; else s.Problems.Add("line " + lineNo + ": HealthSeconds must be 15-900");
+                        break;
+                    case "update.trustedthumbprints": s.TrustedThumbprints = val; break;
                     default: s.Problems.Add("line " + lineNo + ": unknown setting '" + key + "'"); break;
                 }
             }
@@ -348,6 +402,8 @@ namespace Agastya
         private readonly object gate = new object();
         public volatile bool GaveUp;
         public event Action StateChanged;
+        /// <summary>"app" or "browser" when this process opens the interface (the tray), null otherwise (service, console, update check).</summary>
+        public string WindowKind { get; set; }
 
         public Supervisor(Settings s)
         {
@@ -416,6 +472,10 @@ namespace Agastya
             if (cfg.TlsPfx.Length > 0) psi.EnvironmentVariables["AGASTYA_TLS_PFX"] = Settings.StatePath(cfg.TlsPfx);
             if (cfg.TlsPassphraseFile.Length > 0) psi.EnvironmentVariables["AGASTYA_TLS_PASSPHRASE_FILE"] = Settings.StatePath(cfg.TlsPassphraseFile);
             if (cfg.HstsMaxAge.Length > 0) psi.EnvironmentVariables["AGASTYA_HSTS_MAX_AGE"] = cfg.HstsMaxAge;
+            // WP-25 (PRD-005): GET /api/version reports the WebView2 runtime of this computer and where the interface opens
+            string wv2 = Shell.WebView2Version();
+            if (wv2 != null) psi.EnvironmentVariables["AGASTYA_WEBVIEW2_VERSION"] = wv2;
+            if (WindowKind != null) psi.EnvironmentVariables["AGASTYA_SHELL_WINDOW"] = WindowKind;
             try { Directory.CreateDirectory(cfg.WorkspaceDir); } catch (Exception e) { Host.Error("cannot create the data folder " + cfg.WorkspaceDir + ": " + e.Message); return -2; }
 
             Process p = new Process(); p.StartInfo = psi; p.EnableRaisingEvents = true;
@@ -580,7 +640,7 @@ namespace Agastya
             Icacls(cfg.WorkspaceDir, acct); Icacls(Layout.LogDir, acct);
             string cfgDir = Path.GetDirectoryName(Layout.ConfigFile);
             Icacls(cfgDir, "\"NT AUTHORITY\\LOCAL SERVICE\":(OI)(CI)RX");
-            string exe = Path.Combine(Layout.ExeDir, "AgastyaPlatform.exe");
+            string exe = Path.Combine(Layout.InstallDir, "AgastyaPlatform.exe");
             string bin = "\\\"" + exe + "\\\" --service" + (Layout.StateOverride != null ? " --home \\\"" + Layout.StateOverride + "\\\"" : "");
             string o;
             int rc = Sc("create \"" + cfg.ServiceName + "\" binPath= \"" + bin + "\" start= auto obj= \"NT AUTHORITY\\LocalService\" DisplayName= \"Agastya Platform\"", out o);
@@ -639,7 +699,7 @@ namespace Agastya
             fails = 0; warns = 0;
             Console.WriteLine("Agastya Platform " + Layout.Version + " - self-check");
             Console.WriteLine("  mode      " + (Layout.Portable ? "portable" : "installed"));
-            Console.WriteLine("  program   " + Layout.ExeDir);
+            Console.WriteLine("  program   " + Layout.ExeDir + (Layout.CurrentVersion != null ? "  (version folder; launcher in " + Layout.InstallDir + ")" : ""));
             Console.WriteLine("  config    " + Layout.ConfigFile + (File.Exists(Layout.ConfigFile) ? "" : "  (not created yet - defaults apply)"));
             Console.WriteLine("  data      " + cfg.WorkspaceDir);
             Console.WriteLine("  logs      " + Layout.LogDir);
@@ -717,6 +777,17 @@ namespace Agastya
             string st = ServiceTools.StateOf(cfg.ServiceName);
             if (st == "not installed") Pass("Windows service '" + cfg.ServiceName + "' is not installed (optional)"); else Pass("Windows service '" + cfg.ServiceName + "': " + st);
 
+            // WP-25: the versioned layout (launcher = a copy of the current version's programs) and the window the interface opens in
+            if (Layout.CurrentVersion != null)
+            {
+                string drift = Versions.LauncherDrift();
+                if (drift != null) Fail(drift + " - run AgastyaCtl.exe --repair-launcher");
+                else Pass("version " + Layout.CurrentVersion + " is current; earlier versions kept for a rollback: " + Versions.ListLine());
+            }
+            string wv2 = Shell.WebView2Version();
+            if (wv2 != null) Pass("WebView2 runtime " + wv2);
+            else Warn("the WebView2 runtime is not installed: the interface opens in " + (Shell.EdgePath() != null ? "an Edge app window" : "the default browser") + " (install it from the redist folder of the release; DEPLOYMENT-KIT.md)");
+
             Console.WriteLine();
             Console.WriteLine(fails == 0 ? (warns == 0 ? "Everything is in order." : "No problems; " + warns + " warning(s).") : fails + " problem(s) found.");
             return fails == 0 ? 0 : 1;
@@ -739,6 +810,7 @@ namespace Agastya
         {
             cfg = s;
             sup = new Supervisor(s);
+            sup.WindowKind = Agastya.Shell.PlannedWindow(s);
             tray = new NotifyIcon();
             try { tray.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { tray.Icon = SystemIcons.Application; }
             tray.Text = "Agastya Platform";
@@ -787,7 +859,18 @@ namespace Agastya
             try { if (invoker != null && invoker.IsHandleCreated) invoker.BeginInvoke(new Action(Quit)); else Quit(); } catch { Quit(); }
         }
 
-        private void OpenBrowser() { Shell(cfg.Url); }
+        private bool noticeShown;
+        /// <summary>WP-25 (PRD-005): an app window when possible; the default browser otherwise, with a notice saying why (once per run).</summary>
+        private void OpenBrowser()
+        {
+            string notice = Agastya.Shell.Open(cfg, cfg.Url);
+            if (notice != null && !noticeShown)
+            {
+                noticeShown = true;
+                Host.Info("window: " + notice);
+                try { tray.ShowBalloonTip(8000, "Agastya Platform", notice, ToolTipIcon.Info); } catch { }
+            }
+        }
         private static void Shell(string target) { try { Process.Start(new ProcessStartInfo(target) { UseShellExecute = true }); } catch { } }
 
         private void RestartServer()
@@ -822,22 +905,35 @@ namespace Agastya
             "  AgastyaCtl.exe --uninstall-service    remove it (your data is kept)\r\n" +
             "  AgastyaCtl.exe --start | --stop       start or stop the service\r\n" +
             "  AgastyaCtl.exe --quit                 ask a running tray application to close\r\n" +
-            "  AgastyaCtl.exe --backup-db <label>    copy the database to <data>\\backups\\pre-upgrade-<label>-<time> (the installer does this before an upgrade)\r\n" +
+            "  AgastyaCtl.exe --backup-db <label>    copy the stopped database to <data>\\backups\\pre-upgrade-<label>-<time> (Setup now makes a verified platform backup instead)\r\n" +
             "  AgastyaCtl.exe --reset-admin <user>   set a new password for <user> (Administrator; asks for it, never on the command line)\r\n" +
+            "  AgastyaCtl.exe --verify-update <file.agupdate>  check an offline update package; changes nothing\r\n" +
+            "  AgastyaCtl.exe --apply-update <file.agupdate>   install it: verified backup, switch, health check, automatic rollback\r\n" +
+            "  AgastyaCtl.exe --rollback [--restore-db]        go back to the previous version (--restore-db: and to the database copy taken before the update)\r\n" +
+            "  AgastyaCtl.exe --versions | --prune-versions | --repair-launcher\r\n" +
+            "  AgastyaCtl.exe --first-admin <user> --password-file <file>  create the first administrator (temporary password, changed at first sign-in)\r\n" +
             "  AgastyaCtl.exe --version\r\n\r\n" +
             "Options: --home <folder>  keep configuration, data and logs under <folder>\r\n" +
-            "         --port <n> --lan  (with --install-service) written to agastya.ini\r\n";
+            "         --port <n> --lan  (with --install-service) written to agastya.ini\r\n" +
+            "         --allow-unsigned  (with the update commands) accept an unsigned package - development and test machines only\r\n";
 
         [STAThread]
         private static int Main(string[] args)
         {
-            string home = null, mode = null, port = null, label = null; bool lan = false, deep = false, requireSigned = false;
+            string home = null, mode = null, port = null, label = null, passwordFile = null, installDir = null;
+            bool lan = false, deep = false, requireSigned = false, allowUnsigned = false, restoreDb = false, confirm = false;
             for (int i = 0; i < args.Length; i++)
             {
                 string a = args[i];
                 if (a == "--home" && i + 1 < args.Length) home = args[++i];
+                else if (a == "--install-dir" && i + 1 < args.Length) installDir = args[++i];
                 else if (a == "--deep") deep = true;
                 else if (a == "--require-signed") requireSigned = true;
+                else if (a == "--allow-unsigned") allowUnsigned = true;
+                else if (a == "--restore-db") restoreDb = true;
+                else if (a == "--confirm") confirm = true;
+                else if (a == "--password-file" && i + 1 < args.Length) passwordFile = args[++i];
+                else if ((a == "--apply-update" || a == "--verify-update" || a == "--first-admin" || a == "--prepare-upgrade" || a == "--activate") && i + 1 < args.Length) { mode = a; label = args[++i]; }
                 else if (a == "--support-bundle") { mode = a; if (i + 1 < args.Length && !args[i + 1].StartsWith("--")) label = args[++i]; }
                 else if (a == "--port" && i + 1 < args.Length) port = args[++i];
                 else if (a == "--lan") lan = true;
@@ -848,7 +944,9 @@ namespace Agastya
             }
             if (home == null) home = Environment.GetEnvironmentVariable("AGASTYA_HOME");
             Layout.StateOverride = home;
+            Layout.InstallOverride = installDir;
             Layout.Init(home);
+            Versions.CleanupOldLaunchers();   // a launcher replaced while it ran was renamed aside (WP-25)
 
             Settings cfg;
             try { cfg = Settings.Load(); }
@@ -874,6 +972,19 @@ namespace Agastya
                         Console.WriteLine("server on port " + cfg.Port + ": " + (Probe.Alive(cfg.Port) ? "answering" : "not answering"));
                         return 0;
                     case "--backup-db": return BackupDatabase(cfg, label);
+                    // WP-25: offline update, rollback, versions, Setup's steps, first administrator, data removal (Update.cs)
+                    case "--verify-update": return Updater.VerifyOnly(cfg, label, allowUnsigned);
+                    case "--apply-update": return Updater.Apply(cfg, label, allowUnsigned);
+                    case "--rollback": return Updater.Rollback(cfg, restoreDb);
+                    case "--versions": return Updater.ListVersions();
+                    case "--prune-versions": { List<string> gone = Versions.Prune(cfg.KeepVersions, delegate (string m) { Console.WriteLine(m); }); Console.WriteLine(gone.Count + " version folder(s) removed"); return 0; }
+                    case "--repair-launcher":
+                        if (Layout.CurrentVersion == null) { Console.WriteLine("flat layout: nothing to repair"); return 0; }
+                        Versions.RefreshLauncher(delegate (string m) { Console.WriteLine(m); }); Console.WriteLine("the launcher is version " + Layout.CurrentVersion + "'s"); return 0;
+                    case "--prepare-upgrade": return Updater.PrepareUpgrade(cfg, label);
+                    case "--activate": return Updater.Activate(cfg, label);
+                    case "--first-admin": return Updater.FirstAdmin(cfg, label, passwordFile);
+                    case "--remove-data": return Updater.RemoveData(cfg, confirm);
                     case "--reset-admin": return ResetAdmin(cfg, label);
                     case "--quit":
                         try { EventWaitHandle.OpenExisting(QuitEventName(cfg.Port)).Set(); Console.WriteLine("Asked the running application to close."); return 0; }
@@ -968,10 +1079,10 @@ namespace Agastya
             string mutexName = "Global\\AgastyaPlatform-tray-" + cfg.Port;
             using (Mutex single = new Mutex(true, mutexName, out created))
             {
-                if (!created) { if (cfg.OpenBrowser) Process.Start(new ProcessStartInfo(cfg.Url) { UseShellExecute = true }); return 0; }
+                if (!created) { if (cfg.OpenBrowser) Shell.Open(cfg, cfg.Url); return 0; }
                 if (!File.Exists(Layout.NodeExe)) { MessageBox.Show("The Node.js runtime is missing:\n" + Layout.NodeExe + "\n\nRepair the installation.", "Agastya Platform", MessageBoxButtons.OK, MessageBoxIcon.Error); return 1; }
                 // Another copy (the Windows service, or a console run) may already own the port: then just open it.
-                if (Probe.Alive(cfg.Port)) { if (cfg.OpenBrowser) Process.Start(new ProcessStartInfo(cfg.Url) { UseShellExecute = true }); return 0; }
+                if (Probe.Alive(cfg.Port)) { if (cfg.OpenBrowser) Shell.Open(cfg, cfg.Url); return 0; }
                 if (!Probe.PortFree(cfg.Port, cfg.BindAddress))
                 {
                     MessageBox.Show("Port " + cfg.Port + " is used by another program.\n\nChoose a different Port in:\n" + Layout.ConfigFile, "Agastya Platform", MessageBoxButtons.OK, MessageBoxIcon.Error);

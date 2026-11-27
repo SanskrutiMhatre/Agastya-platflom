@@ -30,17 +30,22 @@ signing root to the PCs first if it is an internal CA (`docs/SIGNING.md` section
 | Install, per machine | `Agastya-Platform-<v>-win-x64-Setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG="%TEMP%\agastya-setup.log"` | exit code 0 |
 | Install as a Windows service reachable from the LAN | add `/TASKS="service,lan" /PORT=4040` | exit code 0 |
 | Data elsewhere | add `/DATADIR="E:\AgastyaData"` (`/DIR=` for the program folder) | exit code 0 |
-| Upgrade | the new Setup with the same switches; data and `agastya.ini` are kept, `publisher.db` is backed up first | exit code 0 |
-| Uninstall | `"C:\Program Files\Agastya Platform\unins000.exe" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART` | exit code 0; data kept |
+| Install with the first administrator | add `/ADMINUSER=siteadmin /ADMINPASSWORDFILE="C:\Deploy\temp-password.txt"` (temporary password, changed at first sign-in) | exit code 0 |
+| Upgrade | the new Setup with the same switches; data and `agastya.ini` are kept; a verified platform backup is made first (exit 7 and nothing changed when it fails) | exit code 0 |
+| Offline update | `"C:\Program Files\Agastya Platform\AgastyaCtl.exe" --apply-update "<file>.agupdate"` (exit codes: `docs/OPERATIONS.md` section 8) | exit code 0 |
+| Roll back | `"C:\Program Files\Agastya Platform\AgastyaCtl.exe" --rollback` | exit code 0 |
+| Uninstall | `"C:\Program Files\Agastya Platform\unins000.exe" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART` (add `/PURGEDATA` to delete the data) | exit code 0; data kept |
 | Check after install | `"C:\Program Files\Agastya Platform\AgastyaCtl.exe" --verify --require-signed` then `--doctor` | exit code 0 each |
 
 All switches: `docs/OPERATIONS.md` section 9. Inno Setup exit codes: 0 success; 1 setup failed to initialise; 2 cancelled before installing;
 3 fatal error preparing; 4 fatal error while installing; 5 cancelled while installing; 6 killed; 7 the preparing stage refused (e.g. files in use);
 8 the preparing stage needs a restart. Map 0 to *success* and the others to *failure* in the deployment tool; 8 to *soft reboot* if the tool allows.
 
-The first administrator account is created in the browser the first time the product is opened (nothing ships with a default password). An unattended
-first administrator from the installer (`/ADMINUSER`, `/ADMINPASSWORDFILE`, DEP-014) is **not implemented**; it belongs to the installer work
-package (WP-25).
+The first administrator account is created in the browser the first time the product is opened (nothing ships with a default password), or
+unattended by Setup with `/ADMINUSER` + `/ADMINPASSWORDFILE` (WP-25, DEP-014): the password is read from the file by `AgastyaCtl.exe` and never
+appears on a command line; it is temporary and must be changed at the first sign-in. Delete the file after the rollout. An offline update and
+a rollback set the uninstall entry's `DisplayVersion` to the version that runs and replace the launcher `AgastyaCtl.exe`, so the detection rule
+below sees the updated version without Setup.
 
 ## 3. Detection rule (G-DEP-3)
 

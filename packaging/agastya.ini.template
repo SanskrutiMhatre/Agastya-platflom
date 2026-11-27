@@ -38,6 +38,19 @@ SecureCookies=0
 [app]
 ; 1 = open the browser when the tray application starts.
 OpenBrowser=1
+; Where it opens: auto = an app window of Microsoft Edge when Edge is installed, otherwise the default browser (with a notice);
+; app = the same as auto; browser = always the default browser.
+;Window=auto
+
+[update]
+; Offline updates (AgastyaCtl.exe --apply-update <file.agupdate>, OPERATIONS.md "Updates").
+; Earlier versions kept for a rollback (AgastyaCtl.exe --rollback), 1-10.
+;KeepVersions=2
+; Seconds a new version has to answer /api/version and /api/ready before it is rolled back automatically, 15-900.
+;HealthSeconds=60
+; Further certificates (SHA-1 thumbprints, comma-separated) that may sign an update package, for a certificate renewal.
+; The certificate that signed the installed program is always accepted.
+;TrustedThumbprints=
 
 [logging]
 ; Each log file is closed and renamed (.1, .2, ...) when it reaches this size; the oldest beyond KeepFiles are deleted.

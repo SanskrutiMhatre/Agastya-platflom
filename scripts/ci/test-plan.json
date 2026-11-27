@@ -21,6 +21,6 @@
   ],
   "scriptTests": {
     "_comment": "node:test files outside backend/test, by gate stage, paths from the repository root. release-tools (WP-24) runs first in the package stage and on its own with --stages release-tools.",
-    "release-tools": ["scripts/release/release.test.mjs", "scripts/release/host.test.mjs"]
+    "release-tools": ["scripts/release/release.test.mjs", "scripts/release/host.test.mjs", "scripts/release/update.test.mjs", "scripts/release/installer.test.mjs"]
   }
 }
