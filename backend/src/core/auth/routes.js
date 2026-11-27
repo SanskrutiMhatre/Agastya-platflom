@@ -580,7 +580,7 @@ function registerAuthRoutes(deps) {
 
   /*
     Account creation: username + Full Name (required) + global role. The
-    server derives the temporary password (Surname@Year) and returns it
+    server makes a random temporary password (policy.js) and returns it
     exactly ONCE in this response — it is never stored retrievably and
     never logged.
   */
@@ -777,7 +777,7 @@ function registerAuthRoutes(deps) {
       if (!store.decideResetRequest(request.id, 'approved', req.auth.user.id, nowIso())) {
         return res.status(409).json({ error: 'This request was already decided.' });
       }
-      // The ordinary admin-reset path: Surname@Year, all sessions revoked,
+      // The ordinary admin-reset path: a random temporary password, all sessions revoked,
       // account gated. Temporary password shown once, to the approver.
       const tempPassword = await issueAdminReset(target, req.auth.user, clientIp(req));
       audit({ actorId: req.auth.user.id, actorUsername: req.auth.user.username, action: 'reset.approved', targetType: 'user', targetId: target.id, meta: { requestId: request.id } });

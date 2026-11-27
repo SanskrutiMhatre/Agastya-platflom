@@ -106,7 +106,7 @@ function surnameOf(fullName) {
 }
 
 /*
-  Temporary password: <Surname>-<random>, e.g. "Kumble-k7m2q9xw".
+  Temporary password: <username>-<random> (see the next comment), e.g. "kumble-k7m2q9xw".
 
   JSS Publisher used Surname@Year ("Kumble@2026"), which anyone who knows a new
   colleague's name can guess for the window between account creation and the
