@@ -14,7 +14,24 @@ async function login(baseURL: string | undefined, username: string): Promise<API
   return ctx;
 }
 
+// WP-23: the sessions are reused by every spec file and project of the worker. Each new sign-in is an `auth.login` event, and the Overview's
+// "Recent activity" reads only the newest 12 events before it drops sign-ins, so every extra spec file used to push the seeded project events
+// out of the picture (the dark Overview baseline then showed "Nothing yet"). A reused session signs in once per run.
+let memo: { baseURL: string | undefined; admin: Awaited<ReturnType<APIRequestContext['storageState']>>; author: Awaited<ReturnType<APIRequestContext['storageState']>>; ids: Seed['ids'] } | null = null;
+
 export async function seed(baseURL: string | undefined): Promise<Seed> {
+  if (memo && memo.baseURL === baseURL) {
+    const admin = await pwRequest.newContext({ baseURL, storageState: memo.admin });
+    const author = await pwRequest.newContext({ baseURL, storageState: memo.author });
+    if ((await author.get('/api/auth/me')).ok() && (await admin.get('/api/auth/me')).ok()) return { admin, author, ids: memo.ids };
+    await admin.dispose(); await author.dispose();
+  }
+  const made = await seedFresh(baseURL);
+  memo = { baseURL, admin: await made.admin.storageState(), author: await made.author.storageState(), ids: made.ids };
+  return made;
+}
+
+async function seedFresh(baseURL: string | undefined): Promise<Seed> {
   const probe = await pwRequest.newContext({ baseURL });
   const setup = await (await probe.get('/api/auth/setup')).json();
   if (setup.setupRequired) expect((await probe.post('/api/auth/setup', { data: { username: 'admin', password: PW, fullName: 'Site Admin' } })).ok()).toBeTruthy();
