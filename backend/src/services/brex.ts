@@ -43,6 +43,7 @@ import * as xpath from 'xpath';
 import { xsdRegex } from '../shared/xsdRegex';
 import { valueMatches, contextApplies, isXPath2 } from '../shared/brexValues';
 import { headOf } from './xmlHead';
+import { FileMemo } from './fileMemo';
 
 export interface BrexValue {
   /** The permitted value(s), from `@valueAllowed`. */
@@ -335,9 +336,52 @@ export function matchCount(documentXml: string, objectPath: string): number | nu
 
 const CAP = 100; // findings reported per rule: a rule that selects thousands of nodes does not need thousands of lines
 
+/*
+  WP-17 (PERF-004): most rules of the default BREX are written for one kind of module (`//dml[...]`, `//updateCode[...]`, `//pm[...]`): a
+  descriptive module holds none of those elements, yet the pure-JS XPath engine walked the whole document for each of them (about two thirds of
+  the BREX time of a typical module). A location path whose FIRST step selects elements of one name, from the root (`/name...` or `//name...`),
+  can only select something when the document holds an element of that name: every later step and predicate starts from those elements. So
+  such a rule is not evaluated when the name is absent; its result (no nodes) is the one the engine would have given. Anything else - a union,
+  an operator or function at the top level, `*`, an axis, a prefixed name - is evaluated as before.
+*/
+const FIRST_STEP = /^\/\/?([A-Za-z_][\w.-]*)/;
+const TOP_LEVEL_STEPS = /^(?:\/\/?(?:@?(?:[A-Za-z_*][\w.*-]*)(?:\(\))?|\.\.?))*$/;
+const firstStepCache = new Map<string, string | null>();
+/** The element name a location path's first step selects from the root, or null when the expression is not that simple shape. */
+export function firstStepName(expr: string): string | null {
+  const hit = firstStepCache.get(expr);
+  if (hit !== undefined) return hit;
+  let out: string | null = null;
+  const e = expr.trim(); const m = FIRST_STEP.exec(e);
+  if (m && e[m[0].length] !== ':' && e[m[0].length] !== '(') {
+    // the rest with every bracketed part and quoted literal removed must be plain steps (no union, operator, function or whitespace)
+    let top = ''; let depth = 0; let quote = '';
+    for (const ch of e.slice(m[0].length)) {
+      if (quote) { if (ch === quote) quote = ''; continue; }
+      if (depth > 0 && (ch === '"' || ch === "'")) { quote = ch; continue; }
+      if (ch === '[') { depth++; continue; }
+      if (ch === ']') { depth--; if (depth < 0) break; continue; }
+      if (depth === 0) top += ch;
+    }
+    if (depth === 0 && !quote && TOP_LEVEL_STEPS.test(top)) out = m[1];
+  }
+  firstStepCache.set(expr, out);
+  return out;
+}
+let firstStep = firstStepName;
+/** Test seam (test/wp17-brex-fast): replace the shortcut's classifier, e.g. with one that never qualifies, to compare against a full evaluation. */
+export function __setFirstStep(fn: (expr: string) => string | null): void { firstStep = fn; }
+function elementNames(doc: Node): Set<string> {
+  const names = new Set<string>();
+  const walk = (n: Node): void => { for (let c = n.firstChild; c; c = c.nextSibling) if (c.nodeType === 1) { names.add((c as Element).nodeName); walk(c); } };
+  walk(doc);
+  return names;
+}
+
 /** Evaluate every BREX of the chain against one data module. `models` are in order (the module's BREX first, then its parents). */
 export function checkBrexModels(documentXml: string, models: BrexModel[]): BrexCheckResult {
   const doc = parseDoc(documentXml) as unknown as Node;
+  const present = elementNames(doc);
   const schema = declaredSchemaName(documentXml);
   const findings: BrexFinding[] = [];
   const skippedRules: BrexCheckResult['skippedRules'] = [];
@@ -354,7 +398,10 @@ export function checkBrexModels(documentXml: string, models: BrexModel[]): BrexC
       if (isXPath2(rule.objectPath)) { skippedRules.push({ id: rule.id, path: rule.objectPath, reason: 'XPath 2.0 expression', brex: b.label }); continue; }
       let nodes: Node[];
       try {
-        nodes = evaluateXPath(repairXPath(rule.objectPath), doc);
+        const expr = repairXPath(rule.objectPath);
+        const first = firstStep(expr);
+        if (first !== null && !present.has(first)) { compile(expr); nodes = []; }   // parse it all the same: an unparsable rule is still reported
+        else nodes = evaluateXPath(expr, doc);
       } catch (e) {
         skippedRules.push({ id: rule.id, path: rule.objectPath, reason: (e as Error).message, brex: b.label });
         continue;
@@ -487,14 +534,37 @@ export interface BrexResolution {
   notes: string[];
 }
 
-function findProjectBrex(csdbDir: string | undefined, dmc: string): { xml: string; label: string } | null {
-  if (!csdbDir || !fs.existsSync(csdbDir)) return null;
+/**
+ * WP-17 (PERF-004): what one project-wide BREX pass (validation, the publish gate) would otherwise read again for every module: the CSDB
+ * listing (to find the project's BREX by code) and the text of the BREX files. Made by the caller for one pass and dropped after it, so nothing
+ * outlives the pass; without one every call reads the disk as before.
+ */
+export interface BrexRun { listing: Map<string, string[] | null>; files: Map<string, string | null> }
+export const newBrexRun = (): BrexRun => ({ listing: new Map(), files: new Map() });
+
+function findProjectBrex(csdbDir: string | undefined, dmc: string, run?: BrexRun): { xml: string; label: string } | null {
+  if (!csdbDir) return null;
+  let names = run?.listing.get(csdbDir);
+  if (names === undefined) {
+    names = fs.existsSync(csdbDir) ? fs.readdirSync(csdbDir) : null;
+    run?.listing.set(csdbDir, names);
+  }
+  if (!names) return null;
   const wanted = dmc.toUpperCase();
-  const hits = fs.readdirSync(csdbDir).filter((f) => /\.xml$/i.test(f) && f.toUpperCase().startsWith(wanted)).sort();
+  const hits = names.filter((f) => /\.xml$/i.test(f) && f.toUpperCase().startsWith(wanted)).sort();
   if (!hits.length) return null;
   const f = hits[hits.length - 1];                                       // several issues of the same BREX: the latest
-  try { return { xml: fs.readFileSync(path.join(csdbDir, f), 'utf8'), label: f }; } catch { return null; }
+  const abs = path.join(csdbDir, f);
+  let xml = run?.files.get(abs);
+  if (xml === undefined) {
+    try { xml = fs.readFileSync(abs, 'utf8'); } catch { xml = null; }
+    run?.files.set(abs, xml);
+  }
+  return xml === null ? null : { xml, label: f };
 }
+
+// The bundled default BREX files do not change while the server runs; their text is read once per (size, modification time).
+const defaultText = new FileMemo<string>(16);
 
 /**
  * Resolve the chain of BREX data modules that apply to a document.
@@ -503,7 +573,7 @@ function findProjectBrex(csdbDir: string | undefined, dmc: string): { xml: strin
  * the bundled official default of that code; else, for an unknown S1000D default letter, the default of the module's issue (with a note);
  * else (a custom code that is not in the project) a PROBLEM: the project's rules cannot be enforced.
  */
-export function resolveBrexChain(documentXml: string, csdbDir?: string, forceIssue?: string | null): BrexResolution {
+export function resolveBrexChain(documentXml: string, csdbDir?: string, forceIssue?: string | null, run?: BrexRun): BrexResolution {
   const issue = declaredIssue(documentXml);
   // The project can fix the S1000D issue its checks use (Validation page). It replaces the S1000D DEFAULT business rules only:
   // a BREX data module the project itself holds is always used as it is.
@@ -517,7 +587,7 @@ export function resolveBrexChain(documentXml: string, csdbDir?: string, forceIss
     const file = defaultFile(l);
     if (!fs.existsSync(file)) { res.problems.push({ severity: 'error', kind: 'missing-brex', brex: `S1000D default BREX (${l})`, message: `The bundled S1000D default BREX (${path.basename(file)}) is missing from this installation.` }); return null; }
     if (why) res.notes.push(why);
-    return parseBrexCached(fs.readFileSync(file, 'utf8'), `S1000D default BREX (issue ${(DEFAULT_BY_LETTER[l] ?? issue ?? '?').replace('-', '.')})`, false);
+    return parseBrexCached(defaultText.get(file, fs.statSync(file), () => fs.readFileSync(file, 'utf8')), `S1000D default BREX (issue ${(DEFAULT_BY_LETTER[l] ?? issue ?? '?').replace('-', '.')})`, false);
   };
 
   let next: string | null = declared;
@@ -530,7 +600,7 @@ export function resolveBrexChain(documentXml: string, csdbDir?: string, forceIss
     } else {
       if (seen.has(next)) { res.problems.push({ severity: 'error', kind: 'cycle', brex: next, message: `The BREX chain loops back to ${next}.` }); break; }
       seen.add(next);
-      const own = findProjectBrex(csdbDir, next);
+      const own = findProjectBrex(csdbDir, next, run);
       if (own) {
         try { model = parseBrexCached(own.xml, own.label, true); }
         catch (e) { res.problems.push({ severity: 'error', kind: 'not-a-brex', brex: own.label, message: `${own.label} is named as a BREX but is not one: ${(e as Error).message}.` }); break; }
@@ -579,8 +649,25 @@ export interface ModuleBrexReport {
 
 const lintCache = new Map<string, BrexProblem[]>();
 
-export function checkModuleBrex(documentXml: string, csdbDir?: string, forceIssue?: string | null): ModuleBrexReport {
-  const chain = resolveBrexChain(documentXml, csdbDir, forceIssue);
+/*
+  WP-17 (PERF-004): the result of checking one module against one chain is a function of the module's text and of the chain's models (each
+  model is the parse of a BREX's text, so a changed BREX is a different model). Results are kept by (sha256 of the module, the models' content
+  keys), so a module that did not change since the last pass costs a hash; any change to the module or to a BREX in its chain misses. Bounded,
+  and a result with very many findings is not kept. A kept result is handed out as a copy.
+*/
+const resultMemo = new Map<string, BrexCheckResult>();
+const RESULT_MEMO_MAX = 4000;
+const modelKeys = new WeakMap<BrexModel, string>();
+function modelKey(m: BrexModel): string {
+  let k = modelKeys.get(m);
+  if (!k) { k = crypto.createHash('sha256').update(JSON.stringify(m)).digest('hex'); modelKeys.set(m, k); }
+  return k;
+}
+/** Forget every kept result (tests and diagnostics). */
+export function clearBrexResults(): void { resultMemo.clear(); }
+
+export function checkModuleBrex(documentXml: string, csdbDir?: string, forceIssue?: string | null, run?: BrexRun): ModuleBrexReport {
+  const chain = resolveBrexChain(documentXml, csdbDir, forceIssue, run);
   const problems = [...chain.problems];
   for (const m of chain.models) {
     if (!m.projectOwn) continue;
@@ -589,6 +676,19 @@ export function checkModuleBrex(documentXml: string, csdbDir?: string, forceIssu
     if (!lint) { lint = lintBrex(m); lintCache.set(key, lint); }
     problems.push(...lint);
   }
-  const result = chain.models.length ? checkBrexModels(documentXml, chain.models) : { valid: true, findings: [], rulesEvaluated: 0, rulesSkipped: 0, skippedRules: [], rulesAdvisory: 0, brexSource: '' };
+  let result: BrexCheckResult;
+  if (!chain.models.length) result = { valid: true, findings: [], rulesEvaluated: 0, rulesSkipped: 0, skippedRules: [], rulesAdvisory: 0, brexSource: '' };
+  else {
+    const key = `${crypto.createHash('sha256').update(documentXml).digest('hex')}|${chain.models.map(modelKey).join('|')}`;
+    const kept = resultMemo.get(key);
+    if (kept) result = structuredClone(kept);
+    else {
+      result = checkBrexModels(documentXml, chain.models);
+      if (result.findings.length <= 500) {
+        resultMemo.set(key, structuredClone(result));
+        if (resultMemo.size > RESULT_MEMO_MAX) { const first = resultMemo.keys().next().value; if (first !== undefined) resultMemo.delete(first); }
+      }
+    }
+  }
   return { models: chain.models, result, problems, notes: chain.notes };
 }

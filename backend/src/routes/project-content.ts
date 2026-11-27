@@ -348,9 +348,14 @@ export function registerProjectContentRoutes(app: Express): void {
   const canApprove = (user: { role: string }, role: string) =>
     user.role === 'admin' || (user.role === 'project_manager' && (role === 'manager' || role === 'owner'));
   app.get(`${base}/release`, view('viewer', 'release.read'), wrap((req, res) => {
-    const rs = review.reviewState(req.project.id);
+    // WP-17 (PERF-005): a page view computes the release state once (it was three passes over every source file, each re-read and re-hashed)
+    // and, as the dashboard summary does since WP-18, reuses the digest of a file whose size and times are unchanged. Display only: submit,
+    // approve and every build compute it afresh from the files.
+    const known = csdb.listDms(req.project.id);
+    const st = release.releaseStateOf(req.project.id, { reuse: true, known });
+    const rs = review.reviewState(req.project.id, st);
     res.json({
-      ...release.releaseOverview(req.project.id, canSubmit(req.project.role) || req.auth.user.role === 'admin'),
+      ...release.releaseOverview(req.project.id, canSubmit(req.project.role) || req.auth.user.role === 'admin', { state: st, known }),
       canApprove: canApprove(req.auth.user, req.project.role) && !securityPolicy.approverConflict(store.pendingRelease(req.project.id)?.requested_by, req.auth.user.id),
       approveBlocked: canApprove(req.auth.user, req.project.role) ? securityPolicy.approverConflict(store.pendingRelease(req.project.id)?.requested_by, req.auth.user.id) : null,
       review: { ...rs, comments: review.listComments(req.project.id), open: review.openComments(req.project.id), canComment: canComment(req.project.role) || req.auth.user.role === 'admin' },

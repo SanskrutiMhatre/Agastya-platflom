@@ -101,6 +101,39 @@ class DocIndex {
     return { indexed: onDisk.size };
   }
 
+  /*
+    WP-17 (audit PERF-005): give ONE file its identity, with the same result
+    for that file as syncProject (which walks every file of the project: the
+    cost of a module create grew with the project). A path syncProject would
+    not index (a dot folder, node_modules, a build artefact, another
+    extension) and a file that is not on disk fall back to the full sync, so
+    the answer is always the full sync's.
+  */
+  async syncFile(projectId, projectDir, rel, nowIso) {
+    const r = String(rel).replace(/\\/g, '/');
+    const parts = r.split('/');
+    const base = parts[parts.length - 1];
+    const indexable = parts.every((p) => p && !p.startsWith('.') && p !== '..') && !parts.slice(0, -1).some((p) => EXCLUDE_DIR.has(p))
+      && DOC_EXT.test(base) && !EXCLUDE_FILE.test(base);
+    let isFile = false;
+    try { isFile = fs.statSync(path.join(projectDir, ...parts)).isFile(); } catch { /* not there */ }
+    if (!indexable || !isFile) return this.syncProject(projectId, projectDir, nowIso);
+    let pmName = 'publication.xml';
+    try {
+      const pj = JSON.parse(fs.readFileSync(path.join(projectDir, 'project.json'), 'utf8'));
+      pmName = (pj.input && typeof pj.input.pm === 'string' && safeRelPath(pj.input.pm)) || pmName;
+    } catch { /* defaults are fine */ }
+    const existing = this.resolve(projectId, r);
+    if (!existing) {
+      this.store.stmt(`INSERT INTO documents (id, project_id, rel_path, kind, created_at, updated_at)
+                       VALUES (?,?,?,?,?,?)`)
+        .run(newId(), projectId, r, classifyKind(r, pmName), nowIso, nowIso);
+    } else if (existing.missing_at) {
+      this.store.stmt('UPDATE documents SET missing_at = NULL, updated_at = ? WHERE id = ?').run(nowIso, existing.id);
+    }
+    return { indexed: 1 };
+  }
+
   // Startup reconciliation: heal a cold or stale index for every project on
   // disk, so identity exists before the first client asks.
   async reconcileAll(workspaceDir, projectIds, projectDirFor, nowIso) {

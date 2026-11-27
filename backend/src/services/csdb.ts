@@ -27,7 +27,7 @@ const { isDoubledXml, DOUBLED_MESSAGE } = vendor('engine/doubled');
 
 // The read-only index (file names, identities, the list) lives in csdbIndex.ts (WP-10, ARC-006); re-exported here for compatibility.
 export * from './csdbIndex';
-import { DM_FILE_RE, DmSummary, sha, csdbDir, resolveDmFile, dmcString, parseIdent, listDms } from './csdbIndex';
+import { DM_FILE_RE, DmSummary, sha, csdbDir, resolveDmFile, dmcString, parseIdent, listDms, identityKey, identityClash, noteDmWritten } from './csdbIndex';
 
 // WP-10: data module files are read and written through the ContentStore (storage/contentStore.ts), addressed inside the project.
 const inProject = (projectId: string, abs: string): string => path.relative(content.projectDir(projectId), abs);
@@ -73,13 +73,11 @@ export function contentProblem(rel: string, xml: string): string | null {
  * A project holds each data module once. Two files are the same data module when they carry the same
  * code, issue and language - a different issue or language of the same code is a legitimate, separate file.
  */
-export const identityKey = (d: Pick<DmSummary, 'dmc' | 'issueNumber' | 'inWork' | 'language'>): string =>
-  `${d.dmc}|${d.issueNumber}-${d.inWork}|${d.language}`.toUpperCase();
-
 export function assertUnique(projectId: string, file: string, xml: string): void {
   const mine = parseIdent(headOf(xml), file);
   const key = identityKey(mine);
-  const clash = listDms(projectId).find((d) => d.file.toLowerCase() !== file.toLowerCase() && identityKey(d) === key);
+  const clashFile = identityClash(projectId, file, key);               // WP-17 (PERF-005): the identity index, not a listing of every module
+  const clash = clashFile ? { file: clashFile } : null;
   if (clash) {
     throw conflict(`This project already has that data module: ${clash.file} has the same code (${mine.dmc}), issue (${mine.issueNumber}-${mine.inWork}) and language (${mine.language || 'none'}). Each data module exists once per project - open the existing one, or give this one a different code or issue.`, 'DUPLICATE_DMC', { existing: clash.file });
   }
@@ -88,7 +86,7 @@ export function assertUnique(projectId: string, file: string, xml: string): void
 export async function cut(projectId: string, rel: string, xml: string, actor: Actor, reason: string): Promise<void> {
   try {
     let doc = docIndex.resolve(projectId, rel);
-    if (!doc) { await docIndex.syncProject(projectId, projectDirFor(projectId), nowIso()); doc = docIndex.resolve(projectId, rel); }
+    if (!doc) { await docIndex.syncFile(projectId, projectDirFor(projectId), rel, nowIso()); doc = docIndex.resolve(projectId, rel); }
     if (doc) revisions.cut(doc.id, xml, { reason, createdBy: actor.id, now: nowIso() });
   } catch (e) { console.error('[csdb] revision not recorded:', (e as Error).message); }
 }
@@ -113,7 +111,7 @@ export async function writeDm(projectId: string, file: string, xml: string, base
       throw conflict('This data module was changed by someone else since you opened it.', 'EDIT_CONFLICT',
         { currentHash, modified: modifiedOf(projectId, at) });
     }
-    if (current !== xml) await saveRevisioned(projectId, at, xml, actor, 'save');
+    if (current !== xml) { await saveRevisioned(projectId, at, xml, actor, 'save'); noteDmWritten(projectId, file, xml); }
     return { file, hash: sha(xml), modified: modifiedOf(projectId, at), changed: current !== xml };
   });
 }
@@ -132,6 +130,7 @@ export async function createDm(projectId: string, file: string, xml: string, act
   // Imports (lenient) are brought in as they are: validation and the publication gate report what does not fit.
   if (!lenient && !opts.fromRepository && !opts.revisionOf) assertNewDmAllowed(projectId, xml);   // a revision of a module the project already holds is not a NEW module
   await saveRevisioned(projectId, at, xml, actor, 'create');            // WP-11: atomic, and refused when its revision cannot be recorded
+  noteDmWritten(projectId, file, xml);                                   // WP-17: the identity index learns the new module
   return { file, hash: sha(xml), modified: modifiedOf(projectId, at) };
 }
 
@@ -144,6 +143,7 @@ export async function deleteDm(projectId: string, file: string, actor: Actor, pr
   // Keep the last content in history so a deletion can be undone by hand; when that cannot be recorded the module is not deleted (WP-11).
   await recordBeforeDelete(projectId, rel, actor);
   content.remove(projectId, at);
+  noteDmWritten(projectId, file, null);
   await docIndex.syncProject(projectId, projectDirFor(projectId), nowIso());
 }
 

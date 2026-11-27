@@ -83,24 +83,135 @@ function readHead(abs: string): string {
   let fd: number | undefined;
   try {
     fd = fs.openSync(abs, 'r');
+    const f = fd;
+    return headFrom((buf) => fs.readSync(f, buf, 0, buf.length, 0));
+  } catch { return ''; } finally { if (fd !== undefined) try { fs.closeSync(fd); } catch { /* ignore */ } }
+}
+
+/** The head `readHead` would read from a file holding exactly this text (WP-17: a module just written is not read back from the disk). */
+export function headOfText(xml: string): string {
+  const all = Buffer.from(xml, 'utf8');
+  try { return headFrom((buf) => all.copy(buf, 0, 0, Math.min(buf.length, all.length))); } catch { return ''; }
+}
+
+function headFrom(read: (buf: Buffer) => number): string {
+  {
     // Normally the first 12 KB hold the identity. A long DOCTYPE (one entity per graphic) pushes the root
     // element further down: read on, up to the prolog limit, until it shows up.
     let size = HEAD_BYTES;
     for (;;) {
       const buf = Buffer.alloc(size);
-      const n = fs.readSync(fd, buf, 0, buf.length, 0);
+      const n = read(buf);
       const text = buf.toString('utf8', 0, n);
       const at = rootStart(text, 'dmodule');
       const complete = at >= 0 && text.length >= at + HEAD_BYTES;      // root found AND its identity section read in full
       if (n < size || size >= MAX_PROLOG + HEAD_BYTES || complete) return headOf(text, 'dmodule', HEAD_BYTES);
       size = Math.min(size * 4, MAX_PROLOG + HEAD_BYTES);
     }
-  } catch { return ''; } finally { if (fd !== undefined) try { fs.closeSync(fd); } catch { /* ignore */ } }
+  }
 }
 
 // WP-18 (PERF-016, FE-029): a module's identity is read from its head once and kept until the file changes (size, mtime or ctime), so the list,
 // the summary, the explorer and the BREX check stop re-reading every module on every request.
 const identMemo = new FileMemo<ReturnType<typeof parseIdent>>();
+
+// WP-17: the file-system stat each listed summary was made from, so a caller holding the list (the release fingerprint of a display) need
+// not stat every module a second time in the same request. Not part of the summary itself (nothing changes in the JSON).
+const statOf = new WeakMap<DmSummary, fs.Stats>();
+/** The stat a summary from `listDms` was made from, when it came from there. */
+export function listedStat(d: DmSummary): fs.Stats | undefined { return statOf.get(d); }
+
+/** The identity a module is unique by within a project: code, issue and language. */
+export const identityKey = (d: Pick<DmSummary, 'dmc' | 'issueNumber' | 'inWork' | 'language'>): string =>
+  `${d.dmc}|${d.issueNumber}-${d.inWork}|${d.language}`.toUpperCase();
+
+/** The summary of ONE module (what `listDms` would list for it), or null when the file is not there. */
+export function dmSummaryOf(projectId: string, file: string): DmSummary | null {
+  const abs = resolveDmFile(projectId, file);
+  let st: fs.Stats;
+  try { st = fs.statSync(abs); } catch { return null; }
+  if (!st.isFile()) return null;
+  return summaryFrom(abs, path.basename(abs), st);
+}
+
+function summaryFrom(abs: string, f: string, st: fs.Stats): DmSummary {
+  const ident = identMemo.get(abs, st, () => parseIdent(readHead(abs), f));
+  // a fresh copy per call: callers may change what they are given without touching the memo
+  return {
+    ...ident, size: st.size, modified: st.mtime.toISOString(),
+    dmCodeAttrs: { ...ident.dmCodeAttrs }, issueInfoAttrs: { ...ident.issueInfoAttrs }, languageAttrs: { ...ident.languageAttrs },
+    identExtension: ident.identExtension ? { ...ident.identExtension } : ident.identExtension,
+  };
+}
+
+/*
+  WP-17 (PERF-005): the identity index behind the uniqueness check of every save and create. Listing the CSDB costs one file-system stat per
+  module (about 55 ms at 1000 modules on Windows), and every save and create paid it. The index keeps, per CSDB folder, identity key -> files,
+  and is trusted while the folder's own modification time is unchanged: every write the platform makes is an atomic rename inside the folder
+  (storage/atomicWrite.ts), and an added, removed or renamed file changes the folder's time, so any such change outside the save path makes the
+  next check list the folder again. The save and create paths update the index in place for the module they wrote (noteDmWritten). A change
+  that leaves the folder's time alone (a file edited in place by a tool outside the platform) is picked up within INDEX_MAX_AGE_MS, after which
+  the index is rebuilt anyway. Listings (`listDms`) never use it: they always stat every file.
+*/
+interface IdentIndex { dirMtimeMs: number; builtAt: number; keyOf: Map<string, string>; filesOf: Map<string, Set<string>> }
+const identIndexes = new Map<string, IdentIndex>();
+const INDEX_MAX_AGE_MS = 60000;
+const INDEX_MAX = 64;
+
+function dirTime(dir: string): number | null { try { return fs.statSync(dir).mtimeMs; } catch { return null; } }
+
+function identIndexOf(projectId: string): IdentIndex | null {
+  const dir = csdbDir(projectId);
+  const t = dirTime(dir);
+  if (t === null) { identIndexes.delete(dir); return null; }
+  const had = identIndexes.get(dir);
+  if (had && had.dirMtimeMs === t && Date.now() - had.builtAt < INDEX_MAX_AGE_MS) return had;
+  const idx: IdentIndex = { dirMtimeMs: t, builtAt: Date.now(), keyOf: new Map(), filesOf: new Map() };   // the time read BEFORE the listing
+  for (const d of listDms(projectId)) put(idx, d.file, identityKey(d));
+  identIndexes.delete(dir); identIndexes.set(dir, idx);
+  if (identIndexes.size > INDEX_MAX) { const first = identIndexes.keys().next().value; if (first !== undefined) identIndexes.delete(first); }
+  return idx;
+}
+function put(idx: IdentIndex, file: string, key: string | null): void {
+  const lower = file.toLowerCase();
+  let name = file;                                                       // the name as the folder spells it (a save may address it in another case)
+  const old = idx.keyOf.get(lower);
+  if (old !== undefined) {
+    const s = idx.filesOf.get(old);
+    if (s) { for (const f of s) if (f.toLowerCase() === lower) { name = f; s.delete(f); } if (!s.size) idx.filesOf.delete(old); }
+    idx.keyOf.delete(lower);
+  }
+  if (key === null) return;
+  idx.keyOf.set(lower, key);
+  let s = idx.filesOf.get(key); if (!s) { s = new Set(); idx.filesOf.set(key, s); } s.add(name);
+}
+
+/** Another module of the project with this identity (not `file` itself), or null. Same answer as searching `listDms`. */
+export function identityClash(projectId: string, file: string, key: string): string | null {
+  const idx = identIndexOf(projectId);
+  if (!idx) return null;
+  const lower = file.toLowerCase();
+  const hits = [...(idx.filesOf.get(key) ?? [])].filter((f) => f.toLowerCase() !== lower).sort((a, b) => a.localeCompare(b));
+  return hits[0] ?? null;
+}
+
+/**
+ * After the platform wrote (or deleted) one module through csdb.ts: keep the index in step instead of listing again. The identity is read
+ * back from the file exactly as `listDms` reads it.
+ */
+export function noteDmWritten(projectId: string, file: string, xml: string | null): void {
+  const dir = csdbDir(projectId);
+  const idx = identIndexes.get(dir);
+  if (!idx) return;
+  const t = dirTime(dir);
+  if (t === null) { identIndexes.delete(dir); return; }
+  // the text just written, read the way listDms reads a file (opening a file that was just written waits for the virus scanner on Windows)
+  put(idx, file, xml === null ? null : identityKey(parseIdent(headOfText(xml), file)));
+  idx.dirMtimeMs = t;
+}
+
+/** Forget every identity index (tests; a restore or import that rewrote a whole CSDB may call it too, though the folder time already does). */
+export function clearIdentityIndexes(): void { identIndexes.clear(); }
 
 export function listDms(projectId: string): DmSummary[] {
   const dir = csdbDir(projectId);
@@ -111,13 +222,9 @@ export function listDms(projectId: string): DmSummary[] {
     const abs = path.join(dir, f);
     let st: fs.Stats;
     try { st = fs.statSync(abs); } catch { continue; }
-    const ident = identMemo.get(abs, st, () => parseIdent(readHead(abs), f));
-    // a fresh copy per call: callers may change what they are given without touching the memo
-    out.push({
-      ...ident, size: st.size, modified: st.mtime.toISOString(),
-      dmCodeAttrs: { ...ident.dmCodeAttrs }, issueInfoAttrs: { ...ident.issueInfoAttrs }, languageAttrs: { ...ident.languageAttrs },
-      identExtension: ident.identExtension ? { ...ident.identExtension } : ident.identExtension,
-    });
+    const d = summaryFrom(abs, f, st);
+    statOf.set(d, st);
+    out.push(d);
   }
   return out.sort((a, b) => a.file.localeCompare(b.file));
 }

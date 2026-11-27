@@ -18,6 +18,8 @@ import { nowIso, vendor } from '../config';
 import { store, docIndex, projectDirFor } from '../context';
 import { bad, conflict, notFound } from './http';
 import { readProjectJson, updateProjectJson, pmRel } from './projects';
+import { csdbRel } from './projectRecord';
+import { listedStat } from './csdbIndex';
 import { publicationSources } from './pm';
 import { FileMemo } from './fileMemo';
 import type { DmSummary } from './csdb';
@@ -40,22 +42,33 @@ const RELEASE_SETTING_KEYS = ['name', 'type', 'pipeline', 'input', 'publication'
 const digestMemo = new FileMemo<Buffer>();
 
 export function publicationFingerprint(projectId: string, opts: { reuse?: boolean; known?: DmSummary[] } = {}): string {
+  return fingerprintOf(projectId, opts).fingerprint;
+}
+
+function fingerprintOf(projectId: string, opts: { reuse?: boolean; known?: DmSummary[] }): { fingerprint: string; sourceCount: number } {
   const dir = projectDirFor(projectId);
   const project = readProjectJson(projectId);
   const h = crypto.createHash('sha256');
   const digest = (abs: string): Buffer => crypto.createHash('sha256').update(fs.readFileSync(abs)).digest();
-  for (const rel of publicationSources(projectId, opts.known)) {
+  // WP-17 (PERF-005): with `reuse`, a module the caller listed in this request is not statted a second time (its listing's stat is used)
+  const listed = new Map<string, fs.Stats>();
+  if (opts.reuse && opts.known) {
+    const csdb = csdbRel(project);
+    for (const d of opts.known) { const st = listedStat(d); if (st) listed.set(`${csdb}/${d.file}`, st); }
+  }
+  const sources = publicationSources(projectId, opts.known);
+  for (const rel of sources) {
     h.update(rel, 'utf8');
     h.update('\0');
     const abs = path.join(dir, rel);
-    try { h.update(opts.reuse ? digestMemo.get(abs, fs.statSync(abs), () => digest(abs)) : digest(abs)); }
+    try { h.update(opts.reuse ? digestMemo.get(abs, listed.get(rel) ?? fs.statSync(abs), () => digest(abs)) : digest(abs)); }
     catch { h.update('MISSING'); }
     h.update('\n');
   }
   const settings: Record<string, unknown> = {};
   for (const k of RELEASE_SETTING_KEYS) if (project[k] !== undefined) settings[k] = project[k];
   h.update(JSON.stringify(settings));
-  return h.digest('hex');
+  return { fingerprint: h.digest('hex'), sourceCount: sources.length };
 }
 
 export interface WatermarkSettings { enabled: boolean; text: string; style: string }
@@ -103,11 +116,11 @@ function pmDocument(projectId: string): any {
 
 export function releaseStateOf(projectId: string, opts: { reuse?: boolean; known?: DmSummary[] } = {}) {
   const now = nowIso();
-  const fingerprint = publicationFingerprint(projectId, opts);
+  const { fingerprint, sourceCount } = fingerprintOf(projectId, opts);
   const approved = store.currentRelease(projectId, now);
   const matches = !!approved && approved.content_hash === fingerprint;
   return {
-    fingerprint, approved, released: matches,
+    fingerprint, sourceCount, approved, released: matches,
     staleRelease: !!approved && !matches,
     scheduled: store.scheduledRelease(projectId, now),
     pending: store.pendingRelease(projectId),
@@ -119,15 +132,16 @@ const releaseView = (r: any) => ({
   requestedAt: r.requested_at, requestedBy: r.requested_by_username || null, decidedAt: r.decided_at,
 });
 
-export function releaseOverview(projectId: string, canSubmit: boolean) {
-  const st = releaseStateOf(projectId);
+/** `opts.state` / `opts.known`: the release state and module list this request already holds (WP-17, PERF-005: computed once per page view). */
+export function releaseOverview(projectId: string, canSubmit: boolean, opts: { state?: ReturnType<typeof releaseStateOf>; known?: DmSummary[] } = {}) {
+  const st = opts.state ?? releaseStateOf(projectId);
   const view = (r: any) => (r ? { number: r.release_number, scheduledAt: r.scheduled_at, note: r.note } : null);
   return {
     release: st.released ? view(st.approved) : null,
     staleRelease: st.staleRelease ? view(st.approved) : null,
     scheduled: st.scheduled ? view(st.scheduled) : null,
     pending: st.pending ? releaseView(st.pending) : null,
-    sources: publicationSources(projectId).length,
+    sources: st.sourceCount,
     publicationRel: pmRel(readProjectJson(projectId)),
     history: store.listReleasesForProject(projectId).map(releaseView),
     watermark: readWatermark(projectId),

@@ -17,9 +17,10 @@ import { bad, conflict } from './http';
 import { sha } from './csdbIndex';
 import { readProjectJson, csdbRel, pmRel } from './projects';
 import { assertS1000dPublication } from './projectRecord';
-import { listDms, type DmSummary } from './csdb';
+import { listDms, dmSummaryOf, type DmSummary } from './csdb';
 import { parsePmComplete } from './importer/pmComplete';
 import { RECONSTRUCTED_MARKER } from './importer/package';
+import { FileMemo } from './fileMemo';
 
 const pmc = vendor('engine/pmc');
 const { dmCodeString, pmCodeString } = vendor('engine/resolveDmRefs');
@@ -62,7 +63,11 @@ export function parseModel(text: string): { meta: any; entries: PmEntry[]; warni
   const { generated: _generated, added: _added, ...model } = parsePmComplete(text);
   return model as unknown as ReturnType<typeof parseModel>;
 }
-const readModel = (abs: string): ReturnType<typeof parseModel> => parseModel(fs.readFileSync(abs, 'utf8'));
+// WP-17 (PERF-005): a page view read the publication module three times (the release fingerprint, the raw references, the explorer), each a
+// full parse (about 50-90 ms for 1000 entries). The parse is kept until the file changes (size, modification or change time) and handed out as
+// a copy, so a caller that changes its model changes nothing kept.
+const modelMemo = new FileMemo<ReturnType<typeof parseModel>>(64);
+const readModel = (abs: string): ReturnType<typeof parseModel> => structuredClone(modelMemo.get(abs, fs.statSync(abs), () => parseModel(fs.readFileSync(abs, 'utf8'))));
 
 /** `known`: the module list the caller has just read in the same request (WP-18: the summary lists the modules once, not three times). */
 export function readPm(projectId: string, known?: DmSummary[]) {
@@ -76,6 +81,10 @@ export function readPm(projectId: string, known?: DmSummary[]) {
   return { ...model, counts: pmc.countEntries(model.entries), pool: unplaced(model.entries, dms), dms };
 }
 
+// pmc.parsePm of a publication file, kept per file version (size, times, file id) and handed out as a copy (placeNewDm changes what it gets)
+const pmParseMemo = new FileMemo<{ meta?: unknown; entries: PmEntry[] }>(64);
+const parsedPm = (abs: string) => structuredClone(pmParseMemo.get(abs, fs.statSync(abs), () => pmc.parsePm(fs.readFileSync(abs, 'utf8'))));
+
 const NOT_PRINTED = new Set(['022', '00W', '00Q', '00P']);   // BREX and the applicability tables are project data, not pages of the book
 
 /**
@@ -86,8 +95,8 @@ const NOT_PRINTED = new Set(['022', '00W', '00Q', '00P']);   // BREX and the app
 export function placeNewDm(projectId: string, file: string): boolean {
   try {
     if (readProjectJson(projectId).autoAddToPublication === false || !fs.existsSync(pmPath(projectId))) return false;
-    const model = pmc.parsePm(fs.readFileSync(pmPath(projectId), 'utf8'));
-    const d = listDms(projectId).find((x) => x.file.toLowerCase() === file.toLowerCase());
+    const model = parsedPm(pmPath(projectId));                        // WP-17: the kept parse of this file version, as a copy
+    const d = dmSummaryOf(projectId, file);                         // WP-17 (PERF-005): this module, not a listing of all of them
     if (!d || NOT_PRINTED.has(d.dmCodeAttrs.infoCode)) return false;
     if (!unplaced(model.entries, [d]).length) return false;
     model.entries.push({ type: 'dm', title: d.techName || d.dmc, dmCode: d.dmCodeAttrs, techName: d.techName, infoName: d.infoName });
@@ -145,7 +154,8 @@ export function writePm(projectId: string, model: { meta?: unknown; entries: PmE
   if (counts.total === 0 && !allowEmpty) throw bad('Refusing to save an empty publication. Pass allowEmpty=1 if that is intended.', 'EMPTY_PM');
 
   let xml: string = pmc.serialisePm(model);
-  const check = pmc.countEntries(pmc.parsePm(xml).entries);
+  const reread = pmc.parsePm(xml);
+  const check = pmc.countEntries(reread.entries);
   if (check.total !== counts.total || check.dms !== counts.dms) {
     throw new Error('Internal check failed: the serialised publication does not read back identically. Nothing was written.');
   }
@@ -155,9 +165,13 @@ export function writePm(projectId: string, model: { meta?: unknown; entries: PmE
   // so a save from the Explorer must not silently take it away.
   const existing = fs.existsSync(abs) ? fs.readFileSync(abs, 'utf8') : null;
   if (existing !== null && baseHash !== undefined && sha(existing) !== baseHash) throw conflict('The publication was changed by someone else since you opened it. Reload it to see their changes.', 'EDIT_CONFLICT', { currentHash: sha(existing) });
+  const written = xml;
   if (existing !== null) xml = carryReconstructedMarker(existing, xml);
   if (fs.existsSync(abs)) fs.copyFileSync(abs, abs + '.bak');
   content.writeText(projectId, abs, xml);
+  // WP-17 (PERF-005): the read-back just made IS the parse of the file as written (when nothing was added to the text after it), so the next
+  // module created does not parse the whole publication again
+  if (xml === written) { try { pmParseMemo.get(abs, fs.statSync(abs), () => reread); } catch { /* the memo is a convenience */ } }
   return { counts, backup: path.basename(abs) + '.bak', hash: sha(xml) };
 }
 
@@ -207,22 +221,32 @@ export function explore(projectId: string, known?: DmSummary[]) {
  * not un-release the PDF - hence "referenced", not "everything in csdb".
  */
 /** Every data module a PM names, read from its raw XML: <dmRef> by code and includes by file name. */
-function rawPmReferences(pmXml: string, byCode: Map<string, DmSummary>, byFile: Map<string, DmSummary>): DmSummary[] {
+function rawPmReferences(abs: string, byCode: Map<string, DmSummary>, byFile: Map<string, DmSummary>): DmSummary[] {
   const hits: DmSummary[] = [];
+  const refs = rawRefMemo.get(abs, fs.statSync(abs), () => rawPmKeys(fs.readFileSync(abs, 'utf8')));   // WP-17: parsed once per file version
+  for (const code of refs.codes) { const hit = byCode.get(code); if (hit) hits.push(hit); }
+  for (const file of refs.files) { const hit = byFile.get(file); if (hit) hits.push(hit); }
+  return hits;
+}
+
+/** The references of a publication module's raw XML: every <dmRef>'s code string, then every include's file name, in document order. */
+function rawPmKeys(pmXml: string): { codes: string[]; files: string[] } {
+  const codes: string[] = []; const files: string[] = [];
   const doc = new DOMParser({ onError: () => undefined } as any).parseFromString(pmXml, 'text/xml') as any;
   for (const d of Array.from(doc.getElementsByTagName('dmRef')) as any[]) {
     const c = d.getElementsByTagName('dmCode')[0]; if (!c) continue;
     const attrs: Record<string, string> = {}; for (const a of Array.from(c.attributes) as any[]) attrs[a.name] = a.value;
     const x = d.getElementsByTagName('identExtension')[0];
     const ext: Record<string, string> | null = x ? Object.fromEntries((Array.from(x.attributes) as any[]).map((a) => [a.name, a.value])) : null;
-    const hit = byCode.get(dmCodeString(attrs, ext)); if (hit) hits.push(hit);
+    codes.push(dmCodeString(attrs, ext));
   }
   for (const n of Array.from(doc.getElementsByTagName('*')) as any[]) {
     if (!/(^|:)include$/.test(n.nodeName)) continue;
-    const hit = byFile.get(baseName(n.getAttribute('href') ?? '')); if (hit) hits.push(hit);
+    files.push(baseName(n.getAttribute('href') ?? ''));
   }
-  return hits;
+  return { codes, files };
 }
+const rawRefMemo = new FileMemo<{ codes: string[]; files: string[] }>(64);
 
 export function publicationSources(projectId: string, known?: DmSummary[]): string[] {
   const dir = projectDirFor(projectId);
@@ -246,7 +270,7 @@ export function publicationSources(projectId: string, known?: DmSummary[]): stri
     })(model.entries);
     // The editor's PM model keeps ONE reference per entry; a publication module may legally list several dmRef / includes in one <pmEntry>. Every
     // reference in the raw XML is part of the publication (and must be validated, and filtered), whether or not the model carries it.
-    for (const hit of rawPmReferences(fs.readFileSync(path.join(dir, pmName), 'utf8'), byCode, byFile)) out.add(`${csdb}/${hit.file}`);
+    for (const hit of rawPmReferences(path.join(dir, pmName), byCode, byFile)) out.add(`${csdb}/${hit.file}`);
   } catch { /* an unreadable PM simply contributes only itself */ }
 
   // Front matter is part of the book, and it is the half a settings change rewrites.

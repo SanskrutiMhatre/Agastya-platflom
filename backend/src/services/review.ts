@@ -28,8 +28,9 @@ type Row = Record<string, any>;
 
 export type ReviewState = 'draft' | 'in_review' | 'changes_requested' | 'approved';
 
-export function reviewState(projectId: string): { state: ReviewState; round: number } {
-  const st = releaseStateOf(projectId);
+/** `known`: the release state the caller has already computed in this request (WP-17: a page view computes it once, not three times). */
+export function reviewState(projectId: string, known?: Pick<ReturnType<typeof releaseStateOf>, 'released' | 'pending' | 'staleRelease'>): { state: ReviewState; round: number } {
+  const st = known ?? releaseStateOf(projectId);
   const history: Row[] = store.listReleasesForProject(projectId);          // newest first
   const round = history.filter((h) => h.status !== 'withdrawn').length;
   if (st.released) return { state: 'approved', round };
