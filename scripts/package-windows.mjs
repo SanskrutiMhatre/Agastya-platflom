@@ -164,7 +164,7 @@ log('copying the backend (compiled), the schemas, templates and the publishing e
 for (const d of ['dist', 'schemas', 'templates', 'templates-optional', 'brex', 'samples', 'reference', 'assets']) copyFiltered(path.join(be, d), path.join(appBe, d));
 fs.copyFileSync(path.join(be, 'package.json'), path.join(appBe, 'package.json'));
 mk('app', 'backend', 'scripts');
-for (const s of ['doctor.js', 'reset-admin.js', 'recover-structure.js']) fs.copyFileSync(path.join(be, 'scripts', s), path.join(appBe, 'scripts', s));
+for (const s of ['doctor.js', 'reset-admin.js', 'recover-structure.js', 'agastya-audit.js']) fs.copyFileSync(path.join(be, 'scripts', s), path.join(appBe, 'scripts', s));
 // vendor: the engine, the pipelines and the tools. Not used at run time and left out: FOP's javadocs (94 MB of HTML) and its examples, two stray test
 // files that were left in FOP's folder (example.fo, output.pdf), and the HTML documentation of libxslt. They also hold the longest paths in the tree.
 copyFiltered(path.join(be, 'vendor'), path.join(appBe, 'vendor'), (src) => {

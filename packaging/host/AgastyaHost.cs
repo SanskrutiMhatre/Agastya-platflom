@@ -285,6 +285,17 @@ namespace Agastya
             try { if (EventLog.SourceExists(EventSource)) EventLog.WriteEntry(EventSource, msg, type); } catch { }
         }
 
+        /// <summary>WP-29 (RES-004): a security event with its stable id (docs/OPERATIONS.md section 13). Same rule: only when the source exists.</summary>
+        public static void Event(EventLogEntryType type, string msg, int id)
+        {
+            // AGASTYA_HOST_EVENTLOG=off: the tests of the host never write to this machine's Application log
+            if (string.Equals(Environment.GetEnvironmentVariable("AGASTYA_HOST_EVENTLOG"), "off", StringComparison.OrdinalIgnoreCase)) return;
+            try { if (EventLog.SourceExists(EventSource)) EventLog.WriteEntry(EventSource, msg, type, id); } catch { }
+        }
+
+        /// <summary>The audit key is kept in the state folder, outside the data folder (backed up separately from the database).</summary>
+        public static string AuditKeyFile { get { return Path.Combine(Path.Combine(Layout.StateDir, "keys"), "audit-hmac.key"); } }
+
         public static bool IsAdmin()
         {
             try { return new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator); } catch { return false; }
@@ -416,10 +427,21 @@ namespace Agastya
             if (cfg.TlsPfx.Length > 0) psi.EnvironmentVariables["AGASTYA_TLS_PFX"] = Settings.StatePath(cfg.TlsPfx);
             if (cfg.TlsPassphraseFile.Length > 0) psi.EnvironmentVariables["AGASTYA_TLS_PASSPHRASE_FILE"] = Settings.StatePath(cfg.TlsPassphraseFile);
             if (cfg.HstsMaxAge.Length > 0) psi.EnvironmentVariables["AGASTYA_HSTS_MAX_AGE"] = cfg.HstsMaxAge;
+            // WP-29: security events come back as "##agastya-event|id|level|text" lines (written to the Application log below); the audit key
+            // lives in the state folder, not beside the database; the server's own JSON log file sits with the host's logs.
+            psi.EnvironmentVariables["AGASTYA_EVENT_SINK"] = "host";
+            psi.EnvironmentVariables["AGASTYA_AUDIT_KEY_FILE"] = Host.AuditKeyFile;
+            psi.EnvironmentVariables["AGASTYA_LOG_DIR"] = Layout.LogDir;
             try { Directory.CreateDirectory(cfg.WorkspaceDir); } catch (Exception e) { Host.Error("cannot create the data folder " + cfg.WorkspaceDir + ": " + e.Message); return -2; }
 
             Process p = new Process(); p.StartInfo = psi; p.EnableRaisingEvents = true;
-            p.OutputDataReceived += delegate (object s, DataReceivedEventArgs e) { if (e.Data != null) serverLog.Write(e.Data); };
+            p.OutputDataReceived += delegate (object s, DataReceivedEventArgs e)
+            {
+                if (e.Data == null) return;
+                serverLog.Write(e.Data);
+                SecurityEventLine ev = SecurityEventLine.Parse(e.Data);
+                if (ev != null) Host.Event(ev.Type, ev.Text, ev.Id);
+            };
             p.ErrorDataReceived += delegate (object s, DataReceivedEventArgs e) { if (e.Data != null) serverLog.Write("[stderr] " + e.Data); };
             try { p.Start(); }
             catch (Exception e) { Host.Error("could not start " + Layout.NodeExe + ": " + e.Message); return -1; }
@@ -716,6 +738,7 @@ namespace Agastya
 
             string st = ServiceTools.StateOf(cfg.ServiceName);
             if (st == "not installed") Pass("Windows service '" + cfg.ServiceName + "' is not installed (optional)"); else Pass("Windows service '" + cfg.ServiceName + "': " + st);
+            { string al; int ar = AuditTools.DoctorRow(cfg, out al); if (ar == 0) Pass(al); else if (ar == 1) Fail(al); else if (ar == 2) Warn(al); }   // WP-29
 
             Console.WriteLine();
             Console.WriteLine(fails == 0 ? (warns == 0 ? "Everything is in order." : "No problems; " + warns + " warning(s).") : fails + " problem(s) found.");
@@ -815,6 +838,7 @@ namespace Agastya
             "Agastya Platform {0}\r\n\r\n" +
             "  AgastyaCtl.exe --console              run the server in this window (Ctrl+C stops it)\r\n" +
             "  AgastyaCtl.exe --doctor [--deep]      check the installation and this machine (--deep: hash every program file)\r\n" +
+            "  AgastyaCtl.exe --verify-audit         check the audit log chain against its key and checkpoints (0 = intact, 1 = problems, 2 = cannot check)\r\n" +
             "  AgastyaCtl.exe --verify [--require-signed]  check every program file against the signed manifest (exit 0 = intact)\r\n" +
             "  AgastyaCtl.exe --support-bundle [<file.zip>]  write a ZIP for support: reports and redacted logs, never the database\r\n" +
             "  AgastyaCtl.exe --status               show whether the service / server is running\r\n" +
@@ -843,6 +867,7 @@ namespace Agastya
                 else if (a == "--lan") lan = true;
                 else if (a == "--backup-db" && i + 1 < args.Length) { mode = a; label = args[++i]; }
                 else if (a == "--reset-admin" && i + 1 < args.Length) { mode = a; label = args[++i]; }
+                else if (a == "--parse-event-line" && i + 1 < args.Length) return AuditTools.ParseCommand(args[++i]);   // hidden: tests of the event-line format
                 else if (a.StartsWith("--")) mode = a;
                 else { Console.Error.WriteLine("Unknown argument: " + a); return 2; }
             }
@@ -868,6 +893,7 @@ namespace Agastya
                     case "--help": Console.WriteLine(string.Format(Usage, Layout.Version)); return 0;
                     case "--doctor": return Doctor.Run(cfg, deep);
                     case "--verify": return Integrity.VerifyCommand(requireSigned);
+                    case "--verify-audit": return AuditTools.Verify(cfg);
                     case "--support-bundle": return SupportBundle.Create(cfg, label);
                     case "--status":
                         Console.WriteLine("service '" + cfg.ServiceName + "': " + ServiceTools.StateOf(cfg.ServiceName));
@@ -942,6 +968,7 @@ namespace Agastya
             psi.UseShellExecute = false;
             psi.WorkingDirectory = Path.Combine(Layout.AppDir, "backend");
             psi.EnvironmentVariables["AGASTYA_WORKSPACE_DIR"] = cfg.WorkspaceDir;
+            psi.EnvironmentVariables["AGASTYA_AUDIT_KEY_FILE"] = Host.AuditKeyFile;   // WP-29: the reset is audited and chained with the same key
             using (Process p = Process.Start(psi)) { p.WaitForExit(); Host.Info("reset-admin for " + user + " finished with code " + p.ExitCode); return p.ExitCode; }
         }
 
