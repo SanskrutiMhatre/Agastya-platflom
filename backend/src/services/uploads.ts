@@ -7,10 +7,11 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import multer from 'multer';
+import { config, envPositive } from '../config';
 
-/** A positive number from the environment; unset, empty or invalid (".env" files often leave `NAME=` blank) means the default, never 0 or NaN. */
-export const envPositive = (name: string, fallback: number): number => { const raw = process.env[name]; const n = raw === undefined || raw.trim() === '' ? NaN : Number(raw); return Number.isFinite(n) && n > 0 ? n : fallback; };
-export const MAX_UPLOAD_BYTES = envPositive('AGASTYA_MAX_UPLOAD_BYTES', 2 * 1024 ** 3);
+// WP-10 (PLT-032): the limits come from the one typed configuration; envPositive lives there and is re-exported for compatibility.
+export { envPositive };
+export const MAX_UPLOAD_BYTES = config.limits.maxUploadBytes;
 export const uploadTmp = (): string => { const d = path.join(os.tmpdir(), 'agastya-uploads'); fs.mkdirSync(d, { recursive: true }); return d; };
 export const diskUpload = (opts: { files?: number } = {}) => multer({
   storage: multer.diskStorage({ destination: (_r, _f, cb) => cb(null, uploadTmp()), filename: (_r, _f, cb) => cb(null, `${Date.now()}-${Math.random().toString(36).slice(2)}.upload`) }),
@@ -20,7 +21,7 @@ export const discard = (files: Array<{ path?: string }> | undefined): void => { 
 export const tooLarge = (): { error: string; code: string } => ({ error: `A file is larger than the upload limit (${Math.round(MAX_UPLOAD_BYTES / 1024 ** 2)} MB; set AGASTYA_MAX_UPLOAD_BYTES to change it).`, code: 'FILE_TOO_LARGE' });
 
 /** Time one request may take to arrive in full. Bounded (not disabled) so a stalled client cannot hold a connection forever. */
-export const REQUEST_TIMEOUT_MS = envPositive('AGASTYA_REQUEST_TIMEOUT_MS', 3 * 3600_000);
+export const REQUEST_TIMEOUT_MS = config.limits.requestTimeoutMs;
 /**
  * Server timeouts. requestTimeout: see above. keepAliveTimeout: Node closes an idle connection after 5 s, so a client (or a proxy) that reuses it a moment later
  * is reset ("fetch failed" / ECONNRESET) - seen in the test harness after a slow synchronous step, and a known cause of sporadic errors behind proxies.

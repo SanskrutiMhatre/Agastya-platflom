@@ -41,8 +41,9 @@ const { validateProjectSchema, declaredSchema } = require('../../vendor/engine/v
 const { checkXmlSafety } = require('../core/auth/xmlGuard');
 
 export { MAX_UPLOAD_BYTES } from './uploads';
-import { MAX_UPLOAD_BYTES, envPositive } from './uploads';
-export const importLimits = (): ExtractLimits => ({ ...DEFAULT_LIMITS, maxEntryBytes: MAX_UPLOAD_BYTES, maxTotalBytes: envPositive('AGASTYA_MAX_EXPANDED_BYTES', 8 * 1024 ** 3) });
+import { MAX_UPLOAD_BYTES } from './uploads';
+import { config as appConfig } from '../config';
+export const importLimits = (): ExtractLimits => ({ ...DEFAULT_LIMITS, maxEntryBytes: MAX_UPLOAD_BYTES, maxTotalBytes: appConfig.limits.maxExpandedBytes });
 
 export type FileKind = 'dm' | 'pm' | 'object' | 'asset' | 'manifest' | 'other';
 export interface PackageFile { path: string; abs: string; kind: FileKind; size: number; sha256: string }

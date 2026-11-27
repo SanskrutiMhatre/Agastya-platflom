@@ -16,7 +16,7 @@
 const { hashPassword, newId } = require('./crypto');
 const policy = require('./policy');
 
-async function ensureBootstrapAdmin({ store, audit, env = process.env, log = console.log, now = () => new Date() }) {
+async function ensureBootstrapAdmin({ store, audit, env = {}, log = console.log, now = () => new Date() }) {
   const username = String(env.INITIAL_ADMIN_USERNAME || '').trim();
   const password = env.INITIAL_ADMIN_PASSWORD || '';
 

@@ -7,7 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import { config, nowIso } from './config';
 import { dbBusy, diskFull } from './services/http';
-import { store, sessionsSvc, authz, audit, limiter, docIndex, projectDirFor, publicRoute, clientIp, securityPolicy, auditHealth } from './context';
+import { store, sessionsSvc, authz, audit, limiter, docIndex, projectDirFor, publicRoute, clientIp, securityPolicy, auditHealth, authProvider } from './context';
 import { requestContextMiddleware } from './services/requestContext';
 import { securityHeaders } from './services/securityHeaders';
 import { compressResponses, clientStatic, STUDIO_SCHEMA_SETS } from './services/delivery';
@@ -74,7 +74,7 @@ export function createApp(): express.Express {
     collab: { closeDocumentConnectionsForUser: () => undefined },
     onProjectDecided: () => undefined,
     onAccess: notifyAccess,
-    securityPolicy, auditHealth,
+    securityPolicy, auditHealth, authProvider,
   });
   registerJssGuard(app);                 // before every S1000D-side writer: a JSS document project's publication.xml is never replaced by them
   registerWorkspaceRoutes(app);

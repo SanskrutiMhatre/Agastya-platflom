@@ -19,7 +19,7 @@ export type PdfDocument = any;
 
 export function findPdfjsDir(): string | null {
   const candidates = [
-    process.env.AGASTYA_PDFJS_DIR,
+    config.pdfjsDir,
     path.join(config.root, 'node_modules', 'pdfjs-dist'),
     path.join(config.root, '..', 'frontend', 'node_modules', 'pdfjs-dist'),
   ].filter((d): d is string => !!d);
