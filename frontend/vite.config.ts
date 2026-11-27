@@ -34,7 +34,8 @@ export default defineConfig({
   },
   worker: { format: 'es' },
   test: {
-    environment: 'jsdom', include: ['src/**/*.test.ts'], globalSetup: ['./test-support/global-setup.ts'],
+    // WP-09 (QA-016): *.test.tsx are the React component tests (src/testing/render.tsx is their harness)
+    environment: 'jsdom', include: ['src/**/*.test.ts', 'src/**/*.test.tsx'], globalSetup: ['./test-support/global-setup.ts'],
     // QA-002: schema-validating tests take 4-5 s on an idle machine, so vitest's 5 s default turned a loaded run red. 30 s per test and per hook;
     // the verification suites set longer limits of their own.
     testTimeout: 30_000, hookTimeout: 30_000,

@@ -44,6 +44,7 @@ function createAuthz({ store, sessions, workspaceDir, projectDirFor }) {
     disabled: ['ACCOUNT_DISABLED', 'This account has been disabled.'],
     admin: ['SESSION_REVOKED', 'An administrator ended your session.'],
     revoked: ['SESSION_REVOKED', 'Your session was ended.'],
+    'password-changed': ['SESSION_REVOKED', 'You were signed out because the password of this account was changed.'],
   };
   function deny401(res, req) {
     let reason = null;

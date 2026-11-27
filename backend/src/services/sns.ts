@@ -375,6 +375,16 @@ export function parseImport(format: 'json' | 'csv', text: string): { nodes: Arra
   if (format === 'json') {
     let j: any;
     try { j = JSON.parse(text); } catch (e: any) { return { nodes, errors: [{ line: 'file', message: `Not valid JSON: ${e.message}` }] }; }
+    // WP-09: the file the export route writes ({ format: 'agastya-sns-preset', nodes: [{ path, title }] }) imports back as it is.
+    if (j && j.format === 'agastya-sns-preset' && Array.isArray(j.nodes)) {
+      (j.nodes as Array<{ path?: unknown; title?: unknown } | null>).forEach((n, i) => {
+        const p = typeof n?.path === 'string' ? n.path.trim() : '';
+        if (!p) { errors.push({ line: `nodes[${i}]`, message: 'an entry has no path' }); return; }
+        if (p.split('/').length > 3) { errors.push({ line: p, message: 'deeper than system / subsystem / assembly' }); return; }
+        nodes.push({ path: p, title: String(n?.title ?? '') });
+      });
+      return { nodes, errors };
+    }
     const tree = Array.isArray(j) ? j : j?.tree;
     if (!Array.isArray(tree)) return { nodes, errors: [{ line: 'file', message: 'Expected {"tree":[{"code","title","children"}]}.' }] };
     const walk = (list: any[], prefix: string, depth: number) => {

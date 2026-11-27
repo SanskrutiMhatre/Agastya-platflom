@@ -541,3 +541,142 @@ verified, and what is left or blocked.
 * Left: the "New home" and "Sign-off" columns are filled by each redesign batch (WP-21, WP-22, WP-35); the before column of the results
   table needs a full run on Edge (D18); 145 test ids are named by no browser spec (`info.testidsWithoutBrowserTest`), the guard gaps a batch
   must close or record; computed test ids are counted, not listed.
+### WP-09 Authorisation matrix and hostile-input test suites (QA-004, QA-005, ARC-016, QA-021, QA-023, QA-016) - done, the e2e part not run (see limits)
+
+Branch `wp09-authz-matrix` (from 7eb0160).
+
+* QA-004 / ARC-016 (`backend/test/authz-matrix.test.js`, `test/fixtures/authz-policy.snapshot.json`, `test/fixtures/authz-allow.json`): the
+  role x route matrix is generated from the app itself. The Express router is walked and each route's guard chain is read from the markers in
+  `core/auth/authz.js`. Every layer registered for the same method and path counts as one route. Each guard is called in-process for
+  11 principals: anonymous, onboarding-gated, password-change-gated, author, PM, admin, and project viewer / reviewer / editor / manager /
+  owner. The parameters come from `Layer.match()`, exactly as Express sets them. The result is one row per route (about 280 routes),
+  compared with the committed snapshot. A change to any route's policy fails the test until the snapshot is regenerated
+  (`AGASTYA_UPDATE_AUTHZ_SNAPSHOT=1`) and reviewed in the diff. Rules checked for every route:
+  - no parameter name is repeated;
+  - anonymous gets 401;
+  - only the listed exits get past the onboarding and password-change gates;
+  - an admin passes;
+  - a non-member gets the uniform 404;
+  - the member ladder is monotone;
+  - a write at viewer level or with sign-in only needs a reason in `authz-allow.json` (7 viewer-level and 21 sign-in-only writes are listed
+    with reasons).
+  Over HTTP, on a booted server:
+  - anonymous gets 401 on every non-public route;
+  - a non-member gets 404 on every project route;
+  - one role below the minimum gets the guard's 403 (more than 150 routes);
+  - the minimum role passes the guard on every GET.
+  Last, every route must be referenced by another backend test, e2e spec or script, or be listed with a reason. That list is empty now:
+  every route is referenced, and a stale entry fails. Mutation check: changing the waivers DELETE guard from editor to viewer (in dist)
+  made tests 1 and 2 fail.
+* Defects found and fixed, each with a test:
+  1. `GET /api/projects/:id/packages/import-reports/:id` repeated `:id`. Express gave the report id to the project guard, so the route
+     answered 404 to everyone. It is now `:reportId` (`routes/packages.ts`), asserted in `packages.test.js` (200 with items; 404 for a
+     non-member). The matrix rule "no repeated parameter name" keeps it from coming back.
+  2. Security: with the single-session policy off, a password change and onboarding left the account's other sessions alive. `issue()`
+     displaces only under single-session. Both handlers in `core/auth/routes.js` now end every other session first, with the new reason
+     `password-changed` (`authz.js` END_MESSAGES: SESSION_REVOKED, "...the password of this account was changed"). Asserted in
+     `auth-http.test.js`.
+  3. The SNS preset JSON written by the export route could not be imported back (`services/sns.ts` parseImport). The
+     `{format:'agastya-sns-preset', nodes:[{path,title}]}` form is now accepted, with the depth check. Round trip asserted in
+     `admin-ops.test.js`.
+  4. QA-021 / PUB-008: a conversion from S1000D dropped the ICN artwork that the product keeps beside the data modules (`csdb/`).
+     `zipOfS1000dProject` packed `csdb/` with `/\.xml$/` only; it now also takes `^ICN-` files (`services/xengine/convert.ts`).
+  The matrix found no role-level authorisation defect: every HTTP boundary matched the declared policy.
+* QA-005 (suites for the auth core and the hostile edges):
+  - `auth-core.test.js` (unit, no server):
+    - RateLimiter with an injected clock: window, Retry-After, per-account limit across IPs, per-IP limit, persistence.
+    - SessionService on an in-memory AuthStore: cookie attributes, idle and absolute expiry with their reasons, displacement,
+      multi-session, revoke, disabled account.
+    - Also the password policy, usernames and temporary passwords, checkGrant, hashing (argon2 or scrypt, plus the scrypt fallback
+      format) and originAllowed.
+  - `auth-http.test.js`:
+    - cookie flags, and Secure behind `x-forwarded-proto`;
+    - logout kills the session on the server;
+    - a password change or onboarding ends the other sessions;
+    - disable and enable; the last admin cannot be disabled (409);
+    - admin reset, both kinds;
+    - session list and revoke;
+    - the audit is admin-only, with paging, the action-prefix filter and CSV;
+    - cross-origin writes, sign-in included, get 403;
+    - forgot answers a neutral 202, the reset queue can be approved and rejected, and the shared limit gives 429;
+    - CSV user import is all or nothing.
+  - WebSocket harness: `boot({ ws: true })` in `test/helpers.js` attaches the real broadcaster and returns `socket(client, { origin,
+    headers, path })` with `messages`, `waitFor()` and `closed`. `ws-broadcast.test.js`:
+    - an upgrade without a cookie or with a forged one gets 401; another origin gets 403; another path is refused;
+    - messages are filtered per project (owner, viewer and admin receive; the member of another project does not);
+    - a real build broadcast reaches members only;
+    - a member who is removed stops receiving at once and receives again when re-added;
+    - a 4401 close on logout, on displacement and on admin revoke; the 401 on reconnect carries `X-Session-Ended: admin-revoked`.
+  - `admin-ops.test.js` exercises the routes that no test called before: ownership governance, approvals and release queues (unknown ids
+    give 404), oversight, folders and folder access grants, invitations decline and withdraw, DM history, lock and open, publish status,
+    preset export, import and duplicate, SNS export and import, BREX import preview, waivers, JSG schema, and editing and resetting an
+    ancillary page.
+* QA-021 (`backend/test/xengine-pictures.test.js`):
+  - S1000D to JSS and to JSG on the sample project: every picture the source documents refer to arrives with the same SHA-256, and every
+    picture reference of the converted document resolves to a file.
+  - JSS to S1000D and to JSG: a figure's PNG in `Media/` arrives byte for byte, and the reference resolves.
+  - Before the convert.ts fix the S1000D to JSS case failed: `csdb/ICN-S1KSTUDIO-A-291000-A-00001-00001-A-001-01.svg` was lost.
+* QA-016 (frontend component tests in jsdom; no new dependency):
+  - `vite.config.ts` now includes `src/**/*.test.tsx`.
+  - `src/testing/render.tsx` is a small harness built on react-dom/client and act (`render`, `$`, `button`, `field` by label, `type`,
+    `click`, `key`, `settle`, `cleanup`).
+  - `components/ui.test.tsx` covers:
+    - Modal: role and label; Escape, the close button and a backdrop click close it, sticky ignores the backdrop; focus goes in and comes
+      back; the Tab trap;
+    - ConfirmModal: busy state and the danger style;
+    - PromptModal: trimmed submit, a refusal shown as an alert with aria-invalid, Enter submits;
+    - Field: label and hint wiring;
+    - Toasts: at most four, dismiss, 3.2 s and 10 s.
+  - `pages/AuthScreens.test.tsx` covers the sign-in, forgot-password, first-run, onboarding and forced-change forms: what is sent, a
+    password mismatch is refused without calling the server, server refusals are shown, the signed-out reason is shown.
+  - `store/stores.test.ts` covers:
+    - the session state machine: authed and gated; a 401 when nobody is signed in leads to anon or setup with the reason; a 401 while
+      working opens the re-login dialog; an unreachable server shows the banner and retries; the background check; logout, its listeners
+      and the inbox reset; another user on the same page; resume and abandon;
+    - theme and toasts in the UI store;
+    - the inbox store.
+  - Defect fixed: `Field` pointed its label at the generated id even when the control had its own `id`, so the label named nothing
+    (`components/ui.tsx`).
+* QA-023 (`frontend/e2e/zz-layout-strict.spec.ts`, new; `zz-responsive-layout.spec.ts` untouched):
+  - No overflow excuse: a visible control must lie inside the viewport and inside every `overflow: hidden|clip` ancestor, unless a
+    scrolling box lets the person reach it.
+  - Widths 1024, 1280, 1366, 1440 and 1920 px, on 9 screens. The primary action (New project) must be visible and inside the viewport.
+    A script error on the page is always a failure.
+  - Report-only by default (findings are attached as annotations and printed); `E2E_LAYOUT_STRICT=1` makes every finding a failure.
+* `scripts/ci/test-plan.json`: `authz-matrix`, `auth-core`, `auth-http`, `ws-broadcast` and `admin-ops` are in the security stage.
+  `xengine-pictures` runs in the default backend stage.
+
+Tests run (backend one file at a time after `npx tsc -p .`; frontend per file):
+
+| Test | Result |
+| --- | --- |
+| `authz-matrix` | 6/6 (re-run after the last change) |
+| `auth-core` | 11/11 |
+| `auth-http` | 10/10 |
+| `ws-broadcast` | 5/5 |
+| `admin-ops` | 8/8 |
+| `packages` | 10/10 |
+| `xengine-pictures` | 2/2 (1 of 2 failed before the fix) |
+| `xengine-convert` | 7/7 |
+| `phase17-security` | 5/5 |
+| `wp03-auth` | 10/11. The failure is "security headers", the known clean-checkout failure: `frontend/dist` is missing in the worktree (see WP-08). |
+| vitest `components/ui.test.tsx` | 10/10 |
+| vitest `pages/AuthScreens.test.tsx` | 6/6 |
+| vitest `store/stores.test.ts` | 11/11 |
+
+`npx tsc --noEmit -p .` (frontend) is clean, and the e2e spec type-checks on its own.
+
+Limits / open:
+
+* Not run, as instructed: Playwright (so `zz-layout-strict.spec.ts` has never run; its first report decides when the gate sets
+  `E2E_LAYOUT_STRICT=1`), the full backend suite, full vitest and the gate. The lead should run them; the Field label change touches every
+  form.
+* Lint ratchet: `any.backend` reads 282 against the baseline of 280. The +2 is already present at 7eb0160; this WP adds none (the
+  counts in `sns.ts` and `packages.ts` are unchanged).
+* Seen, not changed: in `core/auth/policy.js` the product word `s1000d` in PRODUCT_WORDS can never match, because the comparison strips
+  digits first.
+* The approval and pending-project paths of the admin queues were exercised only with unknown ids (404), not with a real pending project.
+  The finer checks inside the folder and CIR handlers are covered by the matrix at guard level only.
+* Owner blessing wanted: the 7 viewer-level writes and the 21 sign-in-only writes in `authz-allow.json` are recorded as intended, each with a
+  reason (open, copy, convert, the publish plan, the delivery package, JSS and JSG validate; sign-out, activity, password change, onboarding, invitations, folders, creating and importing projects,
+  notifications, CIR, S1000D config validation; folder and CIR handlers check ownership themselves). The audit's recommendation was taken; the owner can strike any of them, and the test will then demand the guard.

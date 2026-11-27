@@ -342,8 +342,11 @@ function registerAuthRoutes(deps) {
 
       const hash = await hashPassword(next);
       store.updateUser(user.id, { password_hash: hash, must_change_password: 0 }, nowIso());
-      // Fresh session (rotation) + displacement of every other session.
-      const { cookie, displaced } = sessionsSvc.issue(user.id, { ip: clientIp(req), userAgent: String(req.headers['user-agent'] || '').slice(0, 200), req });
+      // Fresh session (rotation) + the end of every other session. WP-09: ended explicitly, because issue() only displaces the others
+      // while the single-session policy is on; a password change must sign every other device out whatever that policy says.
+      const ended = store.revokeAllSessionsForUser(user.id, 'password-changed', nowIso());
+      const { cookie, displaced: alsoDisplaced } = sessionsSvc.issue(user.id, { ip: clientIp(req), userAgent: String(req.headers['user-agent'] || '').slice(0, 200), req });
+      const displaced = ended + alsoDisplaced;
       audit({ actorId: user.id, actorUsername: user.username, action: 'auth.password.changed', ip: clientIp(req), meta: { sessionsRevoked: displaced, viaMaster: viaMaster || undefined } });
       res.set('Set-Cookie', cookie);
       res.json({ ok: true });
@@ -381,7 +384,10 @@ function registerAuthRoutes(deps) {
         username_locked: 1,
       }, nowIso());
 
-      const { cookie, displaced } = sessionsSvc.issue(fresh.id, { ip: clientIp(req), userAgent: String(req.headers['user-agent'] || '').slice(0, 200), req });
+      // WP-09: every other session ends when the permanent password is set, whatever the single-session policy says (see change-password).
+      const ended = store.revokeAllSessionsForUser(fresh.id, 'password-changed', nowIso());
+      const { cookie, displaced: alsoDisplaced } = sessionsSvc.issue(fresh.id, { ip: clientIp(req), userAgent: String(req.headers['user-agent'] || '').slice(0, 200), req });
+      const displaced = ended + alsoDisplaced;
       audit({ actorId: fresh.id, actorUsername: uCheck.username, action: 'auth.onboarding.completed', ip: clientIp(req), meta: { sessionsRevoked: displaced } });
       res.set('Set-Cookie', cookie);
       res.json({ ok: true, user: publicUser(store.getUser(fresh.id)) });

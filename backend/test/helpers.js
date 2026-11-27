@@ -37,7 +37,12 @@ function assertDistFresh() {
   if (newer.length) throw new Error(`backend/dist is older than src/ (${newer.slice(0, 3).join(', ')}${newer.length > 3 ? ', ...' : ''}): the tests would run stale code. Rebuild with \`npx tsc -p .\` in backend/.`);
 }
 
-async function boot() {
+/**
+ * Boot the app. Options:
+ *   ws: true   attach the WebSocket broadcaster (services/broadcast) to the test server exactly as index.ts does, and return
+ *              `socket(client, { origin, headers })`, which opens /ws with that client's cookie (WP-09, QA-005).
+ */
+async function boot({ ws: withWs = false } = {}) {
   assertDistFresh();
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'agastya-v2-test-'));
   process.env.AGASTYA_WORKSPACE_DIR = ws;
@@ -80,14 +85,47 @@ async function boot() {
   }
 
   const sample = (n) => fs.readFileSync(path.join(SAMPLES, n), 'utf8');
+
+  // WebSocket harness (WP-09): the broadcaster on this server, and a client that records every message it receives.
+  let socket = null; const sockets = new Set();
+  if (withWs) {
+    require('../dist/services/broadcast').attach(server);
+    const WebSocket = require('ws');
+    /**
+     * Open /ws as `client` (its cookie; pass null for none). Resolves to { opened, status, ws, messages, closed, waitFor(pred, ms), close() }:
+     * `status` is the HTTP status of a refused upgrade, `closed` a promise of { code, reason } when the server closes the socket.
+     */
+    socket = (client, { origin = base, headers = {}, path: p = '/ws' } = {}) => new Promise((resolve) => {
+      const h = { ...headers }; if (client && client.cookie) h.cookie = client.cookie; if (origin) h.origin = origin;
+      const w = new WebSocket(base.replace(/^http/, 'ws') + p, { headers: h });
+      const messages = []; const waiters = [];
+      let onClose; const closed = new Promise((r) => { onClose = r; });
+      w.on('message', (data) => { let m; try { m = JSON.parse(String(data)); } catch { m = String(data); } messages.push(m); for (const x of [...waiters]) if (x.pred(m)) { waiters.splice(waiters.indexOf(x), 1); x.resolve(m); } });
+      w.on('close', (code, reason) => { sockets.delete(w); onClose({ code, reason: String(reason) }); });
+      const api = {
+        ws: w, messages, closed,
+        /** The first message (already received or arriving within `ms`) that satisfies `pred`, or null after `ms`. */
+        waitFor: (pred, ms = 2000) => { const hit = messages.find(pred); if (hit) return Promise.resolve(hit); return new Promise((r) => { const x = { pred, resolve: r }; waiters.push(x); setTimeout(() => { const i = waiters.indexOf(x); if (i >= 0) { waiters.splice(i, 1); r(null); } }, ms); }); },
+        close: () => { try { w.close(); } catch { /* closed */ } },
+      };
+      w.on('open', () => { sockets.add(w); resolve({ opened: true, status: 101, ...api }); });
+      w.on('unexpected-response', (_req, res) => resolve({ opened: false, status: res.statusCode, headers: res.headers, ...api }));
+      w.on('error', () => resolve({ opened: false, status: 0, ...api }));
+    });
+  }
+
   // close(): stop the renderer and the server, close the database, and remove the throwaway workspace (QA-010). On Windows a file still held by
   // a child process cannot be removed at once; the exit handler tries again. AGASTYA_KEEP_TEMP=1 keeps the workspace.
-  const close = () => new Promise((r) => { try { require('../dist/services/publisher').stopRenderer(); } catch { /* none */ } server.close(r); })
+  const close = () => new Promise((r) => {
+    try { require('../dist/services/publisher').stopRenderer(); } catch { /* none */ }
+    if (withWs) { for (const w of sockets) { try { w.terminate(); } catch { /* gone */ } } try { require('../dist/services/broadcast').close(); } catch { /* none */ } }
+    server.close(r);
+  })
     .then(() => {
       try { require('../dist/context').registryDb.close(); } catch { /* already closed */ }
       temps.add(ws); if (!process.env.AGASTYA_KEEP_TEMP && rmQuiet(ws)) temps.delete(ws);
     });
-  return { base, ws, Client, sample, SAMPLES, close };
+  return { base, ws, Client, sample, SAMPLES, close, socket };
 }
 
 module.exports = { boot, SAMPLES, DM21, RESULTS, tmp };

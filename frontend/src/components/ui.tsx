@@ -36,18 +36,21 @@ export function Alert({ tone, children }: { tone?: 'bad' | 'warn' | 'ok'; childr
 export function Field({ label, hint, error, children }: { label: string; hint?: string; error?: string; children: ReactNode }) {
   const id = useId();
   let tagged = false;
+  // WP-09: the label points at the control's own id when it has one (it used to point at the generated id, which then named nothing)
+  let controlId = id;
   const kids = Children.map(children, (c) => {
     if (!tagged && isValidElement(c) && typeof c.type === 'string' && /^(input|select|textarea)$/.test(c.type)) {
       tagged = true;
       const el = c as ReactElement<{ id?: string; 'aria-describedby'?: string; 'aria-invalid'?: boolean }>;
+      controlId = el.props.id ?? id;
       // UID-002: an error marks the control itself (styles/states.css draws the danger border), not only the text under it
-      return cloneElement(el, { id: el.props.id ?? id, 'aria-describedby': hint || error ? `${id}-note` : undefined, 'aria-invalid': error ? true : el.props['aria-invalid'] });
+      return cloneElement(el, { id: controlId, 'aria-describedby': hint || error ? `${id}-note` : undefined, 'aria-invalid': error ? true : el.props['aria-invalid'] });
     }
     return c;
   });
   return (
     <div className="v2-field">
-      <label htmlFor={id}>{label}</label>
+      <label htmlFor={controlId}>{label}</label>
       {kids}
       {error ? <span id={`${id}-note`} className="v2-error" role="alert">{error}</span> : hint ? <span id={`${id}-note`} className="v2-hint">{hint}</span> : null}
     </div>
