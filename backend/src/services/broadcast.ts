@@ -83,11 +83,13 @@ function inbound(c: Client, data: unknown): void {
   const pid = typeof m.projectId === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(m.projectId) ? m.projectId : null;
   if (pid && !mayRead(c, pid)) return;
   const changed = presence.setPresence(c.id, c.user, pid, presence.cleanDoc(m.doc), m.mode === 'editing' ? 'editing' : 'viewing', now);
-  for (const p of changed) announcePresence(p);
+  for (const p of changed) announcePresence(p, c);
 }
 
 /** Tell a project's readers that its set of people changed (they ask GET /api/projects/:id/presence for the list). */
-function announcePresence(projectId: string): void { broadcast(projectId, { type: 'presence' }); }
+// The connection whose own announcement caused the change is not told about it: that page already knows where it is, and asking for the list
+// again after every save (viewing -> editing -> viewing) cost the editor a request per save (wp18 B4). The same person's other pages are told.
+function announcePresence(projectId: string, except?: Client): void { deliver(projectId, { type: 'presence' }, except); }
 
 /** Re-check the connections of `userId` (or of everyone): close those whose session ended, forget cached permissions. */
 export function recheck(userId: string | null): void {
@@ -169,9 +171,10 @@ export function broadcast(projectId: string, msg: BroadcastMessage): void {
 }
 
 /** Send to the sockets of this process (the server side of a worker's relay calls this directly). */
-export function deliver(projectId: string, msg: BroadcastMessage): void {
+export function deliver(projectId: string, msg: BroadcastMessage, except?: Client): void {
   const payload = JSON.stringify({ ...msg, projectId });
   for (const c of clients) {
+    if (c === except) continue;
     if (c.ws.readyState !== WebSocket.OPEN) continue;
     if (c.ws.bufferedAmount > CLOSE_BACKLOG_BYTES) { forget(c); try { c.ws.terminate(); } catch { /* gone */ } continue; }
     if (msg.type === 'progress' && !msg.done && !msg.error && c.ws.bufferedAmount > SKIP_PROGRESS_BYTES) continue;
