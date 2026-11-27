@@ -22,7 +22,7 @@ import { readProjectJson, updateProjectJson, pmRel } from '../projectRecord';
 import { registerDocumentCreator } from '../documentCreators';
 import { registerPublishCheck } from '../publishChecks';
 import { jssTypeById, type JssDocType, type OutlineNode, type StartBlock, type TableTemplate } from './registry';
-import { escText as esc } from '../../lib/xml';
+import { escText as esc, escAttr } from '../../lib/xml';
 import { sha256 as sha } from '../../lib/hash';
 
 const { validateXML } = require('xmllint-wasm');
@@ -38,7 +38,6 @@ export interface JssFinding { severity: 'error' | 'warning'; rule: string; messa
 export interface JssReport { docType: string | null; valid: boolean; errors: number; warnings: number; findings: JssFinding[]; validatedAt: string }
 
 export { esc };
-const escAttr = (s: string): string => esc(s).replace(/"/g, '&quot;');
 export { sha };
 
 // ── Which projects are JSS-authored ─────────────────────────────────────────────────────────────────────────────────────────────

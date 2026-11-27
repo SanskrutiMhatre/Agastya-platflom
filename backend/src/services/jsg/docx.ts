@@ -10,7 +10,7 @@ import fs from 'fs';
 import path from 'path';
 import { DOMParser } from '@xmldom/xmldom';
 import { ZipFileReader } from '../zipio';
-import { escText as esc } from '../../lib/xml';
+import { escText as esc, escAttr as escA } from '../../lib/xml';
 
 export const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
 const R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
@@ -25,7 +25,7 @@ export type Inline = { t: 'text'; text: string } | { t: 'mark'; mark: Mark; chil
 const MARK_ORDER: Mark[] = ['b', 'i', 'u', 'sup', 'sub'];
 
 export { esc };
-export const escA = (s: string): string => esc(s).replace(/"/g, '&quot;');
+export { escA };
 
 export const inlineXml = (runs: Inline[]): string => runs.map((r) => (r.t === 'text' ? esc(r.text) : r.t === 'br' ? '<br/>' : `<${r.mark}>${inlineXml(r.children)}</${r.mark}>`)).join('');
 export const plain = (runs: Inline[]): string => runs.map((r) => (r.t === 'text' ? r.text : r.t === 'br' ? ' ' : plain(r.children))).join('');

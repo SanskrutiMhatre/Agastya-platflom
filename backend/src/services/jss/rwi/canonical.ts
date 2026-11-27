@@ -4,7 +4,7 @@
 // adapter maps INTO it and the export serializers read FROM it; neither the schema nor the JSS editor is touched. Everything here is pure (text in, text out), so it is tested without a server.
 
 import { DOMParser } from '@xmldom/xmldom';
-import { escText as esc } from '../../../lib/xml';
+import { escText as esc, escAttr as escA } from '../../../lib/xml';
 
 export type Mark = 'b' | 'i' | 'u' | 'sup' | 'sub';
 export type Inline =
@@ -43,7 +43,6 @@ export const plain = (inl: Inline[]): string => inl.map((i) => (i.t === 'text' ?
 // ── writing ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 export { esc };
-const escA = (s: string): string => esc(s).replace(/"/g, '&quot;');
 const at = (name: string, v: string | number | undefined): string => (v === undefined || v === '' ? '' : ` ${name}="${escA(String(v))}"`);
 
 export function inlineXml(inl: Inline[]): string {

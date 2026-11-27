@@ -18,7 +18,7 @@ import { wellFormedError } from '../wellFormed';
 import { readProjectJson, updateProjectJson } from '../projectRecord';
 import { registerDocumentCreator } from '../documentCreators';
 import { jsgTypeById, ISPL_PREFACE, UHB_FRONT_COUNTS, UHB_PREFACE, type JsgDocType } from './registry';
-import { escText as esc } from '../../lib/xml';
+import { escText as esc, escAttr } from '../../lib/xml';
 import { sha256 as sha } from '../../lib/hash';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -33,7 +33,6 @@ export interface JsgFinding { severity: 'error' | 'warning'; rule: string; messa
 export interface JsgReport { docType: string | null; valid: boolean; errors: number; warnings: number; findings: JsgFinding[]; validatedAt: string }
 
 export { esc };
-const escAttr = (s: string): string => esc(s).replace(/"/g, '&quot;');
 export { sha };
 
 /** A project whose source is a JSG document written in the JSG editor. */
