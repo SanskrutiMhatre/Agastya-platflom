@@ -13,6 +13,10 @@ page and all applicability screens and said explicitly that the backend, the dat
 dead-route list is approved together with the front-end cleanup, after the regression sign-off (WP-36). WP-13 therefore removed only client
 code that nothing called (40 wrappers and `frontend/src/api/publish.ts`), and records the routes here for that later decision.
 
+**WP-36 (D19).** The cleanup kept every route below, by the owner's rule above. The removal-completeness gate
+(`frontend/scripts/cleanup/removed-features.json`, run by `npm run lint`) fails if a route of section 1 that it names stops being listed
+here, or if the client starts calling it again without the feature being restored on purpose (then its entry is edited in the same change).
+
 ## 1. Screens removed by the owner on 2026-11-26 (backend kept by the same decision)
 
 | Group | Routes | Still used by |

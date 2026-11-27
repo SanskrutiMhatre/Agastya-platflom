@@ -2137,3 +2137,74 @@ right after 025, whose indexes are in `postSql`.
   - Not run: the T15 test (100 builds, JVM growth). Instead, recycling after 50 jobs and `-Xmx` bound the JVM. The `-Xmx` default
     of 1536 MB is a judgement: the largest sample books built under it in `golden-xignal` and `pdf21`.
   - Non-Windows: no job object. Kill uses SIGKILL of the worker only.
+
+## Phase 6 (WP-36)
+
+### WP-36 Post-redesign cleanup and the removal-completeness gate (CLN-001, CLN-002, CLN-003, CLN-004; ARC-011 `codemirror`, ARC-012 pdf definition helpers) - done (front end); server routes kept by decision
+
+Decision D19 (scope), taken as the audit recommends and recorded here: remove what the scan proves unused in the front end, item by
+item, each with its evidence; keep every server route of `docs/API-ONLY-ROUTES.md`. The owner's lists of 2026-11-26 removed the SNS
+System 2, Brand pack, CSDB and applicability screens and said "backend, data and API stay"; that rule is above the audit's D8/D19
+route list, so no route, service or backend test was removed (and WP-15/WP-17 own most of the backend this week). Nothing a user sees
+was removed: `check:parity` PASS with nothing removed and no explanation row (the two "added" items are WP-14's backend tests).
+
+* The scan (`frontend/scripts/cleanup/scan.mjs`, TypeScript compiler AST, so comments are never references):
+  - files nothing imports from `src/main.tsx` (static, dynamic `import()`, `new URL(.., import.meta.url)`, CSS `@import`);
+    test-only files and ambient `.d.ts` are kept by rule;
+  - exports that no other file of `src`, `e2e`, `scripts`, `test-support` or the configs names, and that their own file uses no further
+    (identifiers plus the words of string literals, so `window.studio.<name>` in a browser-test string counts);
+  - CSS classes of `src/**/*.css` that no non-test source of `frontend/src` or `backend/src` names (string, template and JSX text
+    words, which covers the DOM-built Studio/JSS/JSG editors and server-built HTML); a template or concatenation ending in `prefix-`
+    marks that prefix's classes as generated (x- 95, sev- 3, toast- 2 today);
+  - runtime dependencies (`dependencies`) that nothing imports.
+  `allowlist.json` holds the reasoned exceptions (CodeMirror's own `cm-*`, pdf.js `markedContent`/`endOfContent`; an entry needs a
+  reason, a stale entry warns). `check.mjs` is the report (`npm run check:cleanup`, `--report`, `--json`, `--verbose`).
+* Removal completeness (`removed-features.json`): for each feature the owner removed (CSDB page, System 2 SNS, Brand pack,
+  applicability UI, Codes strip/button, PMC/ICN/contents switches) its deleted files (taken from e85fa94 and c61ec89), identifiers,
+  strings (endpoints, test ids, labels), CSS class prefixes, rail labels and code patterns (`show.pmc|icn|toc`) must not come back in
+  the non-test source; one allowed occurrence (the `sns-defaults` redirect path). The routes the owner kept must stay listed in
+  `docs/API-ONLY-ROUTES.md` (a note there says so). Routes and redirects of the removed screens stay with the parity check.
+* Wired in: `scripts/ci/lint.mjs` hard rules (dead files, exports, classes, dependencies, allow-list problems, removal debris; so
+  `npm run lint`, the gate's lint stage and the pre-push hook hold them at zero); new gate stage `cleanup` after `parity` in the pr,
+  nightly and release profiles (the scan's own tests, then the report `cleanup.md` in the evidence); `npm run check:cleanup` (root and
+  frontend), `npm run test:cleanup` (frontend). The CLN-004 removal checklist is `.github/pull_request_template.md` (client route,
+  rail/labels, API wrapper, server route or its API-ONLY row, helpers, CSS, test ids with an absence test, docs, a removed-features
+  entry, lint).
+* First run of the scan on a2c5b31: 0 files (WP-13 had removed `api/publish.ts`), 18 exports, 38 classes (23 real, 15 library),
+  1 dependency, 6 pieces of removal debris (5 `applic-*`/`v2-brandprev` classes, `applicXml`). After: all zero outside the allow-list.
+* Removed (commits 1abafb1, ad41ac3, 0b1d36b, 16e6080; evidence in each message):
+  - 20 exports: the audit's 12 still present (`ShowMore`, `cloneDoc`, `cellAt`, `moduleIds`, `labelFor`, `mergeAdjacentFormatting` with
+    its helper `sameAttrs`, `cellStart`, `serializeRaw`, `formatXmlText`, `elementIndexAtOffset`, `resolvePath`, `CONTENT_H`; the four
+    role helpers had gone in WP-13), six found since (`JssType`, `isAbort`, `delDraftsOf` - sign-out purges through `lib/draftPurge` -,
+    `fromServer`, `buildPdfDocDefinition`, `buildCombinedPdfDocDefinition`: ARC-012) and the two they left unused
+    (`buildPublicationDefinition`, `dmcOf`).
+  - 23 CSS classes (3,716 bytes of rules): `applic-rows/-row/-vals/-tools` (applicability picker), `v2-brandprev` (Brand pack),
+    `v2-subtabs/-subtab` (System 2 SNS tabs), `type-card*`, `v2-crumbs`, `v2-page-narrow`, `v2-pside`, `v2-pside-head`, `v2-quick`,
+    `.v2-tile .ic`, `.v2-tile .stat`, `.v2-grid.tiles`, `v2-saved`, `v2-w-44`, `v2-w-210`. The audit's `is-collapsed` and `v2-nav-head`
+    are used again (WP-21, WP-35) and stay.
+  - Removal debris: `NewDmOptions.applicXml` and `.actRef`, set only by the removed `studio/ui/applicPicker.ts`; the template now writes
+    directly what it always wrote with both undefined (the plain-text `<applic>`), byte for byte.
+  - `codemirror` (the meta-package; nothing imports it, its dependencies are all direct ones) from `package.json` and the lockfile, by
+    hand and offline; node_modules untouched.
+  - Tests deleted: none. No test assertion changed.
+* Sizes (vite build, `check:bundle`), a2c5b31 -> after: initial load 435.5 -> 433.9 KB raw (130.1 -> 129.8 KB gzip), entry stylesheet
+  55.1 -> 53.5 KB, Studio chunk 846.8 -> 846.6 KB (the bundler had already dropped the unused functions), `dist/assets` 6,539,523 ->
+  6,535,785 bytes. Sources: app.css 33,922 -> 32,778 B, platform.css 39,093 -> 37,162 B, editor-host.css 10,233 -> 9,646 B, admin.css
+  4,566 -> 4,512 B; `frontend/src` 207 lines removed, 10 added.
+* Backend: an ad-hoc search for `backend/src` files that no backend, test, script, packaging or frontend file names found none (only the
+  ambient `types.d.ts`). Backend exports were not swept (WP-15/WP-17 work in those files; `vendor/` is out of bounds), and the services
+  that only the kept routes use (`services/sns/*`, `applicability.writeModel`, `publisher.buildConfiguredPublication`,
+  `listConfiguredPdfs`) stay with them.
+* Tests run (this branch, after all removals): frontend `tsc --noEmit` clean; vitest `src/editors src/parity src/components src/styles
+  src/lib src/pages src/jss src/api` 40 files, 446 passed, 14 skipped (`jss/naval.test.ts` skips itself without the Naval stencils), and
+  `src/studio src/jsg src/store` 10 files, 441 passed, 2 skipped (the fixture writers, `WRITE_FIXTURES` only); `lint:theme` 0 colour
+  literals; `vite build` OK; `check:bundle` PASS (entry stylesheet still over the 30 KB advisory); `node scripts/parity/check.mjs` PASS,
+  nothing removed; `node --test scripts/cleanup/scan.test.mjs` 9/9; `check.mjs` PASS; `node scripts/ci/lint.mjs` all green, ratchets
+  unchanged (any.backend 278, any.frontend 50, require 46/4); negative run: an orphan file with an export, an unused class and the
+  `codemirror` line put back made lint/check fail on each, exit 1. Backend `tsc -p .` clean (no backend source changed). Visual/a11y/
+  keyboard suite (port 4106, msedge): 67 passed, 7 skipped (the keyboard spec's own dark-theme skip), no baseline changed. e2e alone on
+  port 4105 (msedge, one worker): `zz-core-routes`, `doc-pages`, `wp35-redesign`, `wp22-navigation` 30/30; `00-platform` 41/41.
+* Not run (by the brief): the gate (so the new `cleanup` stage was exercised only through its two commands), the full vitest and e2e
+  suites, the backend suite (no backend file changed).
+* Left: backend dead-export sweep (after WP-15/WP-17); the kept API-only routes stay until the owner decides otherwise (D8/D19);
+  `frontend-hygiene.json` in the baseline folder is the audit's snapshot and is not regenerated (the gate's report is the live count).
