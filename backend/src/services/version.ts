@@ -14,8 +14,8 @@
 import fs from 'fs';
 import path from 'path';
 
-/** The HTTP API level. 2 = WP-13: the routes of the removed screens are gone (see docs/audit/IMPLEMENTATION-LOG.md, WP-13). */
-export const API_VERSION = 2;
+/** The HTTP API level (1 = the route set of the 2.0 line; the API-only routes are listed in docs/API-ONLY-ROUTES.md). */
+export const API_VERSION = 1;
 /** The oldest client version that works against this server. */
 export const MIN_CLIENT_VERSION = '2.0.0';
 

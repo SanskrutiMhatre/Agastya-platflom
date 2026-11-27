@@ -144,7 +144,10 @@ for (const s of ['doctor.js', 'reset-admin.js', 'recover-structure.js']) fs.copy
 copyFiltered(path.join(be, 'vendor'), path.join(appBe, 'vendor'), (src) => {
   const r = path.relative(path.join(be, 'vendor'), src).split(path.sep).join('/');
   return /^tools\/fop-2\.10\/javadocs(\/|$)/.test(r) || /^tools\/fop-2\.10\/fop\/(examples(\/|$)|example\.fo$|output\.pdf$)/.test(r)
-    || /^tools\/libxslt-[^/]+\/share\/doc(\/|$)/.test(r) || /\.(map|log)$/.test(r) || (noArial && /^tools\/fonts\/arial[a-z]*\.ttf$/i.test(r));
+    || /^tools\/libxslt-[^/]+\/share\/doc(\/|$)/.test(r) || /\.(map|log)$/.test(r) || (noArial && /^tools\/fonts\/arial[a-z]*\.ttf$/i.test(r))
+    // WP-13 (DEP-021): code nothing in the product calls stays out of the install - the dormant licence check of the older product (kept in the
+    // source, pinned by a test, until decision D12) and the Linux tool stubs (the product is Windows-only)
+    || r === 'engine/license.js' || /^tools-linux(\/|$)/.test(r);
 });
 
 log('copying the web client');

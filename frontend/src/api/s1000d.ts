@@ -40,29 +40,6 @@ export interface NewProjectConfig {
   snsPreset?: string; snsSystems?: string[]; dmTypes?: string[]; pmTemplate?: string;
 }
 
-// ── Applicability ────────────────────────────────────────────────────────────
-export type ValueType = 'string' | 'integer' | 'real' | 'boolean';
-export interface AValue { value: string; label?: string }
-export interface Attribute { id: string; name: string; displayName?: string; descr: string; valueDataType: ValueType; values: AValue[]; valuePattern?: string; productIdentifier?: 'primary' | 'secondary' | 'no' }
-export interface CondType { id: string; name: string; descr: string; valueDataType: ValueType; values: AValue[]; valuePattern?: string }
-export interface Cond { id: string; condTypeId: string; name: string; displayName?: string; descr: string }
-export interface Product { id: string; assigns: Array<{ ident: string; type: 'prodattr' | 'condition'; value: string }> }
-export interface ApplicModel { attributes: Attribute[]; conditionTypes: CondType[]; conditions: Cond[]; products: Product[] }
-export interface ApplicProblem { severity: 'error' | 'warning'; file: string; line: number; location: string; code: string; message: string }
-
-// ── Configuration-specific publication ──────────────────────────────────────
-export interface ConfigChoices {
-  products: Array<{ id: string; assigns: Array<{ ident: string; type: string; value: string }> }>;
-  attributes: Array<{ id: string; name: string; values: string[]; type: string; pattern: string | null }>;
-  conditions: Array<{ id: string; name: string; values: string[]; type: string }>;
-  builds: Array<{ name: string; file: string; size: number; builtAt: string }>; note: string;
-}
-export interface ConfigInput { productId?: string; values?: Array<{ ident: string; value: string }> }
-export interface ConfigPlan {
-  label: string; values: Array<{ ident: string; value: string }>; excluded: string[]; canBuild: boolean; properties: string[];
-  summary: { included: number; excluded: number; elementsRemoved: number; entriesRemoved: number; entriesLeft: number };
-  unresolved: Array<{ file: string; line: number; location: string; properties: string[]; what: string }>;
-}
 
 export const s1000dApi = {
   catalogue: (issue: string, kind: CodeKind) => get<{ codes: CodeRow[]; ranges: CodeRange[]; sources: RefSource[]; rule: string; label: string; customNote: string }>(`/api/s1000d/catalogue?issue=${issue}&kind=${kind}`),
@@ -81,7 +58,6 @@ export const s1000dApi = {
   deletePreset: (id: string) => del(`/api/admin/s1000d/presets/${id}`),
   putPresetNode: (id: string, path: string, title: string) => put(`/api/admin/s1000d/presets/${id}/nodes`, { path, title }),
   deletePresetNode: (id: string, path: string, cascade: boolean) => del<{ removed: number }>(`/api/admin/s1000d/presets/${id}/nodes?path=${encodeURIComponent(path)}&cascade=${cascade}`),
-  importPreset: (id: string, format: 'csv' | 'json', text: string) => post<{ imported: number }>(`/api/admin/s1000d/presets/${id}/import`, { format, text }),
   presetExportUrl: (id: string, format: 'csv' | 'json') => `/api/admin/s1000d/presets/${id}/export?format=${format}`,
 
   project: (id: string) => get<ProjectBundle>(`/api/projects/${id}/s1000d`),
@@ -99,11 +75,5 @@ export const s1000dApi = {
   importSns: (id: string, format: 'csv' | 'json', text: string, dryRun: boolean, overwriteTitles = false) => post<{ report: ImportReport }>(`/api/projects/${id}/sns/import`, { format, text, dryRun, overwriteTitles }).then((r) => r.report),
   snsExportUrl: (id: string, format: 'csv' | 'json') => `/api/projects/${id}/sns/export?format=${format}`,
 
-  configurations: (id: string) => get<ConfigChoices>(`/api/projects/${id}/publish/configurations`),
-  planConfigured: (id: string, input: ConfigInput) => post<ConfigPlan>(`/api/projects/${id}/publish/configured/plan`, input),
-  buildConfigured: (id: string, input: ConfigInput) => post<{ name: string; file: string; plan: { label: string; included: number; excluded: string[]; elementsRemoved: number; entriesRemoved: number }; releaseLabel: string; totalMs?: number }>(`/api/projects/${id}/publish/configured`, input),
-  configuredUrl: (id: string, name: string, download = false) => `/api/projects/${id}/publish/configured/${encodeURIComponent(name)}${download ? '?download=1' : ''}`,
 
-  applicability: (id: string) => get<{ model: ApplicModel; files: Record<'act' | 'cct' | 'pct', string | null>; problems: ApplicProblem[]; filtering: boolean; note: string }>(`/api/projects/${id}/applicability`),
-  saveApplicability: (id: string, model: ApplicModel) => put<{ written: Array<{ table: string; file: string; created: boolean }>; problems: ApplicProblem[] }>(`/api/projects/${id}/applicability`, { model }),
 };

@@ -26,7 +26,6 @@ export interface JssType { id: string; label: string; stencil: string; bodyKind:
 const P = (id: string) => `/api/projects/${id}/jss`;
 
 export const jssApi = {
-  types: () => get<{ types: JssType[] }>('/api/jss/types').then((r) => r.types),
   read: (id: string) => get<JssDocument>(P(id)),
   save: (id: string, xml: string, baseHash?: string) => put<{ hash: string; report: JssReport }>(P(id), { xml, baseHash }),
   validate: (id: string, xml?: string) => post<JssReport>(`${P(id)}/validate`, xml === undefined ? {} : { xml }),
@@ -40,7 +39,6 @@ export interface ExportSummary { ok: true; fileName: string; findings: PackageFi
 /** Importing a finished project package into a JSS document, and exporting the document back as one. */
 export const packageApi = {
   import: (id: string, file: File) => { const fd = new FormData(); fd.append('file', file); return request<{ ok: true; hash: string; report: JssReport; import: ImportSummary }>('POST', `${P(id)}/import-project`, fd).then((r) => r.import); },
-  importReport: (id: string) => get<ImportSummary>(`${P(id)}/import-report`),
   exportCheck: (id: string) => get<{ ok: boolean; report: ExportSummary }>(`${P(id)}/export-check`),
   exportUrl: (id: string) => `${P(id)}/export`,
 };

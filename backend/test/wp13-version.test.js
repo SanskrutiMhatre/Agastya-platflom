@@ -39,7 +39,7 @@ test('/api/health and /api/version (public) report the package version, API leve
     assert.equal(v.status, 200);
     assert.equal(v.json.version, rootPkg.version);
     assert.equal(v.json.product, 'Agastya Platform');
-    assert.ok(Number.isInteger(v.json.apiVersion) && v.json.apiVersion >= 2, 'API level 2 = the dead routes removed in WP-13 are gone');
+    assert.ok(Number.isInteger(v.json.apiVersion) && v.json.apiVersion >= 1, 'an integer API level');
     assert.match(v.json.minClientVersion, /^\d+\.\d+\.\d+$/);
     const { MIGRATIONS } = require('../dist/core/auth/store');
     assert.equal(v.json.schema.level, MIGRATIONS.length);
