@@ -325,6 +325,26 @@ test('concurrent-save property, JSS: racing saves of the same chapter - exactly 
   assert.equal(lost, 0);
 });
 
+test('check-out routes of each format: take, list, release (another author needs an explicit break)', async () => {
+  // DM
+  assert.equal((await bea.post(`/api/projects/${pid}/dms/${DM}/checkout`, {})).status, 200);
+  const dm = (await owner.get(`/api/projects/${pid}/dms/${DM}/checkout`)).json.leases;
+  assert.deepEqual(dm.map((l) => [l.part, l.holder, l.mine]), [['', 'bea', false]]);
+  assert.ok((await owner.get(`/api/projects/${pid}/checkouts`)).json.leases.some((l) => l.holder === 'bea'), 'the project list shows it');
+  assert.equal((await owner.del(`/api/projects/${pid}/dms/${DM}/checkout`)).status, 423, 'releasing someone else\'s check-out needs an explicit break');
+  assert.equal((await bea.del(`/api/projects/${pid}/dms/${DM}/checkout`)).json.released, true);
+  assert.deepEqual((await owner.get(`/api/projects/${pid}/dms/${DM}/checkout`)).json.leases, []);
+  // JSS and JSG, the whole document
+  assert.equal((await bea.post(`/api/projects/${jss}/jss/checkout`, { part: '' })).status, 200);
+  assert.deepEqual((await owner.get(`/api/projects/${jss}/jss/checkouts`)).json.leases.map((l) => [l.part, l.holder]), [['', 'bea']]);
+  assert.equal((await bea.del(`/api/projects/${jss}/jss/checkout?part=`)).json.released, true);
+  assert.deepEqual((await owner.get(`/api/projects/${jss}/jss/checkouts`)).json.leases, []);
+  assert.equal((await bea.post(`/api/projects/${jsg}/jsg/checkout`, { part: '' })).status, 200);
+  assert.deepEqual((await owner.get(`/api/projects/${jsg}/jsg/checkouts`)).json.leases.map((l) => [l.part, l.holder]), [['', 'bea']]);
+  assert.equal((await bea.del(`/api/projects/${jsg}/jsg/checkout?part=`)).json.released, true);
+  assert.deepEqual((await owner.get(`/api/projects/${jsg}/jsg/checkouts`)).json.leases, []);
+});
+
 // ── uploads stream to disk with a cap on the whole request (REL-007, PLT-021) ──────────────────────────────────────────────────
 
 test('an upload over the whole-request cap is refused while it streams (413) and leaves no file behind', async () => {
