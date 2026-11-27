@@ -20,7 +20,7 @@
 import fs from 'fs';
 import path from 'path';
 import type { Config } from './config';
-import { openSqlite, type SqlDatabase } from './storage/sqlite';
+import { openSqlite, setSynchronous, type SqlDatabase } from './storage/sqlite';
 import { checkOrder, inspectSchema, quickCheck, recordApplied, snapshotBeforePendingMigrations, type MigrationStep } from './storage/schema';
 import { ORDER as MIGRATION_ORDER, forDialect } from './storage/migrations';
 import { buildInfo } from './services/version';
@@ -240,7 +240,7 @@ export function createAppContext(config: Config, o: AppContextOverrides = {}): A
   wsEngine.ensureWorkspace(workspaceDir);
   seedTemplates(config.seedTemplatesDir, wsEngine.templatesDir(workspaceDir));
 
-  const db = o.db ?? openSqlite(workspaceDir);
+  const db = o.db ?? openSqlite(workspaceDir, { synchronous: config.database.synchronous });
   const store = new AuthStore(db);
   // WP-29: the chain key, outside the database. Made on the first start; an unreadable or damaged key file stops the start (a silent new key
   // would make every earlier row unverifiable).
@@ -282,12 +282,18 @@ export function createAppContext(config: Config, o: AppContextOverrides = {}): A
        * Then the additive migrations run, and their checksums, the program version and PRAGMA user_version are recorded.
        */
       checkOrder(MIGRATION_ORDER);
+      const qc0 = Date.now();
       quickCheck(db);
+      console.log(`[db] quick_check: ok (${Date.now() - qc0} ms)`);           // WP-17 (PERF-009): the boot check is stated in the log
       const state = inspectSchema(db, MIGRATION_STEPS);
       snapshot = snapshotBeforePendingMigrations(db, workspaceDir, state, nowIso(), config.backup.keepMigrationSnapshots);
       if (snapshot) console.log(`[migration] database copy before ${state.pending[0]}: ${snapshot}`);
-      store.migrate(nowIso()); // additive migrations only
-      recordApplied(db, MIGRATION_STEPS, buildInfo().version);
+      // WP-17 (D14): migrations run with every commit synced (FULL); the working level (config.database.synchronous) after them
+      setSynchronous(db, 'FULL');
+      try {
+        store.migrate(nowIso()); // additive migrations only
+        recordApplied(db, MIGRATION_STEPS, buildInfo().version);
+      } finally { setSynchronous(db, config.database.synchronous); }
       started = true;
       return { snapshot };
     },

@@ -204,8 +204,31 @@ export function gridOf(rows: MNode[]): { columns: number; problem: string | null
   return { columns, problem };
 }
 
+/*
+  WP-17 (PERF-011): the document GET answered with a full validation on every read (about 100-160 ms: a validator worker compiles the schema
+  each time). The report is a function of the document text and of which pictures it names exist; so the last reports are kept by
+  (project, sha256 of the text), together with every picture path the check looked up and what it found. `reuse` (the GET only) answers a kept
+  report when the text is the same and every one of those lookups still gives the same answer; anything else runs the check. Validate, save and
+  the publish gate always run it (and refresh the kept report). The report keeps the `validatedAt` of the run that produced it.
+*/
+interface KeptReport { report: JssReport; probes: Array<[string, boolean]> }
+const keptReports = new Map<string, KeptReport>();
+const KEPT_MAX = 64;
+
 /** Validate a JSS document: well-formedness, the XSD, then the rules of its document type. `projectId` lets the check also see that pictures exist. */
-export async function validateJss(projectId: string | null, xml: string): Promise<JssReport> {
+export async function validateJss(projectId: string | null, xml: string, opts: { reuse?: boolean } = {}): Promise<JssReport> {
+  const key = `${projectId ?? ''}\0${sha(xml)}`;
+  const kept = keptReports.get(key);
+  if (opts.reuse && kept && kept.probes.every(([abs, was]) => fs.existsSync(abs) === was)) return structuredClone(kept.report);
+  const probes: Array<[string, boolean]> = [];
+  const exists = (abs: string): boolean => { const e = fs.existsSync(abs); probes.push([abs, e]); return e; };
+  const report = await checkJss(projectId, xml, exists);
+  keptReports.delete(key); keptReports.set(key, { report: structuredClone(report), probes });
+  if (keptReports.size > KEPT_MAX) { const first = keptReports.keys().next().value; if (first !== undefined) keptReports.delete(first); }
+  return report;
+}
+
+async function checkJss(projectId: string | null, xml: string, exists: (abs: string) => boolean): Promise<JssReport> {
   const findings: JssFinding[] = [];
   const add = (severity: JssFinding['severity'], rule: string, message: string, n: MNode | null, line = n?.line ?? 1) => findings.push({ severity, rule, message, line, location: n ? loc(n) : '/' });
   const done = (docType: string | null): JssReport => {
@@ -317,7 +340,7 @@ export async function validateJss(projectId: string | null, xml: string): Promis
       if (!t.children.some((c) => c.name === 'title')) add('warning', 'JSS-FIGURE-CAPTION', 'A figure without a caption: the stencil numbers and captions every figure ("Figure 11: ...").', t);
       if (projectId) for (const g of t.children.filter((c) => c.name === 'graphic')) {
         const src = g.attrs.src ?? '';
-        if (src && !/^(\.\.|\/|[a-z]:)/i.test(src) && !fs.existsSync(path.join(projectDirFor(projectId), src))) add('error', 'JSS-GRAPHIC-MISSING', `The picture "${src}" is not in the project.`, g);
+        if (src && !/^(\.\.|\/|[a-z]:)/i.test(src) && !exists(path.join(projectDirFor(projectId), src))) add('error', 'JSS-GRAPHIC-MISSING', `The picture "${src}" is not in the project.`, g);
       }
     } else if (t.name === 'section' && !t.children.some((c) => c.name !== 'title')) {
       add('warning', 'JSS-SECTION-EMPTY', `The section "${titleOf(t)}" has no content yet.`, t);

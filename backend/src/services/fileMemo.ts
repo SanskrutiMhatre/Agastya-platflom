@@ -4,7 +4,7 @@
 // Bounded: the oldest entries are dropped beyond `max`, so a very large workspace costs memory in proportion to `max`, not to its size.
 import type fs from 'fs';
 
-interface Entry<T> { size: number; mtimeMs: number; ctimeMs: number; value: T }
+interface Entry<T> { size: number; mtimeMs: number; ctimeMs: number; ino: number; value: T }
 
 export class FileMemo<T> {
   private map = new Map<string, Entry<T>>();
@@ -13,11 +13,12 @@ export class FileMemo<T> {
 
   get(abs: string, st: fs.Stats, compute: () => T): T {
     const e = this.map.get(abs);
-    if (e && e.size === st.size && e.mtimeMs === st.mtimeMs && e.ctimeMs === st.ctimeMs) { this.hits++; return e.value; }
+    // WP-17: the file id as well, so a file replaced by an atomic rename within one clock tick, at the same size, is never taken for the old one
+    if (e && e.size === st.size && e.mtimeMs === st.mtimeMs && e.ctimeMs === st.ctimeMs && e.ino === st.ino) { this.hits++; return e.value; }
     this.misses++;
     const value = compute();
     if (e) this.map.delete(abs);                       // re-insert so the newest entries are the last dropped
-    this.map.set(abs, { size: st.size, mtimeMs: st.mtimeMs, ctimeMs: st.ctimeMs, value });
+    this.map.set(abs, { size: st.size, mtimeMs: st.mtimeMs, ctimeMs: st.ctimeMs, ino: st.ino, value });
     if (this.map.size > this.max) { const first = this.map.keys().next().value; if (first !== undefined) this.map.delete(first); }
     return value;
   }

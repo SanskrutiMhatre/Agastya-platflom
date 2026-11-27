@@ -2275,3 +2275,121 @@ Branch `worktree-agent-a721009b2b8bc5c9d`, from 4994249. No migration.
     - `phase13` 11/12: the admin roles list has 4 roles where the test expects 3, which looks like WP-27's role addition.
   - Not run: the main Playwright suite, the gate, golden/pdf21 suites. No Playwright spec was added for the Release page change.
   - JSG's running head does not name the release number, unlike S1000D and JSS.
+
+### WP-17 Backend, database and validation performance (PERF-004, PERF-005, PERF-007, PLT-008, PERF-009, PERF-011, PERF-013, PERF-014) - done, with one target missed (create)
+
+Branch `wp-17-backend-perf` from 4994249. No migration (028 was kept free; WP-15 may take 027). PERF-002 and PERF-003 were closed by
+WP-32 and WP-33. PUB-006 and the build-output cache are not part of WP-17 and were not taken.
+
+All numbers are medians from `backend/scripts/bench/wp17-bench.js` (new; `--only csdb,dash,sqlite,jss,validation,large`) on this
+machine: Node 22.23.2, i7-6820HQ, Windows Server 2025, **shared with other agents' test runs while measured**, so single values move by
+10-30 %. Before = 4994249, after = this branch.
+
+| Measure (audit benchmark) | Before | After | Target |
+|---|---|---|---|
+| B3 save, 1000-module project | 56.9 ms | 12.1-13.9 ms | <=20 ms |
+| B3 create, 1000-module project | 158.8 ms | 62-79 ms (49.7 ms at 100 modules) | <=50 ms - **missed** |
+| B3 `/summary` | 716 ms | 63-75 ms | <=100 ms |
+| B3 `/release` | 961 ms | 54-62 ms | <=100 ms |
+| B3 `/dms`, `/explore`, `/pmc` | 64 / 140 / 133 ms | 47-65 / 50-57 / 49-75 ms | - |
+| B3 package import of 1000 modules | 45.8 s | 12.5-13.0 s | - |
+| B10 member-only `/api/workspace`, 60 folders, 271 projects | 4876 ms | 108 ms | <=100 ms (at the edge; 33 ms in the test's smaller workspace) |
+| B10 member-only `/api/overview` | 5200 ms | 98 ms | - |
+| B12 SQLite autocommit insert | 3.22 ms | 0.06 ms | <=0.2 ms |
+| PERF-011 JSS document GET | 157 ms | 5.1 ms | <=10 ms |
+| B4 validation, 200 modules, BREX, cold | 21-27 s | 16.7 s first run in a fresh worker; BREX itself 4.9 s (inline profile) | <=5 s BREX |
+| B4 validation after one module edited | 15.2 s | 1.7 s | <=1 s warm (BREX of the unchanged modules is served from the cache; the rest is XSD and the other checks) |
+| B4 validation unchanged (cached run) | 33 ms | 16 ms | - |
+| PERF-014 create / save, 1 MB module | 123 / 147 ms | 87 / 91 ms | - |
+| PERF-014 create / save, 10 MB module | 948 / 955 ms | 718 / 921 ms | - |
+
+* Changes:
+  - **SQLite** (`storage/sqlite.ts`, `appContext.ts`, `config.ts`, `index.ts`; PERF-009, PLT-008):
+    - `synchronous = NORMAL` in WAL mode (decision **D14**, taken as the audit recommends): the database stays consistent after any
+      crash, and a power cut can lose only the last commits before it. `AGASTYA_DB_SYNCHRONOUS=FULL` (`config.database.synchronous`)
+      keeps FULL. Migrations always run under FULL and the working level is restored after them.
+    - `cache_size` 64 MB (was 2 MB), `temp_store = MEMORY`.
+    - The start runs `PRAGMA quick_check` and logs `[db] quick_check: ok (N ms)`.
+    - `startIdleCheckpoint`: once the database has been quiet for 60 s after a change, `wal_checkpoint(TRUNCATE)` runs with
+      `busy_timeout = 0` for that one statement, so it never waits for a reader and never holds a request. The timer is unref'd.
+  - **Dashboard** (`services/projects.ts`, `routes/workspace.ts`; PERF-007): `folderVisibility(user)` reads the user's project set,
+    grants and the folder list once per request, instead of once per folder (it re-listed every project for every folder). The
+    folders shown to each persona are unchanged (test below).
+  - **CSDB** (`services/csdbIndex.ts`, `csdb.ts`, `projectFiles.ts`, `core/collab/docindex.js`, `fileMemo.ts`; PERF-005):
+    - The duplicate-identity check reads an in-memory identity index instead of opening every module on each create and save.
+      The index is rebuilt when the folder's mtime changes (a file added, removed or renamed outside the platform) and at the latest
+      after 60 s, and the platform's own create, save and delete update it in place. The clash reported is the same file as before
+      (the same sort order).
+    - The listing records each file's stat, so the release fingerprint reuses it instead of a second stat per file (1000 stats cost
+      54 ms here, the directory read 2.4 ms).
+    - The document index takes one file at a time on create and save (`syncFile`) instead of walking the whole project.
+    - `FileMemo` also keys on the file id (`ino`), so a file replaced within the same mtime tick is not mistaken for the old one.
+  - **Publication module** (`services/pm.ts`): the parse of `publication.xml` is kept per file version and handed out as a copy. The
+    read-back that `writePm` already makes as its safety check is kept as the next parse, and PM references are memoised. A create
+    no longer parses the whole publication twice.
+  - **Release view** (`routes/project-content.ts`, `services/release.ts`, `review.ts`): `GET /release` and `/summary` compute the
+    release state once and hand it to the review and release overviews (each computed it again). `POST /release` keeps its own full
+    computation.
+  - **JSS** (`services/jss/service.ts`, `routes/jss.ts`; PERF-011): GET reuses the kept report of the same text while every picture
+    the check looked up still gives the same answer. Any change of the text, or a picture added or removed, gets a fresh check.
+    `POST /validate` always checks fresh.
+  - **BREX** (`services/brex.ts`, `validation.ts`, `publishGate.ts`; PERF-004):
+    - A rule whose path starts with an element name the module does not contain is compiled (so a bad rule still fails as before)
+      but not evaluated: it cannot select anything. Only simple top-level steps take the shortcut (no axes, functions or
+      namespaces). The parity test runs every rule of every bundled BREX against the corpus with and without it.
+    - Results are kept per module, keyed by the SHA-256 of the module text and of the BREX models applied (with their issue); at most
+      4000, and results with more than 500 findings are not kept. **The publish gate uses this cache too**: it is keyed by content,
+      not by time, so an identical input gives an identical answer. The gate's own "never use the cached run" rule (WP-14) is about
+      the run-level fingerprint and is unchanged.
+    - One `BrexRun` per pass shares the project BREX lookup and the directory listing between modules.
+  - **Well-formedness** (`vendor/engine/validateXml.js`, vendored; PERF-013): up to 200 files per `xsltproc` call. A batch that
+    reports anything is checked again one file per process, so findings are word for word the old ones. Recorded in
+    `docs/S1000D_COMPLETE_IMPLEMENTATION.md` section 10, item (10).
+  - **Module size** (`services/csdb.ts`, `config.ts`; PERF-014): a documented maximum for modules created or saved in the editor:
+    `config.limits.maxModuleBytes`, 16 MiB by default (`AGASTYA_MAX_MODULE_BYTES`). Above it the answer is 413 `MODULE_TOO_LARGE`
+    with the size, the limit and what to do, and nothing is written. Imports are not limited. **Decision:** the audit names 5 MB "for
+    example". I chose 16 MiB so that no module that can be saved today becomes unsaveable (the JSON body limit is 25 MB). The audit's
+    "no stall above 100 ms at the maximum" holds only at about 1 MB here, so large modules still stall the thread: about 0.35 s at
+    4 MB, 0.9 s at 10 MB. Revisions are not compressed (no migration was written).
+* Tests (new, registered as heavy in `scripts/ci/test-plan.json`):
+  - `wp17-brex-fast.test.js` (5):
+    - parity of the shortcut over every bundled BREX and the corpus;
+    - the simple shapes;
+    - full check equals the reference check without the shortcut;
+    - a kept result equals a fresh one, and the cache misses on a changed BREX, a changed module and another issue;
+    - batched well-formedness over 420 files with three bad ones, giving the single-file findings.
+  - `wp17-perf.test.js` (9):
+    - SQLite pragmas, the quick_check log line, and FULL on request;
+    - autocommit < 1 ms;
+    - **a second writer waits** for a lock held by another process instead of failing;
+    - the idle checkpoint truncates the log;
+    - identity-index invalidation through create, save (identity changed, own identity, other letter case), delete, and a file
+      added and then removed by hand;
+    - JSS report reuse (text changed, picture added; GET equals a fresh validate);
+    - dashboard persona equality (member-only, grantee, no access, creator, admin) and a flat member cost from 10 to 60 folders
+      (25.6 -> 33.5 ms);
+    - B3 shapes from 100 to 1000 modules (save 24.0 -> 16.6 ms, create 49.7 -> 71.4 ms);
+    - the module-size limit on create and save.
+* Tests run (one file at a time, `node --test --test-concurrency=1`, with NAVAL_STENCILS and VEKTRA_SAMPLE set):
+  - New: `wp17-brex-fast` 5/5 and `wp17-perf` 9/9. The final run measured save 22.2 -> 22.4 ms and create 47.7 -> 64.9 ms from 100 to
+    1000 modules, and the member dashboard at 26.2 -> 31.3 ms from 10 to 60 folders.
+  - Required list, all passing:
+    - `wp32-validation-scale` 8/8, `wp32-event-loop` 1/1, `wp32-validator-crash` 1/1, `wp14-jobs` 9/9;
+    - `wp16-validation-framework` 6/6, `wp33-fo-equivalence` 5/5, `wp33-fo-scaling` 1/1;
+    - `brex-gate` 3/3 (989 s), `publish-gate` 24/24 (746 s), `pdf21` 8/8 (954 s), `golden-xignal` 4/4, `pdf-reference` 2/2;
+    - `wp10-seams` 11/11, `wp10-storage-contract` 15/15, `wp28-team-server` 6/6, `authz-matrix` 6/6.
+  - Also run, all passing:
+    - `api` 17/17, `brex` 16/16, `csdb-objects` 4/4, `pm-multi-ref` 5/5, `pm-multiref` 3/3, `release-issue` 1/1;
+    - `wp22-problems` 4/4, `wp11-integrity` 16/16, `wp12-migrations` 10/10, `jss-authoring` 13/13, `wp13-permissions` 3/3;
+    - `admin-ops` 8/8, `rbac` 7/7, `wp18-delivery` 7/7, `deep-workspace` 2/2.
+  - `phase13` 11/12. The failing case counts 4 roles where it expects 3. WP-27's "Auditor (read-only)" entry in
+    `routes/admin.ts` makes the fourth, and this branch does not touch that file or the test. Not fixed here.
+  - Lint green. `any.backend` went from 278 to 277, and the baseline was lowered.
+* Not done, and why:
+  - **Create at 1000 modules stays above 50 ms** (62-79 ms; 49.7 ms at 100 modules). What remains grows with the publication: the
+    rewrite of `publication.xml` (serialise, the safety re-parse, the `.bak` copy, and an atomic write with fsync), plus the
+    module's own atomic write with fsync. Removing the re-parse or the fsync would weaken a safety check, so neither was done.
+  - BREX cold: 4.9 s for 200 modules measured inline, inside the 5 s target. The first validation in a fresh worker took 16.7 s
+    wall time (worker start, XSD, the other checks, and a shared machine).
+  - The `cached` field of the bench script's validation section always reads false; the timings are right.
+  - The load harness was not run.

@@ -52,7 +52,9 @@ export interface Config {
   /** Browser origins of the development server that may make state-changing requests (AGASTYA_DEV_ORIGINS, comma-separated). */
   devOrigins: string[];
   /** Upload and import limits (AGASTYA_MAX_UPLOAD_BYTES, AGASTYA_REQUEST_TIMEOUT_MS, AGASTYA_MAX_EXPANDED_BYTES), and the free-disk floor of GET /api/ready (AGASTYA_READY_MIN_FREE_BYTES). */
-  limits: { maxUploadBytes: number; requestTimeoutMs: number; maxExpandedBytes: number; readyMinFreeBytes: number };
+  limits: { maxUploadBytes: number; requestTimeoutMs: number; maxExpandedBytes: number; readyMinFreeBytes: number;
+    /** WP-17 (PERF-014): the largest data module the editor saves or creates (AGASTYA_MAX_MODULE_BYTES, default 16 MiB); imports are not limited. */
+    maxModuleBytes: number };
   /** WP-06: one server per data folder, unless a test harness opts out (AGASTYA_NO_WORKSPACE_LOCK=1). */
   workspaceLock: boolean;
   /**
@@ -134,6 +136,11 @@ export interface Config {
   directory: DirectoryConfig | null;
   /** WP-14 (PERF-001, PUB-027, PRD-001): the job service that runs validation, the publish gate and publication in worker processes. */
   jobs: JobsConfig;
+  /**
+   * WP-17 (PERF-009, decision D14): the working `synchronous` level of publisher.db. NORMAL (the default) in WAL mode keeps the database
+   * consistent after any crash; a power cut can lose only the last commits. AGASTYA_DB_SYNCHRONOUS=FULL syncs every commit. Migrations always run under FULL.
+   */
+  database: { synchronous: 'NORMAL' | 'FULL' };
 }
 
 function parseLogFormat(raw: string | undefined, nodeEnv: string | undefined): 'json' | 'text' {
@@ -441,6 +448,7 @@ export function buildConfig(env: Env = process.env): Config {
       requestTimeoutMs: envPositive('AGASTYA_REQUEST_TIMEOUT_MS', 3 * 3600_000, env),
       maxExpandedBytes: envPositive('AGASTYA_MAX_EXPANDED_BYTES', 8 * 1024 ** 3, env),
       readyMinFreeBytes: envPositive('AGASTYA_READY_MIN_FREE_BYTES', 256 * 1024 ** 2, env),
+      maxModuleBytes: envPositive('AGASTYA_MAX_MODULE_BYTES', 16 * 1024 ** 2, env),
     },
     workspaceLock: env.AGASTYA_NO_WORKSPACE_LOCK !== '1',
     baseHashCompat: env.AGASTYA_BASEHASH_COMPAT === '1',
@@ -472,6 +480,7 @@ export function buildConfig(env: Env = process.env): Config {
       auditDays: envCount('AGASTYA_AUDIT_RETENTION_DAYS', 730, env),
     },
     jobs: parseJobs(env),
+    database: { synchronous: String(env.AGASTYA_DB_SYNCHRONOUS ?? '').trim().toUpperCase() === 'FULL' ? 'FULL' : 'NORMAL' },
     audit: {
       keyFile: defaultKeyFile(workspaceDir, env),
       checkpointHours: envCount('AGASTYA_AUDIT_CHECKPOINT_HOURS', 24, env),

@@ -6,6 +6,7 @@ import { tuneServer, sweepStaleUploads } from './services/uploads';
 import type http from 'http';
 import path from 'path';
 import { sweepTempFiles } from './storage/atomicWrite';
+import { startIdleCheckpoint } from './storage/sqlite';
 import { config, nowIso } from './config';
 import { createApp } from './app';
 import { store, audit, workspaceDir, registryDb, defaultContext } from './context';
@@ -54,6 +55,7 @@ export async function start(port: number = config.port): Promise<number> {
 
   try { sweepStaleUploads(); } catch { /* the temp folder is a convenience */ }
   setInterval(() => { try { sweepStaleUploads(); } catch { /* best effort */ } }, 3600_000).unref();     // aborted uploads must not pile up on a server that stays up
+  startIdleCheckpoint(defaultContext().db);   // WP-17 (PERF-009): the write-ahead log is folded back and truncated when the server is quiet
   startScheduler(defaultContext());   // WP-12: scheduled backup, weekly restore test, retention (first run 10 minutes after start)
   startDirectorySync(defaultContext());   // WP-27: directory offboarding sync (Mode B with a directory only; daily by default)
   // WP-26: Mode A listens on loopback only, Mode B on the network with TLS only (services/network.ts; the certificate was checked above).

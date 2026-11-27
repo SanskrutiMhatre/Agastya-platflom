@@ -84,13 +84,50 @@ async function pool(items, limit, fn) {
 }
 
 /*
+  WP-17 (audit PERF-013): one process per file made the start of a process
+  (about 35 ms on Windows) most of the cost of this check. xsltproc reads every
+  file named on its command line with the same parser, so a batch of files is
+  one process; a batch that reports nothing at all is a batch of well-formed
+  files (the common case). A batch that reports anything is checked again one
+  file per process, exactly as before, so each finding is the single-file
+  finding, word for word, on the right file. Batches are bounded by the length
+  of the command line (Windows allows 32 767 characters).
+*/
+const BATCH_CHARS = 8000;
+const BATCH_FILES = 200;
+
+function batches(files) {
+    const out = [];
+    let cur = []; let chars = 0;
+    for (const f of files) {
+        if (cur.length && (cur.length >= BATCH_FILES || chars + f.length + 3 > BATCH_CHARS)) { out.push(cur); cur = []; chars = 0; }
+        cur.push(f); chars += f.length + 3;
+    }
+    if (cur.length) out.push(cur);
+    return out;
+}
+
+function parseBatch(xsltproc, dir, rels) {
+    return new Promise((resolve) => {
+        execFile(xsltproc, ['--noout', '--nonet', PARSE_ONLY_XSL, ...rels],
+            { cwd: dir, maxBuffer: 1 << 24, env: toolPaths.childEnv(catalogEnv()) },
+            (err, stdout, stderr) => resolve(!!err || String(stderr || '').trim() !== ''));
+    });
+}
+
+/*
   Returns issues in the shape the validation panel already renders, so a
   malformed file reads like any other finding and clicking it opens the file at
   the line.
 */
 async function validateProjectXml(xsltproc, dir, { limit = 6 } = {}) {
     const files = collect(dir, '', [], 0);
-    const bad = await pool(files, limit, (rel) => parseOne(xsltproc, dir, rel));
+    const bad = [];
+    await pool(batches(files), limit, async (batch) => {
+        if (!(await parseBatch(xsltproc, dir, batch))) return null;      // nothing reported: every file of the batch parsed
+        for (const rel of batch) { const r = await parseOne(xsltproc, dir, rel); if (r) bad.push(r); }
+        return null;
+    });
     bad.sort((a, b) => a.rel.localeCompare(b.rel));
     return {
         checked: files.length,

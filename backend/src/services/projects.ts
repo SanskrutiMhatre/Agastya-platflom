@@ -407,9 +407,9 @@ export function touchOpened(id: string): void {
 // ── Folders ───────────────────────────────────────────────────────────────
 
 /** key -> display name, from project.json groups, remembered empty folders and the ownership table. */
-export function allFolders(): Map<string, string> {
+export function allFolders(platform?: Array<{ id: string; group?: string }>): Map<string, string> {
   const byKey = new Map<string, string>();
-  for (const p of workspace.listProjects(workspaceDir)) {
+  for (const p of platform ?? workspace.listProjects(workspaceDir)) {
     const n = String(p.group || '').trim();
     if (n && !byKey.has(n.toLowerCase())) byKey.set(n.toLowerCase(), n);
   }
@@ -442,12 +442,28 @@ function resolveFolderForFiling(user: User, name: string): string {
 }
 
 export function folderVisibleTo(user: User, name: string): boolean {
-  const key = folderKey(name);
-  if (!key) return false;
-  if (user.role === 'admin' || canManageFolder(user, key)) return true;
-  if (store.getFolderGrant(key, user.id)) return true;
-  const mine = new Set<string>(store.listProjectsForUser(user.id).map((r: any) => r.id));
-  return workspace.listProjects(workspaceDir).some((p: any) => mine.has(p.id) && folderKey(p.group) === key);
+  return folderVisibility(user)(name);
+}
+
+/**
+ * WP-17 (PERF-007, PLT-008): the rule of `folderVisibleTo` as a predicate, with the person's project set and the platform's project list read
+ * ONCE. The dashboard asks it for every folder; it used to re-read both (a disk scan of every project on the platform) per folder, so a
+ * member-only author paid folders x projects. Same rule, same answers: administrator, folder owner, holder of a folder grant, or someone with
+ * a project filed in the folder. `platform` is the list the caller already read (workspace.listProjects), when it has one.
+ */
+export function folderVisibility(user: User, platform?: Array<{ id: string; group?: string }>): (name: string) => boolean {
+  let withMine: Set<string> | null = null;           // folder keys holding a project of this person, read on first need
+  return (name: string): boolean => {
+    const key = folderKey(name);
+    if (!key) return false;
+    if (user.role === 'admin' || canManageFolder(user, key)) return true;
+    if (store.getFolderGrant(key, user.id)) return true;
+    if (!withMine) {
+      const mine = new Set<string>(store.listProjectsForUser(user.id).map((r: any) => r.id));
+      withMine = new Set((platform ?? workspace.listProjects(workspaceDir)).filter((p: { id: string }) => mine.has(p.id)).map((p: { group?: string }) => folderKey(p.group)));
+    }
+    return withMine.has(key);
+  };
 }
 
 export interface FolderView {
@@ -456,12 +472,14 @@ export interface FolderView {
 }
 
 /** The dashboard's view: folders the caller can see, with the projects they can open inside each. */
-export function workspaceFor(user: User): { folders: FolderView[]; ungrouped: ProjectCard[] } {
-  const cards = listProjectsFor(user);
-  const names = allFolders();
+export function workspaceFor(user: User, known?: ProjectCard[]): { folders: FolderView[]; ungrouped: ProjectCard[] } {
+  const cards = known ?? listProjectsFor(user);
+  const platform = workspace.listProjects(workspaceDir);     // read once, for the folder names and the visibility rule (WP-17, PERF-007)
+  const names = allFolders(platform);
+  const visible = folderVisibility(user, platform);
   const folders: FolderView[] = [];
   for (const [key, name] of names) {
-    if (!folderVisibleTo(user, name)) continue;
+    if (!visible(name)) continue;
     const owner = store.getFolderOwner(key);
     const grant = store.getFolderGrant(key, user.id);
     folders.push({

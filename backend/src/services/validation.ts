@@ -23,7 +23,7 @@ import { projectDirFor } from '../context';
 import { readProjectJson, updateProjectJson, csdbRel, mediaRel, pmRel, isS1000dProject } from './projects';
 import { explore } from './pm';
 import { listDms } from './csdb';
-import { checkModuleBrex } from './brex';
+import { checkModuleBrex, newBrexRun } from './brex';
 import { pmRevisionProblems } from './lifecycle';
 import { analyse as analyseExt, usesForeign } from './extensions';
 
@@ -163,11 +163,12 @@ async function brexIssues(input: ValidationInput): Promise<{ issues: Issue[]; no
   const csdbAbs = path.join(dir, csdb);
   const reported = new Set<string>();                                  // a BREX problem is the same for every module that names it: say it once
   const tick = yielder();                                              // WP-32 (PERF-001 stop-gap): a turn for other requests between modules
+  const run = newBrexRun();                                            // WP-17: the CSDB listing and the BREX texts read once for this pass
   for (const d of listDms(projectId)) {
     await tick();
     try {
       const text = fs.readFileSync(path.join(csdbAbs, d.file), 'utf8');
-      const rep = checkModuleBrex(text, csdbAbs, issueUsed);
+      const rep = checkModuleBrex(text, csdbAbs, issueUsed, run);
       checked++;
       for (const f of rep.result.findings) {
         issues.push(norm('brex', { sev: f.severity === 'error' ? 'error' : 'warn', title: `BREX ${f.ruleId}`, rel: `${csdb}/${d.file}`, line: 1, loc: f.where, detail: f.message + (f.found !== undefined ? ` [found: ${f.found}]` : '') + ` (from ${f.brexSource})` }));

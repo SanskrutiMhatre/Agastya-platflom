@@ -22,7 +22,7 @@ import { HttpError, conflict } from './http';
 import { readProjectJson, csdbRel } from './projects';
 import { publicationSources, pmRefsOf } from './pm';
 import { runValidation, type Issue } from './validation';
-import { checkModuleBrex } from './brex';
+import { checkModuleBrex, newBrexRun } from './brex';
 import { isS1000dProject } from './projects';
 import { registerPublishCheck, publishCheckFor, type GateScope, type GatePass, type GateOptions } from './publishChecks';
 import { waiverFor } from './publishWaivers';
@@ -83,12 +83,13 @@ async function assertS1000dPublishable(projectId: string, scope: GateScope, opts
   const ruleBreaks: string[] = [];
   const sourceSeen = new Set<string>();
   const usedProjectBrex = new Set<string>();                             // the project's own BREX data modules that the publication's modules rely on
+  const brexRun = newBrexRun();                                          // WP-17: the CSDB listing and the BREX texts read once for this gate
   for (const rel of isS1000dProject(projectId) ? files : []) {      // business rules exist in S1000D only: a JSS or JSG project is never BREX-checked
     const abs = path.join(dir, rel);
     let text: string;
     try { text = fs.readFileSync(abs, 'utf8'); } catch { continue; }
     const file = rel.split('/').pop() ?? rel;
-    const rep = checkModuleBrex(text, csdbAbs, run.issueUsed);
+    const rep = checkModuleBrex(text, csdbAbs, run.issueUsed, brexRun);
     for (const m of rep.models) if (m.projectOwn) usedProjectBrex.add(m.label);
     for (const f of rep.result.findings) {
       if (f.severity === 'error' && opts.allowRuleBreaks) { ruleBreaks.push(`${file}: ${f.ruleId} - ${f.message} (at ${f.where})`.slice(0, 400)); }

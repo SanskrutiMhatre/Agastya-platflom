@@ -45,7 +45,7 @@ export function registerJssRoutes(app: Express): void {
       chapters: (type?.chapters ?? []).map((c) => c.title), maxDepth: type?.maxDepth ?? 5,
       domain: type?.domain ?? null, chapterRule: type?.chapterRule ?? 'fixed', sectionsFixed: !!type?.sectionsFixed, bodyPage: type?.bodyPage ?? null, tableTemplates: tableTemplatesOf(type),
       chapterStarter: type?.chapterRule === 'free' ? (type.chapters?.[0] ?? null) : null,
-      xml, hash, report: await validateJss(req.project.id, xml),
+      xml, hash, report: await validateJss(req.project.id, xml, { reuse: true }),   // WP-17 (PERF-011): the kept report when nothing it depends on changed
     });
   }));
 

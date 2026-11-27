@@ -215,6 +215,12 @@ cross-module `dmRef`, ICN references, asset integrity).
   `buildJss` and `buildS1000dToFo` right after the WP-02 `foGuard.confineFo` step and before FOP. The platform uses it to write the PDF document
   properties into the FO (`services/pdfInfo.ts`: an `fo:declarations` XMP packet with dc:title, dc:creator, dc:description, pdf:Keywords and
   xmp:CreatorTool, which FOP copies into the PDF's Info dictionary). Without the option the build is byte-for-byte what it was. No stylesheet changed.
+  (11) `vendor/engine/validateXml.js` (WP-17, audit PERF-013): the well-formedness check names up to 200 files (at most 8,000 characters of
+  arguments) to ONE `xsltproc --noout` call instead of starting one process per file; a batch that reports nothing on stderr and exits 0 is a batch
+  of well-formed files, and a batch that reports anything is checked again one file per process exactly as before, so every finding is the
+  single-file finding, word for word, on the right file (long-path and parse-failure texts included). Same parser, same parse-only stylesheet,
+  same catalogue. 199 well-formed modules: one call of 287 ms against about 34 ms per process before; findings checked by
+  `test/wp17-brex-fast.test.js` (420 files, three malformed).
 
 ## 11. Migration
 

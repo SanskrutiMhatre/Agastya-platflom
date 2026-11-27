@@ -36,7 +36,7 @@ export function registerWorkspaceRoutes(app: Express): void {
     const user = req.auth.user;
     const cards = P.listProjectsFor(user);
     const ids = new Set(cards.map((c) => c.id));
-    const folders = P.workspaceFor(user).folders;
+    const folders = P.workspaceFor(user, cards).folders;          // the cards just built, not a second pass over every project (WP-17)
     const recent = [...cards].sort((a, b) => String(b.lastOpened ?? b.updatedAt).localeCompare(String(a.lastOpened ?? a.updatedAt))).slice(0, 6);
 
     const activity = store.listAudit({ limit: 300 })
@@ -169,7 +169,7 @@ export function registerWorkspaceRoutes(app: Express): void {
       build: fs.existsSync(pdf) ? { builtAt: fs.statSync(pdf).mtime.toISOString(), size: fs.statSync(pdf).size } : null,
       members: store.listMembers(id).length,
       // WP-22 (UX-007): the Project Home's Review and Check cards; display only, a failure leaves them out
-      review: (() => { try { return { ...reviewState(id), open: openComments(id) }; } catch { return null; } })(),
+      review: (() => { try { return { ...reviewState(id, rel ?? undefined), open: openComments(id) }; } catch { return null; } })(),   // the state above, not a second full pass (WP-17)
       problems: validation ? (() => { const marks = new Set(listMarks(id).map((m) => m.key)); return { reviewed: validation.issues.filter((i) => marks.has(problemKey(i))).length }; })() : null,
     });
   }));

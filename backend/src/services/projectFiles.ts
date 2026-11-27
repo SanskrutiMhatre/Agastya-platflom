@@ -32,7 +32,7 @@ const revisionFailed = (e: unknown): HttpError =>
 /** The document identity of a file, indexing the project once when the file is not known yet. */
 async function documentOf(projectId: string, rel: string): Promise<{ id: string } | null> {
   let doc = docIndex.resolve(projectId, rel);
-  if (!doc) { await docIndex.syncProject(projectId, projectDirFor(projectId), nowIso()); doc = docIndex.resolve(projectId, rel); }
+  if (!doc) { await docIndex.syncFile(projectId, projectDirFor(projectId), rel, nowIso()); doc = docIndex.resolve(projectId, rel); }   // WP-17: this file, not a walk of the project
   return doc ?? null;
 }
 
