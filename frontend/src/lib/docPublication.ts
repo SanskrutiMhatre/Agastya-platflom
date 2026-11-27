@@ -8,9 +8,9 @@
 //                                    so what was shown is what is saved - nothing is rebuilt from guesses.
 
 import type { DocCodes, Origin } from '../api/xengine';
-import { chapterFromOutline, isSection as jssIsSection, newChapter, newId, type JssDoc, type OutlineNode } from '../jss/model';
+import { chapterFromOutline, isSection as jssIsSection, newChapter, newId, newSection, type JssDoc, type OutlineNode } from '../jss/model';
 import { renumberChapters } from '../jss/ops';
-import { newPara, type JsgDoc } from '../jsg/model';
+import { newPara, type Appendix as JsgAppendix, type JsgDoc } from '../jsg/model';
 
 export type PubKind = 'chapter-intro' | 'section' | 'appendix' | 'plate';
 /** A sub-heading inside a module (it has no code of its own: it is part of its module's data module). `rel` is its number below the module's: "1", "2.1". */
@@ -83,7 +83,15 @@ export type Edit =
   | { op: 'removeChapter'; ch: number }
   | { op: 'removeSection'; ch: number; at: number }
   /** `sections`: the titles of the sections the new chapter starts with (the stencil's, or the one section a JSG chapter starts with) */
-  | { op: 'addChapter'; title: string; sections: string[] };
+  | { op: 'addChapter'; title: string; sections: string[] }
+  /** WP-22 (GAP-003): a new section at the end of a chapter (only where the stencil leaves the sections to the author) */
+  | { op: 'addSection'; ch: number; title: string }
+  /** WP-22 (GAP-003): appendices of a JSG document (a JSS document has none in its model) */
+  | { op: 'addAppendix'; title: string }
+  | { op: 'removeAppendix'; at: number };
+
+/** The letter of the n-th appendix (0 -> A); I and O are skipped, as in a printed manual. */
+export const appendixLetter = (n: number): string => { const L = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; return n < L.length ? L[n] : `${L[Math.floor(n / L.length) - 1]}${L[n % L.length]}`; };
 
 /**
  * Where an item lands in its list once it has been taken out: `from` is its place in that list (null when it comes from another list), `target` the place it was dropped on, and
@@ -128,8 +136,16 @@ export function applyEdits(base: Publication, edits: Edit[]): Publication {
     else if (e.op === 'addChapter') {
       const n = ++fresh;
       p.chapters.push({ key: `new${n}`, title: e.title, label: '', fresh: true, modules: e.sections.map((t, i) => ({ key: `new${n}.${i}`, kind: 'section' as const, title: t, label: '', dmc: '', file: '', origin: 'generated' as const, pictures: [], subs: [], fresh: true })) });
-    }
+    } else if (e.op === 'addSection') {
+      const ch = p.chapters[e.ch]; if (!ch) continue; const n = ++fresh;
+      withSections(ch, [...sectionsOf(ch), { key: `new${n}`, kind: 'section', title: e.title, label: '', dmc: '', file: '', origin: 'generated', pictures: [], subs: [], fresh: true }]);
+    } else if (e.op === 'addAppendix') {
+      const n = ++fresh;
+      p.appendices.push({ key: `new${n}`, kind: 'appendix', title: e.title, label: '', dmc: '', file: '', origin: 'generated', pictures: [], subs: [], fresh: true });
+    } else if (e.op === 'removeAppendix') { if (p.appendices[e.at]) p.appendices.splice(e.at, 1); }
   }
+  // an appendix that was added here is lettered after the ones before it; the others keep the label the document gives them
+  p.appendices.forEach((a, i) => { if (a.fresh) a.label = appendixLetter(i); });
   return relabel(p);
 }
 
@@ -157,12 +173,19 @@ export function applyToJss(doc: JssDoc, edits: Edit[], starter: OutlineNode | nu
       const n = doc.chapters.length + 1; const orientation = doc.chapters[0]?.orientation;
       const ch = starter ? chapterFromOutline(doc, starter, n, orientation) : newChapter(n, e.title, newId(doc, 'c'), orientation);
       ch.title = e.title; doc.chapters.push(ch); renumberChapters(doc);
+    } else if (e.op === 'addSection') {
+      const ch = doc.chapters[e.ch]; if (!ch) continue;
+      const sec = newSection(e.title, newId(doc, 's'));             // empty, as the editor's own "Add section" makes it
+      const last = ch.children.filter(jssIsSection).pop();
+      if (last) ch.children.splice(ch.children.indexOf(last) + 1, 0, sec); else ch.children.push(sec);
     }
+    // addAppendix / removeAppendix: a JSS document has no appendices in its model; the page does not offer them for JSS
   }
 }
 
 /** Apply the edits to a JSG document. */
 export function applyToJsg(doc: JsgDoc, edits: Edit[]): void {
+  const added = new Set<JsgAppendix>();
   for (const e of edits) {
     if (e.op === 'moveChapter') move(doc.chapters, e.from, e.to);
     else if (e.op === 'moveAppendix') move(doc.appendices, e.from, e.to);
@@ -175,7 +198,13 @@ export function applyToJsg(doc: JsgDoc, edits: Edit[]): void {
     else if (e.op === 'removeChapter') { if (doc.chapters.length > 1 && doc.chapters[e.ch]) doc.chapters.splice(e.ch, 1); }
     else if (e.op === 'removeSection') { doc.chapters[e.ch]?.sections.splice(e.at, 1); }
     else if (e.op === 'addChapter') doc.chapters.push({ k: 'chapter', title: e.title, sections: [{ k: 'section', title: 'New section', orientation: 'portrait', children: [newPara('')] }] });
+    // WP-22 (GAP-003): what the JSG editor's own "+ Section" and "+ Appendix" make, with the title the author gave
+    else if (e.op === 'addSection') doc.chapters[e.ch]?.sections.push({ k: 'section', title: e.title, orientation: 'portrait', children: [newPara('')] });
+    else if (e.op === 'addAppendix') { const a: JsgAppendix = { k: 'appendix', label: '', title: e.title, orientation: 'portrait', children: [newPara('')] }; added.add(a); doc.appendices.push(a); }
+    else if (e.op === 'removeAppendix') { if (doc.appendices[e.at]) doc.appendices.splice(e.at, 1); }
   }
+  // lettered by their final place, as the page showed them (applyEdits)
+  doc.appendices.forEach((a, i) => { if (added.has(a)) a.label = appendixLetter(i); });
 }
 
 // ── is the document still the one that was shown? ───────────────────────────────────────────────────────────────────────────────────

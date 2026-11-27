@@ -4,7 +4,7 @@ import type { DocCodes } from '../api/xengine';
 import { parseJss, serializeJss } from '../jss/xml';
 import { parseJsg, serializeJsg } from '../jsg/xml';
 import {
-  applyEdits, applyToJsg, applyToJss, buildPublication, fingerprintOfJsg, fingerprintOfJss, fingerprintOfTree, landing, sameFingerprint, starterSections, subNumber,
+  appendixLetter, applyEdits, applyToJsg, applyToJss, buildPublication, fingerprintOfJsg, fingerprintOfJss, fingerprintOfTree, landing, sameFingerprint, starterSections, subNumber,
   type Edit, type Publication,
 } from './docPublication';
 
@@ -204,5 +204,36 @@ describe('deleting', () => {
   });
   it('ignores a delete that points at nothing', () => {
     expect(shape(applyEdits(buildPublication(JSS_CODES), [{ op: 'removeSection', ch: 0, at: 9 }, { op: 'removeChapter', ch: 9 }]))).toEqual(shape(buildPublication(JSS_CODES)));
+  });
+});
+
+describe('WP-22 (GAP-003): adding a section and an appendix, deleting an appendix', () => {
+  it('adds a section at the end of a JSS chapter, in the tree and in the document, numbered after the others', () => {
+    const edits: Edit[] = [{ op: 'addSection', ch: 1, title: 'Fourth' }, { op: 'addSection', ch: 0, title: 'Limits' }];
+    const shown = applyEdits(buildPublication(JSS_CODES), edits);
+    expect(shape(shown)).toEqual(['1 Leading: 1.1=Purpose, 1.2=Features, 1.3=Limits', '2 Second: 2=Second, 2.1=Third, 2.2=Fourth']);
+    expect(shown.chapters[1].modules[2].fresh).toBe(true);
+    const doc = parseJss(JSS_XML); applyToJss(doc, edits);
+    const back = parseJss(serializeJss(doc));
+    expect(fingerprintOfJss(back)).toEqual(fingerprintOfTree(shown));
+    expect(back.chapters[0].children.filter((c) => c.k === 'section').map((s) => (s as { id?: string }).id).every(Boolean)).toBe(true);   // the new one has an id: its identity key before the first save
+  });
+  it('adds a section and an appendix to a JSG handbook and deletes an appendix; the document holds what the tree shows', () => {
+    const edits: Edit[] = [{ op: 'addSection', ch: 0, title: 'Safety' }, { op: 'addAppendix', title: 'Glossary' }, { op: 'removeAppendix', at: 0 }];
+    const shown = applyEdits(buildPublication(JSG_CODES), edits);
+    expect(shape(shown)[0]).toBe('1 General: 1.1=Introduction, 1.2=Scope, 1.3=Safety');
+    expect(shown.appendices.map((a) => `${a.label}=${a.title}`)).toEqual(['A2=A2 Index', 'B=Glossary']);
+    const g = parseJsg(JSG_XML); applyToJsg(g, edits);
+    const back = parseJsg(serializeJsg(g));
+    expect(back.chapters[0].sections.map((s) => s.title)).toEqual(['Introduction', 'Scope', 'Safety']);
+    expect(back.appendices.map((a) => a.title)).toEqual(['Index', 'Glossary']);
+    expect(back.appendices[1].label).toBe('B');
+  });
+  it('ignores an add or delete that points at nothing', () => {
+    expect(shape(applyEdits(buildPublication(JSS_CODES), [{ op: 'addSection', ch: 9, title: 'x' }]))).toEqual(shape(buildPublication(JSS_CODES)));
+    expect(applyEdits(buildPublication(JSG_CODES), [{ op: 'removeAppendix', at: 9 }]).appendices).toHaveLength(2);
+  });
+  it('letters appendices A..Z without I and O', () => {
+    expect([0, 1, 7, 8, 13, 23, 24].map(appendixLetter)).toEqual(['A', 'B', 'H', 'J', 'P', 'Z', 'AA']);
   });
 });
