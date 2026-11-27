@@ -13,7 +13,10 @@
     "e2e": "playwright test",
     "test:verify": "node scripts/run-verify.mjs",
     "lint:theme": "node scripts/tokens/build-tokens.mjs --check && node scripts/tokens/check-contrast.mjs && node scripts/tokens/lint-colors.mjs",
-    "tokens": "node scripts/tokens/build-tokens.mjs"
+    "tokens": "node scripts/tokens/build-tokens.mjs",
+    "check:parity": "node scripts/parity/check.mjs",
+    "parity:update": "node scripts/parity/check.mjs --update",
+    "parity:scan": "node scripts/parity/scan.mjs"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.4",

@@ -26,6 +26,7 @@
     "gate:nightly": "node scripts/ci/gate.mjs --profile nightly --keep-going",
     "gate:release": "node scripts/ci/gate.mjs --profile release --keep-going",
     "lint": "node scripts/ci/lint.mjs",
+    "check:parity": "node frontend/scripts/parity/check.mjs",
     "readiness": "node scripts/ci/readiness.mjs"
   }
 }

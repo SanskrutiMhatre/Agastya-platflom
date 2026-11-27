@@ -496,3 +496,48 @@ verified, and what is left or blocked.
 * Limits: a full backend, vitest and e2e run of this branch is still to do (the lead's machine time); the three consecutive full runs of
   G-Q-5 therefore stand for the subsets above only. The `layout` text of pdf.js is close to `pdftotext -layout` but not identical (column
   spacing is estimated from glyph widths); the converted tests passed unchanged in their assertions, except where noted above.
+
+## Phase 5
+
+### WP-34 Feature-preservation baseline and parity harness (GAP-009) - done (machine part); the checklist rows are filled per batch
+
+* Generators moved into `frontend/scripts/parity/` (written afresh; the audit's scratchpad `baseline.js` / `analyse.js` were not in the
+  repository): `scan.mjs` (static: routes of `App.tsx` and the three nested route files, with permission condition and page/redirect in
+  the key, `REFERENCE.map` expanded; every `data-testid` in all of `src/` in its four literal forms, computed ones counted per file; browser
+  test titles, unit and backend test files; the keys compared in the editors' own keydown handlers), `diff.mjs` (baseline vs current,
+  explanations), `check.mjs` (CLI). A file that declares `<Route>` and is not in `ROUTE_MOUNTS` fails the scan, so no routes go unseen.
+* Run-time dump: `src/parity/surface.ts` + `parity-dump.test.ts` call `buildCommands()` and `RIBBON` (so the five generator sites are
+  expanded), the rail per kind and the shortcut registries. `check.mjs` runs that test with `PARITY_DUMP=<file>`; in the everyday vitest
+  run the same test compares commands, rail and registry keys with the baseline itself, checks every ribbon id names a command and that no
+  accelerator is bound twice. No browser needed (the risk named in the roadmap for the run-time dump does not apply).
+* The rail moved into a pure function `layouts/projectRail.ts` (`projectRailItems`), rendered unchanged by `ProjectShell` (the unused
+  `jsgUhb` local went with it).
+* JSS/JSG shortcut registry (none existed): `src/lib/editorShortcuts.ts`, 25 entries (JSS 13, JSG 11, ISPL 1) with keys, action, where
+  and file. `editorShortcuts.test.ts` holds it to the handlers: the key names compared in each of `jss/editor.ts`, `jss/dom.ts`,
+  `jsg/editor.ts`, `jsg/shared.ts`, `jsg/ispl-editor.ts` must equal the registry's for that file. The handlers were not changed.
+* Baseline `docs/audit/baseline/parity-baseline.json` (generated, at 7eb0160 + this package): routes 72 (58 pages, 14 redirects), rail 23
+  (S1000D 7, JSS 7, JSG 7, CIR 2), commands 113, keys 125 (Studio 58 accelerators on 57 commands, JSS 14, JSG 13, ISPL 1, handler-scan 39),
+  testids 372, tests 275 (e2e 139 in 17 specs, unit 39, backend 97). Explanations `parity-explanations.json` (empty). Removals fail unless
+  explained row by row (category, key, reason, newHome, checklistRow, decision, batch, date); additions are listed and never fail;
+  `parity:update` refuses while a removal is unexplained.
+* Screens the owner removed before the baseline (CSDB page, the second SNS screen, Brand pack screen, applicability UI, Codes strip and
+  button, PMC/ICN/contents switches) are in `removedByOwner`, not present features: their old addresses are redirects, and the check fails
+  if one becomes a page again, its redirect disappears, or the browser test guarding its absence is gone.
+* Gate: new `parity` stage after `lint` in all three profiles (report `parity.md` in the evidence), in the pre-push hook, and
+  `npm run check:parity` / `parity:update` / `parity:scan` (frontend) plus `check:parity` at the root.
+* Checklist `docs/audit/baseline/CHECKLIST.md` (18 screen groups of 16 section 5.4, old control with its baseline ids, new home, guarding
+  test, sign-off, and a batch log); walk-through `WALKTHROUGH.md` (the ten checks of 5.5 plus the before/after results table).
+* Counts against the audit's text scan (457440f): routes 25 declarations in `App.tsx` = 24 routes + 1 pathless layout route; the 48 others
+  are the nested `<Routes>` of Administrator (28, 11 of them from `REFERENCE.map`), Settings (9) and project settings (11), which the audit
+  did not count. Rail: 10 source lines vs 23 rendered items over four kinds. Commands: 87 literal + 26 generated (emphasis 5, table 10,
+  cell align 4, valign 3, views 4) = 113. Test ids: the audit's method (`data-testid="..."` in `.tsx` under components/layouts/pages) gives
+  373 in 61 files at 7eb0160 (337 in 58 at 457440f: the ids added by WP-03, 05, 07, 18, 19); the baseline's 372 is the number of distinct
+  values over all of `src/` in all literal forms. Tests: 118 blocks in 13 specs then, 139 in 17 now (four new specs since); unit 30 -> 39
+  (36 + three of this package); backend 83 -> 97.
+* Verified: `npx tsc --noEmit -p .` 0 errors; `npx vitest run src/parity src/lib/editorShortcuts.test.ts` 17/17; `check:parity` PASS;
+  negative run: a command and a rail item added to a copy of the baseline gave "2 unexplained removal(s)", exit 1, and the vitest dump test
+  failed the same way; restored, PASS. `scripts/ci/lint.mjs`: all ratchets green except `any.backend` 282 vs 280, which this package does
+  not touch (backend unchanged; it was already so at 7eb0160). Not run: the gate, the full vitest, Playwright, the backend suite.
+* Left: the "New home" and "Sign-off" columns are filled by each redesign batch (WP-21, WP-22, WP-35); the before column of the results
+  table needs a full run on Edge (D18); 145 test ids are named by no browser spec (`info.testidsWithoutBrowserTest`), the guard gaps a batch
+  must close or record; computed test ids are counted, not listed.
