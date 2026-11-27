@@ -5,8 +5,10 @@
 // BEFORE them and answers 409 for a JSS document project, so the file can never be replaced. Documents come into a JSS project through its own import (routes/jss-rwi.ts).
 //
 // WP-16 (PUB-022 / ARC-018): this list is now defence in depth. The writers themselves refuse a JSS document project (assertS1000dPublication in
-// services/projectRecord.ts: pm.writePm, the publication-module import, importer/apply, the package import's publication item, the SNS-derived
-// publication, the front-matter merge), so a route that is not listed here is refused all the same (test/wp16-validation-framework.test.js).
+// services/projectRecord.ts: pm.writePm, the publication-module import, importer/apply, the SNS-derived publication, the front-matter merge),
+// so a route that is not listed here is refused all the same (test/wp16-validation-framework.test.js). The package import is the exception: a NEW
+// JSS project made from an S1000D package deliberately takes the package's publication (xengine-import-wizard.test.js), so packages/import into an
+// existing JSS project is refused here, by this list.
 
 import type { Express } from 'express';
 import { requireProject } from '../context';

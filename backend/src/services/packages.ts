@@ -25,7 +25,6 @@ import * as csdb from './csdb';
 import { checkDmEnterprises } from './enterprises';
 import { newDmProblems, getConfig } from './projectConfig';
 import { csdbRel, mediaRel, pmRel, readProjectJson } from './projects';
-import { assertS1000dPublication } from './projectRecord';
 import { publicationSources } from './pm';
 import { headOf, rootStart } from './xmlHead';
 import { assetProblem, formatOf } from './mediaFormats';
@@ -231,7 +230,6 @@ export async function importPackage(projectId: string, zipPath: string, sourceNa
           it.action = exists ? 'replace' : 'create'; it.message = `${kindOfFile(base)} object.`;
           if (o.validate !== false) toCheck.push({ it, xml });
         } else if (kind === 'pm') {
-          assertS1000dPublication(projectId);                            // WP-16 (PUB-022): never over a JSS document
           const xml = fs.readFileSync(s.abs, 'utf8'); const g = checkXmlSafety(xml); if (!g.ok) throw new Error(g.error);
           if (rootStart(xml, 'pm') < 0) throw new Error('no <pm> root element');
           const exists = fs.existsSync(d.pm);
