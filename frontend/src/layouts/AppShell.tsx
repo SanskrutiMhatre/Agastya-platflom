@@ -113,7 +113,7 @@ export function AppShell() {
             </button>
             {menu ? (
               <div className="v2-card v2-acct-menu" role="menu" aria-label="Account">
-                <div className="v2-acct-who"><strong className="v2-trunc">{user?.fullName || user?.username}</strong><span className="v2-hint">{globalLabel(user?.role)}</span></div>
+                <div className="v2-acct-who"><span className="v2-hint">{globalLabel(user?.role)}</span></div>   {/* owner rule (00-platform): the menu names neither the person nor the username, only the role */}
                 <div className="v2-nav v2-nav-flush">
                   <button className="v2-navbtn" role="menuitem" tabIndex={-1} onClick={() => { setMenu(false); nav('/settings'); }}><Icon name="settings" />Account settings</button>
                   <button className="v2-navbtn" role="menuitem" tabIndex={-1} onClick={() => void logout()}><Icon name="logout" />Sign out</button>
