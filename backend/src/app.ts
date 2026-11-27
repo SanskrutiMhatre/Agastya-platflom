@@ -36,6 +36,7 @@ import { registerJssRwiRoutes } from './routes/jss-rwi';
 import { registerIdentityRoutes } from './routes/identity';
 import { registerXengineRoutes } from './routes/xengine';
 import { registerWaiverRoutes } from './routes/waivers';
+import { registerProblemRoutes } from './routes/problems';
 import { registerBrandRoutes } from './routes/brand';
 import { registerBackupRoutes } from './routes/backups';
 import { notifyAccess } from './services/access-notify';
@@ -129,6 +130,7 @@ export function createApp(): express.Express {
   registerIdentityRoutes(app);
   registerXengineRoutes(app);
   registerWaiverRoutes(app);
+  registerProblemRoutes(app);            // WP-22: the one problems model and the team's reviewed marks
   registerBrandRoutes(app);
   registerBackupRoutes(app);             // WP-12: platform backup, verify, copy, restore into a new folder (administrators)
   // The client's `can` map is read from the guards just registered (WP-13, FE-019): one rule, stated once, on the server.

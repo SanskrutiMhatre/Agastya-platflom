@@ -21,6 +21,8 @@ import { useHostKeys } from '../../editors/host/useHostKeys';
 import { S1000D_STATE } from '../../editors/host/testIds';
 import { EditorSide } from './editor/EditorSide';
 import { PdfPane } from './editor/PdfPane';
+import { rememberDoc } from '../../lib/continueDoc';
+import { CommentsButton, CommentsPanel, useEditorComments } from '../../editors/host/EditorComments';
 
 export function EditorPage() {
   const ctx = useProject();
@@ -51,6 +53,8 @@ export function EditorPage() {
   const docs = useStudio((s) => s.docs);
   const dirtyCount = docs.filter((d) => d.dirty).length;
   const activeDoc = docs.find((d) => d.active);
+  // WP-22 (UX-007): the Project Home's Continue card opens the data module the author last had in front of them
+  useEffect(() => { if (activeDoc?.file && /^DMC-.*\.xml$/i.test(activeDoc.file)) rememberDoc(ctx.id, activeDoc.file, activeDoc.title || activeDoc.file); }, [ctx.id, activeDoc?.file, activeDoc?.title]);
   const [saving, setSaving] = useState(false);
   const saveNow = async () => { setSaving(true); try { await studio.saveActive(); } catch (e) { toast(errText(e), 'error'); } finally { setSaving(false); } };
   const setSide = (open: boolean) => { setSideOpen(open); localStorage.setItem('agastya.editor.side', open ? '1' : '0'); studio.relayout(); };
@@ -65,12 +69,15 @@ export function EditorPage() {
     studio.focus = { toggle: toggleFocus, isOn: () => focusRef.current };
     return () => { studio.focus = null; };
   }, [toggleFocus]);
+  // WP-22 (UX-009): the review comments in the editor (the open data module's first); stepping to one in another module opens it
+  const comments = useEditorComments(ctx.id, ctx.can, activeDoc?.file, (c) => { if (c.dmFile) studio.openDm(c.dmFile).catch((e) => toast(errText(e), 'error')); });
   useHostKeys({
     palette: () => studio.run('tools.palette'),
     shortcuts: () => studio.run('tools.shortcuts'),
     focus: toggleFocus,
     find: (replace) => studio.run(replace ? 'edit.replace' : 'edit.find'),
-    escape: () => { if (focus) { setFocus(false); return true; } return false; },
+    comment: comments.comments.length ? comments.step : undefined,
+    escape: () => { if (comments.shown) { comments.setShown(false); return true; } if (focus) { setFocus(false); return true; } return false; },
   });
 
   /** Drag the edge of the data-module list; the width is remembered. */
@@ -135,7 +142,9 @@ export function EditorPage() {
             : null}
           <span className="v2-edactions" ref={setSlot} data-testid="chrome-preview-slot" />
         </span>}
+        extra={<CommentsButton state={comments} />}
         onPalette={() => studio.run('tools.palette')} onShortcuts={() => studio.run('tools.shortcuts')} />
+      <CommentsPanel projectId={ctx.id} state={comments} activeFile={activeDoc?.file} onOpen={(c) => { if (c.dmFile) openAt(c.dmFile); }} />
       {!writable ? <Alert tone="warn">You have {ctx.role} access to this project: you can read and proof data modules, but changes cannot be saved.</Alert> : null}
       {error ? <Alert tone="bad">{error}</Alert> : null}
       <div className={`v2-split${focus ? ' is-focus' : ''}`} data-testid="editor-split" ref={splitRef} style={dragging || listDrag ? { userSelect: 'none' } : undefined}>

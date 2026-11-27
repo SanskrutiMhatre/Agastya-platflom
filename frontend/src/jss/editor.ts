@@ -115,7 +115,18 @@ export class JssEditor {
 
   setFindings(findings: Finding[]): void { this.findings = findings; this.applyFindingMarks(); this.renderProblems(); this.markOutline(); }
 
-  destroy(): void { document.removeEventListener('selectionchange', this.onSelChange); this.fit?.disconnect(); clearTimeout(this.labelTimer); this.root.remove(); }
+  destroy(): void { document.removeEventListener('selectionchange', this.onSelChange); document.removeEventListener('keydown', this.onPageKey); this.fit?.disconnect(); clearTimeout(this.labelTimer); this.root.remove(); }
+
+  /**
+   * WP-22 (the open item of WP-21): Ctrl+S saves from anywhere on the page, as in the JSG editor, not only with the keyboard inside the editor:
+   * after the find bar was closed with Escape the focus can rest on the page body, and Ctrl+S then reached the browser ("Save page as").
+   * A key the editor already handled (its own root handler) or one meant for an open dialog is left alone.
+   */
+  private onPageKey = (e: KeyboardEvent): void => {
+    if (e.defaultPrevented || !(e.ctrlKey || e.metaKey) || e.altKey || e.key.toLowerCase() !== 's') return;
+    if (document.querySelector('.modal-backdrop, dialog[open], [role="dialog"][aria-modal="true"]')) return;
+    e.preventDefault(); this.opts.host.onSaveRequested();
+  };
 
   /** Scroll to and flash what a finding is about. */
   goTo(location: string): void {
@@ -164,6 +175,8 @@ export class JssEditor {
     this.scrollEl = h('div', { class: 'jss-scroll' }, this.paper);
     this.mainEl = h('div', { class: 'jss-main' }, this.outlineEl, this.scrollEl, this.sourceEl);
     this.problemsEl = h('details', { class: 'jss-problems', 'data-testid': 'jss-problems' }) as HTMLDetailsElement;
+    // WP-22 (06 section 7.2): the Problems drawer closes with Escape while the keyboard is in it (focus returns to its summary line)
+    this.problemsEl.addEventListener('keydown', (e) => { if (e.key === 'Escape' && this.problemsEl.open) { e.preventDefault(); e.stopPropagation(); this.problemsEl.open = false; this.problemsEl.querySelector<HTMLElement>('summary')?.focus(); } });
     this.root.append(this.toolbar, this.mainEl, this.problemsEl);
     this.buildToolbar();
     this.sourceEl.hidden = true;
@@ -186,6 +199,7 @@ export class JssEditor {
       else if (mod && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); this.undo(); }
       else if (mod && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) { e.preventDefault(); this.redo(); }
     });
+    document.addEventListener('keydown', this.onPageKey);
   }
 
   private buildToolbar(): void {

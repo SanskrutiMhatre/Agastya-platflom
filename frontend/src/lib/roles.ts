@@ -18,7 +18,8 @@ export type Capability =
   | 'dm.write' | 'dm.delete' | 'doc.lock' | 'pm.write' | 'graphics.write' | 'settings.write' | 'config.write'
   | 'publish.build' | 'publish.preview' | 'validate.run' | 'watermark.read' | 'watermark.write'
   | 'release.read' | 'release.submit' | 'release.decide' | 'review.comment'
-  | 'members.read' | 'members.invite' | 'members.manage' | 'activity.read';
+  | 'members.read' | 'members.invite' | 'members.manage' | 'activity.read'
+  | 'problems.review';
 export type Can = Partial<Record<Capability, boolean>>;
 export const may = (can: Can | null | undefined, cap: Capability): boolean => !!can?.[cap];
 

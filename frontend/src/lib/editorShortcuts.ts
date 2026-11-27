@@ -6,7 +6,7 @@
 //
 // `keys` use the Studio's notation: Mod = Ctrl on Windows (Cmd on a Mac), then Shift, Alt, and the key name as the browser reports it.
 
-export type ShortcutEditor = 'jss' | 'jsg' | 'jsg-ispl' | 'host';
+export type ShortcutEditor = 'jss' | 'jsg' | 'jsg-ispl' | 'host' | 'platform';
 
 export interface EditorShortcut {
   id: string;
@@ -26,7 +26,7 @@ const host = (id: string, keys: string[], action: string, where: string, file = 
 
 export const EDITOR_SHORTCUTS: EditorShortcut[] = [
   // ---- JSS editor (jss/editor.ts, jss/dom.ts)
-  jss('save', ['Mod+S'], 'Save the document', 'anywhere in the editor'),
+  jss('save', ['Mod+S'], 'Save the document', 'anywhere on the page (WP-22: also after the find bar was closed)'),
   jss('undo', ['Mod+Z'], 'Undo', 'anywhere in the editor'),
   jss('redo', ['Mod+Y', 'Mod+Shift+Z'], 'Redo', 'anywhere in the editor'),
   jss('indent', ['Tab'], 'Indent the list item; in a table, go to the next cell (a new row after the last cell)', 'list item or table cell'),
@@ -36,6 +36,7 @@ export const EDITOR_SHORTCUTS: EditorShortcut[] = [
   jss('merge', ['Backspace'], 'At the start of a block: join it with the one before', 'caret at the start of a block'),
   jss('nextField', ['ArrowDown'], 'At the end of a block: go to the next one', 'caret at the end of a block'),
   jss('prevField', ['ArrowUp'], 'At the start of a block: go to the one before', 'caret at the start of a block'),
+  jss('closeProblems', ['Escape'], 'Close the Problems drawer (WP-22)', 'the Problems drawer at the foot of the editor'),
   jss('goto', ['Enter', 'Space'], 'Go to the heading of an outline row or the place of a problem (Space too, WP-23)', 'outline row, problems row'),
   jss('dialogOk', ['Enter'], 'Confirm the dialog', 'a JSS dialog (not in a text area or on a button)', 'jss/dom.ts'),
   jss('dialogCancel', ['Escape'], 'Cancel the dialog, or close a pop-up menu', 'a JSS dialog or pop-up menu', 'jss/dom.ts'),
@@ -63,10 +64,14 @@ export const EDITOR_SHORTCUTS: EditorShortcut[] = [
   host('focus', ['Mod+.'], 'Focus mode on or off: only the document and a slim header', 'anywhere on the editor page'),
   host('find', ['Mod+F', 'Mod+H'], 'Open Find; with H, Find and replace', 'the JSS editor (the JSG editor has its own find bar on the same keys)'),
   host('escape', ['Escape'], 'Close the find bar, or leave focus mode', 'anywhere on the editor page'),
+  host('comments', ['Alt+Shift+N', 'Alt+Shift+P'], 'Next review comment; with P the previous one (the comments panel opens; WP-22)', 'anywhere on the editor page, when the project has review comments'),
   host('paletteMove', ['ArrowDown', 'ArrowUp'], 'Move through the commands', 'the command palette', 'editors/host/CommandPalette.tsx'),
   host('paletteRun', ['Enter'], 'Run the command', 'the command palette', 'editors/host/CommandPalette.tsx'),
   host('findStep', ['Enter', 'Shift+Enter'], 'Next match; with Shift the previous one', 'the JSS find box', 'editors/host/FindBar.tsx'),
   host('findClose', ['Escape'], 'Close the find bar', 'the JSS find bar', 'editors/host/FindBar.tsx'),
+
+  // ---- WP-22: the platform pages (not an editor): the quick switcher (components/QuickSwitcher.tsx). On an editor page Ctrl+K stays the palette.
+  { id: 'platform.jump', editor: 'platform', keys: ['Mod+K'], action: 'Jump to a project, a page or a data module', where: 'every platform and project page except the editors', file: 'components/QuickSwitcher.tsx' },
 ];
 
 /** The keys of one editor page: the host's, then the editor's own (JSG parts lists also have the JSG editor's page keys). */

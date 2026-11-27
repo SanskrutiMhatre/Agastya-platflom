@@ -13,6 +13,8 @@ import { useSession } from '../store/session';
 import { useInbox } from '../store/inbox';
 import { useApp } from '../store/appSettings';
 import { globalLabel } from '../lib/roles';
+import { ErrorBoundary } from '../components/ErrorBoundary';
+import { JumpButton, QuickSwitcher, useQuickSwitcher } from '../components/QuickSwitcher';
 
 type Item = { to: string; label: string; icon: IconName; roles?: string[] };
 const NAV: Item[] = [
@@ -40,6 +42,7 @@ export function AppShell() {
   const nav = useNavigate();
   const [menu, setMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const switcher = useQuickSwitcher();          // WP-22 (UX-021): Ctrl+K, Jump to…
 
   // Keep the badges (invitations, queues, unread notifications) fresh as the user moves around, and every half minute.
   // WP-18 (FE-020): an answer from the last 30 s is enough here, so moving around does not ask who is signed in each time; any write the
@@ -95,6 +98,7 @@ export function AppShell() {
         <header className="v2-top">
           <h1>{title}</h1>
           <span className="spacer" />
+          <JumpButton onClick={() => switcher.setOpen(true)} />
           <ThemeToggle />
           <NavLink to="/notifications" className="icon-btn v2-bell" aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'} title="Notifications" data-testid="bell">
             <Icon name="bell" size={17} />
@@ -116,9 +120,10 @@ export function AppShell() {
           </div>
         </header>
         <main id={MAIN_ID} className="v2-main-region" tabIndex={-1}>
-          <HeadingLevel level={2}><Outlet /></HeadingLevel>
+          <HeadingLevel level={2}><ErrorBoundary resetKey={loc.pathname} where="platform page"><Outlet /></ErrorBoundary></HeadingLevel>
         </main>
       </div>
+      {switcher.open ? <QuickSwitcher pages={[...items.map((n) => ({ to: n.to, label: n.label })), { to: '/notifications', label: 'Notifications' }]} onClose={() => switcher.setOpen(false)} /> : null}
     </div>
   );
 }

@@ -22,6 +22,8 @@ import { csdbDir, listDms } from '../services/csdb';
 import { explore } from '../services/pm';
 import { lastRun } from '../services/validation';
 import { releaseStateOf } from '../services/release';
+import { reviewState, openComments } from '../services/review';
+import { listMarks, problemKey } from '../services/problems';
 import fs from 'fs';
 import path from 'path';
 import { projectDirFor } from '../context';
@@ -166,6 +168,9 @@ export function registerWorkspaceRoutes(app: Express): void {
       } : null,
       build: fs.existsSync(pdf) ? { builtAt: fs.statSync(pdf).mtime.toISOString(), size: fs.statSync(pdf).size } : null,
       members: store.listMembers(id).length,
+      // WP-22 (UX-007): the Project Home's Review and Check cards; display only, a failure leaves them out
+      review: (() => { try { return { ...reviewState(id), open: openComments(id) }; } catch { return null; } })(),
+      problems: validation ? (() => { const marks = new Set(listMarks(id).map((m) => m.key)); return { reviewed: validation.issues.filter((i) => marks.has(problemKey(i))).length }; })() : null,
     });
   }));
 

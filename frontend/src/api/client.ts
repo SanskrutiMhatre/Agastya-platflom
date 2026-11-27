@@ -26,6 +26,15 @@ export const signalUnauthorized = (): void => onUnauthorized();
 type Reauth = () => Promise<boolean>;
 let reauth: Reauth | null = null;
 export const setReauthHandler = (fn: Reauth | null): void => { reauth = fn; };
+/**
+ * WP-22 (FE-016): every request reports whether the server answered (false: a network error, or 502/503/504 from something in between), so the
+ * session store can show the connection banner at once and take it away at the first answer. A cancelled request reports nothing.
+ */
+type Connection = (ok: boolean) => void;
+let onConnection: Connection = () => undefined;
+export const setConnectionHandler = (fn: Connection): void => { onConnection = fn; };
+const GATEWAY_DOWN = new Set([502, 503, 504]);
+
 /** The sign-in endpoints themselves are never replayed (a wrong password is a 401 too). */
 const isAuthUrl = (url: string) => /^\/api\/auth\//.test(url);
 
@@ -45,7 +54,10 @@ async function send<T>(method: string, url: string, body: unknown, opts: { raw?:
   if (body instanceof FormData) payload = body;
   else if (body !== undefined) { headers['content-type'] = 'application/json'; payload = JSON.stringify(body); }
 
-  const res = await fetch(url, { method, headers, body: payload, credentials: 'same-origin', signal: opts.signal });
+  let res: Response;
+  try { res = await fetch(url, { method, headers, body: payload, credentials: 'same-origin', signal: opts.signal }); }
+  catch (e) { if (!(e instanceof DOMException && e.name === 'AbortError')) onConnection(false); throw e; }
+  onConnection(!GATEWAY_DOWN.has(res.status));
   if (opts.raw && res.ok) return res as unknown as T;
 
   const type = res.headers.get('content-type') ?? '';

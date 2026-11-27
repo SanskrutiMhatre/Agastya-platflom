@@ -8,7 +8,7 @@ import { EDITOR_SHORTCUTS, baseKey } from './editorShortcuts';
 import { handlerKeys } from '../../scripts/parity/scan.mjs';
 
 const SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const FILES = ['jss/editor.ts', 'jss/dom.ts', 'jsg/editor.ts', 'jsg/shared.ts', 'jsg/ispl-editor.ts', 'editors/host/useHostKeys.ts', 'editors/host/CommandPalette.tsx', 'editors/host/FindBar.tsx'];
+const FILES = ['jss/editor.ts', 'jss/dom.ts', 'jsg/editor.ts', 'jsg/shared.ts', 'jsg/ispl-editor.ts', 'editors/host/useHostKeys.ts', 'editors/host/CommandPalette.tsx', 'editors/host/FindBar.tsx', 'components/QuickSwitcher.tsx'];
 
 describe('JSS and JSG shortcut registry', () => {
   it('ids are unique and every entry names a file the test checks', () => {

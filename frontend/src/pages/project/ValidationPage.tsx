@@ -2,12 +2,13 @@
 //
 // The review half is the point. Each finding says what is wrong, where (file and
 // line) and which check found it; the author can filter, mark findings as
-// reviewed (kept in this browser, per project), jump to the offending line in
+// reviewed (for the whole team, on the server, with who and when: WP-22), jump to the offending line in
 // the editor, or export the list.
 
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { contentApi, type ValidationIssue, type ValidationRun } from '../../api';
+import { contentApi, problemsApi, type ReviewMark, type ValidationIssue, type ValidationRun } from '../../api';
+import { forgetLegacyReviewed, issueKey, legacyReviewedKeys, severityLabel } from '../../lib/problems';
 import { Icon } from '../../components/Icon';
 import { PageHeader } from '../../components/PageHeader';
 import { Alert, Badge, Empty, Loading, Spinner, ago, errText, fmtDate, useAsync } from '../../components/ui';
@@ -20,14 +21,33 @@ import { MoreRows, useProgressive } from '../../components/windowing';
 const SOURCE_LABEL: Record<ValidationIssue['source'], string> = {
   xml: 'Well-formedness', xsd: 'S1000D schema', brex: 'Business rules (BREX)', graphics: 'Graphics', ids: 'Identifiers', icn: 'ICN entities', pm: 'Publication',
 };
-const issueKey = (i: ValidationIssue) => `${i.source}|${i.rel}|${i.line}|${i.title}|${i.loc}`;
 const sevTone = (s: ValidationIssue['sev']) => (s === 'error' ? 'bad' : s === 'warn' ? 'warn' : undefined);
 
-function useReviewed(projectId: string) {
-  const key = `agastya.reviewed.${projectId}`;
-  const [set, setSet] = useState<Set<string>>(() => { try { return new Set(JSON.parse(localStorage.getItem(key) ?? '[]')); } catch { return new Set(); } });
-  const toggle = (k: string) => setSet((s) => { const n = new Set(s); if (n.has(k)) n.delete(k); else n.add(k); try { localStorage.setItem(key, JSON.stringify([...n])); } catch { /* private mode */ } return n; });
-  return { reviewed: set, toggle };
+/**
+ * WP-22 (UX-008, FE-015): the "reviewed" marks are the team's, on the server (who and when), not this browser's. Marks an earlier version kept
+ * in this browser are moved to the server once, by someone who may mark findings; then the browser copy is forgotten.
+ */
+function useReviewed(projectId: string, canMark: boolean) {
+  const toast = useUi((s) => s.toast);
+  const [marks, setMarks] = useState<Map<string, ReviewMark>>(new Map());
+  const keep = (list: ReviewMark[]) => setMarks(new Map(list.map((m) => [m.key, m])));
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      try {
+        let list = await problemsApi.marks(projectId);
+        const legacy = legacyReviewedKeys(projectId).filter((k) => !list.some((m) => m.key === k));
+        if (legacy.length && canMark) { list = await problemsApi.setReviewed(projectId, legacy.slice(0, 2000), true); forgetLegacyReviewed(projectId); }
+        if (live) keep(list);
+      } catch { /* the page still shows the findings; the marks are shown once the server answers */ }
+    })();
+    return () => { live = false; };
+  }, [projectId, canMark]);
+  const toggle = async (k: string) => {
+    try { keep(await problemsApi.setReviewed(projectId, [k], !marks.has(k))); }
+    catch (e) { toast(errText(e), 'error'); }
+  };
+  return { reviewed: marks, toggle };
 }
 
 function toCsv(issues: ValidationIssue[]): string {
@@ -49,7 +69,7 @@ export function ValidationPage() {
   const [q, setQ] = useState('');
   const [hideReviewed, setHideReviewed] = useState(false);
   const [selId, setSelId] = useState<string | null>(null);
-  const { reviewed, toggle } = useReviewed(id);
+  const { reviewed, toggle } = useReviewed(id, may(can, 'problems.review'));
 
   useEffect(() => { if (last.data?.run && !run) setRun(last.data.run); }, [last.data, run]);
   // the project's saved choice (the same one the build and release checks use)
@@ -142,7 +162,7 @@ export function ValidationPage() {
             <aside className="v2-card v2-card-pad" aria-label="Finding" style={{ position: 'sticky', top: 0 }}>
               {selected ? (
                 <div className="v2-stack" data-testid="issue-detail">
-                  <div className="v2-row"><Badge tone={sevTone(selected.sev)}>{selected.sev === 'warn' ? 'warning' : selected.sev}</Badge><Badge>{SOURCE_LABEL[selected.source]}</Badge></div>
+                  <div className="v2-row"><Badge tone={sevTone(selected.sev)}>{severityLabel(selected.sev)}</Badge><Badge>{SOURCE_LABEL[selected.source]}</Badge></div>
                   <h3 style={{ margin: 0 }}>{selected.title}</h3>
                   <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{selected.detail}</p>
                   <table className="v2-table" style={{ fontSize: 12.5 }}><tbody>
@@ -150,11 +170,13 @@ export function ValidationPage() {
                     <tr><td className="v2-hint">Line</td><td>{selected.line}</td></tr>
                     {selected.loc ? <tr><td className="v2-hint">Where</td><td className="v2-mono">{selected.loc}</td></tr> : null}
                     <tr><td className="v2-hint">Run</td><td>{fmtDate(run.ranAt)}</td></tr>
+                    {reviewed.get(issueKey(selected)) ? <tr><td className="v2-hint">Reviewed</td><td data-testid="issue-reviewed-by">{reviewed.get(issueKey(selected))!.byName ?? reviewed.get(issueKey(selected))!.by} · {fmtDate(reviewed.get(issueKey(selected))!.at)}</td></tr> : null}
                   </tbody></table>
                   <div className="v2-row wrap">
                     {editable ? <button className="btn btn-primary" onClick={() => nav(`../editor?file=${encodeURIComponent(selected.file)}&line=${selected.line}`)}><Icon name="editor" />Open at line {selected.line}</button>
                       : selected.source === 'pm' ? <button className="btn btn-primary" onClick={() => nav('../publication')}><Icon name="book" />Open Publication</button> : null}
-                    <button className="btn" onClick={() => toggle(issueKey(selected))}><Icon name="check" />{reviewed.has(issueKey(selected)) ? 'Unmark reviewed' : 'Mark reviewed'}</button>
+                    <button className="btn" onClick={() => void toggle(issueKey(selected))} data-testid="issue-mark-reviewed" disabled={!may(can, 'problems.review')}
+                      title={may(can, 'problems.review') ? 'Marks the finding reviewed for everyone on the project (your name and the time are kept)' : 'Reviewers, editors, managers and owners mark findings reviewed'}><Icon name="check" />{reviewed.has(issueKey(selected)) ? 'Unmark reviewed' : 'Mark reviewed'}</button>
                   </div>
                 </div>
               ) : <Empty title="Select a finding">Its explanation and a link to the exact line appear here.</Empty>}

@@ -1210,6 +1210,60 @@ sheet) are kept as they are. No feature removed: the parity check reports 0 remo
   whoever runs the visual suite; the server still writes `t:` keys for id-less sections (preferring ids server-side is not in
   this package); the JSG compare-and-merge path is the JSS one (same hook) but only the JSS path has an e2e test.
 
+### WP-22 Navigation, project home, problems and review workflow (UX-007, UX-008, UX-009, UX-013, UX-014, UX-021, UX-024, UX-025, UX-029, FE-015, FE-016, PRD-003, GAP-003, GAP-006, GAP-008) - done in part (see limits)
+
+Branch `worktree-agent-ae54629ef365272f3` (from `fdfbc27`). Nothing was removed: `check:parity` PASS with no new explanation row.
+
+* **Where am I (UX-007, UX-009)**: every project page except the editor has a breadcrumb bar (`ProjectShell`, `project-bar`: Projects or
+  Repository / project name / section, plus Jump to). The rail gains a first item **Home** (not for CIR) and a pin at its foot (`rail-pin`,
+  remembered in `agastya.rail.pinned`) that writes the labels out (176 px rail); unpinned it stays icon-only with tooltips, as `00-platform.spec` guards.
+* **Project Home (UX-013, PRD-003 part)**: `/projects/:id/home` (`ProjectHomePage`): Continue (the last data module or document opened in this
+  browser, `lib/continueDoc.ts`), Check (counts of the last run, reviewed count, Run check for S1000D with `validate.run`), Review (state, round, open
+  comments), Build (last build); "Needs attention" (open comments, changes requested, a release waiting for the user's decision, errors, unplaced or
+  missing modules, a stale build) and "This week" (with `activity.read`). The summary route returns `review` and `problems.reviewed` for it.
+* **Quick switcher (UX-021)**: Ctrl/Cmd+K outside the editors (the editors keep Ctrl+K for their command palette) and a "Jump to… Ctrl K" button in
+  the top bar and in the project bar (`components/QuickSwitcher.tsx`, the WP-21 `CommandPalette` with its own wording): pages, the project's
+  sections, every project the user can open, and the S1000D project's data modules. Registered as `platform.jump` in `editorShortcuts.ts`; the
+  parity scanner reads its key handler.
+* **One problems model, team "reviewed" marks (UX-008, FE-015)**: `lib/problems.ts` (one `Problem` shape, one severity wording, adapters from the
+  Validation page, the document editors and the server). Backend `services/problems.ts` + `routes/problems.ts`: `GET /api/projects/:id/problems`
+  (last run joined with the marks and the brex waivers), `GET|PUT /api/projects/:id/problems/reviewed` (PUT: reviewer and up, capability
+  `problems.review`, audited `problems.reviewed` / `problems.unreviewed`). Marks are stored in `problem-reviews.json` in the project folder (atomic
+  write, as `publishWaivers.ts`), not a migration, to stay clear of WP-11/WP-16. The Validation page shows who marked and when; marks kept in the
+  browser before are moved to the server once.
+* **Comments in the editor (GAP-006 part, FE-016)**: a Comments button in the shared editor header of all three editors (S1000D, JSS, JSG) with the
+  open count; a side panel listing the open comments (those of the open data module first), Open the data module, Done/Reopen (`review.comment`),
+  "show done"; Alt+Shift+N / Alt+Shift+P step through them; Escape closes the panel. Same data as the Release page (`contentApi.release`).
+* **Problems drawer (WP-21 open item)**: the Studio's bottom pane is at most 25% of the window (CSS and the drag clamp, 60% -> 25%), Escape in it hides
+  it; the JSS problems list is capped at min(190px, 25vh) and closes with Escape.
+* **JSS Esc then Ctrl+S (WP-21 open item)**: the JSS editor listens for Ctrl+S on the document (not only inside the paper) unless a dialog is open or
+  the key was handled; unit test in `jss/editor.test.ts`, browser test in `wp22-navigation.spec`.
+* **Errors and connection (UX-025 part)**: an error boundary around the page outlet of both shells (`error-boundary`: Try again, Reload, Copy
+  details), reset on navigation. The existing `server-unreachable` banner now also follows failed fetches and 502/503/504 answers, clears on the next
+  good answer, polls every 5 s, and follows the browser `offline`/`online` events. The audit log adds filters by user and by day and shows an IPv4
+  address without `::ffff:`.
+* **Publication page (GAP-003)**: add a section to a chapter (only where the stencil leaves sections to the author), add an appendix and delete one
+  (JSG; a JSS document has no appendices in its model), and Redo beside Undo; the edits go into the document through the same `applyToJss`/`applyToJsg`
+  as the other edits (`lib/docPublication.ts`, tests in `docPublication.test.ts`).
+* **Wizard (UX-024)**: the model code and the enterprise code show an example and the rule before input; the model code last used in this browser
+  is offered (`wiz-mic-last`).
+* Recorded decisions: opening a project still lands in the Editor (owner rule; Home is the first rail item and in the switcher). Marking a finding
+  reviewed is now a team action for reviewers and up; a viewer used to keep private browser marks and now sees the button disabled. The drawer cap
+  also limits how far a user can drag the Studio's bottom pane (25% instead of 60%), in the platform and the standalone Studio. Rail labels are not
+  renamed and Explore/Publication are not merged into a Structure page (guarded by e2e and the owner's layout; left to WP-35).
+* Verified (2026-11-27): frontend `tsc --noEmit` clean; vitest `src/editors src/parity src/lib/editorShortcuts.test.ts src/components src/styles
+  src/jss src/lib/docPublication.test.ts src/lib/problems.test.ts` 22 files / 348 tests pass; `lint:theme` 0 literals; `vite build` OK;
+  `check:bundle` PASS (advisory: entry stylesheet over its 30 KB advisory budget, as before); `node scripts/ci/lint.mjs` ratchet unchanged;
+  `check:parity` PASS. Backend `tsc` clean; `wp22-problems` 4/4, `authz-matrix` 6/6 (snapshot regenerated for the 3 new routes, reviewed),
+  `wp10-seams` 11/11, `routes-guarded` 1/1, `wp13-permissions` 3/3. Browser: `e2e/wp22-navigation.spec.ts` alone on port 4091 (Edge) 7/7 (keyboard
+  for the pin, Home, Ctrl+K, marking reviewed, Alt+Shift+N, Esc+Ctrl+S). Visual/a11y suite on port 4092: first run 61 passed, 6 failed (the six screens below, all the intended project bar/rail change), baselines updated, then a full re-run 67 passed, 7 skipped (the keyboard tests skip the dark project by design: "keyboard behaviour does not depend on the theme"); axe and keyboard tests all pass, none allow-listed.
+* Baselines updated (looked at each diff: the 40 px project bar and the Home and pin rail items, nothing else): `e2e/visual/__screenshots__/{light,dark}/{publication,validation,release}.png`.
+* Not done: the Overview/Workspace/Projects merge and the sample buttons (UX-014: `00-platform.spec` creates samples from /workspace while projects
+  exist; left to WP-35 with the shell redesign); presence and edit leases on Home (PRD-003: needs WP-11's version guards); a per-user "show code"
+  preference (GAP-008: no per-user preference store yet, the switch stays per project); imported-fixture browser tests of comments (GAP-006 beyond
+  the sample); new screen captures for the user guide (UX-029); comment markers in the editing surface margin (only the panel list); ellipsis on
+  Activity card titles (UX-025 rest); the full e2e suite, the full vitest and the gate were not run (port 4050 belongs to the lead).
+
 ## Phase 8
 
 ### WP-26 Network security and the client/server protocol (ENT-001, SEC-006, DEP-010) - done (installer TLS page and VM listener scan left to WP-28)

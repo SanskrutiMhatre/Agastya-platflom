@@ -244,21 +244,27 @@ function Sessions() {
   );
 }
 
+/** "::ffff:127.0.0.1" is an IPv4 address written as IPv6; the log shows it as 127.0.0.1 (WP-22, UX-025). */
+export const plainIp = (ip: string | null): string => (ip ?? '').replace(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i, '$1');
+
 export function Audit() {
   const [typed, setTyped] = useState('');
   const [filter, setFilter] = useState('');
   // WP-18 (FE-020): the filter asks the server once the typing pauses, not once per key
   useEffect(() => { const t = setTimeout(() => setFilter(typed), 300); return () => clearTimeout(t); }, [typed]);
   const a = useAsync(() => adminApi.audit(300, filter || undefined), [filter]);
-  const drawn = useProgressive(a.data?.length ?? 0, filter);     // WP-18 (FE-030): first rows now, more on scroll
+  // WP-22 (UX-025): narrow the rows the server sent by who and by day, and show an IPv4 address without its IPv6 wrapper
+  const [who, setWho] = useState(''); const [day, setDay] = useState('');
+  const rows = (a.data ?? []).filter((e) => (!who || (e.actor ?? '').toLowerCase().includes(who.toLowerCase())) && (!day || e.at.slice(0, 10) === day));
+  const drawn = useProgressive(rows.length, `${filter}|${who}|${day}`);     // WP-18 (FE-030): first rows now, more on scroll
   return (
     <div className="v2-stack">
-      <div className="v2-row"><input className="v2-input" style={{ width: 280 }} placeholder="Filter by action, e.g. release.approved" value={typed} onChange={(e) => setTyped(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') setFilter(typed); }} aria-label="Filter audit log by action" /><button className="btn" onClick={a.reload}><Icon name="refresh" />Refresh</button></div>
+      <div className="v2-row"><input className="v2-input" style={{ width: 280 }} placeholder="Filter by action, e.g. release.approved" value={typed} onChange={(e) => setTyped(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') setFilter(typed); }} aria-label="Filter audit log by action" /><input className="v2-input" style={{ width: 160 }} placeholder="Who" value={who} onChange={(e) => setWho(e.target.value)} aria-label="Filter audit log by user" data-testid="audit-who" /><input className="v2-input" type="date" style={{ width: 160 }} value={day} onChange={(e) => setDay(e.target.value)} aria-label="Filter audit log by day" data-testid="audit-day" /><button className="btn" onClick={a.reload}><Icon name="refresh" />Refresh</button></div>
       <div className="v2-card">
-        {a.loading && !a.data ? <Loading /> : !a.data?.length ? <Empty title="No entries" /> : (
+        {a.loading && !a.data ? <Loading /> : !rows.length ? <Empty title="No entries" /> : (
           <table className="v2-table"><thead><tr><th>When</th><th>Who</th><th>Action</th><th>Project</th><th>From</th></tr></thead>
-            <tbody>{a.data.slice(0, drawn.limit).map((e) => <tr key={e.id}><td title={fmtDate(e.at)}>{ago(e.at)}</td><td>{e.actor ?? '—'}</td><td title={e.action}>{actionLabel(e.action)} <span className="v2-hint v2-mono">{e.action}</span></td><td className="v2-mono">{e.projectId ?? ''}</td><td className="v2-mono">{e.ip ?? ''}</td></tr>)}
-              <MoreRows as="tr" colSpan={5} shown={drawn.limit} total={a.data.length} onMore={drawn.more} onAll={drawn.all} /></tbody></table>
+            <tbody>{rows.slice(0, drawn.limit).map((e) => <tr key={e.id}><td title={fmtDate(e.at)}>{ago(e.at)}</td><td>{e.actor ?? '—'}</td><td title={e.action}>{actionLabel(e.action)} <span className="v2-hint v2-mono">{e.action}</span></td><td className="v2-mono">{e.projectId ?? ''}</td><td className="v2-mono">{plainIp(e.ip)}</td></tr>)}
+              <MoreRows as="tr" colSpan={5} shown={drawn.limit} total={rows.length} onMore={drawn.more} onAll={drawn.all} /></tbody></table>
         )}
       </div>
     </div>

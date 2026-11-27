@@ -497,3 +497,41 @@ html[data-editor-focus] .v2-pshell > .v2-rail { visibility: hidden; overflow: hi
 .v2-merge-pick { display: block; padding: 6px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
 .v2-merge-pick.on { border-color: var(--accent); background: var(--accent-soft); }
 @media (max-width: 760px) { .v2-merge-cols { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------------------------------------------- WP-22: navigation, Project Home, review comments in the editors */
+/* the project rail pinned open: the names beside the icons */
+.v2-pshell.rail-pinned { grid-template-columns: 176px 1fr !important; }
+.v2-rail.is-pinned { align-items: stretch; padding: 8px; }
+.v2-rail.is-pinned .v2-rail-nav { align-items: stretch; }
+.v2-rail.is-pinned .v2-rail-item { width: auto; display: flex; align-items: center; justify-content: flex-start; gap: 10px; padding: 0 10px; }
+.v2-rail.is-pinned .v2-rail-project { align-self: center; }
+.v2-rail.is-pinned .v2-rail-badge { position: static; margin-left: auto; }
+.v2-rail-label { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.v2-rail-pin { flex: none; height: 34px; }
+/* the breadcrumb bar of the project pages that are not an editor */
+.v2-pbar { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 4px 20px; background: var(--bg-elev); border-bottom: 1px solid var(--border); flex: none; font-size: 13px; }
+.v2-pbar ol { display: flex; align-items: center; gap: 6px; list-style: none; margin: 0; padding: 0; min-width: 0; }
+.v2-pbar li { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--text-muted); white-space: nowrap; }
+.v2-pbar li + li::before { content: '/'; color: var(--text-faint); }
+.v2-pbar li[aria-current] { color: var(--text); font-weight: 600; }
+.v2-pbar-name { max-width: 40vw; overflow: hidden; text-overflow: ellipsis; color: var(--text); font-weight: 600; }
+.v2-jump { gap: 6px; color: var(--text-muted); }
+@media (max-width: 900px) { .v2-jump-label, .v2-jump .v2-kbd { display: none; } .v2-pbar { padding: 4px 12px; } }
+/* the Project Home */
+.v2-home-card { display: flex; flex-direction: column; min-height: 132px; }
+.v2-home-card-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px 4px; }
+.v2-home-card-head h2, .v2-card-title { font-size: 13px; font-weight: 650; margin: 0; }
+.v2-home-ic { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); flex: none; }
+.v2-home-card-body { padding: 4px 14px; flex: 1; min-width: 0; }
+.v2-home-card-act { padding: 8px 14px 12px; display: flex; gap: 6px; flex-wrap: wrap; }
+.v2-home-list { list-style: none; margin: 0; padding: 4px 0; }
+.v2-home-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 16px; min-width: 0; }
+.v2-home-list li + li { border-top: 1px solid var(--border); }
+/* the review comments beside the document (editors) */
+.v2-edcomments { position: fixed; right: 12px; top: 104px; bottom: 16px; width: min(360px, calc(100vw - 24px)); display: flex; flex-direction: column; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-2); z-index: 40; }
+.v2-edcomments-head { display: flex; align-items: center; gap: 8px; padding: 8px 8px 6px 12px; }
+.v2-edcomments-list { flex: 1; min-height: 0; overflow: auto; padding: 0 10px 10px; display: flex; flex-direction: column; gap: 8px; }
+.v2-rv.is-current { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+.btn.is-on { background: var(--accent-soft); color: var(--accent); }
+/* a page that failed to draw */
+.v2-errpanel { max-width: 640px; }
