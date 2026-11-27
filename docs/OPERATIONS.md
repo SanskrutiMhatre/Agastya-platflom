@@ -69,7 +69,13 @@ Plain text; every key is optional; restart the application or service after a ch
 | Section / key | Default | Meaning |
 | --- | --- | --- |
 | `[server] Port` | `4040` | TCP port. |
-| `[server] Bind` | `loopback` | `loopback` = this computer only. `lan` = every network interface. Or one IPv4 address. |
+| `[server] Bind` | `loopback` | `loopback` = this computer only. `lan` = every network interface. Or one IPv4 address. Anything but loopback needs `[tls]` (section 5). |
+| `[server] Mode` | (from `Bind`) | `local` (Mode A) or `server` (Mode B). Empty = `server` when `Bind` is not loopback. `server` with `Bind=loopback` = behind a TLS proxy on this computer. |
+| `[server] ServerNames` | (none) | Other host names people type, comma-separated. The names in the certificate are always accepted; any other name is refused (421). |
+| `[tls] Certificate`, `Key` | (none) | PEM server certificate (then any intermediate CA) and its private key. Relative paths are relative to `agastya.ini`. |
+| `[tls] Pfx` | (none) | Instead of the two above: one PKCS#12 file. |
+| `[tls] PassphraseFile` | (none) | A file holding the passphrase of an encrypted key or `.pfx`. |
+| `[tls] HstsMaxAge` | `15552000` | `Strict-Transport-Security` max-age (seconds) on HTTPS answers in Mode B; `0` = none. No `includeSubDomains`, no preload. |
 | `[storage] DataDir` | `<state>\workspace` | Where projects and the database live. Move it by stopping the server, moving the folder, and editing this line. |
 | `[security] SecureCookies` | `0` | Set `1` if people reach the server over HTTPS (a reverse proxy in front). |
 | `[app] OpenBrowser` | `1` | Open the browser when the tray application starts. |
@@ -84,10 +90,36 @@ By default the server answers on this computer only (`Bind=loopback`). To serve 
 2. Allow the port through the Windows Firewall. The installer option does it for you (an inbound rule named *Agastya Platform (LAN access)* for
    `runtime\node.exe`, TCP, **private and domain networks only**). By hand:
    `netsh advfirewall firewall add rule name="Agastya Platform" dir=in action=allow protocol=TCP localport=4040 program="C:\Program Files\Agastya Platform\runtime\node.exe" profile=private,domain`
-3. People open `http://<server name>:4040/`.
+3. Give the server a certificate (below, "Mode B: TLS"). Without one the server does **not** start on a network address; the server log and
+   `AgastyaCtl.exe --doctor` name the missing setting.
+4. People open `https://<server name>:4040/`.
 
-The server speaks plain HTTP. On an untrusted network put a reverse proxy that terminates HTTPS in front of it (and set `SecureCookies=1`).
 Every action needs a signed-in account; there is no anonymous access.
+
+### Mode B: TLS
+
+On a network address the server speaks HTTPS only (WP-26): a plain `http://` request to the port gets no answer, session cookies are
+`Secure`, answers carry `Strict-Transport-Security`, and the progress channel is `wss://`. On this computer only (Mode A) it stays plain HTTP
+on `127.0.0.1` / `::1` and never listens on a network interface.
+
+* **Certificate from your organisation's CA (recommended).** Ask for a server certificate whose *subjectAltName* lists every name and address
+  people type (browsers ignore the common name). Put the PEM certificate (server first, then intermediates) and key, or a `.pfx`, in the
+  state folder, for example `tls\`, and set `[tls] Certificate` and `Key` (or `Pfx` and `PassphraseFile`). Clients already trust the CA.
+* **No CA.** `node app\backend\scripts\make-tls-cert.js --out tls --name docs.example.local --name 10.0.0.5 --with-ca` (from the program
+  folder, with `runtime\node.exe`) writes a small private CA and a server certificate signed by it, and prints the SHA-256 thumbprints.
+  Install `ca.pem` once on each client as a trusted root (Group Policy, or *Manage computer certificates*), or compare the printed thumbprint
+  when the browser asks. It installs nothing itself.
+* **Reverse proxy instead.** A proxy *on the same computer* may terminate TLS: then keep `Bind=loopback`, set `Mode=server`, and the proxy's
+  `X-Forwarded-Proto: https` makes cookies `Secure` (the proxy is trusted because it connects from loopback). A proxy on another machine
+  would need plain HTTP on the network, which the server refuses.
+* **Host names.** The server answers only to the loopback names, the names and addresses in the certificate, `ServerNames`, and the `Bind`
+  address. Anything else gets `421 Misdirected Request` (this stops a web page that re-points its own DNS name at the server).
+* **Certificate renewal.** The start-up log and `--doctor` show the days left; under 30 days the log warns at every start; an expired
+  certificate stops the server with a message naming the setting. To renew: put the new files in place (same paths, or change the ini),
+  restart the service. With the private CA, a new server certificate signed by the same `ca-key.pem` needs nothing on the clients; keep
+  `ca-key.pem` offline. On an air-gapped network plan the renewal date when the certificate is issued.
+* **Version handshake.** The page asks `/api/version` at start and sends its version on every request; a page older than the server allows
+  (an open tab across an upgrade) is answered `426` and offers *Reload*; a server older than the page says the server needs an update.
 
 ## 6. Logs
 

@@ -974,3 +974,74 @@ order of 08 section 7:
   suites. `scripts/ci/lint.mjs` reports `any.backend` 282 against a baseline of 280: not from this package (no TypeScript changed here).
 * Not done: the end-to-end acceptance "full 100-module publish at most 40 s" was not measured through the server (the FO stage it was
   dominated by is now under 1 s); a re-check on a newer libxslt if the toolchain changes.
+
+## Phase 8
+
+### WP-26 Network security and the client/server protocol (ENT-001, SEC-006, DEP-010) - done (installer TLS page and VM listener scan left to WP-28)
+
+Decisions taken from the audit (no owner question): native TLS in the Node server (no bundled proxy); a network address without TLS is
+**refused at start**, not warned about (roadmap "refuse non-loopback binding without TLS"; G-SEC-1 counts 0 plain-HTTP answers); a reverse
+proxy is supported only on the same computer (Mode B on 127.0.0.1); HSTS on in Mode B over TLS, 180 days, no includeSubDomains or preload
+(roadmap "HSTS for server mode"; ENT-001's "off by default" was the earlier position); the administrator supplies the certificate, an
+internal CA is the recommended path, and the generator is a separate tool, not a default (ENT-001); a passphrase only from a file.
+
+* **Config (WP-10 rules: only `config.ts` reads the environment; each error names the variable).** New `AGASTYA_MODE` (`local` = Mode A,
+  default; `server` = Mode B), `AGASTYA_TLS_CERT` + `AGASTYA_TLS_KEY` or `AGASTYA_TLS_PFX`, `AGASTYA_TLS_PASSPHRASE_FILE`,
+  `AGASTYA_SERVER_NAMES`, `AGASTYA_HSTS_MAX_AGE`. `buildConfig` refuses: a non-loopback `AGASTYA_HOST` in Mode A (`AGASTYA_HOST: ... is not a
+  loopback address`); Mode B on a network address, or on every interface, without a certificate (`AGASTYA_TLS_CERT: Mode B listens on ...`);
+  half a PEM pair; PEM and PFX together; a passphrase file alone; a server name with a scheme or port; a negative HSTS age. TLS on forces
+  `secureCookies`. `isLoopbackHost` (127/8, ::1, IPv4-mapped, `localhost`, `*.localhost`) is the one loopback test.
+* **Listening (`services/network.ts`, `index.ts`).** Mode A with no `AGASTYA_HOST` now listens on **127.0.0.1 and ::1** (same port; ::1
+  skipped with a warning when the machine lacks it) instead of every interface: from this computer `localhost` keeps working whichever
+  address family a client tries first (browser, Vite proxy, Playwright), and nothing listens on a network interface. The packaged product
+  already set 127.0.0.1 and is unchanged. With TLS the listener is `https.createServer` (TLS 1.2 minimum); a plain HTTP request to that port
+  gets no HTTP answer (the TLS layer drops it). `start()`, `stop()` and `shutdownGracefully()` handle a list of servers (the drain waits for
+  all). The start-up log has a `Network:` line (mode, addresses, certificate subject and names, days left, SHA-256 thumbprint).
+* **Certificate (`loadTls`).** Read and checked before the workspace lock: unreadable file, not a certificate, key not matching
+  (`X509Certificate.checkPrivateKey`), wrong passphrase, unreadable PKCS#12 (`AGASTYA_TLS_PFX`), expired - each stops the start naming the
+  variable; 30 days or less left is a warning at every start. The PKCS#12 details are read from a server-side `TLSSocket` on its context.
+* **Host rule (DNS rebinding; the same on HTTP and the WebSocket).** Every request and every upgrade must name a loopback host, an
+  `AGASTYA_SERVER_NAMES` entry (one-label wildcards; `*` turns the rule off on purpose), a name or address in the certificate, or the
+  `AGASTYA_HOST` address; otherwise `421 {code: MISDIRECTED_REQUEST}`. Before this, `Origin` was only compared with `Host`, so a page whose DNS
+  name was re-pointed at 127.0.0.1 passed the Origin check - for example it could create the first administrator of a fresh install (now a
+  test). Order at the WebSocket upgrade: exact path `/ws` (it was any path starting with `/ws`), Host (421), Origin (403), client version
+  (426), session (401).
+* **Version handshake (WP-13 `/api/version`).** Server: a request carrying `X-Agastya-Client` older than `MIN_CLIENT_VERSION` (a pre-release
+  ranks below its release; a malformed value counts as old) gets `426 {code: CLIENT_TOO_OLD, minClientVersion, version}`; `/api/version`,
+  `/api/health` and `/api/ready` always answer; a request without the header (scripts, tools) is not refused; the WebSocket takes the same
+  value as `?client=`. Client (`frontend/src/lib/handshake.ts`): the version is the root `package.json`, written in by Vite (`define`
+  `__AGASTYA_CLIENT_VERSION__`), API level 1; `GET /api/version` once at start; every API request sends the header and the socket the
+  parameter; a page below `minClientVersion`, a server on a newer API level, or a 426 opens a sticky "A newer version is on the server -
+  Reload" dialog over the page (the page stays mounted, drafts are kept); a server on an older API level says the server needs an update.
+  A network failure is not a mismatch (the existing "not answering" banner handles it).
+* **HSTS** (`securityHeaders.ts`): `Strict-Transport-Security: max-age=<AGASTYA_HSTS_MAX_AGE>` on TLS answers in Mode B only (never on
+  `localhost`, where it would pin every other local web server of the machine to HTTPS).
+* **Administrator tooling.** `backend/scripts/make-tls-cert.js --out <dir> --name <host> [--name ...] [--days] [--with-ca]` writes a server
+  certificate (ECDSA P-256, subjectAltName, serverAuth), self-signed or signed by a new private CA, and prints the thumbprints and settings;
+  it installs nothing. The DER writer is `src/services/tlsCert.ts` (Node can sign but not write certificates); the tests use the same writer,
+  so they need no OpenSSL (the PKCS#12 test uses `openssl` when present and skips otherwise). `npm run doctor` has a "Network and TLS" row
+  (FAIL with the server's own message when the setting cannot start; certificate days left). Host program (`packaging/host/AgastyaHost.cs`):
+  new ini keys `[server] Mode, ServerNames` and `[tls] Certificate, Key, Pfx, PassphraseFile, HstsMaxAge` (relative to `agastya.ini`) passed
+  as environment; a `Bind` other than loopback means Mode B; the liveness probe tries HTTP, then HTTPS on 127.0.0.1 (TLS 1.2; certificate not
+  checked for this loopback probe only); the browser URL is `https://` with TLS; `--doctor` FAILs a network `Bind` without TLS and shows the
+  certificate's days left. `agastya.ini.template` documents the keys; `docs/OPERATIONS.md` section 5 "Mode B: TLS" (internal CA, private CA
+  tool, same-machine proxy, host names, renewal and rotation on air-gapped networks, handshake).
+* Verified (backend `tsc` 0 errors; each file alone, `--test-concurrency=1`, `AGASTYA_CLIENT_DIST` = the main checkout's `frontend/dist`):
+  new `wp26-network` 9/9 - configuration refusals naming each variable; Host rule incl. wildcards, IPv6 and certificate names; certificate
+  errors; PKCS#12 with a passphrase file (openssl present, not skipped); DNS-rebinding setup refused with 421 and nothing created, WebSocket
+  421, exact `/ws`; 426 for old, pre-release and malformed client versions on HTTP and the WebSocket, version routes exempt; a real Mode B
+  process with a throwaway CA and server certificate in a temp folder: HTTPS with a client trusting only the CA, plain HTTP to the port
+  unanswered, a client without the CA refused, `Secure` session cookie, HSTS, Host rule with certificate and configured names, `wss` works
+  and `ws` does not; Mode B without TLS on 0.0.0.0, Mode A on 0.0.0.0, an expired certificate and a wrong key each exit non-zero naming the
+  variable and never listen; Mode A by default listens on loopback and this machine's LAN address refuses the connection. Also `wp03-auth`
+  11/11, `auth-http` 10/10, `auth-core` 11/11, `ws-broadcast` 5/5, `routes-guarded` 1/1, `phase17-security` 5/5, `wp10-seams` 11/11,
+  `wp13-version` 4/4, `authz-matrix` 6/6 (snapshot unchanged: no route added), `wp06-lifecycle` 5/5, `wp13-password-hashing` 3/3,
+  `uploads-config` 4/4. Frontend: `tsc --noEmit` clean; vitest `src/lib/handshake.test.ts` 5/5, `src/api/query.test.ts` +
+  `src/components/ui.test.tsx` 19/19, `importRefusal` + `waivers` + `AuthScreens` + `stores` 33/33. Host program: both executables compile
+  with the packager's `csc` flags (into a scratch folder; not executed). `scripts/ci/lint.mjs` green; `wp26-network.test.js` is in the
+  security stage of `scripts/ci/test-plan.json`. `make-tls-cert.js --with-ca` and the doctor row were run by hand (three configurations).
+* Not done / left: the installer's LAN page does not collect a certificate yet - an upgraded `Bind=lan` install without `[tls]` now stops
+  the server with a clear log line and a `--doctor` FAIL; the installer TLS page, a DPAPI-protected passphrase and the service-only ACL on
+  `tls\` belong to WP-28. G-SEC-1's listener scan on a VM (`Get-NetTCPConnection`) was not run here. The frontend was not rebuilt and
+  Playwright was not run (what a browser on this computer sees on loopback is unchanged). The host program's `--doctor` and probe changes
+  were compiled, not executed. Certificate pinning for a thin Mode B client (WP-28) is not built; browsers use the Windows trust store.

@@ -30,6 +30,16 @@ row('Workspace path length (Windows 259-character limit)', process.platform !== 
   `${workspace} is ${workspace.length} characters; with an 80-character project name and a long data module file name a file path reaches ${worst}` +
   (worst < 260 || process.platform !== 'win32' ? '' : ' - move the workspace nearer the drive root (AGASTYA_WORKSPACE_DIR) or keep project names short'));
 
+// WP-26: the network setting as the server will apply it (Mode A loopback only; Mode B TLS only on the network), and the certificate's state.
+try {
+  const { config } = require(path.join(root, 'dist', 'config'));
+  const net = require(path.join(root, 'dist', 'services', 'network'));
+  const info = config.tls ? net.loadTls(config.tls).info : null;
+  row('Network and TLS', true, net.describeNetwork(config, info) + (info && info.daysLeft <= 30 ? ` - WARNING: the certificate expires in ${info.daysLeft} days; renew it` : ''));
+} catch (e) {
+  row('Network and TLS', false, /Cannot find module/.test(e.message) ? 'backend/dist is missing: build first' : `${e.message} - the server will not start with this setting`);
+}
+
 row('Client build (optional)', fs.existsSync(path.resolve(root, '..', 'frontend', 'dist', 'index.html')), 'run "npm run build" in frontend/ to serve the UI from this process');
 
 let bad = 0;

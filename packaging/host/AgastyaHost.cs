@@ -100,7 +100,22 @@ namespace Agastya
         public int LogMaxMb = 10;
         public int LogKeep = 5;
         public string ServiceName = "AgastyaPlatform";
+        // WP-26: Mode B (a server on the network) serves TLS only. Empty Mode = "server" when Bind is not loopback, else "local".
+        public string Mode = "";
+        public string ServerNames = "";
+        public string TlsCert = "", TlsKey = "", TlsPfx = "", TlsPassphraseFile = "", HstsMaxAge = "";
         public List<string> Problems = new List<string>();
+
+        public bool TlsConfigured { get { return TlsCert.Length > 0 || TlsPfx.Length > 0; } }
+        public bool Loopback { get { string b = BindAddress; return b.StartsWith("127.") || b == "::1" || b.Equals("localhost", StringComparison.OrdinalIgnoreCase); } }
+        public string EffectiveMode { get { return Mode.Length > 0 ? Mode.ToLowerInvariant() : (Loopback ? "local" : "server"); } }
+        /// <summary>A path in agastya.ini may be relative to the folder of agastya.ini.</summary>
+        public static string StatePath(string p)
+        {
+            if (string.IsNullOrEmpty(p)) return p;
+            string x = Environment.ExpandEnvironmentVariables(p);
+            return Path.IsPathRooted(x) ? x : Path.Combine(Path.GetDirectoryName(Layout.ConfigFile), x);
+        }
 
         public string WorkspaceDir
         {
@@ -122,7 +137,7 @@ namespace Agastya
             }
         }
 
-        public string Url { get { return "http://localhost:" + Port + "/"; } }
+        public string Url { get { return (TlsConfigured ? "https" : "http") + "://localhost:" + Port + "/"; } }
 
         public static Settings Load()
         {
@@ -153,6 +168,13 @@ namespace Agastya
                     case "logging.maxfilemb": int mb; if (int.TryParse(val, out mb) && mb >= 1) s.LogMaxMb = mb; break;
                     case "logging.keepfiles": int kf; if (int.TryParse(val, out kf) && kf >= 1) s.LogKeep = kf; break;
                     case "service.name": if (val.Length > 0) s.ServiceName = val; break;
+                    case "server.mode": s.Mode = val; break;
+                    case "server.servernames": s.ServerNames = val; break;
+                    case "tls.certificate": s.TlsCert = val; break;
+                    case "tls.key": s.TlsKey = val; break;
+                    case "tls.pfx": s.TlsPfx = val; break;
+                    case "tls.passphrasefile": s.TlsPassphraseFile = val; break;
+                    case "tls.hstsmaxage": s.HstsMaxAge = val; break;
                     default: s.Problems.Add("line " + lineNo + ": unknown setting '" + key + "'"); break;
                 }
             }
@@ -384,6 +406,14 @@ namespace Agastya
             psi.EnvironmentVariables["AGASTYA_CLIENT_DIST"] = Path.Combine(Path.Combine(Layout.AppDir, "frontend"), "dist");
             psi.EnvironmentVariables["AGASTYA_SHUTDOWN_ON_STDIN_CLOSE"] = "1";
             if (cfg.SecureCookies) psi.EnvironmentVariables["AGASTYA_SECURE_COOKIES"] = "1";
+            // WP-26: the server refuses a network address without TLS and names the setting in the server log.
+            psi.EnvironmentVariables["AGASTYA_MODE"] = cfg.EffectiveMode;
+            if (cfg.ServerNames.Length > 0) psi.EnvironmentVariables["AGASTYA_SERVER_NAMES"] = cfg.ServerNames;
+            if (cfg.TlsCert.Length > 0) psi.EnvironmentVariables["AGASTYA_TLS_CERT"] = Settings.StatePath(cfg.TlsCert);
+            if (cfg.TlsKey.Length > 0) psi.EnvironmentVariables["AGASTYA_TLS_KEY"] = Settings.StatePath(cfg.TlsKey);
+            if (cfg.TlsPfx.Length > 0) psi.EnvironmentVariables["AGASTYA_TLS_PFX"] = Settings.StatePath(cfg.TlsPfx);
+            if (cfg.TlsPassphraseFile.Length > 0) psi.EnvironmentVariables["AGASTYA_TLS_PASSPHRASE_FILE"] = Settings.StatePath(cfg.TlsPassphraseFile);
+            if (cfg.HstsMaxAge.Length > 0) psi.EnvironmentVariables["AGASTYA_HSTS_MAX_AGE"] = cfg.HstsMaxAge;
             try { Directory.CreateDirectory(cfg.WorkspaceDir); } catch (Exception e) { Host.Error("cannot create the data folder " + cfg.WorkspaceDir + ": " + e.Message); return -2; }
 
             Process p = new Process(); p.StartInfo = psi; p.EnableRaisingEvents = true;
@@ -427,13 +457,20 @@ namespace Agastya
 
     internal static class Probe
     {
-        /// <summary>True when something on this port answers the platform's liveness check.</summary>
-        public static bool Alive(int port)
+        static Probe() { try { ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12; } catch { } }
+
+        /// <summary>True when something on this port answers the platform's liveness check (plain HTTP in Mode A, HTTPS in Mode B, WP-26).</summary>
+        public static bool Alive(int port) { return Get("http", port) || Get("https", port); }
+
+        private static bool Get(string scheme, int port)
         {
             try
             {
-                HttpWebRequest r = (HttpWebRequest)WebRequest.Create("http://127.0.0.1:" + port + "/api/health");
+                HttpWebRequest r = (HttpWebRequest)WebRequest.Create(scheme + "://127.0.0.1:" + port + "/api/health");
                 r.Timeout = 2500; r.Proxy = null;
+                // A liveness probe of this computer's own server over loopback: the certificate is checked by the clients, not here
+                // (it rarely names 127.0.0.1).
+                if (scheme == "https") r.ServerCertificateValidationCallback = delegate { return true; };
                 using (HttpWebResponse resp = (HttpWebResponse)r.GetResponse()) { return (int)resp.StatusCode == 200; }
             }
             catch { return false; }
@@ -628,8 +665,22 @@ namespace Agastya
             if (jv != null && jv.IndexOf("version", StringComparison.OrdinalIgnoreCase) >= 0) Pass("Java runtime (for the PDF renderer): " + jv.Split('\n')[0].Trim()); else Fail("the bundled Java runtime does not run");
 
             string bind = cfg.BindAddress;
-            if (bind == "0.0.0.0") Warn("the server is set to listen on every network interface (Bind=" + cfg.Bind + "). Make sure that is intended; see OPERATIONS.md");
-            else Pass("listens on " + bind + " only");
+            // WP-26: a network address is Mode B and needs TLS; the server refuses to start without it.
+            if (!cfg.Loopback && !cfg.TlsConfigured) Fail("Bind=" + cfg.Bind + " serves the network, which needs TLS: set Certificate and Key (or Pfx) under [tls] in agastya.ini; the server does not start without them (OPERATIONS.md, \"Mode B: TLS\")");
+            else if (!cfg.Loopback) Pass("listens on " + bind + " (Mode B) with TLS: " + (cfg.TlsPfx.Length > 0 ? Settings.StatePath(cfg.TlsPfx) : Settings.StatePath(cfg.TlsCert)));
+            else Pass("listens on " + bind + " only (Mode " + (cfg.EffectiveMode == "server" ? "B behind a TLS proxy on this computer" : "A") + ")");
+            if (cfg.TlsCert.Length > 0)
+            {
+                try
+                {
+                    var c = new System.Security.Cryptography.X509Certificates.X509Certificate2(Settings.StatePath(cfg.TlsCert));
+                    int days = (int)Math.Floor((c.NotAfter - DateTime.Now).TotalDays);
+                    if (days < 0) Fail("the TLS certificate expired on " + c.NotAfter.ToString("yyyy-MM-dd"));
+                    else if (days <= 30) Warn("the TLS certificate expires in " + days + " days (" + c.NotAfter.ToString("yyyy-MM-dd") + "); renew it");
+                    else Pass("TLS certificate " + c.Subject + ", " + days + " days left, SHA-256 thumbprint in the server log");
+                }
+                catch (Exception e) { Fail("the TLS certificate " + Settings.StatePath(cfg.TlsCert) + " cannot be read: " + e.Message); }
+            }
 
             if (Probe.Alive(cfg.Port)) Pass("an Agastya Platform server is answering on port " + cfg.Port);
             else if (Probe.PortFree(cfg.Port, bind == "0.0.0.0" ? "0.0.0.0" : "127.0.0.1")) Pass("port " + cfg.Port + " is free");
