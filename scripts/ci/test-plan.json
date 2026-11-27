@@ -18,7 +18,7 @@
   "heavy": [
     "pdf21.test.js", "brex-gate.test.js", "publish-gate.test.js", "dmtypes.test.js", "golden-xignal.test.js", "jss-naval.test.js",
     "jss-stencil-corrections.test.js", "pdf-reference.test.js", "wp32-validation-scale.test.js", "jsg-word.test.js", "jss-authoring.test.js",
-    "wp33-fo-scaling.test.js", "wp11-integrity.test.js"
+    "wp33-fo-scaling.test.js", "wp11-integrity.test.js", "wp14-jobs.test.js", "wp14-job-limits.test.js"
   ],
   "scriptTests": {
     "_comment": "node:test files outside backend/test, by gate stage, paths from the repository root. release-tools (WP-24) runs first in the package stage and on its own with --stages release-tools.",

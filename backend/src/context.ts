@@ -13,7 +13,8 @@ import { createAppContext, redactAuditMeta, type AppContext } from './appContext
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const ctx: AppContext = createAppContext(config);
 try {
-  ctx.start();
+  // WP-14: a job worker (services/jobs) opens the database the server has already checked and migrated; it never migrates or snapshots it.
+  if (!config.jobs.worker) ctx.start();
 } catch (e) {
   // WP-12: a refused database (newer build, edited migration, damaged file, no safety copy) stops the process with the operator's message on top.
   console.error(`\n[start] ${(e as Error).message}\n`);

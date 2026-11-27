@@ -337,6 +337,29 @@ function contract(engine, make) {
     assert.equal(R.leases.purgeExpired(t(200)), 1);
     assert.deepEqual(R.leases.listForDocument('d1'), []);
   });
+
+  withRepos('job records (WP-14): queued -> running -> ended once, log in order with replay, restart marks unfinished jobs interrupted, purge takes the log', (R) => {
+    const t = (min) => new Date(Date.parse(now) + min * 60_000).toISOString();
+    const J = (id, projectId, at) => ({ id, kind: 'validate', projectId, params: '{"brex":true}', actorId: 'u1', actorName: 'alice', createdAt: at });
+    R.jobs.insert(J('j1', 'p1', now)); R.jobs.insert(J('j2', 'p1', t(1))); R.jobs.insert(J('j3', 'p2', t(2)));
+    assert.equal(R.jobs.get('j1').state, 'queued'); assert.equal(R.jobs.get('nope'), null);
+    R.jobs.markRunning('j1', t(3), 4242);
+    assert.equal(R.jobs.get('j1').state, 'running'); assert.equal(R.jobs.get('j1').worker_pid, 4242);
+    for (const [seq, msg] of [[1, 'a'], [2, 'b'], [3, 'c']]) R.jobs.appendLog('j1', seq, t(4), JSON.stringify({ message: msg }));
+    R.jobs.appendLog('j1', 2, t(4), 'duplicate');                                    // a repeated sequence number is ignored, never a second row
+    assert.deepEqual(R.jobs.log('j1', 0, 10).map((l) => [l.seq, JSON.parse(l.message).message]), [[1, 'a'], [2, 'b'], [3, 'c']]);
+    assert.deepEqual(R.jobs.log('j1', 1, 1).map((l) => l.seq), [2], 'replay after a sequence number, limited');
+    assert.equal(R.jobs.finish('j1', 'succeeded', t(5), '{"ok":true}', null, 'hash1'), true);
+    assert.equal(R.jobs.finish('j1', 'failed', t(6), null, '{}'), false, 'an ended job does not end twice');
+    const j1 = R.jobs.get('j1');
+    assert.equal(j1.state, 'succeeded'); assert.equal(j1.result, '{"ok":true}'); assert.equal(j1.input_hash, 'hash1'); assert.equal(j1.finished_at, t(5));
+    R.jobs.markRunning('j2', t(6), 1);
+    assert.deepEqual(R.jobs.listForProject('p1', 10).map((j) => j.id), ['j2', 'j1'], 'newest first');
+    assert.equal(R.jobs.interruptUnfinished(t(7), '{"code":"JOB_INTERRUPTED"}'), 2, 'the running j2 and the queued j3');
+    assert.equal(R.jobs.get('j2').state, 'interrupted'); assert.equal(R.jobs.get('j3').state, 'interrupted'); assert.equal(R.jobs.get('j1').state, 'succeeded');
+    assert.equal(R.jobs.purgeFinishedBefore(t(6)), 1, 'only j1 ended before the cut');
+    assert.equal(R.jobs.get('j1'), null); assert.deepEqual(R.jobs.log('j1', 0, 10), [], 'its log went with it');
+  });
 }
 
 contract('sqlite', makeSqlite);

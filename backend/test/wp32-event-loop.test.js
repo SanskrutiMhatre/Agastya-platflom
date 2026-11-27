@@ -50,9 +50,11 @@ test('a 200-module validation with BREX does not hold the event loop: its longes
       }
     })();
     const t0 = performance.now();
-    const v = await w.post(`/api/projects/${pid}/validation`, { brex: true });
+    // WP-14: `fresh` - the warm-up stored a run of this unchanged content, which the job service would return at once; this run must judge every module
+    const v = await w.post(`/api/projects/${pid}/validation`, { brex: true, fresh: true });
     const wall = performance.now() - t0; done = true; await poll; h0.disable();
     assert.equal(v.status, 200, JSON.stringify(v.json).slice(0, 300));
+    assert.notEqual(v.json.run.cached, true, 'a real run, not the stored one');
     assert.ok(v.json.run.brexChecked >= 200 && v.json.run.schemaChecked >= 200, `BREX and the schema ran on every module (${v.json.run.brexChecked}, ${v.json.run.schemaChecked})`);
     const maxMs = h0.max / 1e6;
     console.log(`validation of ${n} modules: ${Math.round(wall)} ms; longest event-loop stall ${maxMs.toFixed(1)} ms; ${answers.length} health answers, slowest ${Math.max(...answers.map((a) => a.ms)).toFixed(1)} ms`);

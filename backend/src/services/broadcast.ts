@@ -138,12 +138,21 @@ export function attach(server: HttpServer): void {
 }
 
 export type BroadcastMessage =
-  | { type: 'progress'; message: string; done?: boolean; error?: boolean; file?: string; line?: number; hint?: string; preview?: boolean }
-  | { type: 'reload'; kind?: string }
+  | { type: 'progress'; message: string; done?: boolean; error?: boolean; file?: string; line?: number; hint?: string; preview?: boolean; jobId?: string }
+  | { type: 'reload'; kind?: string; jobId?: string }
   /** WP-28: the people in the project changed; ask GET /api/projects/:id/presence */
   | { type: 'presence' }
   /** WP-28: a check-out was taken (released false) or given back / broken / expired (released true) */
-  | { type: 'leases'; path: string; part: string; holder: string | null; released: boolean; broken?: boolean };
+  | { type: 'leases'; path: string; part: string; holder: string | null; released: boolean; broken?: boolean }
+  /** WP-14: a job changed state (queued, running, succeeded, failed, cancelled). No `message` field, so a progress pane ignores it. */
+  | { type: 'job'; job: Record<string, unknown> };
+
+/**
+ * WP-14: in a job worker process there are no sockets; the worker hands every message to its server (services/jobs/worker.ts), which
+ * records it in the job's log and sends it here. `setBroadcastSink(null)` restores direct delivery.
+ */
+let sink: ((projectId: string, msg: BroadcastMessage) => void) | null = null;
+export function setBroadcastSink(fn: ((projectId: string, msg: BroadcastMessage) => void) | null): void { sink = fn; }
 
 function mayRead(c: Client, projectId: string): boolean {
   const hit = c.can.get(projectId);
@@ -155,6 +164,12 @@ function mayRead(c: Client, projectId: string): boolean {
 
 /** Send `msg` (tagged with the project id) to every connected user who can read that project. */
 export function broadcast(projectId: string, msg: BroadcastMessage): void {
+  if (sink) { sink(projectId, msg); return; }
+  deliver(projectId, msg);
+}
+
+/** Send to the sockets of this process (the server side of a worker's relay calls this directly). */
+export function deliver(projectId: string, msg: BroadcastMessage): void {
   const payload = JSON.stringify({ ...msg, projectId });
   for (const c of clients) {
     if (c.ws.readyState !== WebSocket.OPEN) continue;

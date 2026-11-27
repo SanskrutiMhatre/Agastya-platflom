@@ -21,8 +21,9 @@ import { SqliteRetentionRepository, type RetentionRepository } from './retention
 import { SqliteAuditRepository, type AuditRepository } from './auditRepository';
 import { SqliteLeaseRepository, type LeaseRepository, type LeaseRow } from './leaseRepository';
 import { SqliteAccessRepository, type AccessRepository } from './accessRepository';
+import { SqliteJobRepository, type JobRepository, type JobRow, type JobLogRow, type JobState } from './jobRepository';
 
-export type { ProjectRegistry, SnsRepository, ProjectConfigRepository, ReferenceRepository, ActivityRepository, CirLinkRepository, ExtensionRepository, LifecycleRepository, RetentionRepository, AuditRepository, AccessRepository, UnitOfWork, LeaseRepository, LeaseRow };
+export type { ProjectRegistry, SnsRepository, ProjectConfigRepository, ReferenceRepository, ActivityRepository, CirLinkRepository, ExtensionRepository, LifecycleRepository, RetentionRepository, AuditRepository, AccessRepository, UnitOfWork, LeaseRepository, LeaseRow, JobRepository, JobRow, JobLogRow, JobState };
 
 export interface Repositories extends UnitOfWork {
   /** The engine behind these repositories ('sqlite'); a contract test and the migration runner use it to pick a dialect. */
@@ -47,6 +48,8 @@ export interface Repositories extends UnitOfWork {
   audit: AuditRepository;
   /** WP-27 (PLT-016, ENT-005): groups, group grants, capability rules, the directory group map. */
   access: AccessRepository;
+  /** WP-14 (PUB-004): job records and their progress lines. */
+  jobs: JobRepository;
 }
 
 export function createSqliteRepositories(db: SqlDatabase): Repositories {
@@ -69,5 +72,6 @@ export function createSqliteRepositories(db: SqlDatabase): Repositories {
     retention: new SqliteRetentionRepository(db),
     audit: new SqliteAuditRepository(db),
     access: new SqliteAccessRepository(db),
+    jobs: new SqliteJobRepository(db),
   };
 }

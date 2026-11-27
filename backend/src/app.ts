@@ -43,6 +43,7 @@ import { registerWaiverRoutes } from './routes/waivers';
 import { registerProblemRoutes } from './routes/problems';
 import { registerBrandRoutes } from './routes/brand';
 import { registerBackupRoutes } from './routes/backups';
+import { registerJobRoutes } from './routes/jobs';
 import { notifyAccess } from './services/access-notify';
 import { API_VERSION, MIN_CLIENT_VERSION, CLIENT_VERSION_HEADER, buildInfo, clientAccepted, schemaLevel } from './services/version';
 import { hostAllowed, MISDIRECTED } from './services/network';
@@ -125,6 +126,7 @@ export function createApp(): express.Express {
   registerJssGuard(app);                 // before every S1000D-side writer: a JSS document project's publication.xml is never replaced by them
   registerWorkspaceRoutes(app);
   registerProjectContentRoutes(app);
+  registerJobRoutes(app);
   registerTeamRoutes(app);
   registerAdminRoutes(app);
   registerCirRoutes(app);

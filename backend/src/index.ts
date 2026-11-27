@@ -15,6 +15,7 @@ import { acquireWorkspaceLock, releaseWorkspaceLock } from './services/workspace
 import * as broadcast from './services/broadcast';
 import { reconcileRegistry, sweepPendingImports } from './services/projects';
 import { startRenderer, stopRenderer, rendererStatus } from './services/publisher';
+import { shutdownJobs } from './services/jobs';
 import { loadTls, listen, hostCheckFor, setHostCheck, describeNetwork } from './services/network';
 import { installLogging } from './services/log';
 import { enableHostEventSink } from './services/securityEvents';
@@ -48,7 +49,8 @@ export async function start(port: number = config.port): Promise<number> {
   await ensureBootstrapAdmin({ store, audit, env: config.initialAdmin, now: () => new Date() });
 
   const app = createApp();
-  startRenderer();
+  // WP-14: builds run in job workers, each with its own bounded JVM; the server keeps a warm one only when jobs run inline
+  if (config.jobs.mode === 'inline') startRenderer();
 
   try { sweepStaleUploads(); } catch { /* the temp folder is a convenience */ }
   setInterval(() => { try { sweepStaleUploads(); } catch { /* best effort */ } }, 3600_000).unref();     // aborted uploads must not pile up on a server that stays up
@@ -69,6 +71,7 @@ export async function start(port: number = config.port): Promise<number> {
 export function stop(): void {
   stopScheduler();
   stopRenderer();
+  void shutdownJobs();
   broadcast.close();
   for (const s of servers) s.close();
   servers = [];
@@ -87,6 +90,7 @@ export function shutdownGracefully(graceMs = 15000): Promise<void> {
       if (done) return; done = true;
       stopScheduler();
       try { stopRenderer(); } catch { /* best effort */ }
+      void shutdownJobs().catch(() => undefined);           // WP-14: workers and their JVMs end with the server (the job object makes sure)
       try { registryDb.close(); } catch (e) { console.warn('[stop] database close:', (e as Error).message); }
       releaseWorkspaceLock();
       resolve();

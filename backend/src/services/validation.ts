@@ -49,6 +49,10 @@ export interface ValidationRun {
   unchecked: string[];
   /** WP-32 (PERF-002): why each unchecked file was not judged, in a sentence (the validator could not hold it, an issue that is not installed ...). */
   uncheckedWhy?: Record<string, string>;
+  /** WP-14 (PERF-012): the input fingerprint of the run (services/jobs/fingerprint.ts), when the Validation page asked for it. */
+  inputHash?: string;
+  /** WP-14: true when this answer is the stored run of unchanged content, not a new run. */
+  cached?: boolean;
 }
 
 const reportFile = (projectId: string): string => path.join(projectDirFor(projectId), '.validation.json');
@@ -207,7 +211,7 @@ export function setProjectIssue(projectId: string, issue: string): string {
   return issue;
 }
 
-export async function runValidation(projectId: string, opts: { issue?: string; brex?: boolean } = {}): Promise<ValidationRun> {
+export async function runValidation(projectId: string, opts: { issue?: string; brex?: boolean; inputHash?: string } = {}): Promise<ValidationRun> {
   const dir = projectDirFor(projectId);
   const pj = readProjectJson(projectId);
   const csdb = csdbRel(pj);
@@ -261,6 +265,7 @@ export async function runValidation(projectId: string, opts: { issue?: string; b
   const unchecked = new Set<string>(); const uncheckedWhy: Record<string, string> = {};
   for (const n of [...(schema.notes ?? []), ...(schema.issues ?? [])]) if (n.rel && /Not checked|could not run/i.test(String(n.title ?? ''))) { unchecked.add(String(n.rel)); uncheckedWhy[String(n.rel)] = String(n.detail ?? n.title ?? '').slice(0, 300); }
   const run: ValidationRun = { ranAt: nowIso(), issueUsed, checked: xml.checked, schemaChecked: schema.checked, brexChecked, summary, issues, notes, unchecked: [...unchecked], uncheckedWhy };
+  if (opts.inputHash) run.inputHash = opts.inputHash;
   try { fs.writeFileSync(reportFile(projectId), JSON.stringify(run)); } catch { /* the report is a convenience */ }
   return run;
 }

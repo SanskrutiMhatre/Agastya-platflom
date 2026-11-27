@@ -25,7 +25,16 @@ const pause = (ms: number): void => { Atomics.wait(new Int32Array(new SharedArra
 /** Stop the warm renderer: every file it holds open is let go. The next build starts it again (render() starts it when it is not running), a few seconds slower once. */
 export function releaseRenderer(): void {
   try { fopd.stop(); } catch { /* nothing to stop */ }
+  for (const fn of releaseHooks) { try { fn(); } catch { /* best effort */ } }
 }
+
+/**
+ * WP-14: builds now run in job workers, each with its own warm JVM, so those hold the pictures. The job service registers a hook here that
+ * ends its idle workers (and their JVMs) synchronously; a worker that is running a job is left alone. (A registry, so this leaf module
+ * does not import the job service.)
+ */
+const releaseHooks = new Set<() => void>();
+export function onReleaseRenderer(fn: () => void): () => void { releaseHooks.add(fn); return () => releaseHooks.delete(fn); }
 
 /**
  * Run `remove` (it deletes or renames files). If it fails because a file is in use, release the renderer and try again for a couple of seconds; if the file is still in use,
