@@ -42,6 +42,11 @@ export function auditPage(): AuditResult {
     }
     return true;
   };
+  /** In the accessibility tree and reachable even when it has no size (an empty link is still announced and focusable). */
+  const rendered = (el: Element): boolean => {
+    for (let e: Element | null = el; e; e = e.parentElement) { const cs = getComputedStyle(e); if (cs.display === 'none' || cs.visibility === 'hidden') return false; }
+    return true;
+  };
   const hiddenFromAT = (el: Element): boolean => !!el.closest('[aria-hidden="true"], [hidden], [inert]');
   const textOf = (el: Element | null): string => (el ? (el.textContent || '').replace(/\s+/g, ' ').trim() : '');
   const byIds = (ids: string | null): string => (ids || '').split(/\s+/).filter(Boolean).map((id) => textOf(document.getElementById(id))).join(' ').trim();
@@ -68,12 +73,12 @@ export function auditPage(): AuditResult {
   // ------------------------------------------------------------ names
   const BUTTONS = 'button, [role="button"], [role="tab"], [role="menuitem"], [role="radio"], [role="checkbox"], [role="switch"], [role="option"], summary';
   for (const el of Array.from(document.querySelectorAll(BUTTONS))) {
-    if (!visible(el) || hiddenFromAT(el)) continue;
+    if (!rendered(el) || hiddenFromAT(el)) continue;
     count('button-name');
     if (!nameOf(el)) add('button-name', 'critical', el, `${el.tagName.toLowerCase()}${el.getAttribute('role') ? `[role=${el.getAttribute('role')}]` : ''} has no accessible name`);
   }
   for (const el of Array.from(document.querySelectorAll('a[href]'))) {
-    if (!visible(el) || hiddenFromAT(el)) continue;
+    if (!rendered(el) || hiddenFromAT(el)) continue;
     count('link-name'); if (!nameOf(el)) add('link-name', 'serious', el, 'link has no accessible name');
   }
   for (const el of Array.from(document.querySelectorAll('input, select, textarea, [role="textbox"], [role="combobox"], [role="listbox"], [role="slider"], [role="spinbutton"]'))) {
