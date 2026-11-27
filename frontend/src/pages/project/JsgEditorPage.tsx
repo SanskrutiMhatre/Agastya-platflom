@@ -16,7 +16,7 @@ import { canBuild, useProject } from '../../layouts/ProjectShell';
 import { JsgEditor } from '../../jsg/editor';
 import { IsplEditor } from '../../jsg/ispl-editor';
 import type { GraphicInfo, JsgEditorLike } from '../../jsg/shared';
-import { JsgParseError, parseJsg } from '../../jsg/xml';
+import { JsgParseError, parseJsg, serializeJsg } from '../../jsg/xml';
 import { useUi } from '../../store/ui';
 import { DocEditorShell } from '../../editors/host/DocEditorShell';
 import { DocPdfPane } from '../../editors/host/DocPdfPane';
@@ -33,6 +33,7 @@ const ADAPTER: DocAdapter<JsgDocument> = {
   builtNote: (out) => `Built in ${((out.totalMs ?? 0) / 1000).toFixed(1)} s by the JSG engine`,
   findingsWhere: 'listed in the outline',
   parse: (xml) => { parseJsg(xml); },
+  normalize: (xml) => serializeJsg(parseJsg(xml)),
   reloadProject: false,
 };
 

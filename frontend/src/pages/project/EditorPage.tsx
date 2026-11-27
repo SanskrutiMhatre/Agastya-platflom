@@ -18,6 +18,7 @@ import { ConflictDialog } from '../../editors/host/ConflictDialog';
 import { EditorHeader, SaveStateChip } from '../../editors/host/EditorHeader';
 import { useEditorLayout } from '../../editors/host/useEditorLayout';
 import { useHostKeys } from '../../editors/host/useHostKeys';
+import { S1000D_STATE } from '../../editors/host/testIds';
 import { EditorSide } from './editor/EditorSide';
 import { PdfPane } from './editor/PdfPane';
 
@@ -127,7 +128,7 @@ export function EditorPage() {
       <EditorHeader layout={layout} title={ctx.summary.project.name}
         lead={<button className="icon-btn" onClick={() => setSide(!sideOpen)} title={sideOpen ? 'Hide the data module panel' : 'Show the data module panel'} aria-label={sideOpen ? 'Hide the data module panel' : 'Show the data module panel'} aria-pressed={sideOpen} data-testid="toggle-side"><Icon name="panel" size={17} /></button>}
         crumb={activeDoc ? <span className="v2-hint v2-trunc v2-crumb" title={activeDoc.file ?? activeDoc.title}>/ {activeDoc.title || activeDoc.file}</span> : null}
-        state={ready && writable ? <SaveStateChip state={{ saving, dirty: dirtyCount > 0, savedAt, dirtyCount }} testId="save-state" /> : null}
+        state={ready && writable ? <SaveStateChip state={{ saving, dirty: dirtyCount > 0, savedAt, dirtyCount }} ids={S1000D_STATE} /> : null}
         actions={<span className="v2-edactions">
           {ready && writable && dirtyCount > 0
             ? <button className="btn btn-sm btn-primary" onClick={() => void saveNow()} disabled={saving || !activeDoc} title="Save the open data module (Ctrl+S)" data-testid="save-now"><Icon name="check" size={12} />{saving ? 'Saving…' : `Save${dirtyCount > 1 ? ` (${dirtyCount} unsaved)` : ''}`}</button>

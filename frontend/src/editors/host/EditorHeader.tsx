@@ -11,11 +11,12 @@ import { Icon } from '../../components/Icon';
 import { ThemeToggle } from '../../components/ThemeToggle';
 import { saveStateLabel, type SaveStateInput } from './saveState';
 import type { EditorLayout } from './useEditorLayout';
+import type { TestId } from './testIds';
 
-export function SaveStateChip({ state, testId }: { state: SaveStateInput; testId: string }) {
+export function SaveStateChip({ state, ids }: { state: SaveStateInput; ids: TestId }) {
   const { text, tone } = saveStateLabel(state);
   const mark = tone === 'ok' ? '✓ ' : tone === 'warn' ? '● ' : tone === 'bad' ? '! ' : '';
-  return <span className={`v2-badge v2-edstate ${tone === 'busy' ? '' : tone}`} data-testid={testId} data-tone={tone} aria-live="polite" title={tone === 'bad' ? 'The last save did not reach the server. Press Save (Ctrl+S) to try again.' : undefined}>{mark}{text}</span>;
+  return <span className={`v2-badge v2-edstate ${tone === 'busy' ? '' : tone}`} {...ids} data-tone={tone} aria-live="polite" title={tone === 'bad' ? 'The last save did not reach the server. Press Save (Ctrl+S) to try again.' : undefined}>{mark}{text}</span>;
 }
 
 export interface EditorHeaderProps {

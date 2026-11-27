@@ -36,9 +36,9 @@ export function replaceRanges(ranges: Range[], text: string): number {
   const first = editableOf(live[0].startContainer)!;
   first.dispatchEvent(new InputEvent('beforeinput', { bubbles: true, cancelable: true, inputType: 'insertReplacementText' }));
   const touched = new Set<HTMLElement>();
-  for (const r of [...live].sort((a, b) => (a.compareBoundaryPoints(Range.START_TO_START, b) > 0 ? -1 : 1))) {
-    const node = r.startContainer as Text; node.data = node.data.slice(0, r.startOffset) + text + node.data.slice(r.endOffset); touched.add(editableOf(node)!);
-  }
+  // the offsets are read before anything changes: Range objects are live, and a change to a text node moves the other ranges in it
+  const spots = [...live].sort((a, b) => (a.compareBoundaryPoints(Range.START_TO_START, b) > 0 ? -1 : 1)).map((r) => ({ node: r.startContainer as Text, start: r.startOffset, end: r.endOffset }));
+  for (const s of spots) { s.node.replaceData(s.start, s.end - s.start, text); touched.add(editableOf(s.node)!); }
   for (const el of touched) el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertReplacementText' }));
   return live.length;
 }
@@ -91,8 +91,18 @@ export function FindBar({ root, replace, readOnly, onClose, notify }: FindBarPro
     notify(n ? `Replaced ${n} match${n === 1 ? '' : 'es'}.` : 'Nothing to replace.'); run(true);
   };
 
+  /** Close and give the keyboard back to the document, at the current match (or where the search was), so Ctrl+S and typing go on there. */
+  const close = () => {
+    const r = at >= 0 ? hits[at] : undefined; const el = root();
+    const target = r?.startContainer.isConnected ? editableOf(r.startContainer) : el?.querySelector<HTMLElement>('[contenteditable="true"]') ?? null;
+    onClose();
+    if (!target) return;
+    target.focus({ preventScroll: true });
+    if (r?.startContainer.isConnected) { const sel = window.getSelection(); const c = document.createRange(); c.setStart(r.endContainer, Math.min(r.endOffset, (r.endContainer as Text).length ?? r.endOffset)); c.collapse(true); sel?.removeAllRanges(); sel?.addRange(c); }
+  };
+
   const onKey = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onClose(); }
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); }
   };
   return (
     <div className="v2-findbar" role="search" aria-label="Find in the document" data-testid="host-find" onKeyDown={onKey}>
@@ -110,7 +120,7 @@ export function FindBar({ root, replace, readOnly, onClose, notify }: FindBarPro
         <button className="btn btn-sm" onClick={replaceAll} disabled={!hits.length} data-testid="replace-all">Replace all</button>
       </>}
       <span className="spacer" />
-      <button className="icon-btn" onClick={onClose} title="Close (Esc)" aria-label="Close the find bar"><Icon name="close" size={14} /></button>
+      <button className="icon-btn" onClick={close} title="Close (Esc)" aria-label="Close the find bar"><Icon name="close" size={14} /></button>
     </div>
   );
 }

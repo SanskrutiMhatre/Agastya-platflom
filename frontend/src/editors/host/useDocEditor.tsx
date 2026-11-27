@@ -22,6 +22,7 @@ import { downloadText, useLocalDraft } from '../../lib/localDraft';
 import { useProgress } from '../../lib/progress';
 import { useUi } from '../../store/ui';
 import { ConflictDialog, type ConflictCheck } from './ConflictDialog';
+import { DOC_IDS } from './testIds';
 import type { EditorLayout } from './useEditorLayout';
 
 export interface DocFinding { severity: 'error' | 'warning'; message: string; rule?: string; location?: string }
@@ -51,6 +52,8 @@ export interface DocAdapter<L extends DocLoaded> {
   findingsWhere: string;
   /** reading the text with the editor's own model: throws on a document the editor cannot open */
   parse(xml: string): void;
+  /** the editor's own writing of a text (its parser and serializer), so that the three versions of a compare differ only where the content does */
+  normalize?(xml: string): string;
   /** the project summary is asked for again after a save and a build (the JSS page shows its counts) */
   reloadProject: boolean;
 }
@@ -155,7 +158,9 @@ export function useDocEditor<L extends DocLoaded>(ctx: ProjectCtx, adapter: DocA
   };
   const compare = async () => {
     const ed = editorRef.current; if (!ed) return;
-    try { const d = await adapter.read(id); setMerge({ mine: ed.getXml(), theirs: d.xml, theirsHash: d.hash, base: baseRef.current }); }
+    // the server keeps the text as it was written (a stencil, an import, another tool): compare the editor's writing of each version
+    const norm = (x: string) => { try { return adapter.normalize ? adapter.normalize(x) : x; } catch { return x; } };
+    try { const d = await adapter.read(id); setMerge({ mine: ed.getXml(), theirs: norm(d.xml), theirsHash: d.hash, base: norm(baseRef.current) }); }
     catch (e) { toast(errText(e), 'error'); }
   };
   const checkMerged = async (xml: string): Promise<ConflictCheck> => {
@@ -196,7 +201,7 @@ export function useDocEditor<L extends DocLoaded>(ctx: ProjectCtx, adapter: DocA
   /** The alerts above the editor, the same in both pages. `recover` puts the found draft back (each editor does it its own way). */
   const banners = (recover: () => void): ReactNode => <>
     {!writable ? <Alert tone="warn">You have {role} access to this project: you can read the document, but changes cannot be saved.</Alert> : null}
-    {stale ? <Alert tone="warn"><span data-testid={`${kind}-conflict`}>Someone else saved this document after you opened it, so your save was refused. Your changes are still here.</span>{' '}
+    {stale ? <Alert tone="warn"><span {...DOC_IDS[kind].conflict}>Someone else saved this document after you opened it, so your save was refused. Your changes are still here.</span>{' '}
       <button className="btn btn-sm btn-primary" onClick={() => void compare()} data-testid="conflict-compare" title="See your version and theirs side by side, keep what you want from each, and save the checked result"><Icon name="compare" size={12} />Compare and merge…</button>{' '}
       <button className="btn btn-sm" onClick={downloadMine} data-testid="conflict-download">Download my version</button>{' '}
       {role === 'manager' || role === 'owner' ? <><button className="btn btn-sm" onClick={() => void overwrite()} data-testid="conflict-overwrite">Save mine over theirs</button>{' '}</> : null}

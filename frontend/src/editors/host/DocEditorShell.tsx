@@ -10,6 +10,7 @@ import { ShortcutsDialog } from './ShortcutsDialog';
 import type { SaveStateInput } from './saveState';
 import type { EditorLayout } from './useEditorLayout';
 import { useHostKeys } from './useHostKeys';
+import { DOC_IDS } from './testIds';
 
 export interface DocEditorShellProps {
   kind: 'jss' | 'jsg';
@@ -71,13 +72,13 @@ export function DocEditorShell({ kind, shortcuts, layout, title, crumb, saveStat
   return (
     <>
       {guard}
-      <EditorHeader layout={layout} title={title} crumb={crumb} state={<SaveStateChip state={saveState} testId={`${kind}-state`} />}
+      <EditorHeader layout={layout} title={title} crumb={crumb} state={<SaveStateChip state={saveState} ids={DOC_IDS[kind].state} />}
         actions={<span className="v2-edactions" ref={actionsRef}>{actions}</span>} onPalette={() => setPalette(true)} onShortcuts={() => setKeysOpen(true)} />
       {banners}
       {finding && find ? <FindBar key={finding.n} root={() => hostRef.current?.querySelector<HTMLElement>('[data-testid="jss-paper"], .jsg-sheet') ?? hostRef.current} replace={finding.replace} readOnly={readOnly} onClose={() => setFinding(null)} notify={(m) => toast(m, 'info')} /> : null}
-      <div className={`v2-split${focus ? ' is-focus' : ''}`} data-testid={`${kind}-split`} ref={splitRef} style={{ display: loaded ? undefined : 'none', ...(dragging ? { userSelect: 'none' } : {}) }}>
+      <div className={`v2-split${focus ? ' is-focus' : ''}`} {...DOC_IDS[kind].split} ref={splitRef} style={{ display: loaded ? undefined : 'none', ...(dragging ? { userSelect: 'none' } : {}) }}>
         <div className="a" style={{ display: shown === 'pdf' ? 'none' : 'flex', flex: shown === 'edit' ? '1 1 0' : `0 0 ${pct}%`, minWidth: 0 }}>
-          <div ref={hostRef} style={{ flex: 1, minWidth: 0, minHeight: 0, position: 'relative' }} data-testid={`${kind}-host`} />
+          <div ref={hostRef} style={{ flex: 1, minWidth: 0, minHeight: 0, position: 'relative' }} {...DOC_IDS[kind].host} />
         </div>
         {shown === 'split' ? <div className={`v2-divider ${dragging ? 'drag' : ''}`} role="separator" aria-orientation="vertical" aria-label="Resize editor and PDF" aria-valuenow={Math.round(pct)} aria-valuemin={layout.splitRange[0]} aria-valuemax={layout.splitRange[1]} tabIndex={0} onPointerDown={startDrag} onKeyDown={dividerKey} /> : null}
         <div className="b" style={{ flex: '1 1 0', display: shown === 'edit' ? 'none' : 'flex', flexDirection: 'column', minWidth: 0, borderLeft: shown === 'pdf' ? 0 : undefined }}>{pdf}</div>

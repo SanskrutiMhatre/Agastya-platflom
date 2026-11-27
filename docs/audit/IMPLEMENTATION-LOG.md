@@ -974,3 +974,56 @@ order of 08 section 7:
   suites. `scripts/ci/lint.mjs` reports `any.backend` 282 against a baseline of 280: not from this package (no TypeScript changed here).
 * Not done: the end-to-end acceptance "full 100-module publish at most 40 s" was not measured through the server (the FO stage it was
   dominated by is now under 1 s); a re-check on a newer libxslt if the toolchain changes.
+
+## Phase 4
+
+### WP-21 Editor host contract and unified editor chrome (UX-003, UX-002, UX-017, UX-012, UX-020, FE-021, FE-025, PRD-004, GAP-004) - done, with the limits listed
+
+Decision D16 taken as the audit recommends: the chrome, panels and modes are unified, the three canvases (Studio, JSS sheet, JSG
+sheet) are kept as they are. No feature removed: the parity check reports 0 removals (routes 72, rail 23, commands 113 -> 115, keys
+125 -> 153, test ids 372 -> 398, tests 275 -> 310).
+
+* **The host** (`frontend/src/editors/host/`): `saveState.ts` (one vocabulary: Saving… / Save failed: retry / Unsaved changes (n
+  documents) / Saved HH:MM / All changes saved), `useEditorLayout.ts` (Editor | Split | PDF, divider by pointer and arrow keys,
+  focus mode, `reveal()`; per-format storage `agastya.<format>.view|split|focus`; **Write is the default of a new session**),
+  `EditorHeader.tsx` (one header: lead, title, document, state chip, page actions, Commands Ctrl+K, shortcuts F1, focus Ctrl+., the
+  "Editor layout" group, theme), `useHostKeys.ts` (Ctrl+K / Ctrl+Shift+P, F1, Ctrl+., Ctrl+F / Ctrl+H, Esc; never while a dialog is
+  open or when the editor already handled the key), `CommandPalette.tsx` (the header actions, the host commands and every toolbar
+  button of the editor, `data-cmd`, by name; the hidden toolbar tab is opened before its button is pressed), `ShortcutsDialog.tsx`
+  (from `lib/editorShortcuts.ts`, so the dialog and the registry cannot drift), `FindBar.tsx` (JSS find and replace),
+  `merge.ts` + `ConflictDialog.tsx` (three-way line merge: patience anchors + LCS; per-change and per-conflict choice; the merged text
+  is parsed and validated by the server before it is saved), `useDocEditor.tsx` (the JSS/JSG contract: load, save, check, generate,
+  drafts, conflict banner, leave guard, deep link) + `DocEditorShell.tsx` + `DocPdfPane.tsx`, `testIds.ts` (the old test ids
+  written out in full so the parity scan still sees them where they are drawn).
+* **JSS** (`JssEditorPage.tsx`, now an adapter): the shared header with every former button and id (Check, Save, packages, Convert,
+  Export project, Generate PDF); Write by default, Generate opens the PDF pane; **find and replace** (UX-017: count, next/previous,
+  replace, replace all as one Undo step, match case; CSS Custom Highlight with the `--paper-find*` tokens); palette and shortcuts
+  dialog (UX-017); compare and merge on a refused save; focus mode.
+* **JSG** (`JsgEditorPage.tsx`, the same adapter shape): same header and keys (Ctrl+F/H stay the JSG editor's own find bar);
+  autosave, Word import, Convert (UHB), Export kept; the Word import's `window.confirm` became a ConfirmModal "Replace this
+  handbook?" (GAP-002, WP-35's finding, done in passing); the ISPL editor gets its own shortcuts list.
+* **S1000D** (`EditorPage.tsx`, `PdfPane.tsx`, `lib/studioSession.ts`, `studio/ui/app.ts`, `studio/ui/commands.ts`): the shared header
+  (the data-module panel toggle as its lead); `save-state` always shown, `save-now` beside it while unsaved; in Write, Quick preview
+  and Generate are drawn in the header (same ids, one place at a time) and open the PDF pane; the Studio's ribbon **folds to its 32 px
+  tab strip** by default inside the platform (a tab click shows that tab until a command is used, Esc or a click elsewhere; the pin,
+  a double-click on a tab or Ctrl+F1 keeps it open; remembered; standalone Studio unchanged); new commands `view.ribbon` (Ctrl+F1)
+  and `view.focus` (Ctrl+.), Ctrl+K added to `tools.palette`; the refused-save dialog gains "Compare and merge…" (base = the text the
+  hash stands for, kept per open module; the merged text is checked with the Studio's schema+BREX validation before it is saved over
+  the other version).
+* **Focus mode** (all three): the project rail, the side panels and the PDF step aside; `html[data-editor-focus]`; slim header.
+* **GAP-004**: `goToModule` in `jss/editor.ts` and `jsg/editor.ts` honours `#n` (the n-th id-less section of that title, as
+  `xengine/outline.ts keyOf` numbers them); a deep link that matches nothing shows `goto-missing` instead of silently landing at the top.
+* **Registry and parity**: `lib/editorShortcuts.ts` gains the `host.*` entries and `shortcutsFor()`; `editorShortcuts.test.ts` and
+  `scripts/parity/scan.mjs` scan the three host files. CHECKLIST.md sections 5, 13 and 14 filled in.
+* **Measured** (`e2e/wp21-editor-chrome.spec.ts`, fresh profile, 1366x768, Write): S1000D `.editor-host` 61.3% (80.6% in focus),
+  JSS host 86.5% (95.6%), JSG host 86.0% (95.6%). Before: 28.9% (UX-002).
+* **Tests**: new `editors/host/merge.test.ts` (10) and `editors/host/FindBar.test.ts` (3; it caught a live-Range bug in Replace all:
+  a change to a text node moved the other matches in it); new e2e `wp21-editor-chrome.spec.ts` (12: header, keys, palette,
+  shortcuts, focus and the 55%/70% measures per editor; Esc; Ctrl+S/Ctrl+F per editor; JSS find/replace; JSS compare-and-merge;
+  deep link; the folding ribbon; no sideways scroll at 683/820/1024 px). `00-platform.spec.ts` "Quick preview and Generate live
+  together in the panel on the right" now first checks the header slot and switches to Split (Write is the default now).
+* **Limits**: the Problems pane as a bottom drawer of at most 25% height (06 section 7.2) is not done; Esc leaves focus mode in JSS and
+  JSG, in the Studio the Studio's own Esc (clear the selection) comes first, so Ctrl+. or the header button leaves it there; the
+  visual baselines of the three editors (`e2e/visual`) change (new header, folded ribbon, Write default) and need re-capturing by
+  whoever runs the visual suite; the server still writes `t:` keys for id-less sections (preferring ids server-side is not in
+  this package); the JSG compare-and-merge path is the JSS one (same hook) but only the JSS path has an e2e test.

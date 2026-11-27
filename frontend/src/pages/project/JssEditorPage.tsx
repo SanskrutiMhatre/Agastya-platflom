@@ -14,7 +14,7 @@ import { Icon } from '../../components/Icon';
 import { Spinner, errText } from '../../components/ui';
 import { canBuild, useProject } from '../../layouts/ProjectShell';
 import { JssEditor, type GraphicInfo } from '../../jss/editor';
-import { JssParseError, parseJss } from '../../jss/xml';
+import { JssParseError, parseJss, serializeJss } from '../../jss/xml';
 import { PackagePanel } from '../../jss/PackagePanel';
 import { ConvertButton, ExportProjectButton, useSectionCode } from '../../components/DocCodes';
 import { useUi } from '../../store/ui';
@@ -33,6 +33,7 @@ const ADAPTER: DocAdapter<JssDocument> = {
   builtNote: (out) => `Built in ${((out.totalMs ?? 0) / 1000).toFixed(1)} s${out.releaseLabel ? ` · ${out.releaseLabel}` : ' · stamped NOT RELEASED'}`,
   findingsWhere: 'listed below the page',
   parse: (xml) => { parseJss(xml); },
+  normalize: (xml) => serializeJss(parseJss(xml)),
   reloadProject: true,
 };
 

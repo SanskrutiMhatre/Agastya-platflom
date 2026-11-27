@@ -76,15 +76,15 @@ Source files: `studio/**`, `pages/project/EditorPage.tsx`, `pages/project/editor
 
 | Old control | New home | Guarding test | Sign-off |
 |---|---|---|---|
-| Every command of the registry (File, Edit, Format, Structure, Insert, Table, Review, View, Tools), reachable from ribbon, File menu, context menu or palette | | `parity-dump.test.ts` (no command lost, ribbon ids valid, no key clash); 30+ unit files under `studio/` | |
-| Every accelerator (`studio <key> -> <command>`) | | `parity-dump.test.ts`; walk-through item 7 | |
+| Every command of the registry (File, Edit, Format, Structure, Insert, Table, Review, View, Tools), reachable from ribbon, File menu, context menu or palette | WP-21: unchanged. Inside the platform the ribbon folds to its tab strip by default; a click on a tab shows that tab's commands until one is used (Esc or a click elsewhere folds it again), the pin at the end of the tab strip, a double-click on a tab or Ctrl+F1 (new `view.ribbon`) keeps it open, and the choice is remembered. The palette is also on Ctrl+K and on the header's Commands button | `parity-dump.test.ts` (no command lost, ribbon ids valid, no key clash); 30+ unit files under `studio/` | |
+| Every accelerator (`studio <key> -> <command>`) | WP-21: all kept; added Mod+K (palette), Mod+. (`view.focus`, the platform's focus mode), Mod+F1 (`view.ribbon`). F1 is also the header's shortcuts button | `parity-dump.test.ts`; walk-through item 7; `wp21-editor-chrome.spec` | |
 | XML / Tags / Design / Split views, synchronised selection | | `zz-dmtypes.spec`, studio unit tests | |
 | Find and replace, go to ID | | studio unit tests | |
 | Validation (schema, BREX), live validation, problems pane, next/previous problem | | `zz-dmtypes.spec`, `publish-gate.spec` | |
-| Drafts, recovery, conflict dialog | | `wp05-dataloss.spec` | |
-| Module list and tree, new module, CIR pick, side collapse (`dm-list`, `dm-row`, `chapter-node`, `new-dm`, `view-all`, `view-tree`, `toggle-side`, `collapse-side`, `cir-pick`) | | `00-platform.spec` | |
-| Save state and Save now (`save-state`, `save-now`), split (`editor-split`) | | `wp05-dataloss.spec` (save state); `save-now` is used by no test (gap) | |
-| Quick preview, Generate, pop-out windows (`quick-preview-btn`, `generate-btn`, `generate-anyway`, `popout-*`, `pdf-pane`, `pdf-shown`, `pdf-progress`, `pdf-cancel`) | | `zz-dmtypes.spec`, `publish-gate.spec` | |
+| Drafts, recovery, conflict dialog | WP-21: unchanged; the refused-save dialog gains "Compare and merge…" (the host's ConflictDialog: per-change choice, schema+BREX check before the save) | `wp05-dataloss.spec`; `editors/host/merge.test.ts` | |
+| Module list and tree, new module, CIR pick, side collapse (`dm-list`, `dm-row`, `chapter-node`, `new-dm`, `view-all`, `view-tree`, `toggle-side`, `collapse-side`, `cir-pick`) | WP-21: unchanged; `toggle-side` is the lead button of the shared editor header; the panel steps aside in focus mode | `00-platform.spec` | |
+| Save state and Save now (`save-state`, `save-now`), split (`editor-split`) | WP-21: the shared header (`editor-header`); `save-state` is always shown (the host's words: All changes saved / Unsaved changes (n documents) / Saving… / Saved HH:MM), `save-now` beside it while something is unsaved; `editor-split` unchanged, Split/PDF in the shared "Editor layout" group (Editor = Write is the new default) | `wp05-dataloss.spec`, `wp21-editor-chrome.spec` | |
+| Quick preview, Generate, pop-out windows (`quick-preview-btn`, `generate-btn`, `generate-anyway`, `popout-*`, `pdf-pane`, `pdf-shown`, `pdf-progress`, `pdf-cancel`) | WP-21: while the PDF pane is closed (Write) Quick preview and Generate sit in the header (`chrome-preview-slot`, same ids, drawn in one place at a time) and open the pane when pressed; in Split/PDF they are in the "PDF controls" toolbar as before; pop-out buttons stay in the pane | `zz-dmtypes.spec`, `publish-gate.spec`, `00-platform.spec` (Split first) | |
 
 ## 6. S1000D Explore and Publication
 
@@ -164,11 +164,11 @@ Source files: `jss/**`, `pages/project/JssEditorPage.tsx`. Baseline keys `jss ..
 | Old control | New home | Guarding test | Sign-off |
 |---|---|---|---|
 | Stencil outline, add chapter, paper, source view, problems (`jss-editor`, `jss-paper`, `jss-source`, `jss-problems`, `jss-add-chapter`) | | `jss-editor.spec` (12), `jss/*.test.ts` | |
-| Save, check, generate PDF, download, split, state (`jss-save`, `jss-check`, `jss-generate`, `jss-download`, `jss-split`, `jss-state`, `jss-note`) | | `jss-editor.spec` | |
+| Save, check, generate PDF, download, split, state (`jss-save`, `jss-check`, `jss-generate`, `jss-download`, `jss-split`, `jss-state`, `jss-note`) | WP-21: the shared editor header (`editor-header`, DocEditorShell) carries Check, Save, packages, Convert, Export project and Generate PDF with the same ids; `jss-state` uses the host's words; `jss-split`, `jss-host`, `jss-download`, `jss-note` are drawn by the host (`editors/host/testIds.ts`); Generate opens the PDF pane | `jss-editor.spec`, `wp21-editor-chrome.spec` | |
 | Package import and export (`jss-import`, `jss-import-file`, `jss-import-confirm`, `jss-export`, `jss-package-findings`) | | backend `jssdm`, `jssdm-http`; no browser test uses the ids (gap) | |
-| Drafts and conflict (`draft-*`, `conflict-*`, `jss-conflict`) | | `wp05-dataloss.spec` | |
-| Every key of the JSS registry (Mod+S/Z/Y, Tab, Shift+Tab, Enter, Shift+Enter, Backspace, arrows, dialog Enter/Escape) | | `editorShortcuts.test.ts`, `jss/editor.test.ts` | |
-| No find or replace exists (UX-017): not a feature to preserve, a gap | | n/a | |
+| Drafts and conflict (`draft-*`, `conflict-*`, `jss-conflict`) | WP-21: the host's banners (useDocEditor), same ids; the conflict banner adds `conflict-compare` (Compare and merge…) | `wp05-dataloss.spec`, `wp21-editor-chrome.spec` | |
+| Every key of the JSS registry (Mod+S/Z/Y, Tab, Shift+Tab, Enter, Shift+Enter, Backspace, arrows, dialog Enter/Escape) | WP-21: all kept in `jss/editor.ts`; the host adds Ctrl+K / Ctrl+Shift+P (palette), F1 (shortcuts dialog), Ctrl+. (focus), Ctrl+F / Ctrl+H (find), Esc (`host.*` in the registry) | `editorShortcuts.test.ts`, `jss/editor.test.ts`, `wp21-editor-chrome.spec` | |
+| No find or replace exists (UX-017): not a feature to preserve, a gap | WP-21: closed. The host's find bar (`host-find`, `find-input`, `replace-input`, `replace-one`, `replace-all`) over the paper's editable text, one undo step per replace | `wp21-editor-chrome.spec` | |
 
 ## 14. JSG editors
 
@@ -178,9 +178,9 @@ Source files: `jsg/**`, `pages/project/JsgEditorPage.tsx`. Baseline keys `jsg ..
 |---|---|---|---|
 | Handbook editor: sheet, find and replace bar, status (`jsg-sheet`, `jsg-find`, `jsg-status`) | | `jsg-editor.spec` (11), `jsg/*.test.ts` | |
 | ISPL plates and parts, preview toggle (`jsg-preview`, `jsg-preview-toggle`) | | `jsg-editor.spec` | |
-| Save, autosave, check, generate, download, Word import, split (`jsg-save`, `jsg-autosave`, `jsg-check`, `jsg-generate`, `jsg-download`, `jsg-import-word`, `jsg-word-input`, `jsg-split`, `jsg-state`, `jsg-note`) | | `jsg-editor.spec`; backend `jsg-word`, `jsg-engine` | |
-| Drafts and conflict (`draft-*`, `conflict-*`, `jsg-conflict`) | | `wp05-dataloss.spec` | |
-| Every key of the JSG registry (Mod+S/F/H/Z/Y, Escape, Enter/Shift+Enter in the find box and in text) | | `editorShortcuts.test.ts` | |
+| Save, autosave, check, generate, download, Word import, split (`jsg-save`, `jsg-autosave`, `jsg-check`, `jsg-generate`, `jsg-download`, `jsg-import-word`, `jsg-word-input`, `jsg-split`, `jsg-state`, `jsg-note`) | WP-21: the shared editor header (DocEditorShell) with the same ids; the Word import's browser confirm became a ConfirmModal "Replace this handbook?" (GAP-002 in passing); `jsg-state` uses the host's words; Generate opens the PDF pane | `jsg-editor.spec`, `wp21-editor-chrome.spec`; backend `jsg-word`, `jsg-engine` | |
+| Drafts and conflict (`draft-*`, `conflict-*`, `jsg-conflict`) | WP-21: the host's banners, same ids, plus `conflict-compare` | `wp05-dataloss.spec` | |
+| Every key of the JSG registry (Mod+S/F/H/Z/Y, Escape, Enter/Shift+Enter in the find box and in text) | WP-21: all kept (Ctrl+F/H stay the JSG editor's own find bar); the host adds Ctrl+K / Ctrl+Shift+P, F1, Ctrl+., Esc | `editorShortcuts.test.ts`, `wp21-editor-chrome.spec` | |
 
 ## 15. Project settings and S1000D settings
 

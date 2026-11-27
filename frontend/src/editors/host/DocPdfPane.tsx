@@ -2,6 +2,7 @@
 // PdfPane.tsx: Quick preview of one data module, Generate of the publication, pop-out windows).
 
 import { Icon } from '../../components/Icon';
+import { DOC_IDS } from './testIds';
 import { LazyPdfViewer } from '../../components/pdf/LazyPdfViewer';
 
 export interface DocPdfPaneProps {
@@ -23,7 +24,7 @@ export function DocPdfPane({ kind, src, downloadHref, downloadName, builtBy, wha
     <div className="v2-pdfbar">
       <span className="v2-hint">{src ? `The PDF built by ${builtBy} from the saved document` : `Press Generate PDF to build ${what}`}</span>
       <span className="spacer" />
-      {src ? <a className="btn btn-sm" href={downloadHref} data-testid={`${kind}-download`}>Download</a> : null}
+      {src ? <a className="btn btn-sm" href={downloadHref} {...DOC_IDS[kind].download}>Download</a> : null}
     </div>
     <div style={{ flex: 1, minHeight: 0, position: 'relative' }} data-testid="pdf-pane">
       <LazyPdfViewer autoFit src={src} downloadName={downloadName}
@@ -37,6 +38,6 @@ export function DocPdfPane({ kind, src, downloadHref, downloadName, builtBy, wha
           </ol>
         </div></div>} />
     </div>
-    {note || (building && progressLines.length) ? <div className="v2-log" aria-live="polite" data-testid={`${kind}-note`}>{building ? progressLines.slice(-4).map((l, i) => <div key={i}>{l}</div>) : <div>{note}</div>}</div> : null}
+    {note || (building && progressLines.length) ? <div className="v2-log" aria-live="polite" {...DOC_IDS[kind].note}>{building ? progressLines.slice(-4).map((l, i) => <div key={i}>{l}</div>) : <div>{note}</div>}</div> : null}
   </>;
 }
