@@ -98,6 +98,8 @@ export function createApp(): express.Express {
       product: 'Agastya Platform', version: b.version, apiVersion: API_VERSION, minClientVersion: MIN_CLIENT_VERSION,
       schema: { level: schema.level, latest: schema.latest, applied: schema.applied, compatible: schema.unknown.length === 0 },
       build: { commit: b.commit, builtAt: b.builtAt, packaged: b.packaged },
+      // WP-25 (PRD-005): the WebView2 runtime the Windows host found, and whether the interface opened in an app window or the browser
+      shell: { webview2: config.shell.webview2, window: config.shell.window },
     });
   });
 
