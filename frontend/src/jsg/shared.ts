@@ -51,89 +51,91 @@ export function button(label: string, onClick: () => void, cls = ''): HTMLButton
 
 /** The look both editors share: the outline on the left, a toolbar, and a white sheet (Times New Roman, as the stencils set it). */
 export const BASE_CSS = `
-.jsg-ed{display:flex;height:100%;min-height:0;background:var(--bg,#f4f5f7);color:#111;font-size:13px}
-.jsg-nav{flex:0 0 232px;overflow:auto;border-right:1px solid #cfd4da;background:#fff;padding:8px 6px;font-size:12px}
-.jsg-nav h4{margin:8px 4px 4px;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:#5a6572}
-.jsg-nav a{display:block;padding:2px 6px;border-radius:3px;color:#1b1f24;cursor:pointer;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.jsg-nav a:hover{background:#e8f0fe}.jsg-nav a.l2{padding-left:16px}.jsg-nav a.l3{padding-left:26px}
+/* WP-19 (TH-001): one tokenised sheet. The chrome (outline, toolbar, status, find, menu) follows the theme; the sheet is paper and prints white in both themes. */
+.jsg-ed{display:flex;height:100%;min-height:0;background:var(--bg);color:var(--text);font-size:13px}
+.jsg-nav{flex:0 0 232px;overflow:auto;border-right:1px solid var(--border);background:var(--bg-elev);color:var(--text);padding:8px 6px;font-size:12px}
+.jsg-nav h4{margin:8px 4px 4px;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-faint)}
+.jsg-nav a{display:block;padding:2px 6px;border-radius:3px;color:var(--text);cursor:pointer;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jsg-nav a:hover{background:var(--accent-soft)}.jsg-nav a.l2{padding-left:16px}.jsg-nav a.l3{padding-left:26px}
 .jsg-nav .jsg-find{margin:2px 4px;padding:3px 6px;border-radius:3px;font-size:11px;cursor:pointer}
-.jsg-nav .jsg-find.error{background:#fde8e8;color:#8a1c1c}.jsg-nav .jsg-find.warning{background:#fff4e0;color:#7a4b00}
+.jsg-nav .jsg-find.error{background:var(--danger-soft);color:var(--danger)}.jsg-nav .jsg-find.warning{background:var(--warning-soft);color:var(--warning)}
 .jsg-main{flex:1;display:flex;flex-direction:column;min-width:0}
-.jsg-bar{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:6px 8px;border-bottom:1px solid #cfd4da;background:#fff}
-.jsg-bar button{border:1px solid #cfd4da;background:#fff;border-radius:4px;padding:3px 8px;cursor:pointer;font-size:12px;color:#1b1f24}
-.jsg-bar button:hover:not(:disabled){background:#e8f0fe}.jsg-bar button:disabled{opacity:.45;cursor:default}
-.jsg-bar .sep{width:1px;height:18px;background:#cfd4da;margin:0 4px}
+.jsg-bar{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:6px 8px;border-bottom:1px solid var(--border);background:var(--bg-elev)}
+.jsg-bar:not(.jsg-tabbed) button{border:1px solid var(--border);background:var(--bg-elev);border-radius:4px;padding:3px 8px;cursor:pointer;font-size:12px;color:var(--text)}
+.jsg-bar:not(.jsg-tabbed) button:hover:not(:disabled){background:var(--accent-soft)}
+.jsg-bar:not(.jsg-tabbed) button:disabled{background:var(--surface-disabled);color:var(--text-disabled);cursor:not-allowed}
+.jsg-bar .sep{width:1px;height:18px;background:var(--border);margin:0 4px}
 .jsg-scroll{flex:1;overflow:auto;padding:18px}
-.jsg-sheet{margin:0 auto;max-width:794px;background:#fff;color:#000;padding:56px 56px 72px 94px;box-shadow:0 1px 6px rgba(0,0,0,.18);font:12pt/1.15 "Times New Roman",Times,serif}
-.jsg-sheet [contenteditable]{outline:none}.jsg-sheet [contenteditable]:focus{background:#f3f8ff}
-.jsg-sheet [contenteditable]:empty:before{content:attr(data-ph);color:#9aa4ae}
-.jsg-card{border:1px dashed #b8c0c8;border-radius:4px;margin:14px -18px 18px;padding:10px 14px;background:#fafbfc;font:13px/1.35 system-ui,sans-serif}
-.jsg-card h3{margin:0 0 8px;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:#46515e}
+.jsg-sheet{margin:0 auto;max-width:794px;background:var(--paper);color:var(--paper-ink);padding:56px 56px 72px 94px;box-shadow:var(--paper-sheet-shadow);font:12pt/1.15 var(--font-paper-serif)}
+.jsg-sheet [contenteditable]{outline:none}.jsg-sheet [contenteditable]:focus{background:var(--paper-jsg-focus)}
+.jsg-sheet [contenteditable]:empty:before{content:attr(data-ph);color:var(--paper-jsg-placeholder)}
+.jsg-card{border:1px dashed var(--paper-jsg-card-border);border-radius:4px;margin:14px -18px 18px;padding:10px 14px;background:var(--paper-jsg-card-bg);font:13px/1.35 system-ui,sans-serif}
+.jsg-card h3{margin:0 0 8px;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--paper-jsg-card-head)}
 .jsg-card label{display:grid;grid-template-columns:170px 1fr;gap:8px;align-items:center;margin:3px 0}
-.jsg-card input{font:13px system-ui,sans-serif;padding:3px 6px;border:1px solid #cfd4da;border-radius:3px;width:100%;box-sizing:border-box}
-.jsg-card .jsg-row{display:flex;gap:6px;margin:3px 0;align-items:flex-start}.jsg-card .jsg-row>span{flex:0 0 22px;color:#5a6572}
-.jsg-card .jsg-row>[contenteditable],.jsg-card .jsg-row>input{flex:1;border:1px solid #cfd4da;border-radius:3px;padding:3px 6px;background:#fff;min-height:20px}
-.jsg-card button{border:1px solid #cfd4da;background:#fff;border-radius:3px;padding:1px 7px;cursor:pointer;font-size:12px}
-.jsg-chapter{color:#0000ff;font-weight:bold;text-transform:uppercase;font-size:22pt;line-height:1.15;text-align:center;margin:60px 0 6px}
-.jsg-sectionh{color:#0000ff;font-weight:bold;text-transform:uppercase;font-size:22pt;text-align:center;margin:36px 0 12px}
+.jsg-card input{font:13px system-ui,sans-serif;padding:3px 6px;border:1px solid var(--paper-jsg-line);border-radius:3px;width:100%;box-sizing:border-box;background:var(--paper);color:var(--paper-ink)}
+.jsg-card .jsg-row{display:flex;gap:6px;margin:3px 0;align-items:flex-start}.jsg-card .jsg-row>span{flex:0 0 22px;color:var(--paper-jsg-muted)}
+.jsg-card .jsg-row>[contenteditable],.jsg-card .jsg-row>input{flex:1;border:1px solid var(--paper-jsg-line);border-radius:3px;padding:3px 6px;background:var(--paper);min-height:20px}
+.jsg-card button{border:1px solid var(--paper-jsg-line);background:var(--paper);color:var(--paper-ink);border-radius:3px;padding:1px 7px;cursor:pointer;font-size:12px}
+.jsg-chapter{color:var(--paper-heading);font-weight:bold;text-transform:uppercase;font-size:22pt;line-height:1.15;text-align:center;margin:60px 0 6px}
+.jsg-sectionh{color:var(--paper-heading);font-weight:bold;text-transform:uppercase;font-size:22pt;text-align:center;margin:36px 0 12px}
 .jsg-num{display:block;font-size:22pt}
-.jsg-code{display:block;width:fit-content;margin:4px auto 0;padding:0 6px;border:1px solid #d0d7e2;border-radius:3px;background:#eef2f7;color:#475569;font:400 9pt/1.5 ui-monospace,Consolas,monospace;text-transform:none;user-select:none}
-.jsg-flash{animation:jsg-flash 1.6s ease-out}@keyframes jsg-flash{0%{background:#fde68a}100%{background:transparent}}
-.jsg-clause{color:#0000ff;font-weight:bold;text-transform:uppercase;margin:12pt 0 6pt;display:flex;gap:10px}
+.jsg-code{display:block;width:fit-content;margin:4px auto 0;padding:0 6px;border:1px solid var(--paper-code-border);border-radius:3px;background:var(--paper-code-bg);color:var(--paper-code-text);font:400 9pt/1.5 ui-monospace,Consolas,monospace;text-transform:none;user-select:none}
+.jsg-flash{animation:jsg-flash 1.6s ease-out}@keyframes jsg-flash{0%{background:var(--paper-flash)}100%{background:transparent}}
+.jsg-clause{color:var(--paper-heading);font-weight:bold;text-transform:uppercase;margin:12pt 0 6pt;display:flex;gap:10px}
 .jsg-clause .n{flex:0 0 auto;min-width:34px}.jsg-clause .t{flex:1}
 .jsg-p{text-align:justify;margin:3pt 0}
 .jsg-list{margin:3pt 0}.jsg-li{display:flex;gap:8px;margin:3pt 0;text-align:justify}.jsg-li .m{flex:0 0 40px}.jsg-li .b{flex:1}
 .jsg-cap{font-weight:bold;text-align:center;margin:6pt 0}
 .jsg-fig{text-align:center;margin:6pt 0}.jsg-fig img{max-width:100%;max-height:340px}
-.jsg-fig .empty{border:1px dashed #9aa4ae;color:#5a6572;padding:26px;font:12px system-ui,sans-serif}
+.jsg-fig .empty{border:1px dashed var(--paper-jsg-placeholder);color:var(--paper-jsg-muted);padding:26px;font:12px system-ui,sans-serif}
 .jsg-table{border-collapse:collapse;width:100%;font-size:10pt;margin:4pt 0}
-.jsg-table td,.jsg-table th{border:1px solid #444;padding:2px 4px;vertical-align:middle}.jsg-table th{font-weight:bold;text-align:center}
-.jsg-notice{border:1px solid #000;padding:4px 8px;margin:6pt 0}.jsg-notice b{display:block;text-transform:uppercase}
-.jsg-break{border-top:1px dashed #9aa4ae;color:#9aa4ae;font:10px system-ui,sans-serif;text-align:center;margin:8px 0}
-.jsg-tag{font:10px system-ui,sans-serif;color:#5a6572;margin:10px 0 0;text-transform:uppercase}
-.jsg-sel{box-shadow:-4px 0 0 #7aa7ff}.jsg-ro .jsg-bar button.edit{display:none}
+.jsg-table td,.jsg-table th{border:1px solid var(--paper-rule-strong);padding:2px 4px;vertical-align:middle}.jsg-table th{font-weight:bold;text-align:center}
+.jsg-notice{border:1px solid var(--paper-ink);padding:4px 8px;margin:6pt 0}.jsg-notice b{display:block;text-transform:uppercase}
+.jsg-break{border-top:1px dashed var(--paper-jsg-placeholder);color:var(--paper-jsg-placeholder);font:10px system-ui,sans-serif;text-align:center;margin:8px 0}
+.jsg-tag{font:10px system-ui,sans-serif;color:var(--paper-jsg-muted);margin:10px 0 0;text-transform:uppercase}
+.jsg-ro .jsg-bar button.edit{display:none}
 .jsg-app{text-align:center;font-weight:bold;font-size:14pt;margin:34px 0 10px}
 
-
 /* ---- the toolbar in tabs (both JSG editors): Write, Insert, Table, Arrange, Document; every button stays in the page, a tab only hides its panel ---- */
-.jsg-ed{color:var(--text,#111)}
-.jsg-nav{background:var(--bg-elev,#fff);border-right-color:var(--border,#cfd4da);color:var(--text,#1b1f24)}
-.jsg-nav a{color:var(--text,#1b1f24)}.jsg-nav a:hover{background:var(--accent-soft,#e8f0fe)}
-.jsg-bar.jsg-tabbed{display:block;padding:0;background:var(--bg-elev,#fff);border-bottom-color:var(--border,#cfd4da)}
-.jsg-tabs{display:flex;align-items:flex-end;gap:2px;padding:4px 10px 0;border-bottom:1px solid var(--border,#cfd4da)}
-.jsg-quick{display:inline-flex;gap:1px;margin:0 10px 3px 0;padding-right:10px;border-right:1px solid var(--border,#cfd4da)}
-.jsg-tab{height:30px;padding:0 14px;border:1px solid transparent;border-bottom:0;border-radius:6px 6px 0 0;background:none;color:var(--text-muted,#5a6572);font:inherit;font-size:12.5px;cursor:pointer;margin-bottom:-1px}
-.jsg-tab:hover{color:var(--text,#1b1f24);background:var(--bg-hover,#eef2f7)}
-.jsg-tab.on{background:var(--bg,#f4f5f7);color:var(--accent,#2563eb);font-weight:600;border-color:var(--border,#cfd4da);border-bottom:1px solid var(--bg,#f4f5f7)}
-.jsg-tab:focus-visible{outline:2px solid var(--accent,#2563eb);outline-offset:1px}
-.jsg-panels{background:var(--bg,#f4f5f7)}
+.jsg-bar.jsg-tabbed{display:block;padding:0}
+.jsg-tabs{display:flex;align-items:flex-end;gap:2px;padding:4px 10px 0;border-bottom:1px solid var(--border)}
+.jsg-quick{display:inline-flex;gap:1px;margin:0 10px 3px 0;padding-right:10px;border-right:1px solid var(--border)}
+.jsg-tab{height:30px;padding:0 14px;border:1px solid transparent;border-bottom:0;border-radius:6px 6px 0 0;background:none;color:var(--text-muted);font:inherit;font-size:12.5px;cursor:pointer;margin-bottom:-1px}
+.jsg-tab:hover{color:var(--text);background:var(--bg-hover)}
+.jsg-tab.on{background:var(--bg);color:var(--accent);font-weight:600;border-color:var(--border);border-bottom:1px solid var(--bg)}
+.jsg-tab:focus-visible{outline:2px solid var(--focus-ring);outline-offset:1px}
+.jsg-panels{background:var(--bg)}
 .jsg-panel{display:flex;flex-wrap:wrap;align-items:stretch;gap:2px 0;padding:6px 10px 4px;min-height:60px}
 .jsg-panel[hidden]{display:none}
-.jsg-tgroup{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:0 10px;border-right:1px solid var(--border,#cfd4da)}
+.jsg-tgroup{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:0 10px;border-right:1px solid var(--border)}
 .jsg-tgroup:first-child{padding-left:0}.jsg-tgroup:last-of-type{border-right:0}
 .jsg-tbtns{display:flex;align-items:center;flex-wrap:wrap;gap:1px}
-.jsg-tlabel{font-size:10.5px;color:var(--text-faint,#8a94a0);letter-spacing:.03em}
-.jsg-bar .jsg-tb{min-width:28px;height:28px;padding:0 8px;border:1px solid transparent;border-radius:6px;background:none;color:var(--text,#1b1f24);cursor:pointer;font:inherit;font-size:12.5px;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap}
-.jsg-bar .jsg-tb:hover:not(:disabled){background:var(--bg-hover,#eef2f7)}
-.jsg-bar .jsg-tb:disabled{color:var(--text-faint,#8a94a0);cursor:default;opacity:.55}
-.jsg-bar .jsg-tb.on{background:var(--accent-soft,#e8f0fe);color:var(--accent,#2563eb);border-color:var(--accent,#2563eb)}
-.jsg-bar .jsg-tb:focus-visible{outline:2px solid var(--accent,#2563eb);outline-offset:1px}
-.jsg-thint{align-self:center;max-width:52ch;font-size:11.5px;color:var(--text-faint,#8a94a0);padding:0 12px}
-.jsg-menu{position:fixed;z-index:60;min-width:210px;background:var(--bg-elev,#fff);border:1px solid var(--border-strong,#b8c0c8);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:4px;font:13px system-ui,sans-serif}
-.jsg-menu button{display:flex;width:100%;align-items:center;gap:8px;padding:7px 10px;border:0;background:none;border-radius:5px;color:var(--text,#1b1f24);font:inherit;cursor:pointer;text-align:left}
-.jsg-menu button:hover:not(:disabled){background:var(--bg-hover,#eef2f7)}.jsg-menu button:disabled{color:var(--text-faint,#8a94a0);cursor:default}
-.jsg-menu .k{margin-left:auto;color:var(--text-faint,#8a94a0);font-size:11.5px}
-.jsg-menu hr{border:0;border-top:1px solid var(--border,#cfd4da);margin:4px 2px}
+.jsg-tlabel{font-size:10.5px;color:var(--text-faint);letter-spacing:.03em}
+.jsg-bar .jsg-tb{min-width:28px;height:28px;padding:0 8px;border:1px solid transparent;border-radius:6px;background:none;color:var(--text);cursor:pointer;font:inherit;font-size:12.5px;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap}
+.jsg-bar .jsg-tb:hover:not(:disabled){background:var(--bg-hover)}
+.jsg-bar .jsg-tb:active:not(:disabled){background:var(--bg-active)}
+.jsg-bar .jsg-tb:disabled{color:var(--text-disabled);cursor:not-allowed}
+.jsg-bar .jsg-tb.on{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.jsg-bar .jsg-tb:focus-visible{outline:2px solid var(--focus-ring);outline-offset:1px}
+.jsg-thint{align-self:center;max-width:52ch;font-size:11.5px;color:var(--text-faint);padding:0 12px}
+.jsg-menu{position:fixed;z-index:60;min-width:210px;background:var(--bg-elev);border:1px solid var(--border-strong);border-radius:8px;box-shadow:var(--shadow-menu);padding:4px;font:13px system-ui,sans-serif}
+.jsg-menu button{display:flex;width:100%;align-items:center;gap:8px;padding:7px 10px;border:0;background:none;border-radius:5px;color:var(--text);font:inherit;cursor:pointer;text-align:left}
+.jsg-menu button:hover:not(:disabled){background:var(--bg-hover)}.jsg-menu button:disabled{color:var(--text-disabled);cursor:not-allowed}
+.jsg-menu .k{margin-left:auto;color:var(--text-faint);font-size:11.5px}
+.jsg-menu hr{border:0;border-top:1px solid var(--border);margin:4px 2px}
 @media (max-width:900px){.jsg-nav{display:none}.jsg-tabs{overflow-x:auto}.jsg-panel{flex-wrap:nowrap;overflow-x:auto}.jsg-scroll{padding:10px 6px}.jsg-sheet{padding:28px 20px 40px 28px}}
-.jsg-sel{box-shadow:-4px 0 0 var(--accent,#7aa7ff)}
-.jsg-status{display:flex;align-items:center;gap:14px;padding:3px 12px;border-top:1px solid var(--border,#cfd4da);background:var(--bg-elev,#fff);color:var(--text-muted,#5a6572);font:11.5px system-ui,sans-serif;flex:none;white-space:nowrap;overflow:hidden}
-.jsg-status .grow{flex:1;overflow:hidden;text-overflow:ellipsis}.jsg-status select{font:inherit;border:1px solid var(--border,#cfd4da);border-radius:4px;background:var(--bg,#fff);color:inherit;padding:0 2px}
-.jsg-find{display:none;align-items:center;flex-wrap:wrap;gap:6px;padding:6px 10px;border-bottom:1px solid var(--border,#cfd4da);background:var(--bg-elev,#fff);font:12.5px system-ui,sans-serif}
-.jsg-find.open{display:flex}.jsg-find input[type=text]{height:26px;padding:0 8px;border:1px solid var(--border-strong,#b8c0c8);border-radius:5px;background:var(--bg,#fff);color:inherit;min-width:150px}
-.jsg-find button{height:26px;border:1px solid var(--border-strong,#b8c0c8);border-radius:5px;background:var(--bg-elev,#fff);color:inherit;padding:0 9px;cursor:pointer;font:inherit}.jsg-find button:hover:not(:disabled){background:var(--bg-hover,#eef2f7)}.jsg-find button:disabled{opacity:.5;cursor:default}
-.jsg-find .cnt{color:var(--text-faint,#8a94a0);min-width:70px}
-::highlight(jsg-hit){background:#ffe58f;color:#000}::highlight(jsg-cur){background:#ff9f43;color:#000}
-.jsg-orient{font:10px system-ui,sans-serif;color:#6b7280;text-align:center;margin:6px 0;border-top:1px dashed #9aa4ae;padding-top:2px}
+.jsg-sel{box-shadow:-4px 0 0 var(--accent)}
+.jsg-status{display:flex;align-items:center;gap:14px;padding:3px 12px;border-top:1px solid var(--border);background:var(--bg-elev);color:var(--text-muted);font:11.5px system-ui,sans-serif;flex:none;white-space:nowrap;overflow:hidden}
+.jsg-status .grow{flex:1;overflow:hidden;text-overflow:ellipsis}.jsg-status select{font:inherit;border:1px solid var(--border-control);border-radius:4px;background:var(--bg);color:inherit;padding:0 2px}
+.jsg-find{display:none;align-items:center;flex-wrap:wrap;gap:6px;padding:6px 10px;border-bottom:1px solid var(--border);background:var(--bg-elev);font:12.5px system-ui,sans-serif}
+.jsg-find.open{display:flex}.jsg-find input[type=text]{height:26px;padding:0 8px;border:1px solid var(--border-control);border-radius:5px;background:var(--bg);color:inherit;min-width:150px}
+.jsg-find button{height:26px;border:1px solid var(--border-strong);border-radius:5px;background:var(--bg-elev);color:inherit;padding:0 9px;cursor:pointer;font:inherit}.jsg-find button:hover:not(:disabled){background:var(--bg-hover)}.jsg-find button:disabled{background:var(--surface-disabled);color:var(--text-disabled);border-color:var(--border);cursor:not-allowed}
+.jsg-find .cnt{color:var(--text-faint);min-width:70px}
+::highlight(jsg-hit){background:var(--paper-find);color:var(--paper-ink)}::highlight(jsg-cur){background:var(--paper-find-current);color:var(--paper-ink)}
+.jsg-orient{font:10px system-ui,sans-serif;color:var(--paper-hint);text-align:center;margin:6px 0;border-top:1px dashed var(--paper-jsg-placeholder);padding-top:2px}
+.jsg-picker{max-width:560px;width:90%;border:1px solid var(--border-strong);border-radius:6px;padding:12px;font:13px system-ui,sans-serif;background:var(--bg-elev);color:var(--text)}
+.jsg-picker::backdrop{background:var(--scrim)}
+.jsg-picker .jsg-pick{border:1px solid var(--border);background:var(--image-backdrop);color:var(--paper-ink);padding:4px;cursor:pointer}
 `;
 
 // ── The toolbar in tabs ─────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -215,14 +217,14 @@ export function tabbedBar(bar: HTMLElement, tabs: BarTab[], opts: { readOnly: bo
 /** The chooser of a project picture, with an upload; resolves to the picture or null. */
 export async function pickGraphic(host: JsgHost): Promise<GraphicInfo | null> {
   const list = await host.graphics().catch(() => [] as GraphicInfo[]);
-  const dlg = document.createElement('dialog'); dlg.style.cssText = 'max-width:560px;width:90%;border:1px solid #888;border-radius:6px;padding:12px;font:13px system-ui';
+  const dlg = document.createElement('dialog'); dlg.className = 'jsg-picker';
   dlg.innerHTML = `<h3 style="margin:0 0 8px">Choose a picture</h3><div class="jsg-picks" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;max-height:320px;overflow:auto"></div>
     <p style="margin:8px 0 0"><label>Upload a new one: <input type="file" accept="image/*"></label></p><p style="text-align:right;margin:8px 0 0"><button type="button" class="x">Cancel</button></p>`;
   document.body.appendChild(dlg);
   return new Promise((resolve) => {
     const done = (g: GraphicInfo | null): void => { dlg.close(); dlg.remove(); resolve(g); };
     const box = dlg.querySelector('.jsg-picks') as HTMLElement;
-    for (const g of list) { const b = document.createElement('button'); b.type = 'button'; b.style.cssText = 'border:1px solid #ccc;background:#fff;padding:4px;cursor:pointer'; b.innerHTML = `<img src="${escH(g.url)}" alt="" style="max-width:100%;max-height:70px"><div style="font-size:10px;overflow:hidden;text-overflow:ellipsis">${escH(g.name)}</div>`; b.onclick = () => done(g); box.appendChild(b); }
+    for (const g of list) { const b = document.createElement('button'); b.type = 'button'; b.className = 'jsg-pick'; b.innerHTML = `<img src="${escH(g.url)}" alt="" style="max-width:100%;max-height:70px"><div style="font-size:10px;overflow:hidden;text-overflow:ellipsis">${escH(g.name)}</div>`; b.onclick = () => done(g); box.appendChild(b); }
     if (!list.length) box.textContent = 'This project has no pictures yet: upload one below.';
     (dlg.querySelector('input[type=file]') as HTMLInputElement).onchange = (ev) => { const f = (ev.target as HTMLInputElement).files?.[0]; if (f) void host.uploadGraphic(f).then(done, (e) => { host.notify(String(e?.message ?? e), 'error'); done(null); }); };
     (dlg.querySelector('.x') as HTMLElement).onclick = () => done(null);

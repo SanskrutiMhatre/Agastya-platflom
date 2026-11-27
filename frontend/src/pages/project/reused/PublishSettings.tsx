@@ -146,7 +146,7 @@ const MediaPicker: React.FC<{
         <img
           src={settingsApi.mediaUrl(projectId, value)}
           alt=""
-          style={{ width: 72, height: 72, objectFit: 'contain', border: '1px solid var(--x-line)', borderRadius: 6, background: '#fff', padding: 4, alignSelf: 'center' }}
+          style={{ width: 72, height: 72, objectFit: 'contain', border: '1px solid var(--x-line)', borderRadius: 6, background: 'var(--image-backdrop)', padding: 4, alignSelf: 'center' }}
         />
       ) : (
         <div style={{
@@ -472,6 +472,7 @@ export const PublishSettings: React.FC = () => {
                 <Field label="Font size"   value={getPath(house, 'layout.classification.size')}         onChange={v => setH('layout.classification.size', v)}         hint="e.g. 12pt — blank follows header/footer" />
                 <Field label="Font family" value={getPath(house, 'layout.classification.family')}       onChange={v => setH('layout.classification.family', v)}       hint="blank inherits the body font" />
                 <Field label="Weight"      value={getPath(house, 'layout.classification.weight')}       onChange={v => setH('layout.classification.weight', v)}       hint="bold" />
+                {/* lint-colors-ignore: an example value in the hint of a print-colour field */}
                 <Field label="Colour"      value={getPath(house, 'layout.classification.color')}        onChange={v => setH('layout.classification.color', v)}        hint="e.g. #B00020" />
                 <Field label="Margin top"    value={getPath(house, 'layout.classification.marginTop')}    onChange={v => setH('layout.classification.marginTop', v)}    hint="e.g. 2mm" />
                 <Field label="Margin bottom" value={getPath(house, 'layout.classification.marginBottom')} onChange={v => setH('layout.classification.marginBottom', v)} hint="e.g. 2mm" />

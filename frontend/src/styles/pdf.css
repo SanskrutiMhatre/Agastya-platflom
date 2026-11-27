@@ -42,12 +42,12 @@
 }
 
 .textLayer .highlight {
-  background-color: rgba(180, 0, 170, 0.25);
+  background-color: var(--viewer-highlight);
   border-radius: 4px;
 }
 
 .textLayer ::selection {
-  background: rgba(0, 100, 255, 0.3);
+  background: var(--viewer-text-select);
 }
 
 /* pdf.js parks a hidden helper element at the end of the layer; left visible it

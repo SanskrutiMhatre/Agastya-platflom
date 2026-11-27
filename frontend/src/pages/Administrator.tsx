@@ -16,6 +16,7 @@ import { Icon } from '../components/Icon';
 import { PageHeader } from '../components/PageHeader';
 import { Alert, Badge, ConfirmModal, Empty, Field, Loading, Modal, errText, useAsync } from '../components/ui';
 import { useApp } from '../store/appSettings';
+import { DEFAULT_ACCENT, deriveAccent } from '../lib/accent';
 import { useUi } from '../store/ui';
 import { Audit, Users } from './Settings';
 import { CatalogueSection, SnsPresetsSection, ExtensionsSection, CoverageSection } from './AdminS1000d';
@@ -321,14 +322,37 @@ function VisualSection() {
     <div className="v2-stack" style={{ maxWidth: 520 }} data-testid="visual-settings">
       <div><h3 style={{ margin: 0 }}>Visual settings</h3><p className="v2-sub" style={{ margin: '2px 0 0' }}>How the application looks for everyone.</p></div>
       <Field label="Accent colour" hint="Buttons, links and highlights. Clear it to use the default."><div className="v2-row">
-        <input type="color" value={form.accent || '#2563eb'} onChange={(e) => setForm({ ...form, accent: e.target.value })} aria-label="Accent colour" style={{ width: 44, height: 32 }} />
+        <input type="color" value={form.accent || DEFAULT_ACCENT} onChange={(e) => setForm({ ...form, accent: e.target.value })} aria-label="Accent colour" style={{ width: 44, height: 32 }} />
         <span className="v2-mono">{form.accent || 'default'}</span>{form.accent ? <button className="btn btn-sm" onClick={() => setForm({ ...form, accent: '' })}>Use default</button> : null}
       </div></Field>
+      {form.accent ? <AccentPreview hex={form.accent} /> : null}
       <Field label="Default theme" hint="Used until a person picks their own with the theme button."><select className="v2-select" value={form.theme} onChange={(e) => setForm({ ...form, theme: e.target.value as AppSettings['theme'] })}>
         <option value="system">Follow the device</option><option value="light">Light</option><option value="dark">Dark</option></select></Field>
       <label className="v2-row" style={{ gap: 6 }}><input type="checkbox" checked={form.compact} onChange={(e) => setForm({ ...form, compact: e.target.checked })} />Compact layout (tighter spacing)</label>
       {err ? <Alert tone="bad">{err}</Alert> : null}
       <div><button className="btn btn-primary" disabled={busy} onClick={() => void save({ accent: form.accent, theme: form.theme, compact: form.compact })} data-testid="visual-save">Save</button></div>
+    </div>
+  );
+}
+
+/** TH-003: what the accent becomes in each theme, with the measured contrast; the server refuses a colour that has no readable shade. */
+function AccentPreview({ hex }: { hex: string }) {
+  const d = deriveAccent(hex);
+  if (!d.ok) return <Alert tone="bad">{d.reason}</Alert>;
+  const swatch = (theme: 'light' | 'dark') => {
+    const v = d[theme];
+    return (
+      <div className="v2-accent-prev" data-theme-preview={theme} key={theme}>
+        <span className="v2-hint">{theme === 'light' ? 'Light theme' : 'Dark theme'}</span>
+        <span className="v2-accent-btn" style={{ background: v.accent, color: v.onAccent }}>Primary button</span>
+        <span className="v2-mono">{v.accent} · text {v.ratios.onAccent}:1 · on surfaces {v.ratios.worstSurface}:1</span>
+      </div>
+    );
+  };
+  return (
+    <div className="v2-stack" data-testid="accent-preview" style={{ gap: 6 }}>
+      <div className="v2-row wrap">{swatch('light')}{swatch('dark')}</div>
+      {d.adjusted ? <span className="v2-hint" data-testid="accent-adjusted">{hex} is adjusted so text on it stays readable (at least 4.5:1) in each theme.</span> : null}
     </div>
   );
 }

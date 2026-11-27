@@ -219,6 +219,86 @@ verified, and what is left or blocked.
   title as one word and the two quote forms alike; the order assertions are unchanged. The ISPL test now passes; the JSG sample test runs
   on to its page count, which needs poppler's `pdfinfo` (WP-08).
 
+### WP-19 Design tokens, component states, dark/light parity (DS-001, DS-002, DS-003, DS-005, DS-006, DS-007, DS-008, DS-009, TH-001..TH-008, UID-002, UID-003, UID-004) - done, with the limits listed
+
+* DS-001 / DS-009 / TH-002 (one token source): `frontend/src/styles/tokens/tokens.json` is the only place a colour is written. Three tiers:
+  primitives (`--p-*`), semantic tokens with a required [light, dark] pair, `fixed` tokens that are the same in both themes (paper, PDF
+  viewer, shadows), and an alias tier that keeps the old names (`--bg`, `--text-faint`, `--x-*`, `--page-*`, `--xml-*` ...) pointing at the
+  semantic ones. `scripts/tokens/build-tokens.mjs` writes `src/styles/tokens/tokens.css` (imported first in `main.tsx`); `--check` fails
+  when the CSS is stale. The three old token blocks (Studio `app.css`, the `.design-scroll` block of `document.css`, the `--x-*` block of
+  `platform.css`) are gone. Migrated to tokens: shell, Studio, JSS (`jss/style.ts`, `jss/editor.ts`), JSG (`jsg/shared.ts` BASE_CSS rewritten,
+  `editor.ts`, `ispl-editor.ts`, `ispl-preview.ts`), CodeMirror syntax colours, the PDF viewer (`PdfJsViewer.tsx`, `LazyPdfViewer.tsx`,
+  `pdf.css`), the release paper preview, the review comment marks, the explore page.
+* DS-003 (literal lint): `scripts/tokens/lint-colors.mjs` counts hex, rgb()/hsl() and named colours in value position in every .css/.ts/.tsx
+  under `src/` except the token files and tests; exit 1 above 0. Report-only, with the reason printed: the pdfmake print palette
+  (`studio/export/pdf-theme.ts` 6, `pdf-layouts.ts` 2, `pdf-content.ts` 1: the exported PDF's paper, not the screen) and one line written
+  into a blank pop-up window that has no stylesheet (`studio/ui/panels.ts` 1). Count at f16f2ea (same script over `git archive f16f2ea`):
+  **356**; now **0**. `npm run lint:theme` runs build-check + contrast + lint.
+* TH-005 / TH-002 (contrast): `scripts/tokens/check-contrast.mjs` checks 103 declared pairs in both themes (206 checks; text 4.5:1,
+  UI/large 3:1, alpha composited over the panel) and fails on any `var(--x)` under `src/` that nothing defines (coverage); unused aliases
+  are listed as a warning. Same 103 pairs on the old values: 37 of 206 failing; now 0 failing in light and 0 in dark.
+* TH-001 (JSG chrome): the generic `.jsg-bar button` rule that out-specified the tabbed toolbar is scoped to `.jsg-bar:not(.jsg-tabbed)`;
+  the toolbar, tabs, navigator and find panel use the shared tokens, so dark no longer shows a light toolbar and the selected tab reads
+  hovered or not (static test + e2e). The sheet stays on paper tokens (white in both themes).
+* TH-003 (administrator accent): `src/lib/accent.ts` `deriveAccent()` makes a light and a dark variant of any #rrggbb so that the accent is
+  4.5:1 on panel, canvas, hover, pressed and its own soft tint, and the text on it is 4.5:1; it darkens (light) or lightens (dark) in
+  small steps and reports `adjusted`. `store/appSettings.ts` sets `--admin-*-light/-dark`, which `tokens.css` reads through
+  `var(--admin-accent-light, ...)`. The server validates with the same function (`backend/src/services/accent.ts`, generated copy; a
+  vitest proves equal output over 265 colours). Administrator > Visual shows a light and a dark preview of the result and says when the
+  colour was adjusted. #ffcc00 (1.51:1 light) and #1d3a8a (1.77:1 dark) are repaired.
+* TH-004 / TH-008 (theme choice): Account settings has an "Appearance" card (`data-testid="theme-choice"`): Follow the system / Light /
+  Dark; "Follow the system" removes the personal choice. The administrator default theme is cached in `agastya.theme.default` and
+  `theme-init.js` uses it before paint, so a person without a choice gets the organisation default with no flash. The header toggle keeps
+  its behaviour and test id. The Studio's own Theme field is hidden when the Studio runs inside the shell (one control, not two).
+* UID-004: `color-scheme: light` / `dark` is set on the root by `tokens.css`, so native controls, scrollbars and date pickers follow the
+  chosen theme, not the OS.
+* DS-002 (component states): `src/styles/states.css` (loaded last). Disabled = surface-disabled + text-disabled + border, cursor
+  not-allowed, never opacity alone (the opacity rules of `.icon-btn`, `.vs-btn`, `.rb`, `.fm-item`, `.ctx-item`, `.x-btn`, `.picker-item`,
+  JSG cover inputs, JSS tools were removed); busy = `aria-busy="true"` spinner, width kept, no pointer events (ConfirmModal and PromptModal
+  set it); active = surface-pressed; focus-visible = 2px focus ring on segments, tabs, list rows; selected keeps the existing classes;
+  `.btn-danger-solid` is now a real class (ConfirmModal no longer patches it with an inline style). Inputs get a 3:1 control edge
+  (`--border-control`, WCAG 1.4.11). `src/styles/states.test.ts` evaluates the cascade of the real stylesheets with the token values of
+  both themes: 17 controls x their states = 64 cells x 2 themes, each must exist, differ from the default and stay readable.
+* UID-002: `Field` sets `aria-invalid` on its control when it has an error; the control gets a danger border and the message a "!" mark.
+* DS-005: the shell `Modal` moves focus into the dialog (an autoFocus field keeps it), traps Tab, and returns focus to the trigger on close.
+  Toasts have a Dismiss button, pause while hovered or focused, and an error stays 10 s (was 6 s); errors use `role="alert"`.
+* UID-003: `components/FocusTooltip.tsx` shows the `title` of the control that has keyboard focus (`:focus-visible`) as a themed tooltip,
+  hidden on blur, scroll or Escape. Titles stay (accessible names and `getByTitle` are unchanged); the project rail keeps its own labels.
+* TH-006: `@media (forced-colors: active)` gives buttons, menus, cards, toasts and badges a system border, selected rows a Highlight
+  outline, disabled controls GrayText, dots and the primary button `forced-color-adjust: none` with a ButtonText edge;
+  `@media (prefers-contrast: more)` turns decorative borders into control borders and faint text into secondary text.
+* TH-007: every semantic token has a dark value by construction (the build rejects a semantic entry without one; a test proves it).
+* DS-006 / DS-007 (partly): density tokens (`--btn-h`, `--btn-h-sm`, `--input-h`, `--studio-input-h`, `--btn-pad-x`, `--row-pad-y`,
+  `--table-pad-y`, `--page-pad`, `--card-pad`) with comfortable and compact values; the administrator "compact layout" switches them
+  (`html.v2-compact` / `[data-density='compact']`). Comfortable values equal the old sizes. Font-size, radius, z-index and motion scales are
+  tokens. Not done: the toolbar overflow behaviour and migrating every hard-coded size in the Studio ribbon (WP-21).
+* DS-008: `tailwind.config.ts` deleted, `postcss.config.js` runs only autoprefixer (Tailwind generated nothing: no `@tailwind` anywhere).
+  The `tailwindcss` devDependency is still in `package.json`; removing it needs a lock-file update, left to the lead.
+* Fonts: the UI font (Arial/Segoe stack) is unchanged. The mono stack is the offline system stack `'Cascadia Code', 'Cascadia Mono',
+  Consolas, 'Liberation Mono', 'Courier New', monospace` (JetBrains Mono, which was never bundled, is dropped).
+* Intentional visual changes (everything else is meant to look as before in light):
+  - faint/tertiary text a little darker in light (#646c7e -> #5d6475) and lighter in dark (#8590a2 -> #959eae);
+  - warning text #b86b00 -> #a25e00, caution #c27c00 -> #a36800, the XML bracket colour #7a8294 -> #646b79 (light);
+  - input borders darker (control edge #7e8595 light / #767c8a dark) - the most visible change;
+  - dark: pressed surface #2c3a58 -> #27344f, success toast #25804f, info #79a8ff, document selection #8fb2ff, scrim 0.62, find-match
+    and broken-link colours with dark variants, applicability colour #c4a3f5;
+  - rail badge text uses the on-accent ink (dark text in dark theme); badges got `.bad/.warn/.ok` classes instead of inline colours;
+  - PDF viewer accent #66ccff and its outline text on the viewer ink; ISPL preview notes and empty text white on the dark preview;
+  - JSG chrome in light now uses the shared tokens (borders #cfd4da -> #d9dde6, navigator headings in the faint-text colour, find items in
+    the shared colours); the JSG picture picker is a themed dialog on the scrim instead of inline styles; the JSS dialog uses the scrim token;
+  - disabled controls show a grey surface and grey text instead of half-transparent; disabled cursor is not-allowed;
+  - the administrator colour picker starts at the default accent #2456c9.
+* Verified: `node scripts/tokens/build-tokens.mjs --check` ok; `check-contrast.mjs` 206 checks, 0 failing, coverage clean;
+  `lint-colors.mjs` 0 (baseline 356); vitest `src/lib/accent.test.ts` 5/5, `src/styles/tokens/tokens.test.ts` 7/7 (including negative
+  cases: a weakened token, a missing dark value, an undefined variable, five planted literals), `src/styles/states.test.ts` 131/131,
+  `src/jsg/editor.test.ts` + `src/jsg/ispl-preview.test.ts` + `src/jss/editor.test.ts` 55/55; frontend and backend `tsc --noEmit` clean;
+  `vite build` ok.
+* Not run here: `e2e/zz-theme-states.spec.ts` (Playwright, both themes: computed states, JSG chrome in dark, modal focus trap and return,
+  toast dismiss, theme choice, keyboard tooltip, accent repair and the server's 400 on a non-colour). It must be run by the single e2e
+  runner (Edge). The full vitest run was not done (focused files only).
+* Limits: the static matrix reads equal-specificity cascade in source order, not real selector specificity (the e2e spec covers the
+  browser); the keyboard tooltip covers `title` on focusable elements only; the pdfmake print palette keeps literals by design.
+
 ### Environment notes
 
 * `pdfinfo` and `pdfimages` (poppler) are not installed on this machine; only `pdftotext` is. Four existing print tests need them

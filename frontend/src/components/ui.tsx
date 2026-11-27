@@ -1,9 +1,9 @@
 // Shared UI primitives. Buttons, modals and form chrome reuse the Studio's own
 // classes (.btn, .modal-*) so the platform and the embedded editor look alike.
 
-import { Children, cloneElement, isValidElement, useCallback, useEffect, useId, useRef, useState, type ReactElement, type ReactNode } from 'react';
+import { Children, cloneElement, isValidElement, useCallback, useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactElement, type ReactNode } from 'react';
 import { ApiError } from '../api/client';
-import { useUi } from '../store/ui';
+import { useUi, type Toast } from '../store/ui';
 import { Icon } from './Icon';
 
 export const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
@@ -39,8 +39,9 @@ export function Field({ label, hint, error, children }: { label: string; hint?: 
   const kids = Children.map(children, (c) => {
     if (!tagged && isValidElement(c) && typeof c.type === 'string' && /^(input|select|textarea)$/.test(c.type)) {
       tagged = true;
-      const el = c as ReactElement<{ id?: string; 'aria-describedby'?: string }>;
-      return cloneElement(el, { id: el.props.id ?? id, 'aria-describedby': hint || error ? `${id}-note` : undefined });
+      const el = c as ReactElement<{ id?: string; 'aria-describedby'?: string; 'aria-invalid'?: boolean }>;
+      // UID-002: an error marks the control itself (styles/states.css draws the danger border), not only the text under it
+      return cloneElement(el, { id: el.props.id ?? id, 'aria-describedby': hint || error ? `${id}-note` : undefined, 'aria-invalid': error ? true : el.props['aria-invalid'] });
     }
     return c;
   });
@@ -54,15 +55,36 @@ export function Field({ label, hint, error, children }: { label: string; hint?: 
 }
 
 /** `sticky`: a click on the dimmed backdrop does not close it (a dialog that holds work in progress); Escape and the close button still do. */
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]), [contenteditable="true"]';
+
 export function Modal({ title, onClose, children, buttons, width, sticky }: { title: string; onClose: () => void; children: ReactNode; buttons?: ReactNode; width?: number; sticky?: boolean }) {
+  const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
+  // DS-005: focus moves into the dialog on open (an autoFocus field keeps it), Tab stays inside, and focus returns to the trigger on close.
+  useEffect(() => {
+    const trigger = document.activeElement as HTMLElement | null;
+    const el = box.current;
+    if (el && !el.contains(document.activeElement)) {
+      const body = el.querySelector<HTMLElement>(`.modal-body :is(${FOCUSABLE})`);
+      (body ?? el.querySelector<HTMLElement>(FOCUSABLE) ?? el).focus();
+    }
+    return () => { if (trigger && trigger.isConnected && typeof trigger.focus === 'function') trigger.focus(); };
+  }, []);
+  const trap = (e: ReactKeyboardEvent) => {
+    if (e.key !== 'Tab' || !box.current) return;
+    const items = [...box.current.querySelectorAll<HTMLElement>(FOCUSABLE)].filter((x) => x.offsetParent !== null || x === document.activeElement);
+    if (!items.length) { e.preventDefault(); return; }
+    const first = items[0], last = items[items.length - 1];
+    if (e.shiftKey && (document.activeElement === first || document.activeElement === box.current)) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  };
   return (
     <div className="modal-backdrop" onMouseDown={(e) => { if (!sticky && e.target === e.currentTarget) onClose(); }}>
-      <div className="modal" role="dialog" aria-modal="true" aria-label={title} style={width ? { width } : undefined}>
+      <div className="modal" role="dialog" aria-modal="true" aria-label={title} style={width ? { width } : undefined} ref={box} tabIndex={-1} onKeyDown={trap}>
         <div className="modal-head"><h2 className="modal-title">{title}</h2><button className="icon-btn" aria-label="Close" onClick={onClose}><Icon name="close" /></button></div>
         <div className="modal-body">{children}</div>
         {buttons ? <div className="modal-buttons">{buttons}</div> : null}
@@ -77,7 +99,7 @@ export function ConfirmModal({ title, body, confirmLabel = 'Confirm', danger, bu
   return (
     <Modal title={title} onClose={onClose} width={460} buttons={<>
       <button className="btn" onClick={onClose}>Cancel</button>
-      <button className={`btn btn-primary ${danger ? 'btn-danger-solid' : ''}`} style={danger ? { background: 'var(--danger)', borderColor: 'var(--danger)' } : undefined} disabled={busy} onClick={onConfirm}>{confirmLabel}</button>
+      <button className={`btn btn-primary ${danger ? 'btn-danger-solid' : ''}`} disabled={busy} aria-busy={busy || undefined} onClick={onConfirm}>{confirmLabel}</button>
     </>}>{body}</Modal>
   );
 }
@@ -96,7 +118,7 @@ export function PromptModal({ title, label, initial = '', hint, confirmLabel = '
   return (
     <Modal title={title} onClose={onClose} width={440} buttons={<>
       <button className="btn" onClick={onClose}>Cancel</button>
-      <button className="btn btn-primary" disabled={busy || !v.trim()} onClick={submit}>{confirmLabel}</button>
+      <button className="btn btn-primary" disabled={busy || !v.trim()} aria-busy={busy || undefined} onClick={submit}>{confirmLabel}</button>
     </>}>
       <Field label={label} hint={hint} error={err}>
         <input className="v2-input" autoFocus value={v} onChange={(e) => setV(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && v.trim() && !busy) void submit(); }} />
@@ -109,7 +131,25 @@ export function Toasts() {
   const { toasts, dismiss } = useUi();
   return (
     <div className="v2-toasts" aria-live="polite">
-      {toasts.map((t) => <div key={t.id} className={`v2-toast ${t.kind}`} role={t.kind === 'error' ? 'alert' : 'status'} onClick={() => dismiss(t.id)}>{t.text}</div>)}
+      {toasts.map((t) => <ToastItem key={t.id} toast={t} onDismiss={() => dismiss(t.id)} />)}
+    </div>
+  );
+}
+
+/** DS-005: a toast has a dismiss button, pauses while the pointer or the keyboard is on it, and an error stays twice as long (10 s). */
+function ToastItem({ toast: t, onDismiss }: { toast: Toast; onDismiss: () => void }) {
+  const [paused, setPaused] = useState(false);
+  useEffect(() => {
+    if (paused) return undefined;
+    const timer = setTimeout(onDismiss, t.kind === 'error' ? 10000 : 3200);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paused, t.id]);
+  return (
+    <div className={'v2-toast ' + t.kind} role={t.kind === 'error' ? 'alert' : 'status'} onClick={onDismiss}
+      onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} onFocus={() => setPaused(true)} onBlur={() => setPaused(false)}>
+      <span className="v2-toast-text">{t.text}</span>
+      <button type="button" className="v2-toast-x" aria-label="Dismiss" onClick={(e) => { e.stopPropagation(); onDismiss(); }}>×</button>
     </div>
   );
 }

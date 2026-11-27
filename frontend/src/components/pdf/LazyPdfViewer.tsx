@@ -19,7 +19,7 @@ const Viewer = lazy(() =>
 const Loading: React.FC = () => (
   <div style={{
     height: '100%', display: 'grid', placeItems: 'center',
-    background: '#3a3a3e', color: 'rgba(255,255,255,.7)', fontSize: 13,
+    background: 'var(--viewer-canvas)', color: 'var(--viewer-ink-70)', fontSize: 13,
   }}>
     Loading viewer…
   </div>

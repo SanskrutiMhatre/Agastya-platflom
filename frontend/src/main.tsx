@@ -1,10 +1,12 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RouterProvider, createBrowserRouter } from 'react-router-dom';
+import './styles/tokens/tokens.css';
 import './studio/styles/app.css';
 import './studio/styles/document.css';
 import './styles/platform.css';
 import './styles/pdf.css';
+import './styles/states.css';
 import { App } from './App';
 import { applyTheme, useUi } from './store/ui';
 

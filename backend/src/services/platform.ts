@@ -20,6 +20,7 @@ import { store, docIndex, projectDirFor } from '../context';
 import { bad } from './http';
 import { csvText } from './csv';
 import { installedSchemaIssues } from './validation';
+import { deriveAccent } from './accent';
 
 type Row = Record<string, any>;
 
@@ -48,6 +49,8 @@ export function writeSettings(body: Partial<AppSettings>): AppSettings {
   };
   if (!next.appName) throw bad('The application needs a name.', 'NAME_REQUIRED');
   if (next.accent && !/^#[0-9a-f]{6}$/i.test(next.accent)) throw bad('The accent colour must look like #1a73e8.', 'BAD_COLOUR');
+  // WP-19 (TH-003): the same check the Administrator page previews; a colour with no readable light and dark shade is refused.
+  if (next.accent) { const d = deriveAccent(next.accent); if (!d.ok) throw bad(d.reason ?? 'This accent colour cannot be made readable.', 'BAD_COLOUR'); }
   store.configPut('app-settings', 'main', next, nowIso());
   return next;
 }

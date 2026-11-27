@@ -155,7 +155,7 @@ export function DocExplorePage() {
           ) : selPic ? (
             <div className="v2-stack" data-testid="explore-detail">
               <div><h3 style={{ margin: 0 }}>{selPic.file}</h3><div className="v2-sub">Picture</div></div>
-              <img src={graphicsApi.url(id, selPic.file)} alt={selPic.file} style={{ maxWidth: '100%', maxHeight: 180, objectFit: 'contain', border: '1px solid var(--border)', borderRadius: 8, background: '#fff' }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+              <img src={graphicsApi.url(id, selPic.file)} alt={selPic.file} style={{ maxWidth: '100%', maxHeight: 180, objectFit: 'contain', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--image-backdrop)' }} onError={(e) => { e.currentTarget.style.display = 'none'; }} />
               <table className="v2-table" style={{ fontSize: 12.5 }}><tbody>
                 <tr><td className="v2-hint">Picture name (ICN)</td><td className="v2-mono" style={{ wordBreak: 'break-all' }}>{selPic.icn}</td></tr>
                 <tr><td className="v2-hint">File in a package</td><td className="v2-mono" style={{ wordBreak: 'break-all' }}>{selPic.packageFile}</td></tr>

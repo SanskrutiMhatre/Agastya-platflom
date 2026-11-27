@@ -1,0 +1,99 @@
+/* =========================================================================
+   Component states (audit WP-19: DS-002, DS-003, TH-002, TH-006, UID-002, UID-003).
+   Loaded after app.css, document.css and platform.css so a state rule wins over the base rule of the same specificity.
+   Only tokens here - the colour lint (scripts/tokens/lint-colors.mjs) allows no literal.
+   State matrix (what each control shows), both themes through the tokens:
+     hover      surface-hover (accent-hover on primary)         active    surface-pressed
+     focus      2px focus-ring outline, :focus-visible only     selected  surface-selected + accent text (existing .active/.on/.sel classes)
+     disabled   surface-disabled + text-disabled + border-default, cursor not-allowed, never opacity alone
+     busy       aria-busy="true": a spinner in place of the label, width kept, no pointer events
+     error      aria-invalid="true": danger border; the message under the field (Field component) carries the text
+   ========================================================================= */
+
+/* ---------------------------------------------------------------- inputs: a 3:1 boundary (WCAG 1.4.11) */
+.input, .v2-input, .v2-select, .v2-textarea, .x-input, .x-select, .v2-jsg-cover input, .attr-input,
+.panel-filter, .find-input, .find-scope, .pdf-field input[type='text'], .pdf-field select, .v2-filter { border-color: var(--border-control); }
+.v2-filter .v2-input { border-color: transparent; }
+
+/* the destructive solid button of ConfirmModal (it was a class no stylesheet defined, patched with an inline style) */
+.btn-danger-solid { background: var(--danger); border-color: var(--danger); color: var(--text-on-accent); }
+.btn-danger-solid:hover:not(:disabled) { background: var(--danger); filter: brightness(0.92); }
+
+/* ---------------------------------------------------------------- disabled */
+.btn:disabled, .btn[aria-disabled='true'], .x-btn:disabled, .x-btn[aria-disabled='true'],
+.btn-primary:disabled, .btn-danger:disabled, .btn-danger-solid:disabled, .x-btn--primary:disabled {
+  background: var(--surface-disabled); color: var(--text-disabled); border-color: var(--border-default); cursor: not-allowed; box-shadow: none; opacity: 1;
+}
+.btn:disabled .icon, .x-btn:disabled .icon { color: inherit; }
+.icon-btn:disabled, .icon-btn[aria-disabled='true'] { opacity: 1; color: var(--text-disabled); background: transparent; cursor: not-allowed; }
+.rb:disabled, .rb[aria-disabled='true'] { opacity: 1; color: var(--text-disabled); background: transparent; cursor: not-allowed; }
+.rb:disabled .icon, .rb-large:disabled .icon, .rb-small:disabled .icon { color: var(--text-disabled); }
+.vs-btn:disabled { opacity: 1; color: var(--text-disabled); cursor: not-allowed; }
+.fm-item:disabled, .ctx-item:disabled { opacity: 1; color: var(--text-disabled); cursor: not-allowed; }
+.fm-item:disabled .icon, .ctx-item:disabled .icon { color: var(--text-disabled); }
+.picker-item.disabled { opacity: 1; color: var(--text-disabled); cursor: not-allowed; }
+.v2-seg button:disabled, .v2-tab:disabled, .panel-tab:disabled, .ribbon-tab:disabled, .chip-toggle:disabled, .find-toggle:disabled,
+.v2-navbtn:disabled, .v2-chap:disabled, .v2-link:disabled, .jss-ttools button:disabled { color: var(--text-disabled); cursor: not-allowed; opacity: 1; }
+.v2-seg button:disabled { background: var(--surface-disabled); }
+.input:disabled, .v2-input:disabled, .v2-select:disabled, .v2-textarea:disabled, .x-input:disabled, .x-select:disabled, .attr-input:disabled,
+.v2-jsg-cover input:disabled, .find-input:disabled {
+  background: var(--surface-disabled); color: var(--text-disabled); border-color: var(--border-default); cursor: not-allowed; opacity: 1;
+}
+input[type='checkbox']:disabled, input[type='radio']:disabled { cursor: not-allowed; }
+
+/* ---------------------------------------------------------------- busy */
+.btn[aria-busy='true'], .x-btn[aria-busy='true'] { position: relative; color: transparent !important; pointer-events: none; cursor: progress; }
+.btn[aria-busy='true'] > *, .x-btn[aria-busy='true'] > * { visibility: hidden; }
+.btn[aria-busy='true']::after, .x-btn[aria-busy='true']::after {
+  content: ''; position: absolute; inset: 0; margin: auto; width: 12px; height: 12px; border-radius: 50%;
+  border: 2px solid var(--text); border-right-color: transparent; animation: spin 0.8s linear infinite;
+}
+.btn-primary[aria-busy='true']::after, .btn-danger-solid[aria-busy='true']::after { border-color: var(--text-on-accent); border-right-color: transparent; }
+.btn:disabled[aria-busy='true']::after { border-color: var(--text-disabled); border-right-color: transparent; }
+
+/* ---------------------------------------------------------------- active (pressed) and focus */
+.btn:active:not(:disabled), .x-btn:active:not(:disabled) { background: var(--surface-pressed); }
+.btn-primary:active:not(:disabled), .x-btn--primary:active:not(:disabled) { background: var(--accent-hover); }
+.v2-seg button:focus-visible, .v2-tab:focus-visible, .v2-chap:focus-visible, .v2-dm:focus-visible, .v2-anc-name:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.v2-seg button:hover:not(:disabled):not(.on) { background: var(--surface-hover); color: var(--text); }
+
+/* ---------------------------------------------------------------- error (UID-002) */
+.input[aria-invalid='true'], .v2-input[aria-invalid='true'], .v2-select[aria-invalid='true'], .v2-textarea[aria-invalid='true'], .x-input[aria-invalid='true'] { border-color: var(--danger); }
+.v2-input[aria-invalid='true']:focus, .v2-select[aria-invalid='true']:focus, .v2-textarea[aria-invalid='true']:focus { outline-color: var(--danger); }
+.v2-field > .v2-error { display: flex; gap: 4px; align-items: baseline; }
+.v2-field > .v2-error::before { content: '!'; flex: none; display: inline-grid; place-items: center; width: 14px; height: 14px; border-radius: 50%; background: var(--danger); color: var(--text-on-accent); font-size: 10px; font-weight: 700; }
+
+/* ---------------------------------------------------------------- toasts (DS-005): a dismiss button */
+.v2-toast { display: flex; align-items: flex-start; gap: 10px; }
+.v2-toast > .v2-toast-text { flex: 1; min-width: 0; }
+.v2-toast-x { flex: none; border: 0; background: none; color: inherit; cursor: pointer; padding: 0 2px; font-size: 15px; line-height: 1; opacity: 0.85; }
+.v2-toast-x:hover { opacity: 1; }
+.v2-toast-x:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
+
+/* ---------------------------------------------------------------- keyboard tooltip (UID-003): the title of the focused control, themed */
+.v2-ktip { position: fixed; z-index: var(--z-tooltip); max-width: 320px; padding: 5px 9px; border-radius: 6px; background: var(--text); color: var(--bg-elev);
+  font-size: 12px; font-weight: 500; line-height: 1.35; box-shadow: var(--shadow-2); pointer-events: none; white-space: normal; }
+
+/* ---------------------------------------------------------------- administrator accent preview (TH-003) */
+.v2-accent-prev { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); min-width: 220px; flex: 1; }
+.v2-accent-prev[data-theme-preview='light'] { background: var(--p-white); color: var(--p-gray-900); --text-faint: var(--p-gray-600); }
+.v2-accent-prev[data-theme-preview='dark'] { background: var(--p-ink-870); color: var(--p-ink-50); --text-faint: var(--p-ink-250); }
+.v2-accent-btn { align-self: flex-start; height: 28px; padding: 0 12px; border-radius: 6px; display: inline-grid; place-items: center; font-weight: 600; font-size: 12.5px; }
+
+/* ---------------------------------------------------------------- Windows High Contrast (TH-006) */
+@media (forced-colors: active) {
+  .btn, .x-btn, .v2-seg, .v2-card, .modal, .ctx-menu, .jsg-menu, .file-menu, .v2-toast, .toast, .v2-badge, .v2-alert, .v2-rail-badge, .v2-count, .v2-bell-count { border: 1px solid CanvasText; }
+  .input, .v2-input, .v2-select, .v2-textarea, .x-input, .x-select, .attr-input, .panel-filter, .find-input { border-color: FieldText; }
+  .v2-nav a.active, .v2-rail-item.active, .v2-dm.active, .v2-tnode.sel, .v2-issue.sel, .v2-anc-row.sel, .v2-admin-nav a.active, .outline-row.current,
+  .problem.active, .v2-tab.active, .ribbon-tab.active, .panel-tab.active, .jsg-tab.on, .jsg-bar .jsg-tb.on, .v2-seg button.on, .doc-tab.active,
+  .vs-btn.pressed, .rb.pressed, .icon-btn.pressed, .picker-item.active, .v2-chapter.sel, [aria-selected='true'], [aria-current='page'] { outline: 2px solid Highlight; outline-offset: -2px; }
+  .btn:disabled, .x-btn:disabled, .icon-btn:disabled, .rb:disabled, .v2-input:disabled, .input:disabled, .v2-select:disabled { color: GrayText; border-color: GrayText; }
+  :focus-visible { outline: 2px solid Highlight !important; outline-offset: 2px; }
+  .v2-dot, .v2-sev, .v2-unread { forced-color-adjust: none; border: 1px solid CanvasText; }
+  .btn-primary, .x-btn--primary, .btn-danger-solid { forced-color-adjust: none; border: 2px solid ButtonText; }
+}
+
+/* ---------------------------------------------------------------- prefers-contrast: more - decorative edges become control edges, faint text becomes secondary */
+@media (prefers-contrast: more) {
+  :root, :root[data-theme='dark'] { --border: var(--border-control); --border-strong: var(--border-control); --text-faint: var(--text-secondary); }
+}
