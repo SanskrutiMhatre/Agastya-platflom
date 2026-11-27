@@ -22,7 +22,8 @@ a:hover { text-decoration: underline; }
 @media (max-width: 760px) {
   .v2-shell { grid-template-columns: 56px 1fr; }
   .v2-brand { justify-content: center; padding: 14px 0; }
-  .v2-brand .v2-trunc, .v2-side-foot { display: none; }
+  .v2-brand .v2-trunc, .v2-side-foot, .v2-side .v2-nav-head { display: none; }
+  .v2-shell .v2-side > .v2-nav a.active::before { left: -6px; }
   .v2-side > .v2-nav { padding: 6px; }
   .v2-side > .v2-nav a { justify-content: center; position: relative; padding: 0; gap: 0; font-size: 0; }
   .v2-side > .v2-nav a .v2-count { position: absolute; top: 1px; right: 1px; margin: 0; font-size: 10px; min-width: 16px; line-height: 16px; }
@@ -37,6 +38,13 @@ a:hover { text-decoration: underline; }
 .v2-nav a, .v2-nav button.v2-navbtn { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 6px; color: var(--text-muted); font-size: 13px; font-weight: 500; border: 0; background: none; cursor: pointer; text-align: left; width: 100%; }
 .v2-nav a:hover, .v2-nav button.v2-navbtn:hover { background: var(--bg-hover); color: var(--text); text-decoration: none; }
 .v2-nav a.active { background: var(--accent-soft); color: var(--accent); }
+/* WP-35 (group 2, mockup): the current page also carries an accent bar at the sidebar's edge (not colour alone) */
+.v2-side > .v2-nav a { position: relative; }
+.v2-side > .v2-nav a.active::before { content: ""; position: absolute; left: -8px; top: 7px; bottom: 7px; width: 3px; border-radius: 0 3px 3px 0; background: var(--accent); }
+.v2-side-note { padding: 4px 8px; }
+.v2-nav-flush { padding: 0; }
+.v2-acct-menu { position: absolute; right: 0; top: 38px; width: 220px; z-index: var(--z-menu); padding: 6px; box-shadow: var(--shadow-2); }
+.v2-acct-who { display: flex; flex-direction: column; gap: 2px; padding: 4px 10px 8px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
 .v2-nav .v2-count { margin-left: auto; font-size: 11px; background: var(--accent); color: var(--accent-text); border-radius: 10px; padding: 0 6px; min-width: 18px; text-align: center; line-height: 18px; }
 .v2-side-foot { margin-top: auto; padding: 8px; border-top: 1px solid var(--border); }
 .v2-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
@@ -107,6 +115,35 @@ a:hover { text-decoration: underline; }
 .v2-alert.bad { background: var(--danger-soft); color: var(--danger); border-color: transparent; }
 .v2-alert.warn { background: var(--warning-soft); color: var(--warning); border-color: transparent; }
 .v2-alert.ok { background: var(--success-soft); color: var(--success); border-color: transparent; }
+/* WP-35 (group 2): the dashboard parts as classes (were inline styles): sections, the two-column split, invitations, the activity feed */
+.v2-alert.accent { background: var(--accent-soft); color: var(--text); border-color: transparent; }
+.v2-gap-b { margin-bottom: 18px; }
+.v2-osec { margin-bottom: 22px; min-width: 0; }
+.v2-osec-head { margin-bottom: 10px; }
+.v2-osec-head h3 { margin: 0; font-size: var(--fs-md); }
+.v2-split { grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); align-items: start; }
+@media (max-width: 1100px) { .v2-split { grid-template-columns: minmax(0, 1fr); } }
+.v2-feed-item { padding: 9px 14px; border-bottom: 1px solid var(--border); min-width: 0; }
+.v2-feed-item:last-child { border-bottom: 0; }
+.v2-feed-line { font-size: var(--fs-sm); overflow-wrap: anywhere; }
+/* UX-025 (rest): a long project title on an Activity card ends in an ellipsis and never runs under the Open button */
+.v2-grow-min { flex: 1; min-width: 0; }
+.v2-no-shrink { flex: none; }
+.v2-acard-title { display: block; font-size: 14.5px; }
+.v2-mt0 { margin-top: 0; }
+.v2-mt16 { margin-top: 16px; }
+.v2-gap8 { gap: 8px; }
+/* a folded explanation: the summary is a real control (keyboard, 24 px target) */
+.v2-disclose > summary { min-height: 24px; padding: 2px 0; font-size: var(--fs-xs); color: var(--text-muted); cursor: pointer; }
+.v2-disclose > summary:hover { color: var(--text); }
+.v2-disclose > summary:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 2px; }
+.v2-disclose > p { margin: 6px 0 0; }
+/* the watermark preview of the Release page (paper tokens: it shows the printed page) */
+.v2-wm-preview { position: relative; display: grid; place-items: center; height: 150px; overflow: hidden; border: 1px solid var(--border); border-radius: 8px; background: var(--paper); }
+.v2-wm-tiles { position: absolute; inset: -20px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; place-items: center; transform: rotate(-30deg); color: var(--paper-watermark-preview); font-weight: 700; font-size: 13px; }
+.v2-wm-one { color: var(--paper-watermark-preview-strong); font-weight: 800; font-size: 20px; white-space: nowrap; }
+.v2-wm-one.diagonal { transform: rotate(-35deg); }
+.v2-wm-empty.v2-hint { color: var(--paper-muted); }
 .v2-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .v2-table th { text-align: left; padding: 8px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-faint); border-bottom: 1px solid var(--border); font-weight: 600; white-space: nowrap; }
 .v2-table td { padding: var(--table-pad-y) 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }

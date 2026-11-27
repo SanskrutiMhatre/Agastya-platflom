@@ -16,7 +16,7 @@ import { actionLabel, isFeedNoise } from '../lib/activity';
 import { useSession } from '../store/session';
 
 const Section = ({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) => (
-  <section style={{ marginBottom: 22 }}><div className="v2-row v2-spread" style={{ marginBottom: 10 }}><h3 style={{ margin: 0, fontSize: 14 }}>{title}</h3>{action}</div>{children}</section>
+  <section className="v2-osec"><div className="v2-row v2-spread v2-osec-head"><h3>{title}</h3>{action}</div>{children}</section>
 );
 
 function AdminOverview() {
@@ -35,7 +35,7 @@ function AdminOverview() {
           { label: 'Released', value: c.released, tone: 'ok' }, { label: 'Awaiting approval', value: c.pending, tone: c.pending ? 'warn' : undefined }, { label: 'Not released', value: c.unreleased },
         ]} />
       <Section title="Projects"><ProjectStatusTable projects={o.data.projects} empty="No projects on the platform yet." /></Section>
-      <div className="v2-grid" style={{ gridTemplateColumns: 'minmax(0, 2fr) minmax(280px, 1fr)', alignItems: 'start' }}>
+      <div className="v2-grid v2-split">
         <Section title="People" action={<a href="/activity" onClick={(e) => { e.preventDefault(); nav('/activity'); }}>Full activity</a>}><TeamTable team={o.data.team} showRole /></Section>
         <Section title="Recent activity"><FeedList feed={o.data.feed} /></Section>
       </div>
@@ -66,12 +66,12 @@ function ManagerOverview() {
           { label: 'Awaiting your approval', value: approvals.data?.length ?? c.pending, tone: (approvals.data?.length ?? c.pending) ? 'warn' : undefined }, { label: 'Not released', value: c.unreleased },
         ]} />
       {approvals.data?.length ? (
-        <div className="v2-alert accent v2-row v2-spread" style={{ background: 'var(--accent-soft)', color: 'var(--text)', marginBottom: 18 }}>
+        <div className="v2-alert accent v2-row v2-spread v2-gap-b">
           <span><Icon name="clock" /> <strong>{approvals.data.length}</strong> release request{approvals.data.length === 1 ? '' : 's'} waiting for you.</span>
           <button className="btn btn-sm btn-primary" onClick={() => nav('/activity')}>Review</button>
         </div>
       ) : null}
-      <div className="v2-grid" style={{ gridTemplateColumns: 'minmax(0, 2fr) minmax(280px, 1fr)', alignItems: 'start' }}>
+      <div className="v2-grid v2-split">
         <div>
           <Section title="My team"><TeamTable team={o.data.team} empty="Create an Author, then assign them to a project." /></Section>
           <Section title="Projects and release status"><ProjectStatusTable projects={o.data.projects} empty="Create your first project." /></Section>
@@ -106,9 +106,9 @@ function AuthorOverview() {
         stats={[{ label: 'Projects', value: counts.projects }, { label: 'Data modules', value: counts.dataModules }, { label: 'Publications built', value: counts.published }, { label: 'Folders', value: counts.folders }]} />
 
       {inv.data && inv.data.length > 0 ? (
-        <div className="v2-stack" style={{ marginBottom: 18 }}>
+        <div className="v2-stack v2-gap-b">
           {inv.data.map((i) => (
-            <div key={i.id} className="v2-alert accent v2-row v2-spread" style={{ background: 'var(--accent-soft)', color: 'var(--text)' }}>
+            <div key={i.id} className="v2-alert accent v2-row v2-spread">
               <span><Icon name="invite" /> <strong>{i.invitedBy ?? 'Someone'}</strong> invited you to <strong>{i.projectName}</strong> as {i.role}.</span>
               <span className="v2-row"><button className="btn btn-sm btn-primary" onClick={() => answer(i.id, true)}>Accept</button><button className="btn btn-sm" onClick={() => answer(i.id, false)}>Decline</button></span>
             </div>
@@ -116,7 +116,7 @@ function AuthorOverview() {
         </div>
       ) : null}
 
-      <div className="v2-grid" style={{ gridTemplateColumns: 'minmax(0, 2fr) minmax(280px, 1fr)', alignItems: 'start' }}>
+      <div className="v2-grid v2-split">
         <Section title="Recent projects">
           {recent.length === 0
             ? <div className="v2-card"><Empty title="No projects yet">Create your first project, or ask your Project Manager to assign you to one.</Empty></div>
@@ -125,8 +125,8 @@ function AuthorOverview() {
         <Section title="Recent activity">
           <div className="v2-card">
             {activity.length === 0 ? <Empty title="Nothing yet" /> : activity.map((a) => (
-              <div key={a.id} style={{ padding: '9px 14px', borderBottom: '1px solid var(--border)' }}>
-                <div style={{ fontSize: 13 }}><strong>{a.actor ?? 'system'}</strong> {actionLabel(a.action)}{a.projectName ? <> <a href={`/projects/${a.projectId}`} onClick={(e) => { e.preventDefault(); nav(`/projects/${a.projectId}`); }}>{a.projectName}</a></> : null}</div>
+              <div key={a.id} className="v2-feed-item">
+                <div className="v2-feed-line"><strong>{a.actor ?? 'system'}</strong> {actionLabel(a.action)}{a.projectName ? <> <a href={`/projects/${a.projectId}`} onClick={(e) => { e.preventDefault(); nav(`/projects/${a.projectId}`); }}>{a.projectName}</a></> : null}</div>
                 <div className="v2-hint">{ago(a.at)}</div>
               </div>
             ))}
