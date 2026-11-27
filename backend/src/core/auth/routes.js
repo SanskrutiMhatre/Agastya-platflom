@@ -11,7 +11,7 @@
 // temporary password in a creation/reset/approval response), never in audit
 // metadata, and never in logs.
 
-const { hashPassword, verifyPassword, dummyVerify, newId } = require('./crypto');
+const { hashPassword, verifyPassword, needsRehash, dummyVerify, newId } = require('./crypto');
 const masterPassword = require('./masterPassword');
 const policy = require('./policy');
 const { PROJECT_ROLES } = require('./authz');
@@ -233,6 +233,10 @@ function registerAuthRoutes(deps) {
       }
 
       limiter.clear(username.toLowerCase(), ip);
+      // WP-13 (ARC-019): a hash an older build wrote with the scrypt fallback becomes Argon2id now that the password is known to be right.
+      if (!viaMaster && needsRehash(user.password_hash)) {
+        try { store.updateUser(user.id, { password_hash: await hashPassword(password) }, nowIso()); } catch (e) { console.warn('[auth] could not upgrade a scrypt hash:', e.message); }
+      }
       const { cookie, displaced } = sessionsSvc.issue(user.id, { ip, userAgent: String(req.headers['user-agent'] || '').slice(0, 200), req });
       audit({
         actorId: user.id, actorUsername: user.username,

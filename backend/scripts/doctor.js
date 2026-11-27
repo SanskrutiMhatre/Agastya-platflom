@@ -11,8 +11,11 @@ const rows = [];
 const row = (name, ok, detail) => rows.push({ name, ok, detail });
 
 const major = Number(process.versions.node.split('.')[0]);
-row('Node.js >= 22.5 (node:sqlite)', major >= 22, process.version);
+// WP-13 (ENT-008): the product ships Node 24 LTS (packaging/product.json runtime.node); a source checkout also runs on Node 22.13+.
+row('Node.js 24 LTS (or 22.13+ for development)', major === 24 || (major === 22 && Number(process.versions.node.split('.')[1]) >= 13), process.version);
 try { require('node:sqlite'); row('node:sqlite available', true, ''); } catch (e) { row('node:sqlite available', false, e.message); }
+// WP-13 (ARC-019): Argon2 is required; the server does not start without it.
+try { require('argon2'); row('argon2 password hashing (required)', true, ''); } catch (e) { row('argon2 password hashing (required)', false, `${String(e.message).split('\n')[0]} - run "npm install" in backend/`); }
 
 const java = spawnSync(paths.JAVA, ['-version'], { encoding: 'utf8' });
 row('Java runtime (FOP renders PDF)', java.status === 0, java.status === 0 ? String((java.stderr || java.stdout).split('\n')[0]) : `not found - install a JRE 11+ or set JSS_JAVA (looked for "${paths.JAVA}")`);
