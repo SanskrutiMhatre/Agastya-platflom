@@ -39,7 +39,7 @@ function FolderAccessModal({ folder, onClose }: { folder: FolderView; onClose: (
                     {(['viewer', 'reviewer', 'editor', 'owner'] as ProjectRole[]).map((r) => <option key={r}>{r}</option>)}
                   </select>
                 </td>
-                <td style={{ width: 40 }}><button className="icon-btn" aria-label={`Remove ${g.username}`} onClick={() => setGrants(rows.filter((x) => x.userId !== g.userId))}><Icon name="trash" /></button></td>
+                <td style={{ width: 40 }}><button className="icon-btn" aria-label={`Remove ${g.username}`} title={`Remove ${g.username}`} onClick={() => setGrants(rows.filter((x) => x.userId !== g.userId))}><Icon name="trash" /></button></td>
               </tr>))}</tbody></table>
           )}
           {users.data && users.data.length > 0 ? (

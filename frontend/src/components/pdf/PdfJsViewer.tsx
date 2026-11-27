@@ -214,7 +214,7 @@ const TocRow: React.FC<{ item: TocItem; depth: number; pdf: PDFDocumentProxy; cu
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 6 + depth * 14, borderRadius: 4, background: active ? 'var(--viewer-active)' : undefined }}>
         {hasKids ? (
           <button
-            onClick={() => setOpen(o => !o)}
+            onClick={() => setOpen(o => !o)} aria-label={open ? "Collapse" : "Expand"} title={open ? "Collapse" : "Expand"} aria-expanded={open}
             style={{ width: 16, height: 16, border: 'none', background: 'none', color: 'var(--viewer-ink-55)', cursor: 'pointer', padding: 0, transform: open ? 'rotate(90deg)' : undefined, transition: 'transform .12s' }}
           >▶</button>
         ) : <span style={{ width: 16, flexShrink: 0 }} />}
@@ -452,9 +452,9 @@ export const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ src, downloadName = 'o
         display: 'flex', alignItems: 'center', gap: autoFit ? 4 : 6, padding: autoFit ? '5px 6px' : '6px 10px', flexShrink: 0,
         background: 'var(--x-white)', borderBottom: '1px solid var(--x-line)', flexWrap: 'wrap',
       }}>
-        <button style={btn} onClick={() => setTocOpen(o => !o)} title="Table of contents">☰</button>
+        <button style={btn} onClick={() => setTocOpen(o => !o)} title="Table of contents" aria-label="Table of contents">☰</button>
 
-        <button style={btn} onClick={() => goPage(page - 1)} disabled={page <= 1}>‹</button>
+        <button style={btn} onClick={() => goPage(page - 1)} disabled={page <= 1} title="Previous page" aria-label="Previous page">‹</button>
         <input
           value={pageInput}
           onChange={e => setPageInput(e.target.value)}
@@ -464,12 +464,12 @@ export const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ src, downloadName = 'o
           aria-label="Page number"
         />
         <span style={{ fontSize: 12, color: 'var(--x-text-muted)' }}>/ {numPages || '—'}</span>
-        <button style={btn} onClick={() => goPage(page + 1)} disabled={page >= numPages}>›</button>
+        <button style={btn} onClick={() => goPage(page + 1)} disabled={page >= numPages} title="Next page" aria-label="Next page">›</button>
 
         <span style={{ width: autoFit ? 0 : 8 }} />
-        <button style={btn} onClick={() => setScale(s => Math.max(0.4, s - 0.15))}>−</button>
+        <button style={btn} onClick={() => setScale(s => Math.max(0.4, s - 0.15))} title="Zoom out" aria-label="Zoom out">−</button>
         <span style={{ fontSize: 12, minWidth: 40, textAlign: 'center' }}>{Math.round(scale * 100)}%</span>
-        <button style={btn} onClick={() => setScale(s => Math.min(3, s + 0.15))}>+</button>
+        <button style={btn} onClick={() => setScale(s => Math.min(3, s + 0.15))} title="Zoom in" aria-label="Zoom in">+</button>
         <button style={btn} onClick={fitWidth}>Fit</button>
 
         <span style={{ width: 8 }} />
@@ -482,9 +482,9 @@ export const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ src, downloadName = 'o
         />
         {matches.length > 0 && (
           <>
-            <button style={btn} onClick={() => stepMatch(-1)}>‹</button>
+            <button style={btn} onClick={() => stepMatch(-1)} title="Previous match" aria-label="Previous match">‹</button>
             <span style={{ fontSize: 11, color: 'var(--x-text-muted)' }}>{matchIndex + 1}/{matches.length}</span>
-            <button style={btn} onClick={() => stepMatch(1)}>›</button>
+            <button style={btn} onClick={() => stepMatch(1)} title="Next match" aria-label="Next match">›</button>
           </>
         )}
         {searching && <span style={{ fontSize: 11, color: 'var(--x-text-muted)' }}>searching…</span>}

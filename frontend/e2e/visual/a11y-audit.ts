@@ -77,6 +77,16 @@ export function auditPage(): AuditResult {
     count('button-name');
     if (!nameOf(el)) add('button-name', 'critical', el, `${el.tagName.toLowerCase()}${el.getAttribute('role') ? `[role=${el.getAttribute('role')}]` : ''} has no accessible name`);
   }
+  // WP-35 (UID-003): a button that shows only an icon or a glyph (no letter or digit in its text) needs a name AND a tooltip: the name for
+  // assistive technology, the `title` for sighted users (hover; FocusTooltip on keyboard focus). The rail's items carry their own `data-tip`.
+  for (const el of Array.from(document.querySelectorAll('button, [role="button"]'))) {
+    if (!visible(el) || hiddenFromAT(el)) continue;
+    if (/[\p{L}\p{N}]/u.test(textOf(el))) continue;
+    count('icon-button-tooltip');
+    const named = !!(byIds(el.getAttribute('aria-labelledby')) || (el.getAttribute('aria-label') || '').trim());
+    const tip = !!((el.getAttribute('title') || '').trim() || (el.getAttribute('data-tip') || '').trim());
+    if (!named || !tip) add('icon-button-tooltip', 'serious', el, `icon-only button: ${!named ? 'no aria-label' : ''}${!named && !tip ? ', ' : ''}${!tip ? 'no tooltip (title)' : ''}`);
+  }
   for (const el of Array.from(document.querySelectorAll('a[href]'))) {
     if (!rendered(el) || hiddenFromAT(el)) continue;
     count('link-name'); if (!nameOf(el)) add('link-name', 'serious', el, 'link has no accessible name');

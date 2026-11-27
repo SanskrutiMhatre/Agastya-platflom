@@ -66,6 +66,7 @@ test('the audit finds planted defects', async ({ page }) => {
     <p id="low" style="color:#bbbbbb">low contrast text</p>
     <p id="ok" style="color:#333333">readable text</p>
     <button id="noname"></button>
+    <button id="glyph" aria-label="Next page" style="min-width:24px;min-height:24px">›</button>
     <input id="nolabel">
     <img id="noalt" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" width="10" height="10">
     <div role="buttn" id="badrole">x</div>
@@ -77,12 +78,13 @@ test('the audit finds planted defects', async ({ page }) => {
     </main></body></html>`);
   const r = await page.evaluate(auditPage);
   const rules = new Set(r.violations.map((v) => v.rule));
-  for (const rule of ['html-has-lang', 'color-contrast', 'button-name', 'label', 'image-alt', 'aria-roles', 'aria-valid-attr-value', 'target-size', 'link-name', 'nested-interactive', 'aria-hidden-focus']) {
+  for (const rule of ['html-has-lang', 'color-contrast', 'button-name', 'label', 'image-alt', 'aria-roles', 'aria-valid-attr-value', 'target-size', 'link-name', 'nested-interactive', 'aria-hidden-focus', 'icon-button-tooltip']) {
     expect(rules.has(rule), `${rule} is detected`).toBe(true);
   }
   expect(r.violations.filter((v) => v.rule === 'color-contrast').map((v) => v.target)).toEqual(['p#low']);
+  expect(r.violations.filter((v) => v.rule === 'icon-button-tooltip').map((v) => v.target), 'a glyph button with a name but no tooltip (UID-003)').toContain('button#glyph');
   await page.setContent(`<!doctype html><html lang="en"><head><title>t</title></head><body style="background:#ffffff;color:#111111"><main><h1>Clean</h1>
-    <label for="f">Name</label><input id="f"><button style="min-width:24px;min-height:24px">Go</button></main></body></html>`);
+    <label for="f">Name</label><input id="f"><button style="min-width:24px;min-height:24px">Go</button><button aria-label="Next page" title="Next page" style="min-width:24px;min-height:24px">›</button></main></body></html>`);
   expect((await page.evaluate(auditPage)).violations).toEqual([]);
 });
 

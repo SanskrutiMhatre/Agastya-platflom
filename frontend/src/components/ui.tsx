@@ -1,12 +1,27 @@
 // Shared UI primitives. Buttons, modals and form chrome reuse the Studio's own
 // classes (.btn, .modal-*) so the platform and the embedded editor look alike.
 
-import { Children, cloneElement, isValidElement, useCallback, useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactElement, type ReactNode } from 'react';
+import { Children, cloneElement, isValidElement, useCallback, useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactElement, type ReactNode } from 'react';
 import { ApiError } from '../api/client';
 import { useUi, type Toast } from '../store/ui';
 import { Icon } from './Icon';
 
 export const errText = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+/**
+ * WP-35 (UID-003): the design-system pattern for a button that shows only an icon or a glyph. It always carries both an accessible name
+ * (`aria-label`) and a tooltip (`title`): the browser shows the title on mouse hover and `FocusTooltip` shows the same text, themed, on
+ * keyboard focus. `components/iconButtons.test.ts` fails the build for any icon-only `<button>` written without both.
+ */
+export function IconButton({ label, tip, icon, size, className = 'icon-btn', testId, onClick, disabled, pressed }: {
+  label: string; tip?: string; icon: Parameters<typeof Icon>[0]['name']; size?: number; className?: string; testId?: string;
+  onClick: (e: ReactMouseEvent<HTMLButtonElement>) => void; disabled?: boolean; pressed?: boolean;
+}) {
+  return (
+    <button type="button" className={className} aria-label={label} title={tip ?? label} data-testid={testId} onClick={onClick} disabled={disabled}
+      aria-pressed={pressed === undefined ? undefined : pressed}><Icon name={icon} size={size} /></button>
+  );
+}
 
 export function Spinner({ label }: { label?: string }) {
   return <span className="v2-row" role="status"><span className="v2-spin" />{label ? <span className="muted">{label}</span> : null}</span>;
@@ -102,7 +117,7 @@ export function Modal({ title, onClose, children, buttons, width, sticky }: { ti
   return (
     <div className="modal-backdrop" onMouseDown={(e) => { if (!sticky && e.target === e.currentTarget) onClose(); }}>
       <div className="modal" role="dialog" aria-modal="true" aria-label={title} style={width ? { width } : undefined} ref={box} tabIndex={-1} onKeyDown={trap}>
-        <div className="modal-head"><h2 className="modal-title">{title}</h2><button className="icon-btn" aria-label="Close" onClick={onClose}><Icon name="close" /></button></div>
+        <div className="modal-head"><h2 className="modal-title">{title}</h2><IconButton label="Close" icon="close" onClick={onClose} /></div>
         <div className="modal-body">{children}</div>
         {buttons ? <div className="modal-buttons">{buttons}</div> : null}
       </div>
@@ -173,7 +188,7 @@ function ToastItem({ toast: t, onDismiss }: { toast: Toast; onDismiss: () => voi
     <div className={'v2-toast ' + t.kind} role={t.kind === 'error' ? 'alert' : undefined} onClick={onDismiss}
       onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} onFocus={() => setPaused(true)} onBlur={() => setPaused(false)}>
       <span className="v2-toast-text">{t.text}</span>
-      <button type="button" className="v2-toast-x" aria-label="Dismiss" onClick={(e) => { e.stopPropagation(); onDismiss(); }}>×</button>
+      <button type="button" className="v2-toast-x" aria-label="Dismiss" title="Dismiss" onClick={(e) => { e.stopPropagation(); onDismiss(); }}>×</button>
     </div>
   );
 }

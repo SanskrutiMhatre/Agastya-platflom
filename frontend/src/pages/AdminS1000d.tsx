@@ -62,8 +62,8 @@ export function CatalogueSection() {
                 <td className="v2-mono">{c.code}</td><td>{c.title}</td>
                 <td>{c.origin === 'brex' ? <Badge title={`${c.sourceLabel} · ${c.ruleId}`}>{c.ruleId}</Badge> : <Badge tone={c.brexAccepts ? 'ok' : 'warn'} title={c.brexAccepts ? 'Falls in a project-available range the BREX accepts' : 'Not in the default BREX: fails the BREX rule unless the project BREX allows it'}>{c.brexAccepts ? 'custom, in BREX range' : 'custom, outside BREX'}</Badge>}</td>
                 <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{c.origin === 'custom' ? <>
-                  <button className="icon-btn" aria-label={`Edit ${c.code}`} onClick={() => setEditing(c)}><Icon name="edit" size={14} /></button>
-                  <button className="icon-btn" aria-label={`Delete ${c.code}`} onClick={() => void askDelete(c)}><Icon name="trash" size={14} /></button></> : null}</td>
+                  <button className="icon-btn" aria-label={`Edit ${c.code}`} title={`Edit ${c.code}`} onClick={() => setEditing(c)}><Icon name="edit" size={14} /></button>
+                  <button className="icon-btn" aria-label={`Delete ${c.code}`} title={`Delete ${c.code}`} onClick={() => void askDelete(c)}><Icon name="trash" size={14} /></button></> : null}</td>
               </tr>))}</tbody></table></div>
         )}
       </div>
@@ -173,7 +173,7 @@ export function SnsPresetsSection() {
             <tr key={n.path}><td style={{ paddingLeft: 8 + Math.max(0, n.level - 1) * 22, width: 160 }} className="v2-mono">{n.code}{n.note?.ambiguous ? '*' : ''}</td>
               <td>{n.title}{n.note?.category ? <> <Badge>category</Badge></> : null}{n.note?.ambiguous ? <> <Badge tone="warn" title="The specification defines this system more than once; it is not copied into projects automatically">defined twice</Badge></> : null}{n.note?.rangeEnd ? <> <Badge>range to {String(n.note.rangeEnd)}</Badge></> : null}
                 {n.definition ? <div className="v2-hint">{n.definition}</div> : null}</td>
-              {!p.readOnly ? <td style={{ textAlign: 'right' }}><button className="icon-btn" aria-label={`Delete ${n.path}`} onClick={async () => { try { await s1000dApi.deletePresetNode(p.id, n.path, true); detail.reload(); list.reload(); } catch (e) { toast(errText(e), 'error'); } }}><Icon name="trash" size={14} /></button></td> : null}</tr>))}</tbody></table></div>
+              {!p.readOnly ? <td style={{ textAlign: 'right' }}><button className="icon-btn" aria-label={`Delete ${n.path}`} title={`Delete ${n.path}`} onClick={async () => { try { await s1000dApi.deletePresetNode(p.id, n.path, true); detail.reload(); list.reload(); } catch (e) { toast(errText(e), 'error'); } }}><Icon name="trash" size={14} /></button></td> : null}</tr>))}</tbody></table></div>
         </div>
       ) : <Empty title="Choose a preset to see its entries" />}
       {creating ? <PromptModal title="New SNS preset" label="Name" confirmLabel="Create" onClose={() => setCreating(false)} onSubmit={async (name) => { const r = await s1000dApi.createPreset(name); toast('Preset created', 'success'); list.reload(); setSel(r.preset.id); }} /> : null}

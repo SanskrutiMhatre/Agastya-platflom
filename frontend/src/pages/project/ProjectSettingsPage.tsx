@@ -140,7 +140,7 @@ function Team() {
               <td style={{ width: 210 }}>{locked(x.role)
                 ? <Badge tone={x.role === 'owner' || x.role === 'manager' ? 'accent' : undefined}>{PROJECT_LABEL[x.role]}</Badge>
                 : <select className="v2-select" value={x.role} aria-label={`Access of ${x.username}`} onChange={(e) => setAccess({ userId: x.userId, name: x.fullName, role: e.target.value as ProjectRole })}>{rowRoles.map((r) => <option key={r} value={r}>{PROJECT_LABEL[r]}</option>)}</select>}</td>
-              <td style={{ width: 44, textAlign: 'right' }}>{!locked(x.role) ? <button className="icon-btn" aria-label={`Remove ${x.username}`} onClick={() => setRemove({ userId: x.userId, name: x.fullName })}><Icon name="trash" /></button> : null}</td>
+              <td style={{ width: 44, textAlign: 'right' }}>{!locked(x.role) ? <button className="icon-btn" aria-label={`Remove ${x.username}`} title={`Remove ${x.username}`} onClick={() => setRemove({ userId: x.userId, name: x.fullName })}><Icon name="trash" /></button> : null}</td>
             </tr>))}</tbody></table>
         {m.data.invitations.length ? (
           <><div className="v2-card-head" style={{ borderTop: '1px solid var(--border)' }}>Invitations waiting</div>

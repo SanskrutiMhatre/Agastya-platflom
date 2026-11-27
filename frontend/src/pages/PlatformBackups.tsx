@@ -78,7 +78,7 @@ export function PlatformBackups() {
                       <button className="btn btn-sm" disabled={!!busy} aria-busy={busy === `v-${b.name}` || undefined} onClick={() => void act(`v-${b.name}`, async () => { const r = await backupApi.verify(b.name); return `Verified: ${r.report.files} files and ${r.report.rows} rows restore exactly`; })}>{busy === `v-${b.name}` ? 'Checking…' : 'Verify'}</button>{' '}
                       <button className="btn btn-sm" disabled={!!busy} onClick={() => setCopying(b.name)}>Copy to…</button>{' '}
                       <button className="btn btn-sm" disabled={!!busy} onClick={() => setRestoring(b.name)}>Restore…</button>{' '}
-                      <button className="btn btn-sm" disabled={!!busy} onClick={() => setDeleting(b.name)} aria-label={`Delete ${b.name}`}><Icon name="trash" /></button>
+                      <button className="btn btn-sm" disabled={!!busy} onClick={() => setDeleting(b.name)} aria-label={`Delete ${b.name}`} title={`Delete ${b.name}`}><Icon name="trash" /></button>
                     </td>
                   </tr>
                 ))}
