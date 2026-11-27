@@ -1,5 +1,5 @@
 #!/bin/sh
-# A quick local gate before a push (WP-08, QA-001): build, lint ratchet, tools canary and the security matrix (a few minutes).
+# A quick local gate before a push (WP-08, QA-001): build, lint ratchet, parity check, tools canary and the security matrix (a few minutes).
 # Not installed automatically. To use it in a checkout:   git config core.hooksPath scripts/ci/hooks
 # The full gates are `npm run gate` (pr), `npm run gate:nightly` and `npm run gate:release`.
-exec node scripts/ci/gate.mjs --stages build,lint,tools,security
+exec node scripts/ci/gate.mjs --stages build,lint,parity,tools,security

@@ -8,6 +8,8 @@
 //   build            backend tsc (dist/ is what the tests run)          frontend-build  tsc --noEmit + vite build (the e2e server serves it)
 //   typecheck        frontend tsc --noEmit (the backend build is its type check)
 //   lint             scripts/ci/lint.mjs: ratchets (`any`, lazy require, .only) against scripts/ci/lint-baseline.json
+//   parity           frontend/scripts/parity/check.mjs (WP-34, GAP-009): no route, rail item, command, key, test id or test removed without a row
+//                    in docs/audit/baseline/parity-explanations.json; the report is parity.md in the evidence folder
 //   tools            backend/test/tools-canary.test.js: every tool the tests need, by name; the gate stops here when one is missing
 //   security         the security matrix files (authorisation, routes, hostile input)
 //   backend          every other backend file except the heavy and PDF-smoke ones, N files at a time, each in its own process
@@ -19,7 +21,7 @@
 //   package          npm run package:win, then verify:package
 //   readiness        scripts/ci/readiness.mjs (RES-011): the static release gates
 //
-// Profiles: pr = build, frontend-build, lint, tools, security, backend, pdf-smoke, frontend (about the PR budget of QA-001); nightly = everything up to e2e;
+// Profiles: pr = build, frontend-build, lint, parity, tools, security, backend, pdf-smoke, frontend (about the PR budget of QA-001); nightly = everything up to e2e;
 // release = nightly + frontend-verify + package + readiness.
 //
 // Evidence (QA-017): DIR (default verification-results/ci/<UTC time>-<commit>) gets meta.json (commit, dirty tree, Node, OS, tool versions),
@@ -47,9 +49,9 @@ const BUDGET_FILE = path.resolve(opt('skip-budget', path.join(ROOT, 'scripts', '
 const BUDGET = JSON.parse(fs.readFileSync(BUDGET_FILE, 'utf8'));
 const flag = (name) => argv.includes(`--${name}`);
 const PROFILES = {
-  pr: ['build', 'frontend-build', 'lint', 'tools', 'security', 'backend', 'pdf-smoke', 'frontend'],      // frontend-build: the security headers test reads the served client
-  nightly: ['build', 'frontend-build', 'typecheck', 'lint', 'tools', 'security', 'backend', 'pdf-smoke', 'backend-heavy', 'frontend', 'e2e'],
-  release: ['build', 'frontend-build', 'typecheck', 'lint', 'tools', 'security', 'backend', 'pdf-smoke', 'backend-heavy', 'frontend', 'frontend-verify', 'e2e', 'package', 'readiness'],
+  pr: ['build', 'frontend-build', 'lint', 'parity', 'tools', 'security', 'backend', 'pdf-smoke', 'frontend'],      // frontend-build: the security headers test reads the served client
+  nightly: ['build', 'frontend-build', 'typecheck', 'lint', 'parity', 'tools', 'security', 'backend', 'pdf-smoke', 'backend-heavy', 'frontend', 'e2e'],
+  release: ['build', 'frontend-build', 'typecheck', 'lint', 'parity', 'tools', 'security', 'backend', 'pdf-smoke', 'backend-heavy', 'frontend', 'frontend-verify', 'e2e', 'package', 'readiness'],
 };
 const profile = opt('profile', 'pr');
 if (!PROFILES[profile]) { console.error(`unknown profile ${profile} (pr, nightly, release)`); process.exit(2); }
@@ -179,6 +181,7 @@ const STAGES = {
   },
   typecheck: () => { const [n, a] = npmCli(FRONTEND, 'typescript', 'bin', 'tsc'); return simpleStage('typecheck', n, [...a, '--noEmit', '-p', '.'], { cwd: FRONTEND, limitMs: 10 * 60_000 }); },
   lint: () => simpleStage('lint', nodeBin, [path.join(ROOT, 'scripts', 'ci', 'lint.mjs')], { limitMs: 5 * 60_000 }),
+  parity: () => simpleStage('parity', nodeBin, [path.join(FRONTEND, 'scripts', 'parity', 'check.mjs'), '--report', path.join(EVIDENCE, 'parity.md')], { cwd: FRONTEND, limitMs: 10 * 60_000 }),
   tools: async () => {
     const ok = await backendStage('tools', backendFiles.tools, 1);
     const tap = fs.readFileSync(path.join(EVIDENCE, 'tools', `${PLAN.tools}${RUNS > 1 ? '.run1' : ''}.tap`), 'utf8');

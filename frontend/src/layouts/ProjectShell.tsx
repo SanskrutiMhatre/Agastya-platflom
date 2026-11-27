@@ -5,7 +5,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { workspaceApi, type ProjectRole, type Summary } from '../api';
-import { Icon, type IconName } from '../components/Icon';
+import { Icon } from '../components/Icon';
+import { projectRailItems } from './projectRail';
 import { Alert, Loading, errText } from '../components/ui';
 import { MissingBrex } from '../components/MissingBrex';
 
@@ -19,8 +20,6 @@ export const useProject = (): ProjectCtx => useOutletContext<ProjectCtx>();
 
 export const canWrite = (role: ProjectRole): boolean => role === 'editor' || role === 'manager' || role === 'owner';
 export const canBuild = (role: ProjectRole): boolean => role !== 'viewer';
-
-interface Item { to: string; label: string; icon: IconName; badge?: { text: string; tone: 'bad' | 'warn' | 'ok' } | null }
 
 /**
  * FE-005: one shell per project. Keyed by the id, a move from one project to another (a link, Back, Forward) starts a fresh shell with no
@@ -50,28 +49,9 @@ function ProjectShellFor({ id }: { id: string }) {
   }
   if (!summary) return <Loading />;
 
-  const v = summary.validation;
-  const rel = summary.release;
   const isCir = summary.project.type === 'CIR';
-  const jssDoc = summary.project.authoring === 'jss-xml';                      // a JSS document: its Explore and Publication pages show the document's chapters with their codes (DocExplorePage, DocPublicationPage)
-  const jsg = summary.project.format === 'jsg';                                // a JSG document is one XML file too: the same two pages, no S1000D tools
-  const jsgUhb = jsg && summary.project.manualType === 'uhb';
   const s1000d = (summary.project.format ?? 's1000d') === 's1000d';           // validation (schemas, BREX) belongs to S1000D only
-  const items: Item[] = isCir ? [
-    { to: `/projects/${id}/editor`, label: 'Editor', icon: 'editor' },
-    { to: `/projects/${id}/graphics`, label: 'Graphics', icon: 'image' },
-  ] : [
-    { to: `/projects/${id}/editor`, label: 'Editor', icon: 'editor' },
-    { to: `/projects/${id}/explore`, label: 'Explore', icon: 'explore' },
-    { to: `/projects/${id}/publication`, label: 'Publication', icon: 'book' },
-    { to: `/projects/${id}/graphics`, label: 'Graphics', icon: 'image' },
-    ...(jssDoc || jsg ? [{ to: `/projects/${id}/ancillary`, label: 'Ancillary pages', icon: 'file' as const }] : []),
-    ...(s1000d ? [
-      { to: `/projects/${id}/validation`, label: 'Validation', icon: 'shield' as const, badge: v && v.error > 0 ? { text: String(v.error), tone: 'bad' as const } : null },
-    ] : []),
-    { to: `/projects/${id}/release`, label: 'Release', icon: 'rocket', badge: rel?.pending ? { text: '!', tone: 'warn' } : rel?.released ? { text: `R${rel.number}`, tone: 'ok' } : null },
-    { to: `/projects/${id}/settings`, label: 'Settings', icon: 'settings' },
-  ];
+  const items = projectRailItems(id, summary);                                // WP-34: the rail per project kind lives in projectRail.ts
 
   const ctx: ProjectCtx = { id, summary, role: summary.role, reload: load };
   return (
