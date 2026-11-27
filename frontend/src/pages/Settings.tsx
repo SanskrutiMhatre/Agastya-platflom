@@ -12,6 +12,7 @@ import { useSession } from '../store/session';
 import { useUi } from '../store/ui';
 import { BackupButton } from '../components/Oversight';
 import { actionLabel } from '../lib/activity';
+import { MoreRows, useProgressive } from '../components/windowing';
 
 function Account() {
   const { user, logout } = useSession();
@@ -237,15 +238,20 @@ function Sessions() {
 }
 
 export function Audit() {
+  const [typed, setTyped] = useState('');
   const [filter, setFilter] = useState('');
+  // WP-18 (FE-020): the filter asks the server once the typing pauses, not once per key
+  useEffect(() => { const t = setTimeout(() => setFilter(typed), 300); return () => clearTimeout(t); }, [typed]);
   const a = useAsync(() => adminApi.audit(300, filter || undefined), [filter]);
+  const drawn = useProgressive(a.data?.length ?? 0, filter);     // WP-18 (FE-030): first rows now, more on scroll
   return (
     <div className="v2-stack">
-      <div className="v2-row"><input className="v2-input" style={{ width: 280 }} placeholder="Filter by action, e.g. release.approved" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filter audit log by action" /><button className="btn" onClick={a.reload}><Icon name="refresh" />Refresh</button></div>
+      <div className="v2-row"><input className="v2-input" style={{ width: 280 }} placeholder="Filter by action, e.g. release.approved" value={typed} onChange={(e) => setTyped(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') setFilter(typed); }} aria-label="Filter audit log by action" /><button className="btn" onClick={a.reload}><Icon name="refresh" />Refresh</button></div>
       <div className="v2-card">
         {a.loading && !a.data ? <Loading /> : !a.data?.length ? <Empty title="No entries" /> : (
           <table className="v2-table"><thead><tr><th>When</th><th>Who</th><th>Action</th><th>Project</th><th>From</th></tr></thead>
-            <tbody>{a.data.map((e) => <tr key={e.id}><td title={fmtDate(e.at)}>{ago(e.at)}</td><td>{e.actor ?? '—'}</td><td title={e.action}>{actionLabel(e.action)} <span className="v2-hint v2-mono">{e.action}</span></td><td className="v2-mono">{e.projectId ?? ''}</td><td className="v2-mono">{e.ip ?? ''}</td></tr>)}</tbody></table>
+            <tbody>{a.data.slice(0, drawn.limit).map((e) => <tr key={e.id}><td title={fmtDate(e.at)}>{ago(e.at)}</td><td>{e.actor ?? '—'}</td><td title={e.action}>{actionLabel(e.action)} <span className="v2-hint v2-mono">{e.action}</span></td><td className="v2-mono">{e.projectId ?? ''}</td><td className="v2-mono">{e.ip ?? ''}</td></tr>)}
+              <MoreRows as="tr" colSpan={5} shown={drawn.limit} total={a.data.length} onMore={drawn.more} onAll={drawn.all} /></tbody></table>
         )}
       </div>
     </div>

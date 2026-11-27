@@ -13,14 +13,20 @@ import { ImportPackageDialog } from './ImportPackageDialog';
 import { studio, useStudio } from '../../../lib/studioSession';
 import { useSession } from '../../../store/session';
 import { useUi } from '../../../store/ui';
+import { MoreRows, VirtualRows, useProgressive } from '../../../components/windowing';
 
 type View = 'tree' | 'all';
 
-export function EditorSide({ ctx, refreshKey, width, onCollapse }: { ctx: ProjectCtx; refreshKey: number; width: number; onCollapse: () => void }) {
+/**
+ * `refreshKey` reloads the module list; `treeKey` (default: the same) reloads the publication tree. A save of an existing module changes the
+ * list (title, lock, time) but not the tree, so the editor bumps only the first after such a save (WP-18, FE-029).
+ */
+export function EditorSide({ ctx, refreshKey, treeKey, width, onCollapse }: { ctx: ProjectCtx; refreshKey: number; treeKey?: number; width: number; onCollapse: () => void }) {
   const toast = useUi((s) => s.toast);
   const docs = useStudio((s) => s.docs);
   const list = useAsync(() => contentApi.dms(ctx.id), [ctx.id, refreshKey]);
-  const explore = useAsync(() => contentApi.explore(ctx.id), [ctx.id, refreshKey]);
+  const explore = useAsync(() => contentApi.explore(ctx.id), [ctx.id, treeKey ?? refreshKey]);
+  const listBox = useRef<HTMLDivElement>(null);
   const [q, setQ] = useState('');
   const [del, setDel] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
@@ -101,13 +107,24 @@ export function EditorSide({ ctx, refreshKey, width, onCollapse }: { ctx: Projec
     );
   };
 
+  const matchNode = (n: Extract<ExploreNode, { kind: 'dm' }>) => match({ file: n.file, title: n.title, dmc: n.dmc, infoName: n.infoName, techName: byFile.get(n.file)?.techName });
+  /** How many module rows the tree would draw (open chapters, matching the filter): the total the progressive drawing counts against. */
+  const countRows = (nodes: ExploreNode[], path: string): number => nodes.reduce((sum, n, i) => {
+    const key = `${path}/${i}`;
+    if (n.kind === 'chapter') return sum + (!q && closed.has(key) ? 0 : countRows(n.children, key));
+    return sum + (n.kind === 'dm' && matchNode(n) ? 1 : 0);
+  }, 0);
+  // WP-18 (FE-030): in a large publication the tree draws its first rows and more as the end comes into view
+  let budget = Number.MAX_SAFE_INTEGER;
+
   /** Chapters with their modules, in publication order. A chapter is shown when it, or anything in it, matches the filter. */
   const renderNodes = (nodes: ExploreNode[], depth: number, path: string): React.ReactNode[] => nodes.flatMap((n, i): React.ReactNode[] => {
     const key = `${path}/${i}`;
     if (n.kind === 'chapter') {
-      const inner = renderNodes(n.children, depth + 1, key);
-      if (q && inner.length === 0) return [];
+      if (budget <= 0) return [];
       const shut = !q && closed.has(key);
+      const inner = shut ? [] : renderNodes(n.children, depth + 1, key);
+      if (q && inner.length === 0) return [];
       return [(
         <div key={key} data-testid="chapter-node">
           <button className="v2-chap" style={{ paddingLeft: 4 + depth * 14 }} onClick={() => toggle(key)} aria-expanded={!shut}>
@@ -119,7 +136,8 @@ export function EditorSide({ ctx, refreshKey, width, onCollapse }: { ctx: Projec
     }
     if (n.kind === 'dm') {
       const d = byFile.get(n.file);
-      if (!match({ file: n.file, title: n.title, dmc: n.dmc, infoName: n.infoName, techName: d?.techName })) return [];
+      if (!matchNode(n) || budget <= 0) return [];
+      budget--;
       return [row({ file: n.file, title: d?.techName || n.title, sub: n.infoName || n.dmc, indent: depth + 0.5 })];
     }
     if (n.kind === 'missing' && !q) return [<div key={key} className="v2-hint" style={{ padding: `2px 8px 2px ${12 + depth * 14}px` }} title="Listed in the publication but not in the project">Missing: {n.ref}</div>];
@@ -127,8 +145,13 @@ export function EditorSide({ ctx, refreshKey, width, onCollapse }: { ctx: Projec
   });
 
   const rows: DmSummary[] = (list.data ?? []).filter(match);
-  const tree = explore.data ? renderNodes(explore.data.tree, 0, 'r') : [];
   const unplaced = (explore.data?.unplaced ?? []).filter(match);
+  const treeTotal = view === 'tree' && explore.data ? countRows(explore.data.tree, 'r') + unplaced.length : 0;
+  const progressive = useProgressive(treeTotal, `${q}|${view}|${ctx.id}`);
+  budget = progressive.limit;
+  const tree = explore.data ? renderNodes(explore.data.tree, 0, 'r') : [];
+  const unplacedShown = unplaced.slice(0, Math.max(0, budget));
+  const treeShown = progressive.limit;
 
   return (
     <aside className="v2-dmpanel" aria-label="Data modules" style={{ flex: `0 0 ${width}px`, width }}>
@@ -166,7 +189,7 @@ export function EditorSide({ ctx, refreshKey, width, onCollapse }: { ctx: Projec
           {q ? `${rows.length} of ${list.data?.length ?? 0} data modules match` : `${list.data?.length ?? 0} data module${(list.data?.length ?? 0) === 1 ? '' : 's'}`}
           {docs.some((d) => d.dirty) ? <> · <span style={{ color: 'var(--warning)' }}>{docs.filter((d) => d.dirty).length} unsaved</span></> : null}
         </div>
-        <div className="v2-dmlist" data-testid="dm-list">
+        <div className="v2-dmlist" data-testid="dm-list" ref={listBox}>
           {untitled.map((d) => (
             <button key={d.key} className={`v2-dm ${d.active ? 'active' : ''}`} onClick={() => studio.focusEditor()}>
               <span className={`v2-dot ${d.dirty ? 'dirty' : 'open'}`} /><span className="t"><b>{d.title}</b><span>New, not saved to the project yet</span></span>
@@ -181,14 +204,15 @@ export function EditorSide({ ctx, refreshKey, width, onCollapse }: { ctx: Projec
               {unplaced.length ? (
                 <div data-testid="unplaced-group">
                   <div className="v2-chap static" title="Not placed in the publication yet. Add them from the Publication tab.">Not in the publication <span className="v2-hint">{unplaced.length}</span></div>
-                  {unplaced.map((d) => row({ file: d.file, title: d.techName, sub: d.infoName || d.dmc, indent: 0.5 }))}
+                  {unplacedShown.map((d) => row({ file: d.file, title: d.techName, sub: d.infoName || d.dmc, indent: 0.5 }))}
                 </div>
               ) : null}
+              <MoreRows shown={treeShown} total={treeTotal} onMore={progressive.more} onAll={progressive.all} />
               {!explore.loading && !tree.length && !unplaced.length && !untitled.length ? <div className="v2-hint" style={{ padding: 10 }}>{q ? 'No data module matches.' : 'No chapters yet. Arrange them in the Publication tab.'}</div> : null}
             </>
           ) : (
             <>
-              {rows.map((d) => row({ file: d.file, title: d.techName, sub: d.infoName || d.dmc }))}
+              <VirtualRows items={rows} scrollRef={listBox} keyOf={(d) => d.file} row={(d) => row({ file: d.file, title: d.techName, sub: d.infoName || d.dmc })} />
               {!list.loading && rows.length === 0 && !untitled.length ? <div className="v2-hint" style={{ padding: 10 }}>{q ? <>No data module matches “{q}”. <button className="v2-link" onClick={() => setQ('')}>Clear the search</button></> : <>No data modules yet. Press <b>New</b> to write one, or use the upload button to import existing files.</>}</div> : null}
             </>
           )}

@@ -13,6 +13,7 @@ import type { Express } from 'express';
 import { nowIso } from '../config';
 import { requireAuth, requireProject, store, audit, workspace, workspaceDir, clientIp } from '../context';
 import { wrap, param, bad } from '../services/http';
+import { pageRequest, searchText, windowOf } from '../services/paging';
 import * as P from '../services/projects';
 import { createSampleProject } from '../services/sample';
 import { createJsgSampleProject } from '../services/jsg/sample';
@@ -84,7 +85,15 @@ export function registerWorkspaceRoutes(app: Express): void {
   // the formats / domains / manual types the wizard offers (services/formats): the wizard never hard-codes them
   app.get('/api/formats', requireAuth(), wrap((_req, res) => { res.json({ formats: FORMATS }); }));
 
-  app.get('/api/projects', requireAuth(), wrap((req, res) => { res.json({ projects: P.listProjectsFor(req.auth.user) }); }));
+  // WP-18 (PERF-016): `?limit=&offset=` (and `q`, matched against name, id and folder) return one window and the total; without them, the whole list as before.
+  app.get('/api/projects', requireAuth(), wrap((req, res) => {
+    const want = pageRequest(req); const q = searchText(req);
+    let projects: any[] = P.listProjectsFor(req.auth.user);
+    if (q) projects = projects.filter((p) => [p.name, p.id, p.folder, p.group].some((v) => typeof v === 'string' && v.toLowerCase().includes(q)));
+    if (!want) return void res.json({ projects });
+    const w = windowOf(projects, want);
+    res.json({ projects: w.items, ...w.page });
+  }));
 
   app.post('/api/projects', requireAuth(), wrap(async (req, res) => {
     const card = await P.createProject(req.auth.user, req.body ?? {});
@@ -140,9 +149,9 @@ export function registerWorkspaceRoutes(app: Express): void {
     const id: string = req.project.id;
     const dms = listDms(id);
     let pm: any = null;
-    try { const ex = explore(id); pm = { totals: ex.totals, chapters: ex.tree.filter((n) => n.kind === 'chapter').length, title: ex.meta?.pmTitle ?? '' }; } catch { /* no PM yet */ }
+    try { const ex = explore(id, dms); pm = { totals: ex.totals, chapters: ex.tree.filter((n) => n.kind === 'chapter').length, title: ex.meta?.pmTitle ?? '' }; } catch { /* no PM yet */ }
     const validation = lastRun(id);
-    const rel = (() => { try { return releaseStateOf(id); } catch { return null; } })();
+    const rel = (() => { try { return releaseStateOf(id, { reuse: true, known: dms }); } catch { return null; } })();   // display only (WP-18)
     const pdf = path.join(projectDirFor(id), PDF_NAME);
     res.json({
       project: P.projectCard(store.getProjectRow(id), req.project.role, req.auth.user.role === 'admin' ? 'admin' : 'project'),

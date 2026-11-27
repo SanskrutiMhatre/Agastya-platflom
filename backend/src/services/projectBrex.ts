@@ -17,20 +17,26 @@ import { ISSUE_LABEL } from './s1000dRef';
 import { csdbDir, listDms, createDm } from './csdb';
 import { declaredBrexDmc, defaultLetterFor } from './brex';
 import { hasSchema } from './registry';
+import { FileMemo } from './fileMemo';
 
 const { validateDocument } = require('../../vendor/engine/validateSchema');
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const DEFAULT_PARENT = /^DMC-S1000D-[A-Z]-04-10-0301-00A-022A-D$/;
 const NS = 'xmlns:dc="http://www.purl.org/dc/elements/1.1/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"';
 
+// WP-18 (FE-028, PERF-016): the BREX a module names is read once per version of the file (size, mtime, ctime), not on every poll.
+const declaredMemo = new FileMemo<string | null>();
+
 /** The BREX data modules that project modules name, are not S1000D defaults, and are not in the project. */
 export function missingBrex(projectId: string): string[] {
   const dir = csdbDir(projectId);
-  const have = listDms(projectId).map((d) => d.file.toUpperCase());
+  const dms = listDms(projectId);
+  const have = dms.map((d) => d.file.toUpperCase());
   const out = new Set<string>();
-  for (const d of listDms(projectId)) {
+  for (const d of dms) {
     let want: string | null = null;
-    try { want = declaredBrexDmc(fs.readFileSync(path.join(dir, d.file), 'utf8')); } catch { /* unreadable: the other checks report it */ }
+    const abs = path.join(dir, d.file);
+    try { want = declaredMemo.get(abs, fs.statSync(abs), () => declaredBrexDmc(fs.readFileSync(abs, 'utf8'))); } catch { /* unreadable: the other checks report it */ }
     if (!want || DEFAULT_PARENT.test(want)) continue;
     if (!have.some((f) => f.startsWith(want!.toUpperCase()))) out.add(want);
   }

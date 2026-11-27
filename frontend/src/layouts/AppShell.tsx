@@ -27,6 +27,7 @@ const NAV: Item[] = [
 ];
 // Notifications is not in the sidebar: the bell in the top bar opens it.
 const TITLES: Record<string, string> = { '/notifications': 'Notifications' };
+const NAV_REUSE_MS = 30_000;
 
 export function AppShell() {
   const { user, pendingInvitations, adminQueues, logout, load } = useSession();
@@ -40,7 +41,9 @@ export function AppShell() {
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Keep the badges (invitations, queues, unread notifications) fresh as the user moves around, and every half minute.
-  useEffect(() => { void load(); void refreshCount(); }, [loc.pathname, load, refreshCount]);
+  // WP-18 (FE-020): an answer from the last 30 s is enough here, so moving around does not ask who is signed in each time; any write the
+  // person makes clears it (api/query.ts), the minute heartbeat and the half-minute count still reach the server.
+  useEffect(() => { void load({ ttl: NAV_REUSE_MS }); void refreshCount({ ttl: NAV_REUSE_MS }); }, [loc.pathname, load, refreshCount]);
   useEffect(() => { void loadApp(); }, [loadApp]);
   useEffect(() => { const t = setInterval(() => void refreshCount(), 30_000); return () => clearInterval(t); }, [refreshCount]);
   useEffect(() => {

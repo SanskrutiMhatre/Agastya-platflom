@@ -14,6 +14,7 @@ import { vendor, nowIso } from '../config';
 import { docIndex, revisions, projectDirFor } from '../context';
 import { bad, conflict, notFound, forbidden } from './http';
 import { HEAD_BYTES, MAX_PROLOG, headOf, rootStart } from './xmlHead';
+import { FileMemo } from './fileMemo';
 import { wellFormedError } from './wellFormed';
 import { readProjectJson, csdbRel, mediaRel } from './projects';
 import { assertNewDmAllowed } from './projectConfig';
@@ -113,6 +114,10 @@ function readHead(abs: string): string {
   } catch { return ''; } finally { if (fd !== undefined) try { fs.closeSync(fd); } catch { /* ignore */ } }
 }
 
+// WP-18 (PERF-016, FE-029): a module's identity is read from its head once and kept until the file changes (size, mtime or ctime), so the list,
+// the summary, the explorer and the BREX check stop re-reading every module on every request.
+const identMemo = new FileMemo<ReturnType<typeof parseIdent>>();
+
 export function listDms(projectId: string): DmSummary[] {
   const dir = csdbDir(projectId);
   if (!fs.existsSync(dir)) return [];
@@ -122,7 +127,13 @@ export function listDms(projectId: string): DmSummary[] {
     const abs = path.join(dir, f);
     let st: fs.Stats;
     try { st = fs.statSync(abs); } catch { continue; }
-    out.push({ ...parseIdent(readHead(abs), f), size: st.size, modified: st.mtime.toISOString() });
+    const ident = identMemo.get(abs, st, () => parseIdent(readHead(abs), f));
+    // a fresh copy per call: callers may change what they are given without touching the memo
+    out.push({
+      ...ident, size: st.size, modified: st.mtime.toISOString(),
+      dmCodeAttrs: { ...ident.dmCodeAttrs }, issueInfoAttrs: { ...ident.issueInfoAttrs }, languageAttrs: { ...ident.languageAttrs },
+      identExtension: ident.identExtension ? { ...ident.identExtension } : ident.identExtension,
+    });
   }
   return out.sort((a, b) => a.file.localeCompare(b.file));
 }

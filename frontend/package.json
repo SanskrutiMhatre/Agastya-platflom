@@ -8,6 +8,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --port 4174 --strictPort",
     "typecheck": "tsc --noEmit",
+    "check:bundle": "node scripts/check-bundle.mjs",
     "test": "vitest run --exclude \"src/studio/__tests__/verify/{rules,controls,editor,editor-controls,elements,brex-parity,brex-xpath}.test.ts\"",
     "e2e": "playwright test",
     "test:verify": "vitest run --no-file-parallelism src/studio/__tests__/verify/rules.test.ts src/studio/__tests__/verify/controls.test.ts src/studio/__tests__/verify/editor.test.ts src/studio/__tests__/verify/editor-controls.test.ts src/studio/__tests__/verify/inventory.test.ts src/studio/__tests__/verify/brex-parity.test.ts src/studio/__tests__/verify/brex-xpath.test.ts"

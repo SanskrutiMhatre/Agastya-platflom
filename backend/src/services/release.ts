@@ -19,6 +19,8 @@ import { store, docIndex, projectDirFor } from '../context';
 import { bad, conflict, notFound } from './http';
 import { readProjectJson, updateProjectJson, pmRel } from './projects';
 import { publicationSources } from './pm';
+import { FileMemo } from './fileMemo';
+import type { DmSummary } from './csdb';
 
 const watermarkEngine = vendor('engine/watermark');
 const { newId } = require('../core/auth/crypto');
@@ -33,14 +35,20 @@ const RELEASE_SETTING_KEYS = ['name', 'type', 'pipeline', 'input', 'publication'
  * that two callers hashing different views of project.json made an approved
  * release unable to ever match its own content.
  */
-export function publicationFingerprint(projectId: string): string {
+// WP-18 (PERF-016): the dashboard summary asks for the release state on every visit and after every save. For that DISPLAY the digest of a source
+// file whose size, mtime and ctime are unchanged is reused; the same function with `reuse` off (every decision: submit, approve, build) reads every file.
+const digestMemo = new FileMemo<Buffer>();
+
+export function publicationFingerprint(projectId: string, opts: { reuse?: boolean; known?: DmSummary[] } = {}): string {
   const dir = projectDirFor(projectId);
   const project = readProjectJson(projectId);
   const h = crypto.createHash('sha256');
-  for (const rel of publicationSources(projectId)) {
+  const digest = (abs: string): Buffer => crypto.createHash('sha256').update(fs.readFileSync(abs)).digest();
+  for (const rel of publicationSources(projectId, opts.known)) {
     h.update(rel, 'utf8');
     h.update('\0');
-    try { h.update(crypto.createHash('sha256').update(fs.readFileSync(path.join(dir, rel))).digest()); }
+    const abs = path.join(dir, rel);
+    try { h.update(opts.reuse ? digestMemo.get(abs, fs.statSync(abs), () => digest(abs)) : digest(abs)); }
     catch { h.update('MISSING'); }
     h.update('\n');
   }
@@ -93,9 +101,9 @@ function pmDocument(projectId: string): any {
   return docIndex.resolve(projectId, pmRel(readProjectJson(projectId)));
 }
 
-export function releaseStateOf(projectId: string) {
+export function releaseStateOf(projectId: string, opts: { reuse?: boolean; known?: DmSummary[] } = {}) {
   const now = nowIso();
-  const fingerprint = publicationFingerprint(projectId);
+  const fingerprint = publicationFingerprint(projectId, opts);
   const approved = store.currentRelease(projectId, now);
   const matches = !!approved && approved.content_hash === fingerprint;
   return {

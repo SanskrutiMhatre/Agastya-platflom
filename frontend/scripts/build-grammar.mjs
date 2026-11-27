@@ -18,6 +18,9 @@ import { JSDOM } from 'jsdom';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const schemaDir = path.join(root, 'public/schemas');
+// WP-18 (FE-032): these issues are the server's own schema sets (backend/schemas), served to the browser by the backend at /schemas/<issue>/
+const SERVER_SETS = { '4-2': '4.2', '5-0': '5.0', '6': '6.0', '7': '7.0' };
+const issueDirOf = (issue) => (SERVER_SETS[issue] ? path.join(root, '..', 'backend', 'schemas', SERVER_SETS[issue]) : path.join(schemaDir, issue));
 const outDir = path.join(root, 'public/grammar');
 const XS = 'http://www.w3.org/2001/XMLSchema';
 
@@ -104,7 +107,7 @@ function withOcc(p, o) {
 }
 
 function compileGrammar(issue, schemaName) {
-  const issueDir = path.join(schemaDir, issue);
+  const issueDir = issueDirOf(issue);
   const reg = loadSchemaSet(issueDir, schemaName + '.xsd');
   const out = { issue, schema: schemaName, root: null, elements: {}, types: {}, groups: {}, simple: {} };
 
@@ -351,13 +354,13 @@ function compileGrammar(issue, schemaName) {
 }
 
 function main() {
-  const issues = fs.readdirSync(schemaDir).filter((d) => d !== 'ent' && fs.statSync(path.join(schemaDir, d)).isDirectory()); // 'ent' holds entity files, not an issue
+  const issues = [...new Set([...Object.keys(SERVER_SETS), ...fs.readdirSync(schemaDir).filter((d) => d !== 'ent' && fs.statSync(path.join(schemaDir, d)).isDirectory())])]; // 'ent' holds entity files, not an issue
   const index = {};
   const skip = new Set(['xlink', 'rdf', 'dc', 'xml']);
   for (const issue of issues) {
     index[issue] = [];
     fs.mkdirSync(path.join(outDir, issue), { recursive: true });
-    for (const f of fs.readdirSync(path.join(schemaDir, issue))) {
+    for (const f of fs.readdirSync(issueDirOf(issue))) {
       if (!f.endsWith('.xsd')) continue;
       const name = f.slice(0, -4);
       if (skip.has(name)) continue;

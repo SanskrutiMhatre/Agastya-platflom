@@ -14,6 +14,7 @@ import { Alert, Badge, Empty, Loading, Spinner, ago, errText, fmtDate, useAsync 
 import { canBuild, useProject } from '../../layouts/ProjectShell';
 import { useUi } from '../../store/ui';
 import { csvRow } from '../../lib/csv';
+import { MoreRows, useProgressive } from '../../components/windowing';
 
 const SOURCE_LABEL: Record<ValidationIssue['source'], string> = {
   xml: 'Well-formedness', xsd: 'S1000D schema', brex: 'Business rules (BREX)', graphics: 'Graphics', ids: 'Identifiers', icn: 'ICN entities', pm: 'Publication',
@@ -74,6 +75,13 @@ export function ValidationPage() {
     for (const i of shown) { const k = i.rel || '(project)'; if (!m.has(k)) m.set(k, []); m.get(k)!.push(i); }
     return [...m.entries()].sort((a, b) => b[1].filter((x) => x.sev === 'error').length - a[1].filter((x) => x.sev === 'error').length || a[0].localeCompare(b[0]));
   }, [shown]);
+  // WP-18 (FE-030): thousands of findings draw their first rows, more as the end comes into view (groups keep their order and headings)
+  const drawn = useProgressive(shown.length, `${run?.ranAt ?? ''}|${q}|${source}|${hideReviewed}|${sev.error}${sev.warn}${sev.info}`);
+  const groups = useMemo(() => {
+    let left = drawn.limit; const out: Array<[string, ValidationIssue[], number]> = [];
+    for (const [file, list] of byFile) { if (left <= 0) break; out.push([file, list.slice(0, left), list.length]); left -= list.length; }
+    return out;
+  }, [byFile, drawn.limit]);
   const selected = run?.issues.find((i) => i.id === selId) ?? null;
   const sources = [...new Set((run?.issues ?? []).map((i) => i.source))];
 
@@ -110,10 +118,10 @@ export function ValidationPage() {
 
           <div className="v2-grid" style={{ gridTemplateColumns: 'minmax(0, 3fr) minmax(300px, 2fr)', alignItems: 'start' }}>
             <div className="v2-card" data-testid="issue-list">
-              {shown.length === 0 ? <Empty title={run.issues.length ? 'Nothing matches these filters' : 'No problems found'}>{run.issues.length ? 'Adjust the filters above.' : 'Every check passed.'}</Empty> : byFile.map(([file, list]) => (
+              {shown.length === 0 ? <Empty title={run.issues.length ? 'Nothing matches these filters' : 'No problems found'}>{run.issues.length ? 'Adjust the filters above.' : 'Every check passed.'}</Empty> : groups.map(([file, list, count]) => (
                 <div key={file}>
                   <div style={{ padding: '8px 12px', background: 'var(--bg-sunken)', borderBottom: '1px solid var(--border)', fontWeight: 600, display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <Icon name="xml" size={14} /><span className="v2-trunc v2-mono">{file}</span><span className="spacer" /><Badge tone={list.some((x) => x.sev === 'error') ? 'bad' : 'warn'}>{list.length}</Badge>
+                    <Icon name="xml" size={14} /><span className="v2-trunc v2-mono">{file}</span><span className="spacer" /><Badge tone={list.some((x) => x.sev === 'error') ? 'bad' : 'warn'}>{count}</Badge>
                   </div>
                   {list.map((i) => (
                     <div key={i.id} className={`v2-issue ${selId === i.id ? 'sel' : ''}`} onClick={() => setSelId(i.id)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter') setSelId(i.id); }} data-testid="issue">
@@ -127,6 +135,7 @@ export function ValidationPage() {
                   ))}
                 </div>
               ))}
+              {shown.length ? <MoreRows shown={drawn.limit} total={shown.length} onMore={drawn.more} onAll={drawn.all} /> : null}
             </div>
 
             <aside className="v2-card v2-card-pad" aria-label="Finding" style={{ position: 'sticky', top: 0 }}>

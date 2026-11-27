@@ -219,6 +219,64 @@ verified, and what is left or blocked.
   title as one word and the two quote forms alike; the order assertions are unchanged. The ISPL test now passes; the JSG sample test runs
   on to its page count, which needs poppler's `pdfinfo` (WP-08).
 
+## Phase 4 (taken early, in parallel with Phase 1B)
+
+### WP-18 Frontend performance and delivery (FE-020, FE-027, FE-029, FE-030, FE-031, FE-032, FE-026, FE-033, PERF-016) - done, two parts left (see end)
+
+* Compression and caching (FE-027, PERF-016), `services/delivery.ts`, Node's own zlib (no new dependency; nothing usable was in
+  node_modules): API answers of 1 KB or more that go out through `res.send`/`res.json` and are JSON, text or XML are gzip for a client
+  that accepts it (`Vary: Accept-Encoding`; ETag and 304 still work); files, streams and binary bodies are untouched. The built client:
+  hashed `/assets/*` are `public, max-age=31536000, immutable`, `index.html` and the SPA fallback `no-cache`, every other file revalidates
+  as before; text files of 1 KB or more go out brotli (or gzip), compressed once per file version on the thread pool and kept in a 128 MB
+  memory cache; a Range request or a client that wants identity gets the plain file. Measured on the built client: initial load
+  (theme-init, entry, react, CSS) 655,724 B on the wire before, 165,356 B after (brotli); the Studio chunk 862,011 B before, 245,398 B after.
+* Server work at scale (PERF-016, FE-028 part), `services/fileMemo.ts`: a module's identity (list), the BREX it names (`/brex/missing`) and,
+  for the dashboard display only, its content digest (release state on `/summary` and the oversight list) are kept per file and computed
+  again when the file's size, mtime or ctime changes; decisions (submit, approve, build) still hash every file. `/summary` lists the modules
+  once instead of three times (`explore`, `publicationSources` and the fingerprint take the list the route already read). At 500 modules,
+  median of 5, same machine, same load, before / after: `/summary` 229 / 38 ms, `/brex/missing` 213 / 44 ms, `/dms` 89 / 35 ms,
+  `/explore` 78 / 27 ms (the earlier, more loaded run: 759 / 300, 786 / 153, 441 / 141 ms). `/dms` 380,574 B becomes 8,874 B gzip.
+* Opt-in paging (PERF-016), `services/paging.ts`: `GET /api/projects` and `GET /api/projects/:id/dms` take `limit` (1-1000), `offset` and
+  `q`; `/dms` also `fields=list` (the slim row a list shows). Without them the answer is exactly the old one, so every caller keeps working
+  (all current callers want the whole list and filter it themselves; the long-list cost on the page is handled by windowing below). First
+  page: `/api/projects?limit=20` 10,643 B, `/dms?limit=50` 38,054 B identity (both far under 20 KB gzip).
+* Query layer (FE-020), `frontend/src/api/query.ts`, used by every `get()`: identical GETs in flight share one request, an answer is reused
+  for 300 ms (or the caller's `ttl`), every write through the client (and the importer's XMLHttpRequest uploads) drops every entry and every
+  request in flight, a caller's AbortSignal cancels its wait and the shared request only when nobody waits; each caller gets its own copy.
+  Navigation refreshes the session and the unread count with a 30 s reuse window (any write clears it; the minute heartbeat and the
+  half-minute count still go to the server), so moving between pages asks `/api/auth/me` zero times and signing in asks it once.
+* One save (FE-029): `PUT` plus `/summary`, `/media`, `/settings`, `/dms`, `/explore`, `/dms` (6 GETs) before; now `PUT` plus `/dms` (the
+  Studio and the side list ask together; one request) and `/summary` = 2 GETs. Media and settings cannot change by a save; the publication
+  tree is asked for again only when the save created a new module (`onSaved(created)`, `EditorSide` `treeKey`). Not measured in a
+  browser here (no Playwright run allowed); the unit test simulates the two callers and `e2e/wp18-performance.spec.ts` B4 measures it.
+* Long lists (FE-030), `frontend/src/components/windowing.tsx`: the editor's "All" list is virtualised (rows in view plus 12 each side,
+  spacers for the rest: at most about 45 of 5,000 rows drawn); the chapter tree, the Projects table, the Validation findings, the
+  Publication pool and the audit log draw their first 100 rows and more as the end comes into view (or "Show more" / "Show all"). Lists of
+  up to 200 rows are drawn in full, as before, so the existing tests and small projects see no change. The audit filter asks the server
+  300 ms after typing pauses, not per key.
+* One copy of pdfmake (FE-031): pdfmake and its Roboto, Helvetica and Courier files are URL assets fetched and evaluated the way the bundle
+  already was (`fonts.ts`), so the page and the PDF worker share one file each instead of a copy per graph; the unit tests keep the import
+  path (removed from the build). `dist/assets` 31 files with 2 copies of each, now 26 with one (about 2.7 MB less); a Node check evaluated the
+  built assets and printed a PDF. `chunkSizeWarningLimit` 1500 to 900 (no chunk is over it).
+* One schema tree (FE-032): `frontend/public/schemas/{4-2,5-0,6,7}` (31 MB) were the server's `4.2`, `5.0`, `6.0`, `7.0` apart from line
+  endings and one processing instruction (checked before removal); they are gone, the backend serves its own sets at `/schemas/<issue>/`
+  (the Vite dev server proxies them), the Studio tests and `build-grammar.mjs` read them from `backend/schemas`. `4-1` and `ent` stay in the
+  client because their content differs (recorded in `backend/schemas/PROVENANCE.md`; choosing one changes validation results). `dist` 63 MB
+  to 32 MB. The packaged layout already ships `backend/schemas` (`package-windows.mjs`, the host's self-check), so the installer needs nothing new.
+* Budgets (FE-026, FE-033): `frontend/scripts/check-bundle.mjs` (`npm run check:bundle` after a build) fails on initial JS + CSS over 180 KB
+  gzip (now 178.0 KB), the Studio chunk over 300 KB gzip (263.7 KB) and a second copy of pdfmake or a font; the 30 KB entry-CSS budget is a
+  warning (82.1 KB) until the Studio styles move (below). `e2e/wp18-performance.spec.ts` holds the browser probes with the audit's budgets:
+  B1 initial wire bytes and headers, B2 `/auth/me` on sign-in and navigation, B4 GETs per save, B3 rows and nodes at 500 modules, B7 first-page size.
+* Verified: `backend/test/wp18-delivery.test.js` 7/7 (compression and 304, immutable and no-cache headers, br/gzip/identity/Range/HEAD,
+  path escape, the schema route serving the server's bytes and the removed folders staying removed, paging and slim rows with the default
+  unchanged, the memo seeing a same-size edit, a changed BREX reference and a new file at once); `api` 17/17, `routes-guarded` 1/1,
+  `release-issue` 1/1, `wp03-auth` 11/11, `phase13` 12/12, `phase17-security` 5/5. Frontend: `tsc` clean, `vite build`, vitest
+  `api/query.test.ts` 9/9, `components/windowing.test.ts` 4/4 (found and fixed an empty window when scrolled past the end),
+  `studio/__tests__/dmtypes` 178/178 (1 env-gated skip), `isoentities` 4/4, `extensions` 6/6, `lib`, `waivers`, `importRefusal` 29/29.
+* Left: (1) the Studio stylesheets (58.7 KB of the 82 KB entry CSS) still load with the entry: they also define the app-wide tokens and
+  resets, which WP-19 (design tokens) is rewriting; moving them belongs with it. (2) `e2e/wp18-performance.spec.ts` was written, not run
+  (the lead's runner); the per-save and navigation counts above are by construction and unit test until it runs.
+
 ### Environment notes
 
 * `pdfinfo` and `pdfimages` (poppler) are not installed on this machine; only `pdftotext` is. Four existing print tests need them

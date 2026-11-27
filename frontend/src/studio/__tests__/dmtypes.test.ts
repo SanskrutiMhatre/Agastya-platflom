@@ -6,12 +6,13 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { schemaDir } from './schemaDir';
 import { spawnSync } from 'node:child_process';
 import { TEMPLATES, buildDataModule, defaultNewDmOptions } from '../core/templates';
 import { grammarFromJson, type GrammarJson } from '../core/grammar';
 
 const PUB = path.resolve(__dirname, '../../../public');
-const ISSUES = ['4-2', '5-0', '6', '7'].filter((i) => fs.existsSync(path.join(PUB, 'schemas', i)));
+const ISSUES = ['4-2', '5-0', '6', '7'].filter((i) => fs.existsSync(schemaDir(i)));
 const gram = (issue: string, schema: string) =>
   grammarFromJson(JSON.parse(fs.readFileSync(path.join(PUB, 'grammar', issue, schema + '.json'), 'utf8')) as GrammarJson);
 
@@ -19,7 +20,7 @@ function xsdErrors(xml: string, issue: string, schema: string): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dmt-'));
   const f = path.join(dir, 'dm.xml');
   fs.writeFileSync(f, xml);
-  const r = spawnSync('xmllint', ['--noout', '--schema', path.join(PUB, 'schemas', issue, schema + '.xsd'), f], { encoding: 'utf8' });
+  const r = spawnSync('xmllint', ['--noout', '--schema', path.join(schemaDir(issue), schema + '.xsd'), f], { encoding: 'utf8' });
   return r.status === 0 ? '' : r.stderr.trim();
 }
 
@@ -36,7 +37,7 @@ describe('the data module types the wizard offers', () => {
   });
   it('every type has an official XSD and a compiled grammar for every issue the wizard offers', () => {
     for (const t of TEMPLATES) for (const i of ISSUES) {
-      expect(fs.existsSync(path.join(PUB, 'schemas', i, t.schema + '.xsd')), `${t.schema} xsd ${i}`).toBe(true);
+      expect(fs.existsSync(path.join(schemaDir(i), t.schema + '.xsd')), `${t.schema} xsd ${i}`).toBe(true);
       expect(fs.existsSync(path.join(PUB, 'grammar', i, t.schema + '.json')), `${t.schema} grammar ${i}`).toBe(true);
     }
   });

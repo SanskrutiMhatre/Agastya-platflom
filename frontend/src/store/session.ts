@@ -19,7 +19,7 @@ interface SessionState {
   /** FE-004: the server did not answer (restart, network, sleep). The person stays signed in; a banner says it is retrying. */
   unreachable: boolean;
   /** Resolve who is signed in (or whether first-run setup is needed). Called once at boot and after any auth change. */
-  load: () => Promise<void>;
+  load: (o?: { ttl?: number }) => Promise<void>;
   /** Background check (every minute): a 401 opens the re-login dialog; a network error shows the banner. Not activity. */
   check: () => Promise<void>;
   login: (username: string, password: string) => Promise<void>;
@@ -50,9 +50,9 @@ let retryDelay = 2000;
 export const useSession = create<SessionState>((set, get) => ({
   status: 'loading', user: null, gates: NO_GATES, pendingInvitations: 0, adminQueues: null, signedOutReason: null, reauth: null, unreachable: false,
 
-  async load() {
+  async load(o) {
     try {
-      const me = await authApi.me();
+      const me = await authApi.me({ ttl: o?.ttl ?? 0 });      // only the navigation refresh reuses a recent answer (WP-18); a request in flight is still shared
       const gated = me.gates.onboarding || me.gates.mustChangePassword;
       const prev = get().user;
       if (prev && prev.id !== me.user.id) tellSignedOut(false);

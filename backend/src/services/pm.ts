@@ -62,14 +62,15 @@ export function parseModel(text: string): { meta: any; entries: PmEntry[]; warni
 }
 const readModel = (abs: string): ReturnType<typeof parseModel> => parseModel(fs.readFileSync(abs, 'utf8'));
 
-export function readPm(projectId: string) {
+/** `known`: the module list the caller has just read in the same request (WP-18: the summary lists the modules once, not three times). */
+export function readPm(projectId: string, known?: DmSummary[]) {
   const abs = pmPath(projectId);
   if (!fs.existsSync(abs)) throw bad('This project has no publication module yet.', 'NO_PM');
   let model: ReturnType<typeof parseModel>;
   // WP-07 (FE-009): a file that is not a publication module (a JSS or JSG document project, a damaged file) is the project's state, not a server bug
   try { model = readModel(abs); }
   catch (e) { throw bad(`The publication module of this project cannot be read: ${(e as Error).message}`, 'NOT_A_PM'); }
-  const dms = listDms(projectId);
+  const dms = known ?? listDms(projectId);
   return { ...model, counts: pmc.countEntries(model.entries), pool: unplaced(model.entries, dms), dms };
 }
 
@@ -162,8 +163,8 @@ export type ExploreNode =
   | { kind: 'missing'; title: string; ref: string; style: 'include' | 'dmRef' }
   | { kind: 'pmRef'; title: string };
 
-export function explore(projectId: string) {
-  const { meta, entries, warnings, counts, pool, dms } = readPm(projectId);
+export function explore(projectId: string, known?: DmSummary[]) {
+  const { meta, entries, warnings, counts, pool, dms } = readPm(projectId, known);
   const { byCode, byFile } = indexes(dms);
   const missing: string[] = [];
 
@@ -217,7 +218,7 @@ function rawPmReferences(pmXml: string, byCode: Map<string, DmSummary>, byFile: 
   return hits;
 }
 
-export function publicationSources(projectId: string): string[] {
+export function publicationSources(projectId: string, known?: DmSummary[]): string[] {
   const dir = projectDirFor(projectId);
   const pj = readProjectJson(projectId);
   const csdb = csdbRel(pj);
@@ -227,7 +228,7 @@ export function publicationSources(projectId: string): string[] {
 
   try {
     const model = readModel(path.join(dir, pmName));
-    const { byCode, byFile } = indexes(listDms(projectId));
+    const { byCode, byFile } = indexes(known ?? listDms(projectId));
     (function walk(list: PmEntry[]) {
       for (const e of list ?? []) {
         if (e.type === 'folder') { walk(e.children ?? []); continue; }

@@ -14,11 +14,14 @@ export default defineConfig({
     proxy: {
       '/api': { target: API, changeOrigin: false },
       '/ws': { target: API.replace(/^http/, 'ws'), ws: true },
+      // WP-18 (FE-032): these schema sets are the server's own (backend/schemas), served by the backend; 4-1 and ent stay in public/
+      ...Object.fromEntries(['4-2', '5-0', '6', '7'].map((i) => [`/schemas/${i}/`, { target: API, changeOrigin: false }])),
     },
   },
   build: {
     target: 'es2022',
-    chunkSizeWarningLimit: 1500,
+    // WP-18 (FE-031): low enough that a new oversize chunk shows; the budgets themselves are checked by scripts/check-bundle.mjs
+    chunkSizeWarningLimit: 900,
     rollupOptions: {
       output: {
         // The Studio (CodeMirror, pdfmake) is large and only the editor route needs it.

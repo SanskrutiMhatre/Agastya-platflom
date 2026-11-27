@@ -10,6 +10,7 @@ import { dbBusy, diskFull } from './services/http';
 import { store, sessionsSvc, authz, audit, limiter, docIndex, projectDirFor, publicRoute, clientIp, securityPolicy, auditHealth } from './context';
 import { requestContextMiddleware } from './services/requestContext';
 import { securityHeaders } from './services/securityHeaders';
+import { compressResponses, clientStatic, STUDIO_SCHEMA_SETS } from './services/delivery';
 import { originAllowed } from './services/origin';
 import { registerWorkspaceRoutes } from './routes/workspace';
 import { registerProjectContentRoutes } from './routes/project-content';
@@ -48,6 +49,7 @@ export function createApp(): express.Express {
   app.disable('x-powered-by');
   app.use(requestContextMiddleware(clientIp));   // every audit row gets the client address; a 500 answers with this request's id (WP-03)
   app.use(securityHeaders);                      // CSP, nosniff, framing, referrer (ENT-012, FE-017)
+  app.use(compressResponses);                    // gzip for JSON / text answers of 1 KB or more (WP-18: PERF-016)
   app.use(express.json({ limit: '25mb' }));
 
   /*
@@ -99,13 +101,16 @@ export function createApp(): express.Express {
   // Unknown API paths are JSON 404s, never the SPA shell.
   app.use('/api', (_req, res) => { res.status(404).json({ error: 'Not found' }); });
 
+  // One copy of the S1000D schemas (WP-18, FE-032): the Studio's in-browser check reads /schemas/<issue>/ from the server's own sets, so the
+  // browser and the server validate against the same files. Issue 4.1 and the shared entity files still ship with the client (their copies differ).
+  for (const [web, dir] of Object.entries(STUDIO_SCHEMA_SETS)) app.use(`/schemas/${web}`, clientStatic(path.join(config.schemasDir, dir)));
+
   // The built client, when present: one process serves the UI and the API.
   const index = path.join(config.clientDist, 'index.html');
   if (fs.existsSync(index)) {
-    app.use(express.static(config.clientDist, {
-      setHeaders: (res, file) => { if (file.endsWith('index.html')) res.setHeader('Cache-Control', 'no-cache'); },
-    }));
-    app.get(/^\/(?!api\/|ws).*/, (_req, res) => { res.sendFile(index); });
+    // hashed assets immutable, index.html no-cache, text files compressed once and kept (WP-18: FE-027)
+    app.use(clientStatic(config.clientDist));
+    app.get(/^\/(?!api\/|ws).*/, (_req, res) => { res.setHeader('Cache-Control', 'no-cache'); res.sendFile(index); });
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
