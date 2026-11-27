@@ -198,15 +198,18 @@ export async function authenticode(files) {
   const { spawnSync } = await import('node:child_process');
   const list = path.join(fs.mkdtempSync(path.join((await import('node:os')).tmpdir(), 'agastya-ac-')), 'files.txt');
   fs.writeFileSync(list, files.join('\n'), 'utf8');
-  const script = `$ErrorActionPreference='Stop'; Get-Content -LiteralPath '${list.replace(/'/g, "''")}' -Encoding UTF8 | ForEach-Object { $s = Get-AuthenticodeSignature -LiteralPath $_; ` +
-    `$c = $s.SignerCertificate; '{0}|{1}|{2}|{3}|{4}' -f $_, $s.Status, $(if ($c) { $c.Thumbprint } else { '' }), $(if ($s.TimeStamperCertificate) { '1' } else { '0' }), $(if ($c) { $c.Subject } else { '' }) }`;
+  // the result lines carry the index of the file, not its name: PowerShell's console output is not UTF-8, and a build folder may have a non-ASCII name
+  const script = `$ErrorActionPreference='Stop'; $i = 0; Get-Content -LiteralPath '${list.replace(/'/g, "''")}' -Encoding UTF8 | ForEach-Object { $s = Get-AuthenticodeSignature -LiteralPath $_; ` +
+    `$c = $s.SignerCertificate; '{0}|{1}|{2}|{3}|{4}' -f $i, $s.Status, $(if ($c) { $c.Thumbprint } else { '' }), $(if ($s.TimeStamperCertificate) { '1' } else { '0' }), $(if ($c) { $c.Subject } else { '' }); $i++ }`;
   const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script], { encoding: 'utf8', maxBuffer: 64 << 20 });
   fs.rmSync(path.dirname(list), { recursive: true, force: true });
   if (r.status !== 0) throw new Error(`Get-AuthenticodeSignature failed: ${r.stderr.trim().slice(0, 400)}`);
-  return r.stdout.split(/\r?\n/).filter(Boolean).map((l) => {
-    const [file, status, thumbprint, ts, ...subject] = l.split('|');
-    return { file, status, thumbprint, timestamped: ts === '1', subject: subject.join('|') };
+  const out = r.stdout.split(/\r?\n/).filter(Boolean).map((l) => {
+    const [i, status, thumbprint, ts, ...subject] = l.split('|');
+    return { file: files[Number(i)], status, thumbprint, timestamped: ts === '1', subject: subject.join('|') };
   });
+  if (out.length !== files.length || out.some((a) => !a.file)) throw new Error(`Get-AuthenticodeSignature answered for ${out.length} of ${files.length} files`);
+  return out;
 }
 
 /** True when Windows reports the file as signed and intact (Valid, or intact but chained to a root this PC does not trust). */
