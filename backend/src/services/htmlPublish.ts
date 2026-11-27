@@ -30,8 +30,8 @@ import { findAll, parseTree, type MNode } from './miniXml';
 import { bad } from './http';
 import { formatOf } from './mediaFormats';
 import { resolveRevision, chains } from './lifecycle';
+import { escAttr as esc } from '../lib/xml';
 
-const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const slug = (s: string): string => s.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'x';
 const safeId = (s: string): string => `i-${s.replace(/[^A-Za-z0-9_.-]/g, '_')}`;
 

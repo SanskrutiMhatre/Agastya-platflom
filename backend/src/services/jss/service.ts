@@ -9,7 +9,6 @@
 // stencil's rules is a draft and is saved. A PDF is only built from a document that has just been checked (assertJssPublishable).
 import { assertNativeJssXml, nativeProblemOf } from './native';
 import fs from 'fs';
-import crypto from 'crypto';
 import path from 'path';
 import { config, vendor } from '../../config';
 import { projectDirFor, content } from '../../context';
@@ -21,7 +20,10 @@ import { parseTree, walk, norm, type MNode } from '../miniXml';
 import { wellFormedError } from '../wellFormed';
 import { readProjectJson, updateProjectJson, pmRel } from '../projectRecord';
 import { registerDocumentCreator } from '../documentCreators';
+import { registerPublishCheck } from '../publishChecks';
 import { jssTypeById, type JssDocType, type OutlineNode, type StartBlock, type TableTemplate } from './registry';
+import { escText as esc, escAttr } from '../../lib/xml';
+import { sha256 as sha } from '../../lib/hash';
 
 const { validateXML } = require('xmllint-wasm');
 const { bookmetaXml } = vendor('engine/frontmatterInject');
@@ -35,9 +37,8 @@ export const COMPOSED_NAME = '_jss-book.xml';
 export interface JssFinding { severity: 'error' | 'warning'; rule: string; message: string; line: number; location: string }
 export interface JssReport { docType: string | null; valid: boolean; errors: number; warnings: number; findings: JssFinding[]; validatedAt: string }
 
-export const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const escAttr = (s: string): string => esc(s).replace(/"/g, '&quot;');
-export const sha = (text: string): string => crypto.createHash('sha256').update(text).digest('hex');
+export { esc };
+export { sha };
 
 // ── Which projects are JSS-authored ─────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -336,6 +337,18 @@ export async function assertJssPublishable(projectId: string): Promise<{ validat
     verifyUnchanged: () => { if (readSource(projectId).hash !== hash) throw conflict('The document changed while the PDF was being prepared; build again.', 'CHANGED_DURING_VALIDATION'); },
   };
 }
+
+// The publication gate asks the format's own check (publishChecks.ts, WP-16 S1K-006): a JSS document has its own schema and the stencil's rules,
+// not S1000D's; the same fresh check, run here.
+registerPublishCheck({
+  format: 'jss',
+  owns: isJssAuthored,
+  check: async (projectId, scope) => {
+    if (scope !== 'publication') throw conflict('A single-module preview is an S1000D feature; a JSS document is built as a whole.', 'NOT_S1000D');
+    const g = await assertJssPublishable(projectId);
+    return { validatedAt: g.validatedAt, files: [pmRel(readProjectJson(projectId))], warnings: g.warnings, ruleBreaks: [], verifyUnchanged: g.verifyUnchanged };
+  },
+});
 
 // ── The book the pipeline renders ───────────────────────────────────────────────────────────────────────────────────────────────
 

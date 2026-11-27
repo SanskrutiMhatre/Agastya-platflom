@@ -16,44 +16,40 @@
 // Scope: the data modules the publication contains (full build, release request, release approval) or the one module being previewed.
 // Drafts that are not in the publication do not block it.
 import fs from 'fs';
-import crypto from 'crypto';
 import path from 'path';
 import { projectDirFor } from '../context';
 import { HttpError, conflict } from './http';
-import { readProjectJson, csdbRel, pmRel } from './projects';
+import { readProjectJson, csdbRel } from './projects';
 import { publicationSources, pmRefsOf } from './pm';
 import { runValidation, type Issue } from './validation';
 import { checkModuleBrex } from './brex';
 import { isS1000dProject } from './projects';
-import { isJssAuthored, assertJssPublishable } from './jss/service';
+import { registerPublishCheck, publishCheckFor, type GateScope, type GatePass, type GateOptions } from './publishChecks';
 import { waiverFor } from './publishWaivers';
+import { sha256FileOr as sha } from '../lib/hash';
 
 export interface GateFinding { file: string; kind: 'malformed' | 'schema' | 'unchecked' | 'brex' | 'brex-source' | 'applic' | 'revision'; title: string; detail: string; line: number }
-export interface GatePass { validatedAt: string; files: string[]; warnings: string[]; /** Modules that break a business rule but were built anyway because the author asked for it. */ ruleBreaks: string[]; verifyUnchanged: () => void }
-/**
- * `allowRuleBreaks`: let a build go ahead when the ONLY thing wrong is that a module breaks a business rule (BREX). Schema errors, unusable BREX files and bad references are never let through, and a release is always checked strictly.
- * `waivable`: the caller is a DRAFT build (a PDF of unreleased work or a one-module preview), so a recorded waiver may stand in for a BREX the project lacks.
- * A release request or approval never sets it.
- */
-export interface GateOptions { allowRuleBreaks?: boolean; waivable?: boolean }
+export type { GateScope, GatePass, GateOptions } from './publishChecks';
 
-const sha = (abs: string): string => { try { return crypto.createHash('sha256').update(fs.readFileSync(abs)).digest('hex'); } catch { return 'MISSING'; } };
 
 /** The data modules (project-relative paths) a scope covers. */
-export function gateTargets(projectId: string, scope: 'publication' | { file: string }): string[] {
+export function gateTargets(projectId: string, scope: GateScope): string[] {
   const csdb = csdbRel(readProjectJson(projectId)).replace(/\/+$/, '');
   if (scope !== 'publication') return [`${csdb}/${scope.file}`];
   const prefix = `${csdb}/`.toLowerCase();
   return publicationSources(projectId).filter((rel) => rel.toLowerCase().startsWith(prefix));
 }
 
-export async function assertPublishable(projectId: string, scope: 'publication' | { file: string }, opts: GateOptions = {}): Promise<GatePass> {
-  // A JSS document has its own schema and the stencil's rules, not S1000D's: the same fresh check, run by the JSS service.
-  if (isJssAuthored(projectId)) {
-    if (scope !== 'publication') throw conflict('A single-module preview is an S1000D feature; a JSS document is built as a whole.', 'NOT_S1000D');
-    const g = await assertJssPublishable(projectId);
-    return { validatedAt: g.validatedAt, files: [pmRel(readProjectJson(projectId))], warnings: g.warnings, ruleBreaks: [], verifyUnchanged: g.verifyUnchanged };
-  }
+/**
+ * The gate: a fresh check of what a build will contain, by the check of the project's format (publishChecks.ts, WP-16 S1K-006). A JSS document
+ * registers its own (its schema and the stencil's rules: services/jss/service.ts); everything else is judged by the S1000D check below.
+ */
+export async function assertPublishable(projectId: string, scope: GateScope, opts: GateOptions = {}): Promise<GatePass> {
+  return publishCheckFor(projectId).check(projectId, scope, opts);
+}
+
+/** The S1000D check: schema, business rules (BREX), applicability and revision references of the modules the scope covers. */
+async function assertS1000dPublishable(projectId: string, scope: GateScope, opts: GateOptions): Promise<GatePass> {
   const dir = projectDirFor(projectId);
   const files = gateTargets(projectId, scope);
   const want = new Set(files.map((f) => f.toLowerCase()));
@@ -173,3 +169,5 @@ export async function assertPublishable(projectId: string, scope: 'publication' 
     },
   };
 }
+
+registerPublishCheck({ format: 's1000d', owns: () => true, check: assertS1000dPublishable }, { asDefault: true });

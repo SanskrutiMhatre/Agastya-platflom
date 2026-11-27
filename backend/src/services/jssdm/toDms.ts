@@ -22,6 +22,7 @@ import { DEFAULT_BREX_42, type PmEntryOut, type PmMeta } from '../sns/pmxml';
 import { LABEL_DEFAULTS, securityCodeOf, type MappingEntry, type ModuleIds, type Publisher } from './fromDms';
 import { PAGE_DEFS, pageDef, type PageDef, type PageId } from './reserved';
 import { generatedMarker } from './sidecar';
+import { escText as esc, escAttr } from '../../lib/xml';
 
 export interface GeneratedDm {
   file: string;
@@ -65,8 +66,6 @@ export interface GenerateResult {
 
 // ── small writers ──────────────────────────────────────────────────────────────────────────────
 
-const esc = (v: unknown): string => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const escAttr = (v: unknown): string => esc(v).replace(/"/g, '&quot;');
 const para = (text: unknown): string => (String(text ?? '').trim() ? `<para>${esc(String(text).trim())}</para>` : '<para />');
 /** A label override. The engine stores them NESTED ({ labels: { handbooks: { colSr } } }); a flat "handbooks.colSr" key is accepted too. */
 const labelAt = (labels: Record<string, any>, key: string): string | undefined => {

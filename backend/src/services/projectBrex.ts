@@ -18,9 +18,9 @@ import { csdbDir, listDms, createDm } from './csdb';
 import { declaredBrexDmc, defaultLetterFor } from './brex';
 import { hasSchema } from './registry';
 import { FileMemo } from './fileMemo';
+import { escAttr as esc } from '../lib/xml';
 
 const { validateDocument } = require('../../vendor/engine/validateSchema');
-const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const DEFAULT_PARENT = /^DMC-S1000D-[A-Z]-04-10-0301-00A-022A-D$/;
 const NS = 'xmlns:dc="http://www.purl.org/dc/elements/1.1/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"';
 

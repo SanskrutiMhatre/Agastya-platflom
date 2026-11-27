@@ -17,6 +17,7 @@ import { lastRun, runValidation, type Issue } from './validation';
 import { newDmProblems } from './projectConfig';
 import { checkAssets } from './assets';
 import { fileNameProblem, listObjects, OBJECT_FILE_RE, type ObjectSummary } from './csdbObjects';
+import { readAttrs } from './xmlHead';
 
 export interface Finding { module: string; rule: string; severity: 'error' | 'warn' | 'info'; location: string; line: number; message: string; fix: string; source: string }
 
@@ -55,7 +56,7 @@ export function consistency(projectId: string): Finding[] {
     }
     // cross-module references: dmRef to a module this project does not hold (legitimate across projects, so a warning)
     for (const m of xml.matchAll(/<dmRef\b[^>]*>([\s\S]*?)<\/dmRef>/g)) {
-      const code = /<dmCode\b([^>]*?)\/?>/.exec(m[1]); if (!code) continue; const a: Record<string, string> = {}; for (const x of code[1].matchAll(/([\w:.-]+)\s*=\s*"([^"]*)"/g)) a[x[1]] = x[2];
+      const code = /<dmCode\b([^>]*?)\/?>/.exec(m[1]); if (!code) continue; const a = readAttrs(code[1]);
       const dmc = dmcString(a).toUpperCase(); if (!have.has(dmc)) out.push({ module: d.file, rule: 'XREF_DM', severity: 'warn', location: `<dmRef> ${dmc}`, line: xml.slice(0, m.index).split('\n').length, message: `Refers to data module ${dmc}, which is not in this project.`, fix: 'Add the module to the project (or the Common Information Repository), or remove the reference if it points to another CSDB.', source: 'consistency' });
     }
   }

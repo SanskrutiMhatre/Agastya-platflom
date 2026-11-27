@@ -7,7 +7,6 @@
 // A PDF is only built from a document that has just been checked (assertJsgPublishable).
 
 import fs from 'fs';
-import crypto from 'crypto';
 import path from 'path';
 import { config } from '../../config';
 import { projectDirFor, content } from '../../context';
@@ -19,6 +18,8 @@ import { wellFormedError } from '../wellFormed';
 import { readProjectJson, updateProjectJson } from '../projectRecord';
 import { registerDocumentCreator } from '../documentCreators';
 import { jsgTypeById, ISPL_PREFACE, UHB_FRONT_COUNTS, UHB_PREFACE, type JsgDocType } from './registry';
+import { escText as esc, escAttr } from '../../lib/xml';
+import { sha256 as sha } from '../../lib/hash';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { validateXML } = require('xmllint-wasm');
@@ -31,9 +32,8 @@ export const SOURCE_NAME = 'jsg-document.xml';
 export interface JsgFinding { severity: 'error' | 'warning'; rule: string; message: string; line: number; location: string }
 export interface JsgReport { docType: string | null; valid: boolean; errors: number; warnings: number; findings: JsgFinding[]; validatedAt: string }
 
-export const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const escAttr = (s: string): string => esc(s).replace(/"/g, '&quot;');
-export const sha = (text: string): string => crypto.createHash('sha256').update(text).digest('hex');
+export { esc };
+export { sha };
 
 /** A project whose source is a JSG document written in the JSG editor. */
 export const isJsgProject = (projectId: string): boolean => readProjectJson(projectId).format === 'jsg';

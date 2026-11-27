@@ -7,12 +7,12 @@
 
 import fs from 'fs';
 import path from 'path';
-import crypto from 'crypto';
 import { projectDirFor } from '../context';
 import { bad } from './http';
-import { HEAD_BYTES, MAX_PROLOG, headOf, rootStart } from './xmlHead';
+import { HEAD_BYTES, MAX_PROLOG, headOf, rootStart, readAttrs as attrs } from './xmlHead';
 import { FileMemo } from './fileMemo';
 import { readProjectJson, csdbRel } from './projectRecord';
+import { sha256 as sha } from '../lib/hash';
 
 export const DM_FILE_RE = /^DMC-[A-Za-z0-9._-]+\.xml$/i;
 
@@ -25,7 +25,7 @@ export interface DmSummary {
   issueInfoAttrs: Record<string, string>; languageAttrs: Record<string, string>;
 }
 
-export const sha = (s: string | Buffer): string => crypto.createHash('sha256').update(s).digest('hex');
+export { sha };
 
 export function csdbDir(projectId: string): string {
   return path.join(projectDirFor(projectId), csdbRel(readProjectJson(projectId)));
@@ -41,13 +41,6 @@ export function resolveDmFile(projectId: string, file: string): string {
   return abs;
 }
 
-const attrs = (src: string): Record<string, string> => {
-  const out: Record<string, string> = {};
-  const re = /([\w:.-]+)\s*=\s*"([^"]*)"/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(src))) out[m[1]] = m[2];
-  return out;
-};
 
 /** "MODEL-AA-00-00-00-00A-040A-D" from dmCode attributes. */
 export function dmcString(a: Record<string, string>): string {

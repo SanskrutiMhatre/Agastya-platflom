@@ -11,6 +11,7 @@ import fs from 'fs';
 import path from 'path';
 import { headOf } from '../xmlHead';
 import { dmCodeToString, parseDmCode } from './codes';
+import { readAttrs as attrsOf } from '../xmlHead';
 
 export interface DmLike {
   file: string;
@@ -30,13 +31,6 @@ export interface DmLike {
   security?: string;
 }
 
-const attrsOf = (src: string): Record<string, string> => {
-  const out: Record<string, string> = {};
-  const re = /([\w:.-]+)\s*=\s*"([^"]*)"/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(src))) out[m[1]] = m[2];
-  return out;
-};
 const decode = (s: string): string => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
 const clean = (s: string | undefined): string => decode((s ?? '').replace(/<[^>]*>/g, '')).replace(/\s+/g, ' ').trim();
 

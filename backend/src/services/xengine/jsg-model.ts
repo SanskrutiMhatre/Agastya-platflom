@@ -9,6 +9,7 @@
 // Pure: text in, text out.
 
 import { DOMParser } from '@xmldom/xmldom';
+import { escAttr } from '../../lib/xml';
 import { esc, isSection, plain, type Align, type Block, type Chapter, type Figure, type Inline, type JssDocument, type List, type ListItem, type ListType, type Mark, type Notice, type Para, type Part, type Row, type Section, type Table } from '../jss/rwi/canonical';
 import { Findings } from '../jss/rwi/report';
 
@@ -124,7 +125,7 @@ export function parseJsg(xml: string, findings: Findings = new Findings()): Pars
 
 // ── writing ─────────────────────────────────────────────────────────────────────────────────────────────────────
 
-const at = (n: string, v: string | number | undefined): string => (v === undefined || v === '' ? '' : ` ${n}="${esc(String(v)).replace(/"/g, '&quot;')}"`);
+const at = (n: string, v: string | number | undefined): string => (v === undefined || v === '' ? '' : ` ${n}="${escAttr(v)}"`);
 const idOk = (s: string | undefined): string | undefined => (s && /^[A-Za-z_][A-Za-z0-9_.-]*$/.test(s) ? s : undefined);
 
 interface Ctx { findings: Findings; ids: Set<string>; where: string }

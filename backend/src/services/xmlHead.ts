@@ -8,6 +8,9 @@
 // instead of from byte 0.
 // =============================================================================
 
+/** Reading a start tag's attributes off the head without a full parse (audit S1K-007: one helper instead of four). */
+export { readAttrs } from '../lib/xml';
+
 /** How much of a document, counted from its root element, holds its identity and status section. */
 export const HEAD_BYTES = 12288;
 /** The prolog is searched up to here; a longer one is not a document this tool should be reading. */

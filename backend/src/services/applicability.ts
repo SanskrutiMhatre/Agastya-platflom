@@ -31,6 +31,7 @@ import { defaultLetterFor } from './brex';
 import { listItems } from './adminConfig';
 import { IssueKey } from './s1000dRef';
 import { yielder } from './yieldLoop';
+import { escAttr as esc } from '../lib/xml';
 
 const { validateDocument } = vendor('engine/validateSchema');
 
@@ -55,7 +56,6 @@ const TABLES = {
 type TableKey = keyof typeof TABLES;
 
 const NCNAME = /^[A-Za-z_][A-Za-z0-9._-]*$/;
-const esc = (s: unknown): string => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 // ── Value syntax ─────────────────────────────────────────────────────────────
 

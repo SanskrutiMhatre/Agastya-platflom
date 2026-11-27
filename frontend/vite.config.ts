@@ -5,6 +5,8 @@ import fs from 'node:fs';
 // WP-26: the client's own version, for the handshake with /api/version (src/lib/handshake.ts). The product version is the root package.json's
 // (the server reads the same, services/version.ts), so a page and a server from the same build always agree.
 const CLIENT_VERSION = String(JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version);
+import { fileURLToPath } from 'node:url';
+import { searchForWorkspaceRoot } from 'vite';
 
 // The API (and its WebSocket) lives on the backend port; the dev server proxies
 // both so the browser only ever talks to one origin and the session cookie just works.
@@ -20,6 +22,9 @@ export default defineConfig({
   server: {
     port: 5174,
     strictPort: true,
+    // WP-16 (S1K-003 / ARC-008): the BREX value forms and the XSD-pattern translator are ONE source shared with the server
+    // (backend/src/shared/); the dev server may serve that folder besides the frontend itself. A production build bundles it.
+    fs: { allow: [searchForWorkspaceRoot(fileURLToPath(new URL('.', import.meta.url))), fileURLToPath(new URL('../backend/src/shared', import.meta.url))] },
     proxy: {
       '/api': { target: API, changeOrigin: false },
       '/ws': { target: API.replace(/^http/, 'ws'), ws: true },

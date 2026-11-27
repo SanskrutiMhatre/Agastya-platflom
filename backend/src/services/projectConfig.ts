@@ -33,6 +33,7 @@ import {
   CODE_KINDS, CodeKind, IssueKey, ISSUE_KEYS, ISSUE_LABEL, KIND_RULE, getCode, issueKeyOf, listCodes, typeAdvice,
 } from './s1000dRef';
 import { listProjectSns } from './sns';
+import { readAttrs } from './xmlHead';
 
 // WP-10 (PRD-002): every statement is in repositories/projectConfigRepository.ts; this file holds the rules.
 const R = () => repos.projectConfig;
@@ -179,7 +180,7 @@ export function deriveConfig(projectId: string, by: ProjectConfig['origin']['by'
       const head = fs.readFileSync(path.join(csdb, d.file), 'utf8').slice(0, 40000);
       const m = /<brexDmRef>[\s\S]*?<dmCode\b([^>]*)\/?>/.exec(head);
       if (m) {
-        const a: Record<string, string> = {}; m[1].replace(/([\w:.-]+)\s*=\s*"([^"]*)"/g, (_s, k, v) => (a[k] = v, ''));
+        const a = readAttrs(m[1]);
         refs.push([a.modelIdentCode, a.systemDiffCode, a.systemCode, `${a.subSystemCode}${a.subSubSystemCode}`, a.assyCode, `${a.disassyCode}${a.disassyCodeVariant}`, `${a.infoCode}${a.infoCodeVariant}`, a.itemLocationCode].join('-'));
       }
     } catch { /* unreadable file: ignored here, validation reports it */ }
@@ -390,9 +391,8 @@ export interface NewDmFacts { schema: string; issue: IssueKey | null; code: Reco
 export function factsOf(xml: string): NewDmFacts {
   const head = xml.slice(0, 60000);
   const attrs = (re: RegExp): Record<string, string> => {
-    const m = re.exec(head); const out: Record<string, string> = {};
-    if (m) m[1].replace(/([\w:.-]+)\s*=\s*"([^"]*)"/g, (_s, k, v) => (out[k] = v, ''));
-    return out;
+    const m = re.exec(head);
+    return m ? readAttrs(m[1]) : {};
   };
   const loc = /noNamespaceSchemaLocation\s*=\s*"([^"]+)"/.exec(head);
   const schema = loc ? (loc[1].split('/').pop() ?? '').replace(/\.xsd$/i, '') : '';

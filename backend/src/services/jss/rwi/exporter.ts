@@ -21,12 +21,12 @@ import { Findings } from './report';
 import { DEFAULT_ROOT, codeAttrs, contentXml, dmcFileName, doctypeFor, documentXml, generatedIdentity, generatedPmHead, icnNameFor, identAndStatusXml, pmcXml, type ModuleIdentity, type PmcChapter, type PmcLayout, type PmcModule, type SerializeCtx } from './serialize';
 import { schemaCheck } from './validate';
 import { exportIdentity } from '../../xengine/project';
+import { sha256 as sha } from '../../../lib/hash';
 
 export interface ExportFile { name: string; data?: Buffer; abs?: string }
 export interface ExportPlan { fileName: string; files: ExportFile[]; report: ExportReport; blocked: boolean }
 
 const MEDIA_EXT = /\.(png|jpe?g|gif|bmp|svg|tiff?)$/i;
-const sha = (b: Buffer): string => createHash('sha256').update(b).digest('hex');
 const safeName = (s: string): string => s.replace(/[^\w.\- ]/g, '_').trim() || 'Package';
 
 export async function planExport(projectId: string): Promise<ExportPlan> {

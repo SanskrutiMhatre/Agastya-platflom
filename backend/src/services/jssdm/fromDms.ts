@@ -26,6 +26,7 @@ import { vendor } from '../../config';
 import { dmLikeFromXml } from '../sns/dms';
 import { attr, collapse, descendants, elems, entityMap, first, inlineOf, linesOf, parseXml, readTable, textOf, type El, type Inline } from './dom';
 import { PAGE_DEFS, classifyFrontMatter, pageDef, type PageId } from './reserved';
+import { readAttrs } from '../xmlHead';
 
 export interface FmDmInput { file: string; xml: string }
 
@@ -605,7 +606,7 @@ function idsOf(found: Found[], infos: Array<ReturnType<typeof dmLikeFromXml>>, p
   const org = /<originator\s+enterpriseCode="([^"]*)"[^>]*>\s*<enterpriseName>([^<]*)<\/enterpriseName>/.exec(head);
   if (org) out.originator = { enterpriseCode: org[1], enterpriseName: org[2].trim() };
   const brex = /<brexDmRef>[\s\S]*?<dmCode\b([^>]*)\/?>/.exec(head);
-  if (brex) { const at: Record<string, string> = {}; brex[1].replace(/([\w:.-]+)\s*=\s*"([^"]*)"/g, (_m, k, v) => (at[k] = v)); out.brex = at; }
+  if (brex) { out.brex = readAttrs(brex[1]); }
   if (pmMeta?.issueDate?.year) out.issueDate = { year: pmMeta.issueDate.year, month: pmMeta.issueDate.month ?? '01', day: pmMeta.issueDate.day ?? '01' };
   return out;
 }
