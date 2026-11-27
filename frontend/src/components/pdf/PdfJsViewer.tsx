@@ -151,8 +151,8 @@ const PageSlot: React.FC<PageSlotProps> = ({ pdf, pageNum, scale, active, regist
       ref={wrapRef}
       data-page={pageNum}
       style={{
-        position: 'relative', margin: '12px auto', background: '#fff',
-        boxShadow: '0 2px 10px rgba(0,0,0,.25)',
+        position: 'relative', margin: '12px auto', background: 'var(--viewer-page)',
+        boxShadow: 'var(--viewer-page-shadow)',
         ...(size ? { width: size.width, height: size.height } : { width: '80%', aspectRatio: '210 / 297' }),
       }}
     >
@@ -169,12 +169,12 @@ const PageSlot: React.FC<PageSlotProps> = ({ pdf, pageNum, scale, active, regist
         <div key={o.key} style={{
           position: 'absolute', left: o.left, top: o.top, width: o.width, height: o.height,
           zIndex: 10, pointerEvents: 'none',
-          background: o.key === currentMatchKey ? 'rgba(255,150,0,.55)' : 'rgba(255,230,0,.45)',
-          outline: o.key === currentMatchKey ? '2px solid rgb(230,120,0)' : undefined,
+          background: o.key === currentMatchKey ? 'var(--viewer-match-current)' : 'var(--viewer-match)',
+          outline: o.key === currentMatchKey ? '2px solid var(--viewer-match-outline)' : undefined,
         }} />
       ))}
 
-      <div style={{ position: 'absolute', bottom: 4, right: 8, fontSize: 10, color: '#aaa', userSelect: 'none', pointerEvents: 'none' }}>
+      <div style={{ position: 'absolute', bottom: 4, right: 8, fontSize: 10, color: 'var(--viewer-page-label)', userSelect: 'none', pointerEvents: 'none' }}>
         {pageNum}
       </div>
     </div>
@@ -211,11 +211,11 @@ const TocRow: React.FC<{ item: TocItem; depth: number; pdf: PDFDocumentProxy; cu
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 6 + depth * 14, borderRadius: 4, background: active ? 'rgba(255,255,255,.12)' : undefined }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 6 + depth * 14, borderRadius: 4, background: active ? 'var(--viewer-active)' : undefined }}>
         {hasKids ? (
           <button
             onClick={() => setOpen(o => !o)}
-            style={{ width: 16, height: 16, border: 'none', background: 'none', color: 'rgba(255,255,255,.5)', cursor: 'pointer', padding: 0, transform: open ? 'rotate(90deg)' : undefined, transition: 'transform .12s' }}
+            style={{ width: 16, height: 16, border: 'none', background: 'none', color: 'var(--viewer-ink-55)', cursor: 'pointer', padding: 0, transform: open ? 'rotate(90deg)' : undefined, transition: 'transform .12s' }}
           >▶</button>
         ) : <span style={{ width: 16, flexShrink: 0 }} />}
         <button
@@ -225,12 +225,12 @@ const TocRow: React.FC<{ item: TocItem; depth: number; pdf: PDFDocumentProxy; cu
           style={{
             flex: 1, minWidth: 0, textAlign: 'left', padding: '6px 0', fontSize: 12,
             border: 'none', background: 'none', cursor: page == null ? 'default' : 'pointer',
-            color: active ? 'var(--x-accent, #6cf)' : 'rgba(255,255,255,.8)',
+            color: active ? 'var(--viewer-accent)' : 'var(--viewer-ink-80)',
             fontWeight: active ? 600 : 400, opacity: page == null ? 0.4 : 1,
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}
         >{item.title}</button>
-        {page != null && <span style={{ fontSize: 10, color: 'rgba(255,255,255,.4)' }}>{page}</span>}
+        {page != null && <span style={{ fontSize: 10, color: 'var(--viewer-ink-55)' }}>{page}</span>}
       </div>
       {hasKids && open && item.items!.map((kid, i) => (
         <TocRow key={i} item={kid} depth={depth + 1} pdf={pdf} current={current} onGoPage={onGoPage} />
@@ -442,15 +442,15 @@ export const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ src, downloadName = 'o
 
   const btn: React.CSSProperties = {
     padding: '3px 9px', fontSize: 12, borderRadius: 4,
-    border: '1px solid var(--x-line)', background: 'var(--x-white, #fff)', color: 'var(--text, inherit)', cursor: 'pointer',
+    border: '1px solid var(--x-line)', background: 'var(--x-white)', color: 'var(--text)', cursor: 'pointer',
   };
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#3a3a3e' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--viewer-canvas)' }}>
       {/* Toolbar */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: autoFit ? 4 : 6, padding: autoFit ? '5px 6px' : '6px 10px', flexShrink: 0,
-        background: 'var(--x-white, #fff)', borderBottom: '1px solid var(--x-line)', flexWrap: 'wrap',
+        background: 'var(--x-white)', borderBottom: '1px solid var(--x-line)', flexWrap: 'wrap',
       }}>
         <button style={btn} onClick={() => setTocOpen(o => !o)} title="Table of contents">☰</button>
 
@@ -500,9 +500,9 @@ export const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ src, downloadName = 'o
       {/* Body */}
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         {tocOpen && (
-          <div style={{ width: 230, flexShrink: 0, overflow: 'auto', background: '#2c2c30', padding: '8px 4px' }}>
+          <div style={{ width: 230, flexShrink: 0, overflow: 'auto', background: 'var(--viewer-sidebar)', padding: '8px 4px' }}>
             {!pdf ? null : outline.length === 0 ? (
-              <div style={{ padding: 12, fontSize: 11.5, color: 'rgba(255,255,255,.4)' }}>
+              <div style={{ padding: 12, fontSize: 11.5, color: 'var(--viewer-ink-55)' }}>
                 This document has no table of contents.
               </div>
             ) : outline.map((item, i) => (
@@ -513,13 +513,13 @@ export const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ src, downloadName = 'o
 
         <div ref={containerRef} style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
           {error ? (
-            <div style={{ padding: 24, color: '#f88', fontSize: 13 }}>⚠ {error}</div>
+            <div style={{ padding: 24, color: 'var(--viewer-error)', fontSize: 13 }}>⚠ {error}</div>
           ) : !src ? (
-            <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: 'rgba(255,255,255,.55)', fontSize: 13 }}>
+            <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: 'var(--viewer-ink-55)', fontSize: 13 }}>
               {placeholder ?? 'No PDF yet.'}
             </div>
           ) : loading && !numPages ? (
-            <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: 'rgba(255,255,255,.7)', fontSize: 13 }}>
+            <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: 'var(--viewer-ink-70)', fontSize: 13 }}>
               Loading…
             </div>
           ) : (

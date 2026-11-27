@@ -8,7 +8,10 @@ function read(): ThemeChoice {
 }
 
 export function applyTheme(choice: ThemeChoice): void {
-  const dark = choice === 'dark' || (choice === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+  // 'system' = the organisation default when the administrator set one (cached by store/appSettings.ts, TH-008), else the OS.
+  let fallback: string | null = null;
+  try { fallback = localStorage.getItem('agastya.theme.default'); } catch { /* private mode */ }
+  const dark = choice === 'dark' || (choice === 'system' && (fallback === 'dark' || (fallback !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches)));
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
 }
 
@@ -34,7 +37,7 @@ export const useUi = create<UiState>((set, get) => ({
   toast(text, kind = 'info') {
     const id = ++seq;
     set({ toasts: [...get().toasts, { id, kind, text }].slice(-4) });
-    setTimeout(() => get().dismiss(id), kind === 'error' ? 6000 : 3200);
+    // the timer lives in the toast itself (components/ui.tsx ToastItem): it pauses on hover and focus (DS-005)
   },
   dismiss(id) { set({ toasts: get().toasts.filter((t) => t.id !== id) }); },
 }));

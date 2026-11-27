@@ -7,6 +7,7 @@ import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import { adminApi, authApi, teamApi, type GlobalRole, type User } from '../api';
 import { globalLabel } from '../lib/roles';
 import { Icon } from '../components/Icon';
+import { ThemeChoiceControl } from '../components/ThemeToggle';
 import { Alert, Badge, ConfirmModal, Empty, Field, Loading, Modal, ago, errText, fmtDate, useAsync } from '../components/ui';
 import { useSession } from '../store/session';
 import { useUi } from '../store/ui';
@@ -46,6 +47,11 @@ function Account() {
           {err ? <Alert tone="bad">{err}</Alert> : null}
           <div><button className="btn btn-primary" disabled={busy || !cur || !p}>Change password</button></div>
         </form>
+      </div>
+      <div className="v2-card v2-card-pad" data-testid="appearance">
+        <h3 style={{ marginTop: 0 }}>Appearance</h3>
+        <p className="v2-sub" style={{ marginTop: 0 }}>Theme on this computer. "Follow the system" uses your organisation's default, or else the Windows setting.</p>
+        <ThemeChoiceControl />
       </div>
       <div><button className="btn" onClick={() => void logout()}><Icon name="logout" />Sign out</button></div>
     </div>

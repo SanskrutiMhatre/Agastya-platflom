@@ -85,7 +85,7 @@ export function ReviewReader({ projectId, file, comments, canComment, canResolve
         <div role={canComment ? 'button' : undefined} tabIndex={canComment ? 0 : undefined}
           onClick={() => canComment && setPick(sel ? null : path)} onKeyDown={(e) => { if (canComment && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setPick(sel ? null : path); } }}
           title={canComment ? 'Click to comment on this' : undefined}
-          style={{ padding: '4px 8px', borderRadius: 6, cursor: canComment ? 'pointer' : 'default', background: sel ? 'var(--accent-soft, rgba(80,120,255,.12))' : here.length ? 'rgba(255,170,0,.12)' : undefined, fontWeight: HEADINGS.has(el.tagName) ? 700 : 400, fontSize: HEADINGS.has(el.tagName) ? '1.05em' : undefined }}>
+          style={{ padding: '4px 8px', borderRadius: 6, cursor: canComment ? 'pointer' : 'default', background: sel ? 'var(--accent-soft)' : here.length ? 'var(--comment-mark)' : undefined, fontWeight: HEADINGS.has(el.tagName) ? 700 : 400, fontSize: HEADINGS.has(el.tagName) ? '1.05em' : undefined }}>
           <span className="v2-hint v2-mono" style={{ fontSize: 11, marginRight: 8 }}>{el.tagName}</span>{words}
           {here.length ? <Badge tone="warn" title="Comments here"> {here.filter((c) => !c.resolved).length || '✓'}</Badge> : null}
         </div>
@@ -93,7 +93,7 @@ export function ReviewReader({ projectId, file, comments, canComment, canResolve
         {sel ? (
           <form className="v2-stack" style={{ marginTop: 6 }} onSubmit={(e) => { e.preventDefault(); if (text.trim()) void send(path, el); }}>
             <textarea className="v2-textarea" rows={2} maxLength={4000} autoFocus value={text} onChange={(e) => setText(e.target.value)} placeholder="Your comment on this…" aria-label="Comment on this place" data-testid="pin-text" />
-            {err ? <span className="v2-hint" style={{ color: 'var(--danger, #c33)' }}>{err}</span> : null}
+            {err ? <span className="v2-hint" style={{ color: 'var(--danger)' }}>{err}</span> : null}
             <div className="v2-row"><button className="btn btn-sm btn-primary" disabled={busy || !text.trim()} data-testid="pin-add"><Icon name="comment" size={13} />Comment here</button><button type="button" className="btn btn-sm" onClick={() => setPick(null)}>Cancel</button></div>
           </form>
         ) : null}

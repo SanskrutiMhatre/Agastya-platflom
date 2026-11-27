@@ -1157,7 +1157,7 @@ export class Dialogs {
     const delay = input(String(s.xmlCommitDelay), { type: 'number', min: 100, max: 5000, step: 100 });
     const body = h('div', { class: 'settings' },
       h('div', { class: 'form-section' }, 'General'),
-      h('div', { class: 'form-grid' }, field('Default view', view), field('Theme', theme), field('Default S1000D issue for new data modules', issue), field('Default graphic notation', notation)),
+      h('div', { class: 'form-grid' }, field('Default view', view), ...(this.app.host ? [] : [field('Theme', theme)]), field('Default S1000D issue for new data modules', issue), field('Default graphic notation', notation)),
       h('div', { class: 'form-section' }, 'Editing'),
       spell.el, sync.el, splitTags.el, field('XML view: apply edits after (ms)', delay),
       h('div', { class: 'form-section' }, 'Validation'),

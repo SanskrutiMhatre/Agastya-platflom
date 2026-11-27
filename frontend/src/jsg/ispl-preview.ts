@@ -79,27 +79,27 @@ export function platePages(doc: JsgDoc, plateIndex: number): PageSpec[] {
 }
 
 const CSS = `
-.jsg-pv{background:#6b7280;padding:10px 10px 30px;min-height:100%;box-sizing:border-box;font:12px system-ui,sans-serif}
-.jsg-pv-head{display:flex;gap:6px;align-items:center;color:#fff;margin:0 0 8px;flex-wrap:wrap}
-.jsg-pv-head select,.jsg-pv-head button{font:12px system-ui;border-radius:3px;border:1px solid #9ca3af;padding:2px 6px;background:#fff;color:#111}
-.jsg-pv-note{color:#e5e7eb;font-size:11px;margin:2px 0 10px}
-.jsg-pv-tag{color:#e5e7eb;font-size:11px;margin:10px 0 3px}
+.jsg-pv{background:var(--preview-canvas);padding:10px 10px 30px;min-height:100%;box-sizing:border-box;font:12px system-ui,sans-serif}
+.jsg-pv-head{display:flex;gap:6px;align-items:center;color:var(--preview-text);margin:0 0 8px;flex-wrap:wrap}
+.jsg-pv-head select,.jsg-pv-head button{font:12px system-ui;border-radius:3px;border:1px solid var(--preview-control-line);padding:2px 6px;background:var(--preview-control-bg);color:var(--preview-control-ink)}
+.jsg-pv-note{color:var(--preview-note);font-size:11px;margin:2px 0 10px}
+.jsg-pv-tag{color:var(--preview-note);font-size:11px;margin:10px 0 3px}
 .jsg-pv-wrap{position:relative;margin:0 auto}
-.jsg-pv-page{position:absolute;left:0;top:0;width:296.9mm;height:210mm;background:#fff;color:#000;box-shadow:0 2px 8px rgba(0,0,0,.45);transform-origin:top left;overflow:hidden;font:12pt "Times New Roman",Times,serif}
+.jsg-pv-page{position:absolute;left:0;top:0;width:296.9mm;height:210mm;background:var(--paper);color:var(--paper-ink);box-shadow:var(--preview-page-shadow);transform-origin:top left;overflow:hidden;font:12pt var(--font-paper-serif)}
 .jsg-pv-page .h{position:absolute;left:0;right:0;top:15mm;text-align:center;font-size:9pt;line-height:1.15}
 .jsg-pv-page .h span{display:block;font-size:10pt}
 .jsg-pv-page .f span{display:block}.jsg-pv-page .f{position:absolute;left:0;right:0;bottom:15mm;text-align:center;font-size:10pt}
 .jsg-pv-page .b{position:absolute;left:15mm;right:15mm;top:20mm;bottom:20mm;overflow:hidden}
-.jsg-pv-page .cap{color:#f00;font-weight:bold;font-size:14pt;text-align:center;margin:0 0 12pt}
-.jsg-pv-page .vcap{color:#f00;font-weight:bold;font-size:14pt;text-align:center;margin-top:8pt}
-.jsg-pv-page .big{text-align:center;font-weight:bold;font-size:36pt;color:#00f;line-height:1.3;margin-top:30mm}
+.jsg-pv-page .cap{color:var(--paper-caption);font-weight:bold;font-size:14pt;text-align:center;margin:0 0 12pt}
+.jsg-pv-page .vcap{color:var(--paper-caption);font-weight:bold;font-size:14pt;text-align:center;margin-top:8pt}
+.jsg-pv-page .big{text-align:center;font-weight:bold;font-size:36pt;color:var(--paper-heading);line-height:1.3;margin-top:30mm}
 .jsg-pv-page .pic{text-align:center}.jsg-pv-page .pic img{object-fit:contain}
 .jsg-pv-page .grid{display:grid;gap:2mm;justify-items:center}
 .jsg-pv-page .grid div{font-size:10pt;text-align:center}
 .jsg-pv-page table{border-collapse:collapse;width:100%;table-layout:fixed;font-size:12pt}
-.jsg-pv-page td,.jsg-pv-page th{border:.5pt solid #000;padding:3.7pt 5.4pt;line-height:15.8pt;vertical-align:middle;overflow:hidden;word-wrap:break-word}
+.jsg-pv-page td,.jsg-pv-page th{border:.5pt solid var(--paper-ink);padding:3.7pt 5.4pt;line-height:15.8pt;vertical-align:middle;overflow:hidden;word-wrap:break-word}
 .jsg-pv-page th{font-weight:bold;text-align:center}.jsg-pv-page th small{display:block;font-size:6.5pt}
-.jsg-pv-empty{color:#9ca3af;text-align:center;margin-top:30mm;font-size:12pt}
+.jsg-pv-empty{color:var(--preview-empty);text-align:center;margin-top:30mm;font-size:12pt}
 `;
 
 const mm = (v: number): string => `${v}mm`;

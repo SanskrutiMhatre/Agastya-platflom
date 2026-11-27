@@ -191,11 +191,11 @@ export function ReleasePage() {
                 {r.watermarkStyles.map((s) => <option key={s} value={s}>{s === 'diagonal' ? 'Diagonal across the page' : s === 'horizontal' ? 'Horizontal, centred' : 'Tiled, repeated over the page'}</option>)}
               </select>
             </Field>
-            <div aria-label="Watermark preview" style={{ height: 150, border: '1px solid var(--border)', borderRadius: 8, background: '#fff', position: 'relative', overflow: 'hidden', display: 'grid', placeItems: 'center' }}>
+            <div aria-label="Watermark preview" style={{ height: 150, border: '1px solid var(--border)', borderRadius: 8, background: 'var(--paper)', position: 'relative', overflow: 'hidden', display: 'grid', placeItems: 'center' }}>
               {wm.enabled && wm.text ? (wm.style === 'tiled'
-                ? <div style={{ position: 'absolute', inset: -20, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, transform: 'rotate(-30deg)', color: 'rgba(100,110,130,.35)', fontWeight: 700, fontSize: 13, placeItems: 'center' }}>{Array.from({ length: 15 }, (_, i) => <span key={i}>{wm.text}</span>)}</div>
-                : <span style={{ color: 'rgba(100,110,130,.4)', fontWeight: 800, fontSize: 20, transform: wm.style === 'diagonal' ? 'rotate(-35deg)' : 'none', whiteSpace: 'nowrap' }}>{wm.text}</span>)
-                : <span className="v2-hint">{wm.enabled ? 'Enter the watermark text' : 'No watermark on released copies'}</span>}
+                ? <div style={{ position: 'absolute', inset: -20, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, transform: 'rotate(-30deg)', color: 'var(--paper-watermark-preview)', fontWeight: 700, fontSize: 13, placeItems: 'center' }}>{Array.from({ length: 15 }, (_, i) => <span key={i}>{wm.text}</span>)}</div>
+                : <span style={{ color: 'var(--paper-watermark-preview-strong)', fontWeight: 800, fontSize: 20, transform: wm.style === 'diagonal' ? 'rotate(-35deg)' : 'none', whiteSpace: 'nowrap' }}>{wm.text}</span>)
+                : <span className="v2-hint" style={{ color: 'var(--paper-muted)' }}>{wm.enabled ? 'Enter the watermark text' : 'No watermark on released copies'}</span>}
             </div>
             {writable ? <div><button className="btn btn-primary" disabled={!wmDirty || busy} onClick={() => act(async () => { await contentApi.saveWatermark(id, wm); setWmDirty(false); }, 'Watermark saved')}>Save watermark</button></div> : null}
           </div>

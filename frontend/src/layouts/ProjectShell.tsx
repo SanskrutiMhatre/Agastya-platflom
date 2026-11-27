@@ -72,7 +72,6 @@ function ProjectShellFor({ id }: { id: string }) {
     { to: `/projects/${id}/release`, label: 'Release', icon: 'rocket', badge: rel?.pending ? { text: '!', tone: 'warn' } : rel?.released ? { text: `R${rel.number}`, tone: 'ok' } : null },
     { to: `/projects/${id}/settings`, label: 'Settings', icon: 'settings' },
   ];
-  const tone = { bad: 'var(--danger)', warn: 'var(--warning)', ok: 'var(--success)' } as const;
 
   const ctx: ProjectCtx = { id, summary, role: summary.role, reload: load };
   return (
@@ -86,7 +85,7 @@ function ProjectShellFor({ id }: { id: string }) {
           {items.map((i) => (
             <NavLink key={i.to} to={i.to} className={({ isActive }) => `v2-rail-item ${isActive ? 'active' : ''}`} data-tip={i.label} aria-label={i.label}>
               <Icon name={i.icon} size={20} />
-              {i.badge ? <span className="v2-rail-badge" style={{ background: tone[i.badge.tone] }}>{i.badge.text}</span> : null}
+              {i.badge ? <span className={`v2-rail-badge ${i.badge.tone}`}>{i.badge.text}</span> : null}
             </NavLink>
           ))}
         </nav>

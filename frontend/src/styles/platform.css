@@ -47,7 +47,7 @@ a:hover { text-decoration: underline; }
 .v2-edhead > h1 { min-width: 0; flex: 0 1 auto; }
 .v2-crumbs { display: flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: 13px; min-width: 0; }
 .v2-crumbs strong { color: var(--text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.v2-page { flex: 1; min-height: 0; overflow: auto; padding: 22px 28px 40px; }
+.v2-page { flex: 1; min-height: 0; overflow: auto; padding: var(--page-pad); }
 .v2-page-narrow { max-width: 880px; }
 .v2-page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 18px; flex-wrap: wrap; }
 .v2-page-head h2 { margin: 0; font-size: 20px; font-weight: 650; }
@@ -55,7 +55,7 @@ a:hover { text-decoration: underline; }
 
 /* ------------------------------------------------------------- primitives */
 .v2-card { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 10px; }
-.v2-card-pad { padding: 16px 18px; }
+.v2-card-pad { padding: var(--card-pad); }
 .v2-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--border); font-weight: 600; }
 .v2-grid { display: grid; gap: 14px; }
 .v2-grid.cols-4 { grid-template-columns: repeat(auto-fit, minmax(min(190px, 100%), 1fr)); }
@@ -76,7 +76,7 @@ a:hover { text-decoration: underline; }
 .v2-badge.warn { background: var(--warning-soft); color: var(--warning); border-color: transparent; }
 .v2-badge.bad { background: var(--danger-soft); color: var(--danger); border-color: transparent; }
 .v2-badge.accent { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
-.v2-input, .v2-select, .v2-textarea { height: 32px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--bg-elev); width: 100%; }
+.v2-input, .v2-select, .v2-textarea { height: var(--input-h); padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--bg-elev); width: 100%; }
 .v2-textarea { height: auto; padding: 8px 10px; resize: vertical; }
 .v2-input:focus, .v2-select:focus, .v2-textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
 .v2-field { display: flex; flex-direction: column; gap: 5px; }
@@ -87,7 +87,6 @@ a:hover { text-decoration: underline; }
 .v2-jsg-cover .jsg-card > label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
 .v2-jsg-cover input { height: 32px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--bg-elev); color: var(--text); width: 100%; font: inherit; font-weight: 400; }
 .v2-jsg-cover input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
-.v2-jsg-cover input:disabled { opacity: .7; }
 .v2-jsg-cover .jsg-card > div { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; }
 .v2-jsg-cover .jsg-tag { font-size: 12px; font-weight: 600; color: var(--text-muted); }
 .v2-jsg-cover .jsg-row { display: flex; gap: 6px; align-items: center; }
@@ -101,7 +100,7 @@ a:hover { text-decoration: underline; }
 .v2-alert.ok { background: var(--success-soft); color: var(--success); border-color: transparent; }
 .v2-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .v2-table th { text-align: left; padding: 8px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-faint); border-bottom: 1px solid var(--border); font-weight: 600; white-space: nowrap; }
-.v2-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.v2-table td { padding: var(--table-pad-y) 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
 .v2-table tbody tr:hover { background: var(--bg-hover); }
 .v2-table tr.clickable { cursor: pointer; }
 .v2-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 18px; overflow-x: auto; }
@@ -138,8 +137,8 @@ a:hover { text-decoration: underline; }
 /* ------------------------------------------------------------ toasts */
 .v2-toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 300; }
 .v2-toast { padding: 10px 14px; border-radius: 8px; background: var(--text); color: var(--bg-elev); box-shadow: var(--shadow-2); font-size: 13px; max-width: 420px; }
-.v2-toast.error { background: var(--toast-error); color: #fff; }
-.v2-toast.success { background: var(--success); color: #fff; }
+.v2-toast.error { background: var(--toast-error); color: var(--text-on-solid); }
+.v2-toast.success { background: var(--toast-success); color: var(--text-on-solid); }
 
 /* -------------------------------------------------------- project shell */
 .v2-pshell { display: grid; grid-template-columns: 232px 1fr; height: 100%; min-height: 0; }
@@ -200,24 +199,12 @@ a:hover { text-decoration: underline; }
 .x-display { font-weight: 650; } .x-display--lg { font-size: 20px; }
 .x-card { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 10px; } .x-card--pad { padding: 16px 18px; }
 .x-btn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--bg-elev); cursor: pointer; font-weight: 500; white-space: nowrap; text-decoration: none; color: var(--text); }
-.x-btn:hover { background: var(--bg-hover); text-decoration: none; } .x-btn:disabled { opacity: .5; cursor: default; }
+.x-btn:hover { background: var(--bg-hover); text-decoration: none; }
 .x-btn--primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); } .x-btn--primary:hover { background: var(--accent-strong); }
 .x-input, .x-select { height: 32px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--bg-elev); width: 100%; }
 .x-pill { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 10px; font-size: 11px; font-weight: 600; } .x-pill--neutral { background: var(--bg-sunken); color: var(--text-muted); border: 1px solid var(--border); }
 .x-table { width: 100%; border-collapse: collapse; } .x-table th, .x-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); text-align: left; }
 
-/* Tokens the reused Agastya screens (PmcBuilder, PublishSettings) read, mapped onto the Studio's design tokens. */
-:root {
-  --x-s1: 4px; --x-s2: 8px; --x-s3: 12px; --x-s4: 16px; --x-s5: 24px; --x-s6: 32px;
-  --x-text: var(--text); --x-text-muted: var(--text-muted); --x-text-faint: var(--text-faint);
-  --x-line: var(--border); --x-line-strong: var(--border-strong); --x-surface: var(--bg-elev); --x-surface-alt: var(--bg-sunken);
-  --x-accent: var(--accent); --x-accent-bg: var(--accent-soft); --x-accent-tint: var(--accent-soft);
-  --x-error: var(--danger); --x-error-bg: var(--danger-soft); --x-error-line: var(--danger);
-  --x-ok: var(--success); --x-ok-bg: var(--success-soft); --x-ok-line: var(--success);
-  --x-warn: var(--warning); --x-warn-bg: var(--warning-soft); --x-warn-line: var(--warning);
-  --x-font-mono: var(--font-mono);
-  --x-white: var(--bg-elev); /* the PDF viewer toolbar read this undefined token and fell back to hard-coded white in dark mode */
-}
 
 /* ------------------------------------------- embedded Studio containment */
 .v2-split > .a { overflow: hidden; }
@@ -237,7 +224,8 @@ a:hover { text-decoration: underline; }
 .v2-rail-item:hover { background: var(--bg-hover); color: var(--text); }
 .v2-rail-item.active { background: var(--accent-soft); color: var(--accent); }
 .v2-rail-project { width: 34px; height: 34px; border-radius: 9px; background: var(--accent); color: var(--accent-text); display: grid; place-items: center; font-weight: 700; position: relative; }
-.v2-rail-badge { position: absolute; top: 3px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; font-size: 10px; font-weight: 700; color: #fff; display: grid; place-items: center; line-height: 1; }
+.v2-rail-badge { position: absolute; top: 3px; right: 2px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; font-size: 10px; font-weight: 700; color: var(--text-on-accent); display: grid; place-items: center; line-height: 1; }
+.v2-rail-badge.bad { background: var(--danger); } .v2-rail-badge.warn { background: var(--warning); } .v2-rail-badge.ok { background: var(--success); }
 /* hover label: shown to the right of the icon, instantly (the native title tooltip is slow) */
 .v2-rail [data-tip]:hover::after, .v2-rail [data-tip]:focus-visible::after {
   content: attr(data-tip); position: absolute; left: calc(100% + 10px); top: 50%; transform: translateY(-50%);
@@ -336,9 +324,8 @@ a:hover { text-decoration: underline; }
 .v2-bell { position: relative; display: inline-grid; place-items: center; text-decoration: none; color: inherit; }
 .v2-bell.active { color: var(--accent); }
 .v2-bell-count { position: absolute; top: -3px; right: -3px; margin: 0; padding: 0 4px; min-width: 16px; font-size: 10px; line-height: 16px; background: var(--accent); color: var(--accent-text); border-radius: 8px; text-align: center; }
-html.v2-compact .v2-page { padding: 14px 18px; }
-html.v2-compact .v2-table td, html.v2-compact .v2-table th { padding-top: 5px; padding-bottom: 5px; }
-html.v2-compact .v2-card-pad { padding: 12px; }
+/* compact layout (administrator setting): html.v2-compact switches the density tokens in tokens.css (DS-006); the table header follows here */
+html.v2-compact .v2-table th { padding-top: 5px; padding-bottom: 5px; }
 
 /* ---------------------------------------------------------- graphics, administrator, review */
 .v2-gfx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
@@ -384,7 +371,7 @@ html.v2-compact .v2-card-pad { padding: 12px; }
 .v2-diff.before { border-left: 3px solid var(--danger); }
 .v2-diff.after { border-left: 3px solid var(--success); }
 .v2-pickbtns { display: flex; gap: 8px; flex-wrap: wrap; }
-.v2-brandprev { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; background: #fff; color: #1b2330; min-height: 64px; }
+.v2-brandprev { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--paper); color: var(--paper-ink-soft); min-height: 64px; }
 .v2-brandprev img { max-height: 48px; max-width: 160px; object-fit: contain; }
 
 /* ---------------------------------------------- SNS (project settings tab, administrator defaults) */
@@ -415,7 +402,7 @@ html.v2-compact .v2-card-pad { padding: 12px; }
 .v2-divider { width: 4px; }
 @media (max-width: 900px) {
   .v2-crumb, .v2-saved { display: none; }
-  .v2-dmpanel { position: absolute; z-index: 5; height: 100%; box-shadow: 4px 0 16px rgba(0,0,0,.18); }
+  .v2-dmpanel { position: absolute; z-index: 5; height: 100%; box-shadow: var(--shadow-drawer); }
 }
 .v2-split { position: relative; }
 
@@ -444,10 +431,10 @@ html.v2-compact .v2-card-pad { padding: 12px; }
 @media (max-width: 900px) { .v2-anc { grid-template-columns: 1fr; } }
 .v2-anc-field textarea.v2-input { height: auto; padding: 7px 10px; line-height: 1.45; resize: vertical; }
 
-/* the PDF viewer is dark in both themes: its empty-state text must read on it */
-[data-testid="pdf-pane"] .v2-empty, [data-testid="pdf-pane"] .v2-empty h3, [data-testid="pdf-pane"] .v2-empty > svg { color: #d5dae0; }
-[data-testid="pdf-pane"] .v2-empty strong { color: #fff; font-weight: 600; }
+/* the PDF viewer is dark in both themes (a recorded decision, TH-007: tokens viewer-*): its empty-state text must read on it */
+[data-testid="pdf-pane"] .v2-empty, [data-testid="pdf-pane"] .v2-empty h3, [data-testid="pdf-pane"] .v2-empty > svg { color: var(--viewer-text); }
+[data-testid="pdf-pane"] .v2-empty strong { color: var(--viewer-text-strong); font-weight: 600; }
 
 /* FE-004: the server is not answering; the page stays usable. */
 .v2-offline-banner { position: fixed; left: 50%; top: 8px; transform: translateX(-50%); z-index: 1000; padding: 6px 14px; border-radius: 6px;
-  background: var(--warning-soft); color: var(--warning); border: 1px solid currentColor; font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+  background: var(--warning-soft); color: var(--warning); border: 1px solid currentColor; font-size: 13px; box-shadow: var(--shadow-banner); }

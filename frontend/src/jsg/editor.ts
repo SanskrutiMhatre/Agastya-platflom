@@ -587,7 +587,7 @@ export class JsgEditor implements JsgEditorLike {
       li.appendChild(body); e.appendChild(li);
     });
     if (!this.readOnly) {
-      const add = this.el('button', '', '+ item'); (add as HTMLButtonElement).type = 'button'; add.style.cssText = 'font:11px system-ui;margin-left:48px;border:1px dashed #9aa4ae;background:#fff;border-radius:3px;cursor:pointer';
+      const add = this.el('button', '', '+ item'); (add as HTMLButtonElement).type = 'button'; add.style.cssText = 'font:11px system-ui;margin-left:48px;border:1px dashed var(--paper-jsg-placeholder);background:var(--paper);color:var(--paper-ink);border-radius:3px;cursor:pointer';
       add.addEventListener('mousedown', (ev) => ev.preventDefault());
       add.addEventListener('click', () => { l.items.push({ parts: [{ k: 'text', inline: [] }] }); this.afterEdit(l); });
       e.appendChild(add);
@@ -666,7 +666,7 @@ export class JsgEditor implements JsgEditorLike {
     this.doc.chapters.forEach((c, ci) => { link(`CHAPTER ${ci + 1}  ${c.title}`, 'l1', `jsg-ch-${ci}`); c.sections.forEach((s, si) => link(`SECTION ${si + 1}  ${s.title}`, 'l2', `jsg-sec-${ci}-${si}`)); });
     if (this.doc.appendices.length) { this.nav.append(this.el('h4', '', 'Appendices')); this.doc.appendices.forEach((a, i) => link(`${a.label}  ${a.title}`, 'l2', `jsg-app-${i}`)); }
     if (!this.readOnly) {
-      const mk = (label: string, fn: () => void): void => { const b = this.el('button', '', label); (b as HTMLButtonElement).type = 'button'; b.style.cssText = 'font:11px system-ui;margin:4px 2px 0;border:1px solid #cfd4da;background:#fff;border-radius:3px;cursor:pointer;color:#1b1f24'; b.onclick = fn; this.nav.appendChild(b); };
+      const mk = (label: string, fn: () => void): void => { const b = this.el('button', '', label); (b as HTMLButtonElement).type = 'button'; b.style.cssText = 'font:11px system-ui;margin:4px 2px 0;border:1px solid var(--border);background:var(--bg-elev);border-radius:3px;cursor:pointer;color:var(--text)'; b.onclick = fn; this.nav.appendChild(b); };
       this.nav.append(this.el('h4', '', 'Structure'));
       mk('+ Chapter', () => { this.doc.chapters.push({ k: 'chapter', title: 'NEW CHAPTER', sections: [{ k: 'section', title: 'New section', orientation: 'portrait', children: [newPara('')] }] }); this.afterEdit(null); });
       mk('+ Section', () => { const c = this.doc.chapters[this.doc.chapters.length - 1]; if (c) { c.sections.push({ k: 'section', title: 'New section', orientation: 'portrait', children: [newPara('')] }); this.afterEdit(null); } });
