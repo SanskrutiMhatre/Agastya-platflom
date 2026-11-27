@@ -1271,26 +1271,5 @@ export function toggleInline(sel: ModelSelection, name: string, attrs: Record<st
   return { anchor: { node: first, offset: 0 }, focus: { node: last, offset: last.length } };
 }
 
-/** Merges adjacent sibling formatting elements with identical attributes. */
-export function mergeAdjacentFormatting(root: Element) {
-  for (const e of Array.from(root.getElementsByTagName('*'))) {
-    if (!FORMATTING.has(e.nodeName) || !e.isConnected) continue;
-    let next = e.nextSibling;
-    while (next && next.nodeType === 1 && next.nodeName === e.nodeName && sameAttrs(e, next as Element)) {
-      while (next.firstChild) e.appendChild(next.firstChild);
-      const n2 = next.nextSibling;
-      next.parentNode!.removeChild(next);
-      next = n2;
-    }
-    e.normalize();
-  }
-}
-
-function sameAttrs(a: Element, b: Element): boolean {
-  if (a.attributes.length !== b.attributes.length) return false;
-  for (const at of Array.from(a.attributes)) if (b.getAttribute(at.name) !== at.value) return false;
-  return true;
-}
-
 export { childNames, elementChildren, elementIndex };
 export { closest, closestName } from './xml';

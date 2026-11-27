@@ -482,19 +482,6 @@ export function serialize(node: Node, opts: SerializeOptions = {}): SerializeRes
   return { text: parts.join(''), spans };
 }
 
-/** Serialises a node without pretty printing (exact content), for clipboard and fragments. */
-export function serializeRaw(node: Node): string {
-  const s = new XMLSerializer().serializeToString(node);
-  return s;
-}
-
-/** Pretty-prints arbitrary XML text (keeps mixed content intact). */
-export function formatXmlText(text: string, grammar: Grammar | null): string {
-  const p = parseXml(text);
-  normalizeWhitespace(p.doc, grammar);
-  return serialize(p.doc, { grammar, doctype: p.doctype, xmlDecl: p.xmlDecl }).text;
-}
-
 // ---------------------------------------------------------------- utilities
 export function elementChildren(el: Node): Element[] {
   const out: Element[] = [];
@@ -510,14 +497,6 @@ export function childNames(el: Node): string[] {
 export function elementIndex(child: Element): number {
   let i = 0;
   for (let c = child.previousSibling; c; c = c.previousSibling) if (c.nodeType === 1) i++;
-  return i;
-}
-
-/** Converts a childNodes offset into an element-children index. */
-export function elementIndexAtOffset(parent: Node, offset: number): number {
-  let i = 0;
-  const kids = parent.childNodes;
-  for (let k = 0; k < Math.min(offset, kids.length); k++) if (kids[k].nodeType === 1) i++;
   return i;
 }
 
@@ -564,23 +543,6 @@ export function nodePath(n: Node): string {
     c = el.parentNode;
   }
   return '/' + segs.join('/');
-}
-
-/** Resolves a path produced by nodePath. */
-export function resolvePath(doc: Document, path: string): Element | null {
-  const segs = path.split('/').filter(Boolean);
-  let cur: Element | null = null;
-  for (const seg of segs) {
-    const m = seg.match(/^([^[]+)(?:\[(\d+)\])?$/);
-    if (!m) return null;
-    const name = m[1];
-    const idx = m[2] ? parseInt(m[2], 10) : 1;
-    const pool: Element[] = cur ? elementChildren(cur) : doc.documentElement ? [doc.documentElement] : [];
-    const matches = pool.filter((e) => e.nodeName === name);
-    cur = matches[idx - 1] ?? null;
-    if (!cur) return null;
-  }
-  return cur;
 }
 
 export function textOf(n: Node | null): string {

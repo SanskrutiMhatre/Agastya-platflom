@@ -216,8 +216,6 @@ export function splitCell(t: Table, group: 'head' | 'body', row: number, index: 
   return true;
 }
 
-export const cellAt = (t: Table, group: 'head' | 'body', row: number, col: number): Cell | undefined => (group === 'head' ? t.head : t.body)[row]?.cells[col];
-
 // ── Lists ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 const isList = (p: Part): p is List => p.k === 'list';

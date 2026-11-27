@@ -5,7 +5,7 @@
 // says the severity with `severityLabel`, so the words and the counts are the same wherever a finding is shown. The server keeps the same shape
 // (backend services/problems.ts) with the team's "reviewed" marks, so a mark is seen by everyone.
 
-import type { ProblemRow, ProblemState, ValidationIssue } from '../api';
+import type { ProblemState, ValidationIssue } from '../api';
 
 export type Severity = 'error' | 'warn' | 'info';
 export interface Problem {
@@ -38,11 +38,6 @@ export function fromValidationIssue(i: ValidationIssue, reviewed?: { by?: string
 export function fromDocFinding(f: { severity: 'error' | 'warning'; rule: string; message: string; line: number; location: string }, file = 'document'): Problem {
   return { key: `doc|${file}|${f.line}|${f.rule}|${f.location}`, source: 'document', severity: f.severity === 'error' ? 'error' : 'warn', file, line: f.line, rule: f.rule,
     message: f.message, location: f.location, state: 'open' };
-}
-
-export function fromServer(p: ProblemRow): Problem {
-  return { key: p.key, source: p.source, severity: p.severity, file: p.file, line: p.line, rule: p.rule, message: p.message, detail: p.detail, location: p.location,
-    state: p.state, reviewedBy: p.reviewedBy, reviewedAt: p.reviewedAt };
 }
 
 /** Counts of one list, by severity and by state. */

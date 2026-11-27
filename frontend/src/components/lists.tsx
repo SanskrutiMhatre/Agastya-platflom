@@ -45,19 +45,3 @@ export function CappedList<T>({ items, render, initial = 25, page = 100, noun = 
   );
 }
 
-/**
- * The "Showing 100 of 4,200 rows" line with its buttons, for a table or tree whose rows the caller slices itself (`cap` from lib/importPackage.ts).
- * `shown` is the number of rows currently rendered; `onShown` receives the new number.
- */
-export function ShowMore({ shown, total, page = 100, noun = 'rows', testid, onShown }: { shown: number; total: number; page?: number; noun?: string; testid?: string; onShown: (n: number) => void }) {
-  const hidden = Math.max(0, total - shown);
-  if (hidden === 0) return null;
-  const step = Math.min(page, hidden);
-  return (
-    <div className="v2-row wrap" style={{ marginTop: 6 }} data-testid={testid}>
-      <span className="v2-hint">Showing {Math.min(shown, total)} of {total} {noun}.</span>
-      {step < hidden ? <button type="button" className="btn btn-sm" onClick={() => onShown(showMore(shown, total, page))} data-testid={testid ? `${testid}-more` : undefined}>Show {step} more</button> : null}
-      <button type="button" className="btn btn-sm" onClick={() => onShown(total)} data-testid={testid ? `${testid}-all` : undefined}>Show all {total}</button>
-    </div>
-  );
-}
