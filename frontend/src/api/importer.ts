@@ -10,6 +10,7 @@
 // they go through XMLHttpRequest; errors are turned into the same ApiError every other call throws.
 
 import { ApiError, post, get, signalUnauthorized } from './client';
+import { invalidate } from './query';
 
 export type ImportSeverity = 'error' | 'warning' | 'info';
 export type ImportFileKind = 'dm' | 'brex' | 'pmc' | 'icn' | 'image' | 'other' | 'ignored';
@@ -131,7 +132,9 @@ function send<T>(url: string, form: FormData, onProgress?: (loaded: number, tota
     xhr.open('POST', url);
     xhr.withCredentials = true;
     if (onProgress) xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded, e.total); };
+    invalidate();                                     // a write that does not go through request(): the query layer is told by hand (WP-18)
     xhr.onload = () => {
+      invalidate();
       let data: Record<string, unknown> | null = null;
       if ((xhr.getResponseHeader('content-type') ?? '').includes('json')) { try { data = JSON.parse(xhr.responseText) as Record<string, unknown>; } catch { data = null; } }
       if (xhr.status >= 200 && xhr.status < 300) { resolve(data as T); return; }

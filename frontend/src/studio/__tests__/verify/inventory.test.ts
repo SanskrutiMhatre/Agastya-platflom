@@ -7,6 +7,7 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import { schemaDir } from '../schemaDir';
 import { TEMPLATES, buildDataModule, defaultNewDmOptions } from '../../core/templates';
 import { SCHEMAS, detectSchema, schemaUrl, ISSUES as EDITOR_ISSUES } from '../../core/s1000d';
 import { parseXml } from '../../core/xml';
@@ -35,7 +36,7 @@ describe('schema mapping', () => {
   for (const type of TYPES) {
     for (const issue of ISSUES) {
       it(`${type} ${issue}: XSD, grammar, schema URL and detection agree`, () => {
-        const xsd = path.join(PUB, 'schemas', issue, type + '.xsd');
+        const xsd = path.join(schemaDir(issue), type + '.xsd');
         expect(fs.existsSync(xsd), `missing ${xsd}`).toBe(true);
         const j = gramJson(issue, type);
         expect(j.schema, 'grammar belongs to this type').toBe(type);
@@ -146,7 +147,7 @@ describe('the reference dictionaries (vim-s1000d) agree with the compiled gramma
 describe('issues beyond the wizard', () => {
   it('records, per type, which schemas exist for 4.1 (editor-supported, hidden in the wizard)', () => {
     const rows: Record<string, { xsd: boolean; grammar: boolean }> = {};
-    for (const t of TYPES) rows[t] = { xsd: fs.existsSync(path.join(PUB, 'schemas', '4-1', t + '.xsd')), grammar: fs.existsSync(path.join(PUB, 'grammar', '4-1', t + '.json')) };
+    for (const t of TYPES) rows[t] = { xsd: fs.existsSync(path.join(schemaDir('4-1'), t + '.xsd')), grammar: fs.existsSync(path.join(PUB, 'grammar', '4-1', t + '.json')) };
     (report.issues as Record<string, unknown>)['4-1'] = rows;
     // the only 4.1 gap is business-rules documents, which S1000D introduced in 4.2
     expect(Object.entries(rows).filter(([, v]) => !v.xsd || !v.grammar).map(([k]) => k)).toEqual(['brdoc']);

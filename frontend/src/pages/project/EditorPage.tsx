@@ -27,6 +27,7 @@ export function EditorPage() {
   const [savedTick, setSavedTick] = useState(0);
   const [error, setError] = useState('');
   const [sideKey, setSideKey] = useState(0);
+  const [treeKey, setTreeKey] = useState(0);
   const [ready, setReady] = useState(false);
   const [pct, setPct] = useState(() => Math.min(80, Math.max(25, Number(localStorage.getItem('agastya.editor.split')) || 56)));
   const [dragging, setDragging] = useState(false);
@@ -86,7 +87,8 @@ export function EditorPage() {
 
   useEffect(() => {
     studio.notify = (m, kind) => toast(m, kind === 'error' ? 'error' : kind === 'success' ? 'success' : 'info');
-    studio.onSaved = () => { setSavedTick((t) => t + 1); setSideKey((k) => k + 1); reload(); };
+    // WP-18 (FE-029): after a save the list and the project summary are asked for again; the publication tree only when a new module was created
+    studio.onSaved = (created) => { setSavedTick((t) => t + 1); setSideKey((k) => k + 1); if (created) setTreeKey((k) => k + 1); reload(); };
     let alive = true;
     (async () => {
       try {
@@ -138,7 +140,7 @@ export function EditorPage() {
       {!canWrite(ctx.role) ? <Alert tone="warn">You have {ctx.role} access to this project: you can read and proof data modules, but changes cannot be saved.</Alert> : null}
       {error ? <Alert tone="bad">{error}</Alert> : null}
       <div className="v2-split" data-testid="editor-split" ref={splitRef} style={dragging || listDrag ? { userSelect: 'none' } : undefined}>
-        {sideOpen ? <EditorSide ctx={ctx} refreshKey={sideKey} width={listW} onCollapse={() => setSide(false)} /> : null}
+        {sideOpen ? <EditorSide ctx={ctx} refreshKey={sideKey} treeKey={treeKey} width={listW} onCollapse={() => setSide(false)} /> : null}
         {sideOpen ? <div className={`v2-divider ${listDrag ? 'drag' : ''}`} role="separator" aria-orientation="vertical" aria-label="Resize data module list" tabIndex={0}
           onPointerDown={startListDrag} onKeyDown={(e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { const w = Math.min(480, Math.max(180, listW + (e.key === 'ArrowRight' ? 16 : -16))); setListW(w); localStorage.setItem('agastya.editor.listw', String(w)); studio.relayout(); } }} /> : null}
         <div className="a" style={{ display: shown === 'pdf' ? 'none' : 'flex', flex: shown === 'edit' ? '1 1 0' : `0 0 calc((100% - ${sideOpen ? listW + 5 : 0}px) * ${pct / 100})` }}>

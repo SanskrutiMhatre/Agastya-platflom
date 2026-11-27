@@ -1,5 +1,6 @@
 // Thin fetch wrapper. Everything is same-origin (the Vite proxy in dev, the Express
 // server in production), so the HttpOnly session cookie travels by itself.
+import { shared, invalidate } from './query';
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public code?: string, public body?: Record<string, unknown>) {
@@ -27,7 +28,14 @@ export const setReauthHandler = (fn: Reauth | null): void => { reauth = fn; };
 /** The sign-in endpoints themselves are never replayed (a wrong password is a 401 too). */
 const isAuthUrl = (url: string) => /^\/api\/auth\//.test(url);
 
-export async function request<T = unknown>(method: string, url: string, body?: unknown, opts: { raw?: boolean; quiet401?: boolean; background?: boolean; replayed?: boolean } = {}): Promise<T> {
+export async function request<T = unknown>(method: string, url: string, body?: unknown, opts: { raw?: boolean; quiet401?: boolean; background?: boolean; replayed?: boolean; signal?: AbortSignal } = {}): Promise<T> {
+  // WP-18: a write makes every answer read before it old (api/query.ts); once before it is sent and once after it is answered.
+  const write = method !== 'GET' && method !== 'HEAD';
+  if (write) invalidate();
+  try { return await send<T>(method, url, body, opts); } finally { if (write) invalidate(); }
+}
+
+async function send<T>(method: string, url: string, body: unknown, opts: { raw?: boolean; quiet401?: boolean; background?: boolean; replayed?: boolean; signal?: AbortSignal }): Promise<T> {
   const headers: Record<string, string> = {};
   // A timer's request (badge counts, status checks) is not the person working: it does not keep the session from going idle (WP-03).
   if (opts.background) headers['x-agastya-background'] = '1';
@@ -35,7 +43,7 @@ export async function request<T = unknown>(method: string, url: string, body?: u
   if (body instanceof FormData) payload = body;
   else if (body !== undefined) { headers['content-type'] = 'application/json'; payload = JSON.stringify(body); }
 
-  const res = await fetch(url, { method, headers, body: payload, credentials: 'same-origin' });
+  const res = await fetch(url, { method, headers, body: payload, credentials: 'same-origin', signal: opts.signal });
   if (opts.raw && res.ok) return res as unknown as T;
 
   const type = res.headers.get('content-type') ?? '';
@@ -52,7 +60,14 @@ export async function request<T = unknown>(method: string, url: string, body?: u
   return data as T;
 }
 
-export const get = <T,>(url: string, o?: { quiet401?: boolean; background?: boolean }) => request<T>('GET', url, undefined, o);
+/**
+ * A GET through the query layer (api/query.ts, WP-18): identical GETs in flight share one request, an answer is reused for a few hundred ms
+ * (or `ttl`), every write clears both, `fresh` always goes to the server, `signal` cancels this caller's wait.
+ */
+export const get = <T,>(url: string, o?: { quiet401?: boolean; background?: boolean; ttl?: number; fresh?: boolean; signal?: AbortSignal }) =>
+  shared<T>(`${url}${o?.background ? '\u0000bg' : ''}${o?.quiet401 ? '\u0000q' : ''}`,
+    (signal) => request<T>('GET', url, undefined, { quiet401: o?.quiet401, background: o?.background, signal }),
+    { ttl: o?.ttl, fresh: o?.fresh, signal: o?.signal });
 export const post = <T,>(url: string, body: unknown = {}, o?: { quiet401?: boolean }) => request<T>('POST', url, body, o);
 export const put = <T,>(url: string, body: unknown) => request<T>('PUT', url, body);
 export const patch = <T,>(url: string, body: unknown) => request<T>('PATCH', url, body);

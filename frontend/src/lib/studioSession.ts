@@ -52,7 +52,8 @@ class StudioSession {
   private serverDms: DmSummary[] = [];
   /** Reports user-facing messages (toast) and lets the page reload counts after a save. */
   notify: (msg: string, kind?: 'info' | 'error' | 'success') => void = () => undefined;
-  onSaved: () => void = () => undefined;
+  /** `created`: the save made a new data module (it may have joined the publication), not a new version of an open one. */
+  onSaved: (created: boolean) => void = () => undefined;
 
   constructor() {
     this.root.className = 'app';
@@ -203,9 +204,16 @@ class StudioSession {
   }
 
   /** Media list (for ICN artwork) and publication settings (for quick preview). */
-  async refreshProjectData(): Promise<void> {
+  async refreshProjectData(opts: { dmsOnly?: boolean } = {}): Promise<void> {
     if (!this.projectId) return;
     const id = this.projectId;
+    // WP-18 (FE-029): a save changes the module list, never the pictures or the publication settings, so after a save only the list is asked for
+    // (and the editor's side list asks for the same /dms at the same moment: the query layer sends one request for both).
+    if (opts.dmsOnly) {
+      const dms = await contentApi.dms(id).catch(() => null);
+      if (id === this.projectId && dms) this.serverDms = dms;
+      return;
+    }
     const [media, settings, dms] = await Promise.all([contentApi.media(id).catch(() => []), contentApi.settings(id).catch(() => null), contentApi.dms(id).catch(() => null)]);
     if (id !== this.projectId) return;
     this.media = media;
@@ -340,8 +348,8 @@ class StudioSession {
         this.refs.set(ed.doc, { file: suggested, hash: out.hash });
         ed.doc.fileName = suggested;
       }
-      this.onSaved();
-      void this.refreshProjectData();
+      void this.refreshProjectData({ dmsOnly: true });   // first, so the side list's request (started by onSaved's render) joins it
+      this.onSaved(!ref);
       return true;
     } catch (e) {
       if (e instanceof ApiError && e.code === 'EDIT_CONFLICT') {

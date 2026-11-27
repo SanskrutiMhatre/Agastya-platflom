@@ -6,6 +6,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { schemaDir } from '../schemaDir';
 import zlib from 'node:zlib';
 import { spawn } from 'node:child_process';
 import { TEMPLATES, buildDataModule, defaultNewDmOptions } from '../../core/templates';
@@ -101,7 +102,7 @@ export function xsdValidate(xml: string, issue: string, schema: string): Promise
         new Promise<XsdResult & { verdict: boolean }>((resolve, reject) => {
           const f = path.join(TMP, `d${++seq}.xml`);
           fs.writeFileSync(f, xml);
-          const p = spawn('xmllint', ['--noout', '--schema', path.join(PUB, 'schemas', issue, schema + '.xsd'), f]);
+          const p = spawn('xmllint', ['--noout', '--schema', path.join(schemaDir(issue), schema + '.xsd'), f]);
           let err = '';
           p.stderr.on('data', (d) => (err += d));
           p.on('error', reject);

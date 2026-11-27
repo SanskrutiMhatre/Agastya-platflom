@@ -17,6 +17,11 @@
 import { instantiatePdfmake, patchPdfmakeSource, type PatchId } from './pdfmake-patch';
 import { JUSTIFY } from './pdf-theme';
 import { TABLE_LAYOUTS } from './pdf-layouts';
+// only the URLs (a few bytes each); the files are fetched when a PDF is exported
+import pdfmakeUrl from 'pdfmake/build/pdfmake.js?url';
+import helveticaUrl from 'pdfmake/build/standard-fonts/Helvetica.js?url';
+import robotoUrl from 'pdfmake/build/fonts/Roboto.js?url';
+import courierUrl from 'pdfmake/build/standard-fonts/Courier.js?url';
 
 export interface PdfMakeLike {
   createPdf(def: unknown, options?: unknown): {
@@ -36,14 +41,35 @@ let loaded: Promise<PdfMakeLike> | null = null;
  * A fresh pdfmake instance with the fonts and the named table layouts registered. `patch: false` gives stock pdfmake
  * (for comparison in the tests); the export uses `loadPdfMake()`, which keeps one patched instance.
  */
+/**
+ * pdfmake and its three font files. In the built application they are plain files fetched by URL (WP-18, FE-031): the export runs on the
+ * page or in the PDF worker, and Vite builds the worker as a graph of its own, so `import()` of them gave every file twice (2.75 MB); a URL
+ * asset is the same file for both. The unit tests (Node, MODE "test") import them as before; that branch is removed from the build.
+ */
+async function pdfmakeFiles(): Promise<[string, unknown, unknown, unknown]> {
+  if (import.meta.env.MODE === 'test') {
+    const [{ default: rawSource }, helvetica, roboto, courier] = await Promise.all([
+      // the unminified bundle as text: it is patched and evaluated here (see pdfmake-patch.ts)
+      import('pdfmake/build/pdfmake.js?raw'),
+      import('pdfmake/build/standard-fonts/Helvetica.js'),
+      import('pdfmake/build/fonts/Roboto.js'),
+      import('pdfmake/build/standard-fonts/Courier.js'),
+    ]);
+    return [rawSource, helvetica, roboto, courier];
+  }
+  const text = async (url: string) => {
+    const r = await fetch(new URL(url, self.location.href), { credentials: 'same-origin' });
+    if (!r.ok) throw new Error(`Could not load ${url} (${r.status})`);
+    return r.text();
+  };
+  const [rawSource, ...fonts] = await Promise.all([pdfmakeUrl, helveticaUrl, robotoUrl, courierUrl].map(text));
+  // each font file is a small CommonJS module (`module.exports = fontContainer`): evaluated the way the pdfmake bundle is
+  const [helvetica, roboto, courier] = fonts.map((src) => instantiatePdfmake(src));
+  return [rawSource, helvetica, roboto, courier];
+}
+
 export async function createPdfMake(patch = true): Promise<PdfMakeLike> {
-  const [{ default: rawSource }, helvetica, roboto, courier] = await Promise.all([
-    // the unminified bundle as text: it is patched and evaluated here (see pdfmake-patch.ts)
-    import('pdfmake/build/pdfmake.js?raw'),
-    import('pdfmake/build/standard-fonts/Helvetica.js'),
-    import('pdfmake/build/fonts/Roboto.js'),
-    import('pdfmake/build/standard-fonts/Courier.js'),
-  ]);
+  const [rawSource, helvetica, roboto, courier] = await pdfmakeFiles();
   const patched = patch ? patchPdfmakeSource(rawSource, JUSTIFY.shrink) : { source: rawSource, applied: [] as PatchId[], missing: [] as PatchId[] };
   const pdfMake = instantiatePdfmake(patched.source) as PdfMakeLike;
   pdfMake.patches = { applied: patched.applied, missing: patched.missing };

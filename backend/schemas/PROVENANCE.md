@@ -144,8 +144,20 @@ them as *not schema-checked*, never as valid (`test/scorm-validation.test.js`). 
 were wrong and are corrected in the compliance matrix. The official IEEE LTSC address (`http://ltsc.ieee.org/xsd/lomv1.0/lom.xsd`) redirects to a login-gated
 document site and returns HTML, not a schema; **no substitute was downloaded or written**, because a schema of unknown origin would make the provenance worse, not
 better. To close the gap, supply the toolkit's own `lom_schema` folder (the exact files the toolkit's SCORM schema was built against): place it at
-`backend/schemas/lom_schema/` and `frontend/public/schemas/lom_schema/`, then `test/scorm-validation.test.js` fails on purpose and the matrix row can be
+`backend/schemas/lom_schema/` (since WP-18 the Studio reads 4.2 / 5.0 / 6.0 from here too; 4.1 would also need `frontend/public/schemas/lom_schema/`), then `test/scorm-validation.test.js` fails on purpose and the matrix row can be
 upgraded. The Studio's SCORM editing therefore has grammar-level evidence only (compiled grammar), not XSD evidence.
 
 The frontend copies (`frontend/public/schemas/<issue>/`) of the four 4.2/5.0/6.0 schemas were added in Phase 17 (byte-identical to these) so the Studio
 grammars (`frontend/public/grammar/`, built with `frontend/scripts/build-grammar.mjs`) cover them.
+
+## One copy for the browser and the server (WP-18, audit FE-032, 2026-11-27)
+
+The Studio's in-browser check used its own copies in `frontend/public/schemas/{4-2,5-0,6,7}` (31 MB). They equalled `4.2/`, `5.0/`, `6.0/` and
+`7.0/` here apart from line endings and the `xml-stylesheet` processing instruction at the top of `xml.xsd` (checked with
+`diff -rq --strip-trailing-cr` before removal; this tree also holds `xcf.xsd` and the entity folders the Studio copy lacked). They were removed:
+the backend serves these four sets at `/schemas/4-2/`, `/schemas/5-0/`, `/schemas/6/` and `/schemas/7/` (`services/delivery.ts`
+`STUDIO_SCHEMA_SETS`, the Vite dev server proxies the same paths), so the browser and the server validate against the same files, and the
+Studio tests and `frontend/scripts/build-grammar.mjs` read them from here. Two folders stay in the client because their content differs and
+choosing one is a validation decision, not a size one: `frontend/public/schemas/4-1` (its `brex.xsd` and `process.xsd` differ from `4.1/`) and
+`frontend/public/schemas/ent` (its `ISOEntities` header and `iso-pub.ent` `rdquor` differ from `4.2/ent`). `test/wp18-delivery.test.js` fails if the
+removed folders come back or if the route stops serving this tree's bytes.

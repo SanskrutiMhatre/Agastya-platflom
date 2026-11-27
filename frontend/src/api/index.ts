@@ -92,7 +92,8 @@ export const authApi = {
   setup: (b: { username: string; password: string; fullName: string }) => post<{ user: User; gates: Gates }>('/api/auth/setup', b, { quiet401: true }),
   login: (username: string, password: string) => post<{ user: User; gates: Gates }>('/api/auth/login', { username, password }, { quiet401: true }),
   logout: () => post('/api/auth/logout'),
-  me: () => get<{ user: User; gates: Gates; pendingInvitations: number; adminQueues?: AdminQueues }>('/api/auth/me', { quiet401: true }),
+  /** `ttl`: an answer this recent is enough (the refresh on navigation, WP-18); any write since clears it. */
+  me: (o?: { ttl?: number }) => get<{ user: User; gates: Gates; pendingInvitations: number; adminQueues?: AdminQueues }>('/api/auth/me', { quiet401: true, ttl: o?.ttl }),
   onboarding: (b: { username: string; password: string }) => post<{ user: User }>('/api/auth/onboarding', b),
   changePassword: (currentPassword: string, newPassword: string) => post('/api/auth/change-password', { currentPassword, newPassword }),
   forgot: (username: string) => post('/api/auth/forgot', { username }, { quiet401: true }),
@@ -215,7 +216,7 @@ export interface Notice { id: number; kind: string; title: string; body: string 
 export interface Inbox { unread: number; items: Notice[] }
 export const notifyApi = {
   list: () => get<Inbox>('/api/notifications'),
-  unread: () => get<{ unread: number }>('/api/notifications/unread-count', { background: true }).then((r) => r.unread),
+  unread: (o?: { ttl?: number }) => get<{ unread: number }>('/api/notifications/unread-count', { background: true, ttl: o?.ttl }).then((r) => r.unread),
   markRead: (ids?: number[]) => post<Inbox>('/api/notifications/read', ids ? { ids } : {}),
 };
 export const BACKUP_URL = '/api/backup';

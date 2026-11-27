@@ -4,6 +4,7 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { schemaDir } from './schemaDir';
 import { spawnSync } from 'node:child_process';
 import { validateXsd, type XmllintRunner, type SchemaLoader } from '../validation/xsd';
 
@@ -19,7 +20,7 @@ const runner: XmllintRunner = async (run) => {
   return { exitCode: r.status ?? 1, stdout: r.stdout, stderr: r.stderr };
 };
 const loader: SchemaLoader = async (issue, file) => {
-  try { return fs.readFileSync(path.join(PUB, 'schemas', issue, file), 'utf8'); } catch { return null; }
+  try { return fs.readFileSync(path.join(schemaDir(issue), file), 'utf8'); } catch { return null; }
 };
 
 const withEntities = (url: string, body = '&deg; &plusmn;') =>

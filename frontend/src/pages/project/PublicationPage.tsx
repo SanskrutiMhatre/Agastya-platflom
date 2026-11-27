@@ -21,6 +21,7 @@ import { pmcApi, poolToEntry } from '../../api/pmc';
 import { refusalOf, type Refusal } from '../../lib/waivers';
 import { PublishWaivers } from './PublishWaivers';
 import { useUi } from '../../store/ui';
+import { MoreRows, useProgressive } from '../../components/windowing';
 
 const keyOf = (p: Path) => p.join('.');
 const pathOf = (k: string) => k.split('.').map(Number);
@@ -80,6 +81,7 @@ export function PublicationPage() {
     return files;
   }, [entries, byFile, byCode]);
   const pool = useMemo(() => dms.filter((d) => !placed.has(d.file)).filter((d) => !q || `${d.techName} ${d.infoName} ${d.dmc} ${d.file}`.toLowerCase().includes(q.toLowerCase())), [dms, placed, q]);
+  const poolDrawn = useProgressive(pool.length, q);       // WP-18 (FE-030): a large pool draws its first rows, more on scroll
   const counts = useMemo(() => countOf(entries), [entries]);
   const missing = useMemo(() => { let n = 0; (function walk(list: PmEntry[]) { for (const e of list) { if (e.type === 'folder') walk(e.children ?? []); else if (!describe(e, byFile, byCode).found) n++; } })(entries); return n; }, [entries, byFile, byCode]);
 
@@ -252,12 +254,13 @@ export function PublicationPage() {
             <div style={{ padding: '10px 12px 4px' }}><input className="v2-input" placeholder="Search data modules…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search data modules not placed" /></div>
             {writable ? <div className="v2-hint" style={{ padding: '2px 14px 8px' }}>Adding to: <strong>{selected && getAt(entries, pathOf(selected))?.type === 'folder' ? (getAt(entries, pathOf(selected)) as { title: string }).title : 'select a chapter first'}</strong></div> : null}
             <div className="v2-pool">
-              {pool.length === 0 ? <div className="v2-hint" style={{ padding: 14 }}>{dms.length - placed.size === 0 ? 'Every data module is in the publication.' : 'No data module matches.'}</div> : pool.map((d) => (
+              {pool.length === 0 ? <div className="v2-hint" style={{ padding: 14 }}>{dms.length - placed.size === 0 ? 'Every data module is in the publication.' : 'No data module matches.'}</div> : pool.slice(0, poolDrawn.limit).map((d) => (
                 <div key={d.file} className="v2-pool-item" draggable={writable} data-testid="pool-item" onDragStart={(ev) => { ev.dataTransfer.effectAllowed = 'copy'; setDrag({ from: null, pool: d, over: null, where: null }); }} onDragEnd={() => setDrag(null)}>
                   <div style={{ minWidth: 0, flex: 1 }}><div className="v2-mod-title">{d.techName || d.file}</div><div className="v2-hint v2-trunc">{d.infoName}</div><div className="v2-mono v2-hint">{d.dmc}</div></div>
                   {writable ? <button className="btn btn-sm" onClick={() => addModule(d)} aria-label={`Add ${d.techName || d.file} to the selected chapter`}><Icon name="plus" size={13} />Add</button> : null}
                 </div>
               ))}
+              <MoreRows shown={poolDrawn.limit} total={pool.length} onMore={poolDrawn.more} onAll={poolDrawn.all} />
             </div>
           </div>
 

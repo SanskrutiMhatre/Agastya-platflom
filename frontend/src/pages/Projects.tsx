@@ -8,6 +8,7 @@ import { SampleButton } from '../components/SampleButton';
 import { CreateProjectModal, RoleBadge, formatLabel } from '../components/project';
 import { Alert, Badge, Empty, Loading, PromptModal, ago, useAsync } from '../components/ui';
 import { useUi } from '../store/ui';
+import { MoreRows, useProgressive } from '../components/windowing';
 
 type Sort = 'recent' | 'name' | 'dms';
 
@@ -30,6 +31,7 @@ export function Projects() {
       : sort === 'dms' ? b.dmCount - a.dmCount
         : String(b.lastOpened ?? b.updatedAt).localeCompare(String(a.lastOpened ?? a.updatedAt)));
   }, [list.data, q, sort]);
+  const shown = useProgressive(rows.length, `${q}|${sort}`);      // WP-18 (FE-030): a long list draws its first rows, more on scroll
 
   if (list.loading && !list.data) return <Loading />;
   if (list.error) return <div className="v2-page"><Alert tone="bad">{list.error}</Alert></div>;
@@ -56,7 +58,7 @@ export function Projects() {
           <table className="v2-table">
             <thead><tr><th>Name</th>{overseer ? <th>Status</th> : null}<th>Folder</th>{role === 'admin' ? <th>Owner</th> : <th>Your role</th>}<th>Data modules</th><th>Engine</th><th>Last opened</th><th /></tr></thead>
             <tbody>
-              {rows.map((p) => (
+              {rows.slice(0, shown.limit).map((p) => (
                 <tr key={p.id} className="clickable" onClick={() => open(p.id)} data-testid="project-row">
                   <td><strong>{p.name}</strong>{p.hasPdf ? <> <Badge tone="ok">PDF built</Badge></> : null}{p.missingSince ? <> <Badge tone="bad">Folder missing</Badge></> : null}</td>
                   {overseer ? <td>{status.data?.get(p.id) ? <StatusBadge status={status.data.get(p.id)!.status} stale={status.data.get(p.id)!.changedSinceRelease} /> : null}</td> : null}
@@ -70,6 +72,7 @@ export function Projects() {
                   </td>
                 </tr>
               ))}
+              <MoreRows as="tr" colSpan={8} shown={shown.limit} total={rows.length} onMore={shown.more} onAll={shown.all} />
             </tbody>
           </table>
         )}

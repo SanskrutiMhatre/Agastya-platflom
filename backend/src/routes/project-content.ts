@@ -19,6 +19,7 @@ import { nowIso, vendor } from '../config';
 import { requireProject, requireAdmin, store, audit, projectDirFor, workspaceDir, docIndex, authz, securityPolicy } from '../context';
 import { headOf, rootStart } from '../services/xmlHead';
 import { wrap, param, bad, notFound, forbidden, conflict, HttpError } from '../services/http';
+import { pageRequest, searchText, windowOf } from '../services/paging';
 import { getConfig, getConfigRow, newDmProblems } from '../services/projectConfig';
 import { ISSUE_LABEL } from '../services/s1000dRef';
 import * as csdb from '../services/csdb';
@@ -63,10 +64,23 @@ export function registerProjectContentRoutes(app: Express): void {
   const log = (req: any, action: string, meta?: unknown) => audit({ actorId: req.auth.user.id, actorUsername: req.auth.user.username, action, projectId: req.project.id, targetType: 'project', targetId: req.project.id, meta });
 
   // ── Data modules (the Editor) ───────────────────────────────────────────
+  // WP-18 (PERF-016, FE-030): `?limit=&offset=` return one window plus the total, `q` narrows by file name, code or title on the server, and
+  // `fields=list` sends the slim row a list shows (no identity attribute maps). Without them: every module, every field, exactly as before.
   app.get(`${base}/dms`, view('viewer'), wrap((req, res) => {
+    const want = pageRequest(req); const q = searchText(req);
+    const slim = req.query.fields === 'list';
     const locked = new Set<string>(store.listLockedPaths(req.project.id));
     const pj = readProjectJson(req.project.id);
-    res.json({ dms: csdb.listDms(req.project.id).map((d) => ({ ...d, locked: locked.has(`${csdbRel(pj)}/${d.file}`) })) });
+    let all = csdb.listDms(req.project.id);
+    if (q) all = all.filter((d) => [d.file, d.dmc, d.techName, d.infoName, d.title].some((v) => typeof v === 'string' && v.toLowerCase().includes(q)));
+    const w = want ? windowOf(all, want) : null;
+    const rows = (w ? w.items : all).map((d) => {
+      const isLocked = locked.has(`${csdbRel(pj)}/${d.file}`);
+      if (!slim) return { ...d, locked: isLocked };
+      return { file: d.file, dmc: d.dmc, techName: d.techName, infoName: d.infoName, title: d.title, issueNumber: d.issueNumber, inWork: d.inWork,
+        language: d.language, issue: d.issue, security: d.security, size: d.size, modified: d.modified, locked: isLocked };
+    });
+    res.json(w ? { dms: rows, ...w.page } : { dms: rows });
   }));
 
   app.get(`${base}/dms/:file`, view('viewer'), wrap((req, res) => { res.json(csdb.readDm(req.project.id, param(req, 'file'))); }));

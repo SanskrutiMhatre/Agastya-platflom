@@ -23,7 +23,7 @@ export function oversightFor(user: Actor) {
 
   const projects = ids.map((id) => {
     const pj = readProjectJson(id);
-    const st = releaseStateOf(id);
+    const st = releaseStateOf(id, { reuse: true });            // display only (WP-18): unchanged files keep their digest
     const status: ReleaseStatus = st.released ? 'released' : st.pending ? 'pending' : 'unreleased';
     const a = byId.get(id);
     return {
