@@ -62,13 +62,25 @@ gate('G-SEC-11a', 'the executables and the installer carry a valid Authenticode 
   }
   return { status: bad.length ? 'FAIL' : 'PASS', detail: bad.join('; ') || `${exes.length} signed` };
 });
-gate('G-SEC-11b', 'the Node runtime the product ships has at least 6 months of support left', () => {
+gate('G-SEC-11b', 'the Node runtime the product ships has at least 12 months of support left', () => {
+  // WP-13 (ENT-008): what is checked is the runtime the product SHIPS - the one recorded in release/BUILD-INFO.json when a release is present,
+  // otherwise the pin in packaging/product.json - not the Node that happens to run this script.
   // Node release schedule (nodejs.org/about/releases, as known on 2026-11-27): even majors are LTS for 30 months after their April release.
   const EOL = { 20: '2026-04-30', 22: '2027-04-30', 24: '2028-04-30', 26: '2029-04-30' };
-  const major = Number(process.versions.node.split('.')[0]);
-  if (!EOL[major]) return { status: 'FAIL', detail: `Node ${process.version} is not an LTS line this script knows` };
+  const product = JSON.parse(fs.readFileSync(path.join(ROOT, 'packaging', 'product.json'), 'utf8'));
+  const pinned = product.runtime?.node;
+  const buildInfo = path.join(RELEASE, 'BUILD-INFO.json');
+  const shipped = fs.existsSync(buildInfo) ? String(JSON.parse(fs.readFileSync(buildInfo, 'utf8')).node || '').replace(/^v/, '') : null;
+  const ver = shipped || pinned;
+  if (!ver) return { status: 'FAIL', detail: 'packaging/product.json has no runtime.node pin' };
+  const major = Number(ver.split('.')[0]);
+  if (!EOL[major]) return { status: 'FAIL', detail: `Node ${ver} is not an LTS line this script knows` };
+  const min = product.runtime?.minSupportMonths ?? 12;
   const months = (new Date(EOL[major]) - new Date()) / (30.44 * 864e5);
-  return { status: months >= 6 ? 'PASS' : 'FAIL', detail: `Node ${process.version}: end of life ${EOL[major]}, ${months.toFixed(1)} months left (the product requires Node 22, scripts/package-windows.mjs)` };
+  const notes = [`Node ${ver} (${shipped ? 'release/BUILD-INFO.json' : 'pin in packaging/product.json'}): end of life ${EOL[major]}, ${months.toFixed(1)} months left`];
+  if (shipped && pinned && shipped !== pinned) notes.push(`the release was built with ${shipped}, the pin is ${pinned}`);
+  const bad = months < min || (shipped && pinned && Number(shipped.split('.')[0]) !== Number(pinned.split('.')[0]));
+  return { status: bad ? 'FAIL' : 'PASS', detail: notes.join('; ') };
 });
 gate('RES-005', 'a software bill of materials is shipped with the release', () => {
   const sbom = fs.existsSync(RELEASE) ? fs.readdirSync(RELEASE).filter((n) => /sbom|\.cdx\.json$|\.spdx(\.json)?$/i.test(n)) : [];

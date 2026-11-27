@@ -6,7 +6,7 @@
 // queryable INDEX over it: the project registry (name, type, template, dates)
 // plus, from Phase 2, a file index (path, kind, chapter).
 //
-// Uses node:sqlite (built into Node 24) — no native compile step, which keeps
+// Uses node:sqlite (built into Node; the product ships Node 24 LTS, pinned in packaging/product.json - WP-13) - no native compile step, which keeps
 // the app trivially distributable.
 
 const path = require('path');

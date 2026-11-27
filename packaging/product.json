@@ -9,5 +9,13 @@
   "defaultPort": 4040,
   "defaultServiceName": "AgastyaPlatform",
   "firewallRuleName": "Agastya Platform (LAN access)",
+  "runtime": {
+    "node": "24.22.3",
+    "nodeEndOfLife": "2028-04-30",
+    "nodeZipSha256": "e612af99f626ab415ea225af6bce5c971feb448cb5cae250bb1c3fa50c5f7d9f",
+    "nodeSource": "https://nodejs.org/dist/v24.22.3/node-v24.22.3-win-x64.zip",
+    "minSupportMonths": 12,
+    "notes": "WP-13 (ENT-008, DEP-018): the Node.js runtime the installer ships. Node 24 is the LTS line (security support to 2028-04-30). scripts/package-windows.mjs refuses any other major, a patch older than this pin, and a runtime with less than minSupportMonths of support left; scripts/ci/readiness.mjs (G-SEC-11b) applies the same rule. Patch cadence: docs/BUNDLED-COMPONENTS.md."
+  },
   "notes": "publisher, copyright and url are shown in Add/Remove Programs, the installer and the executables' Properties > Details. They are placeholders: set them to the organisation that distributes the product (an empty copyright becomes 'Copyright (C) <year> <publisher>'). appId must never change once an installer has been released (it is how upgrades find the installed copy)."
 }

@@ -35,9 +35,12 @@ import { registerXengineRoutes } from './routes/xengine';
 import { registerWaiverRoutes } from './routes/waivers';
 import { registerBrandRoutes } from './routes/brand';
 import { notifyAccess } from './services/access-notify';
+import { API_VERSION, MIN_CLIENT_VERSION, buildInfo, schemaLevel } from './services/version';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { registerAuthRoutes } = require('./core/auth/routes');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { MIGRATIONS } = require('./core/auth/store');
 
 export function createApp(): express.Express {
   // S1000D reference catalogues, SNS presets, carry-over of the retired flat tables, and a configuration for every existing project (idempotent).
@@ -66,7 +69,16 @@ export function createApp(): express.Express {
   });
 
   app.get('/api/health', publicRoute('Liveness probe: reveals only that the server is up.'),
-    (_req, res) => { res.json({ status: 'ok', version: '2.0.0', time: nowIso() }); });
+    (_req, res) => { res.json({ status: 'ok', version: buildInfo().version, time: nowIso() }); });
+  // Version identity (WP-13, DEP-004): read by the installer's verification and by a client before it signs in (compatibility handshake).
+  app.get('/api/version', publicRoute('Version handshake: product version, API level and database schema level; no user data.'), (_req, res) => {
+    const b = buildInfo(); const schema = schemaLevel(store.db, MIGRATIONS);
+    res.json({
+      product: 'Agastya Platform', version: b.version, apiVersion: API_VERSION, minClientVersion: MIN_CLIENT_VERSION,
+      schema: { level: schema.level, latest: schema.latest, applied: schema.applied, compatible: schema.unknown.length === 0 },
+      build: { commit: b.commit, builtAt: b.builtAt, packaged: b.packaged },
+    });
+  });
 
   registerAuthRoutes({
     app, store, sessionsSvc, authz, audit, limiter, nowIso, projectDirFor, docIndex,
