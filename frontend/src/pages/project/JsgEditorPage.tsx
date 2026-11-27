@@ -122,7 +122,7 @@ export function JsgEditorPage() {
   }, [id]);
 
   return (<>
-    <DocEditorShell kind="jsg" shortcuts={loaded && parseKind(loaded.xml) === 'ispl' ? 'jsg-ispl' : 'jsg'} layout={layout} title={summary.project.name} hostRef={hostRef} loaded={!!loaded} find={false} readOnly={!writable}
+    <DocEditorShell kind="jsg" projectId={id} can={can} shortcuts={loaded && parseKind(loaded.xml) === 'ispl' ? 'jsg-ispl' : 'jsg'} layout={layout} title={summary.project.name} hostRef={hostRef} loaded={!!loaded} find={false} readOnly={!writable}
       crumb={loaded ? <span className="v2-badge accent" title={`JSG document type ${loaded.docType}, from the stencil ${loaded.stencil}`}>JSG · {loaded.label}</span> : null}
       saveState={host.saveState} guard={host.guard} banners={host.banners(recover)}
       actions={<>

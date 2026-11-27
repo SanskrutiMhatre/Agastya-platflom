@@ -16,7 +16,7 @@ import { resolveFormat, type ResolvedFormat } from './formats';
 import fs from 'fs';
 import path from 'path';
 import { config, nowIso, vendor } from '../config';
-import { store, registryDb, workspace, projectDirFor, workspaceDir, docIndex, audit, authz } from '../context';
+import { store, registryDb, workspace, projectDirFor, workspaceDir, docIndex, audit, authz, content, repos } from '../context';
 import { documentCreator } from './documentCreators';
 import { bad, conflict, forbidden, notFound } from './http';
 import { removeReleasingRenderer } from './renderer';
@@ -60,7 +60,7 @@ export interface ProjectCard {
   autoAddToPublication: boolean;
   /** Page furniture of S1000D publications: rotated side text in the left margin, and the default header logo. On by default. */
   sideText: { enabled: boolean; publisher: string; draftNote: boolean }; headerLogo: boolean; publisherLogo: boolean;
-  folder: string; status: string; role: string; accessVia: 'project' | 'folder' | 'admin';
+  folder: string; status: string; role: string; accessVia: 'project' | 'folder' | 'admin' | 'group' | 'auditor';
   /** WP-13 (FE-019): what the caller may do here, computed from the route guards (services/permissions.ts). */
   can: Record<string, boolean>;
   dmCount: number; hasPdf: boolean; createdAt: string; updatedAt: string; lastOpened: string | null;
@@ -75,8 +75,12 @@ function countDms(id: string, pj: any): number {
   } catch { return 0; }
 }
 
-export function projectCard(row: any, role: string, via: ProjectCard['accessVia']): ProjectCard {
+/** WP-27: the person a card is for, when their capability rules and the auditor flag must shape its `can` map. */
+export interface CardViewer { id: string; role: string; auditor?: boolean }
+
+export function projectCard(row: any, role: string, via: ProjectCard['accessVia'], viewer?: CardViewer): ProjectCard {
   const pj = readProjectJson(row.id);
+  const canOpts = viewer ? { readOnly: !!viewer.auditor && viewer.role !== 'admin', rules: authz.rulesFor(viewer, row.id) } : {};
   return {
     id: row.id,
     name: pj.name || row.name || row.id,
@@ -94,7 +98,7 @@ export function projectCard(row: any, role: string, via: ProjectCard['accessVia'
     jssDocType: pj.authoring === 'jss-xml' ? (pj.jssDocType ?? null) : null,
     folder: String(pj.group || '').trim(),
     status: row.status || 'active',
-    role, accessVia: via, can: canFor(role, row.status || 'active'),
+    role, accessVia: via, can: canFor(role, row.status || 'active', canOpts),
     dmCount: countDms(row.id, pj),
     hasPdf: fs.existsSync(path.join(projectDirFor(row.id), 'jss-output.pdf')),
     createdAt: row.created_at, updatedAt: row.updated_at, lastOpened: row.last_opened || null,
@@ -104,13 +108,31 @@ export function projectCard(row: any, role: string, via: ProjectCard['accessVia'
 }
 
 /** Every project this user may open - administrators see all of them. */
-export function listProjectsFor(user: User): ProjectCard[] {
+export function listProjectsFor(user: User & { auditor?: boolean }): ProjectCard[] {
   if (user.role === 'admin') {
     return store.listAllProjects().map((r: any) => projectCard(r, 'owner', 'admin'));
   }
-  return store.listProjectsForUser(user.id)
+  // WP-27: a read-only auditor sees every active project (CIR aside, as for everyone), as a viewer.
+  if (user.auditor) {
+    return (store.listAllProjects() as Array<{ id: string; status?: string; type?: string }>).filter((r) => (r.status || 'active') === 'active' && r.type !== 'CIR')
+      .map((r) => projectCard(r, 'viewer', 'auditor', user));
+  }
+  const cards: ProjectCard[] = store.listProjectsForUser(user.id)
     .filter((r: any) => (r.status || 'active') === 'active')
-    .map((r: any) => projectCard(r, r.member_role, r.access_via === 'folder' ? 'folder' : 'project'));
+    .map((r: any) => projectCard(r, r.member_role, r.access_via === 'folder' ? 'folder' : 'project', user));
+  // WP-27: projects reached through a group grant; a group can raise the role held by name or by folder, never lower it.
+  const RANK: Record<string, number> = { viewer: 1, reviewer: 2, editor: 3, manager: 4, owner: 5 };
+  const byId = new Map(cards.map((c) => [c.id, c]));
+  for (const g of repos.access.projectsGrantedToUser(user.id)) {
+    const had = byId.get(g.project_id);
+    if (had && (RANK[had.role] || 0) >= (RANK[g.role] || 0)) continue;
+    const row = store.getProjectRow(g.project_id);
+    if (!row || (row.status || 'active') !== 'active' || row.type === 'CIR') continue;
+    const card = projectCard(row, g.role, 'group', user);
+    if (had) cards.splice(cards.indexOf(had), 1, card); else cards.push(card);
+    byId.set(card.id, card);
+  }
+  return cards;
 }
 
 // ── Create / copy / rename / delete ───────────────────────────────────────
@@ -212,7 +234,7 @@ export async function createProject(user: User, input: CreateProjectInput): Prom
   } else if (!fromId && fmt?.jsgType) {
     // a JSG document is authored as JSG XML (services/jsg), in its own file: no S1000D publication module
     documentCreator('jsg')(id, fmt.jsgType, { projectName: name.toUpperCase() });
-  } else if (!fromId && !fs.existsSync(pmFile)) fs.writeFileSync(pmFile, EMPTY_PM(name, profile ? chapterEntries(profile) : ''), 'utf8');
+  } else if (!fromId && !fs.existsSync(pmFile)) content.writeText(id, pmFile, EMPTY_PM(name, profile ? chapterEntries(profile) : ''));
   if (!fromId && cfgPatch?.mic && fs.existsSync(pmFile)) {
     // the publication module's own code: model code - issuer (the responsible partner) - number - volume, and the language and partner it names
     const rpcCode = String(cfgPatch.responsiblePartner?.code ?? '').toUpperCase(); const rpcName = String(cfgPatch.responsiblePartner?.name ?? '');
@@ -220,7 +242,7 @@ export async function createProject(user: User, input: CreateProjectInput): Prom
     pm = pm.replace('modelIdentCode="MODEL" pmIssuer="00000" pmNumber="00000"', `modelIdentCode="${String(cfgPatch.mic).toUpperCase()}" pmIssuer="${rpcCode || '00000'}" pmNumber="00001"`)
       .replace('<language countryIsoCode="IN" languageIsoCode="en"/>', `<language countryIsoCode="${String(cfgPatch.country ?? 'IN').toUpperCase()}" languageIsoCode="${String(cfgPatch.language ?? 'en').toLowerCase()}"/>`)
       .replace('<responsiblePartnerCompany enterpriseCode="00000"/>', rpcCode ? `<responsiblePartnerCompany enterpriseCode="${rpcCode}">${rpcName ? `<enterpriseName>${rpcName.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</enterpriseName>` : ''}</responsiblePartnerCompany>` : '<responsiblePartnerCompany enterpriseCode="00000"/>');
-    fs.writeFileSync(pmFile, pm, 'utf8');
+    content.writeText(id, pmFile, pm);
   }
   for (const sub of ['csdb', 'Media']) fs.mkdirSync(path.join(dir, sub), { recursive: true });
 
@@ -252,7 +274,7 @@ export async function createProject(user: User, input: CreateProjectInput): Prom
   } catch (e) {
     // roll the half-made project back: its folder first (it needs no database), then its registry row and configuration
     try { workspace.deleteProject(workspaceDir, id); } catch { /* best effort */ }
-    try { registryDb.deleteProject(id); store.clearProjectGovernance(id); PC.deleteProjectConfig(id); } catch { /* best effort */ }
+    try { registryDb.deleteProject(id); store.clearProjectGovernance(id); repos.access.deleteProjectAccess(id); PC.deleteProjectConfig(id); } catch { /* best effort */ }
     throw e;
   }
   await docIndex.syncProject(id, dir, now);
@@ -316,7 +338,7 @@ export function deleteProject(user: User, id: string): void {
   // the audit log keeps the record of what happened.
   const purged = store.purgeProjectContent(id, { name: row.name, by: user.id, now: nowIso() });
   registryDb.deleteProject(id);
-  store.clearProjectGovernance(id);
+  store.clearProjectGovernance(id); repos.access.deleteProjectAccess(id);   // WP-27: group grants and capability rules go with the project
   PC.deleteProjectConfig(id);
   audit({ actorId: user.id, actorUsername: user.username, action: 'project.deleted', projectId: id, targetType: 'project', targetId: id, meta: { name: row.name, purged } });
 }
@@ -342,7 +364,7 @@ export function discardProject(id: string, reason: string): void {
   const name = store.getProjectRow(id)?.name ?? id;
   store.purgeProjectContent(id, { name, by: null, now: nowIso() });
   registryDb.deleteProject(id);
-  store.clearProjectGovernance(id);
+  store.clearProjectGovernance(id); repos.access.deleteProjectAccess(id);   // WP-27: group grants and capability rules go with the project
   try { PC.deleteProjectConfig(id); } catch { /* none */ }
   audit({ actorId: null, actorUsername: 'system', action: 'project.import_discarded', projectId: id, targetType: 'project', targetId: id, meta: { name, reason } });
 }

@@ -23,7 +23,7 @@ import path from 'path';
 import { pipeline } from 'stream/promises';
 import type { Writable } from 'stream';
 import { nowIso } from '../config';
-import { docIndex, projectDirFor, registryDb, workspace, workspaceDir } from '../context';
+import { docIndex, projectDirFor, registryDb, workspace, workspaceDir, content } from '../context';
 import { bad } from './http';
 import { createProject, fillImported, readProjectJson, unsafeInputFields, cleanInput, type User } from './projects';
 import { restoreSettings, settingsOf } from './packageSettings';
@@ -183,7 +183,7 @@ export async function restoreProjectArchive(user: User, zipPath: string, opts: {
         if (input && Object.keys(input).length) merged.input = input; else delete merged.input;
         findings.push({ severity: 'warning', message: `The archive's project file pointed outside the project (${dropped.join(', ')}); those locations were ignored and the standard folders are used.` });
       }
-      fs.writeFileSync(path.join(dir, 'project.json'), JSON.stringify(merged, null, 2), 'utf8');
+      content.writeText(id, 'project.json', JSON.stringify(merged, null, 2));
       registryDb.upsertProject({ id, name: merged.name, type: merged.type, template: merged.templateRef, now });
 
       // 4. the house style and the brand pack: written only when this workspace has none of that name (the workspace's own is never replaced)

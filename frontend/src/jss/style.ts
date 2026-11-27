@@ -142,7 +142,7 @@ export const JSS_CSS = `
 .jss-flash { animation: jss-flash 1.6s ease-out; }
 @keyframes jss-flash { 0% { background: var(--paper-flash); } 100% { background: transparent; } }
 
-.jss-problems { flex: none; border-top: 1px solid var(--border); background: var(--bg-elev); max-height: 190px; overflow: auto; }
+.jss-problems { flex: none; border-top: 1px solid var(--border); background: var(--bg-elev); max-height: min(190px, 25vh); overflow: auto; }   /* WP-22: a drawer of at most 25% height; Escape closes it */
 .jss-problems summary { padding: 6px 12px; cursor: pointer; font-weight: 600; user-select: none; position: sticky; top: 0; background: var(--bg-elev); }
 .jss-pr { display: flex; gap: 8px; padding: 4px 12px; cursor: pointer; align-items: baseline; }
 .jss-pr:hover { background: var(--bg-hover); }

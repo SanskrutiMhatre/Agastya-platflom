@@ -942,7 +942,7 @@ test.describe('roles: administrator -> Project Manager -> Author', () => {
     expect((await mgr.request.post(`/api/projects/${id}/assign`, { data: { username: 'arjun', role: 'editor' } })).ok()).toBe(true);
     expect((await mgr.request.post(`/api/projects/${id}/dms`, { data: { file: DESC, xml } })).ok()).toBe(true);
     const pmc = await (await mgr.request.get(`/api/projects/${id}/pmc`)).json();
-    expect((await mgr.request.put(`/api/projects/${id}/pmc`, { data: { meta: pmc.meta, entries: [{ type: 'folder', title: 'Chapter 1', children: [{ type: 'include', title: 'Pump', href: `csdb/${DESC}` }] }] } })).ok()).toBe(true);
+    expect((await mgr.request.put(`/api/projects/${id}/pmc`, { data: { baseHash: pmc.hash, meta: pmc.meta, entries: [{ type: 'folder', title: 'Chapter 1', children: [{ type: 'include', title: 'Pump', href: `csdb/${DESC}` }] }] } })).ok()).toBe(true);
 
     await auth.goto(`/projects/${id}/release`);
     await expect(auth.getByTestId('review-status')).toHaveAttribute('data-state', 'draft');

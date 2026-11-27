@@ -150,14 +150,27 @@ class AuthStore {
   anyAdminExists() { return this.countAdmins() > 0; }
 
   updateUser(id, fields, now) {
-    const allowed = ['full_name', 'role', 'password_hash', 'must_change_password', 'onboarding_pending', 'username_locked', 'disabled_at', 'active_project_id', 'username'];
+    const allowed = ['full_name', 'role', 'password_hash', 'must_change_password', 'onboarding_pending', 'username_locked', 'disabled_at', 'active_project_id', 'username',
+      // WP-27 (migration 024): directory link, why an account is disabled, the read-only auditor flag
+      'auth_source', 'external_id', 'directory_dn', 'directory_checked_at', 'disabled_reason', 'auditor'];
     const keys = Object.keys(fields).filter((k) => allowed.includes(k));
     if (!keys.length) return this.getUser(id);
     const sets = keys.map((k) => `${k} = ?`).join(', ');
     this.stmt(`UPDATE users SET ${sets}, updated_at = ? WHERE id = ?`)
       .run(...keys.map((k) => fields[k]), now, id);
-    if (keys.includes('disabled_at') || keys.includes('role')) this.emitAccessChanged(id);
+    if (keys.includes('disabled_at') || keys.includes('role') || keys.includes('auditor')) this.emitAccessChanged(id);
     return this.getUser(id);
+  }
+
+  /** WP-27: the accounts that sign in against the directory (the sync job checks each of them). */
+  listDirectoryUsers() {
+    return this.stmt("SELECT * FROM users WHERE auth_source = 'directory' ORDER BY username").all();
+  }
+
+  /** WP-27: the account a directory entry was provisioned as (by its stable id), or null. */
+  findUserByExternalId(externalId) {
+    if (!externalId) return null;
+    return this.stmt("SELECT * FROM users WHERE auth_source = 'directory' AND external_id = ?").get(String(externalId)) || null;
   }
 
   /*
@@ -1120,8 +1133,8 @@ class AuthStore {
   // ---- shared CIR ---------------------------------------------------------
 
   cirList() {
-    return this.stmt(`SELECT m.*, u.username AS added_by_username, u.full_name AS added_by_name
-                      FROM cir_modules m LEFT JOIN users u ON u.id = m.added_by ORDER BY m.file`).all();
+    return this.stmt(`SELECT m.*, u.username AS added_by_username, u.full_name AS added_by_name, v.username AS updated_by_username, v.full_name AS updated_by_name
+                      FROM cir_modules m LEFT JOIN users u ON u.id = m.added_by LEFT JOIN users v ON v.id = m.updated_by ORDER BY m.file`).all();
   }
 
   cirGet(id) {
@@ -1138,6 +1151,11 @@ class AuthStore {
                ON CONFLICT(file) DO UPDATE SET title = excluded.title, info_name = excluded.info_name, dmc = excluded.dmc,
                  info_code = excluded.info_code, kind = excluded.kind, note = excluded.note, added_by = excluded.added_by, added_at = excluded.added_at`)
       .run(id, file, title || null, infoName || null, dmc || null, infoCode || null, kind || null, note || null, addedBy || null, now);
+  }
+
+  // WP-11 (SEC-017): who last replaced a module; the first uploader (added_by) is kept.
+  cirTouch(file, userId, now) {
+    return Number(this.stmt('UPDATE cir_modules SET updated_by = ?, updated_at = ? WHERE file = ?').run(userId || null, now, String(file)).changes) === 1;
   }
 
   cirDelete(id) {

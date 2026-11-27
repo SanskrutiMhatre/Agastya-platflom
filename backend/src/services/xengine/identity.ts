@@ -16,7 +16,7 @@
 import fs from 'fs';
 import path from 'path';
 import { nowIso } from '../../config';
-import { projectDirFor } from '../../context';
+import { projectDirFor, content } from '../../context';
 import { bad } from '../http';
 import { normTitle, type Outline, type OutlineModule } from './outline';
 
@@ -140,7 +140,7 @@ export function readRecord(projectId: string): IdentityRecord | null {
 }
 
 export function writeRecord(projectId: string, rec: IdentityRecord): void {
-  fs.writeFileSync(identityPath(projectId), JSON.stringify(rec, null, 1), 'utf8');
+  content.writeText(projectId, identityPath(projectId), JSON.stringify(rec, null, 1));
 }
 
 export interface ReconcileResult { added: number; retired: number; revived: number; rekeyed: number; picturesAdded: number; changed: boolean }

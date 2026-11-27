@@ -19,7 +19,27 @@
 const ROLE_RANK = { viewer: 1, reviewer: 2, editor: 3, manager: 4, owner: 5 };
 const PROJECT_ROLES = ['owner', 'manager', 'editor', 'reviewer', 'viewer'];
 
-function createAuthz({ store, sessions, workspaceDir, projectDirFor }) {
+/*
+  WP-27 (PLT-016, ENT-023): fine-grained permissions on top of the role ladder.
+
+    group grants       a project role held through a group (access_group_members + project_group_grants); the strongest of the
+                       person's membership, folder grant and group grants is their role, exactly like the folder level.
+    capability rules   per project, allow or deny ONE capability (the `cap` a route guard declares) for a person or a group.
+                       Deny wins over every allow and every role-ladder result; allow lets a person below the route's minimum role
+                       use that one capability (an "export only" or "waiver only" grant). Neither applies to a software administrator
+                       or to an owner of the project (they keep full authority; the administrator is the break-glass account).
+                       A rule never gives access to a project the person cannot open at all, and never lifts the pending/closed gate.
+    auditor            a global read-only flag on an account: every active project is readable (as a viewer), the audit log and the
+                       access lists are readable (requireGlobal), and every state-changing request is refused (403 READ_ONLY_ACCOUNT)
+                       except the account's own gate exits (sign out, change password, activity).
+
+  `access` is the access repository (repositories/accessRepository.ts); without it (older callers, unit tests) only the ladder applies.
+*/
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+/** Global capabilities that are not a project role: who holds them besides an administrator. */
+const GLOBAL_CAPS = { 'audit.read': ['auditor'], 'access.read': ['auditor'] };
+
+function createAuthz({ store, sessions, workspaceDir, projectDirFor, access = null }) {
   // ---- request plumbing ---------------------------------------------------
 
   function resolveAuth(req) {
@@ -58,6 +78,14 @@ function createAuthz({ store, sessions, workspaceDir, projectDirFor }) {
   }
   function deny403(res, code, error) {
     return res.status(403).json({ error: error || 'You do not have permission to do that.', code: code || 'FORBIDDEN' });
+  }
+
+  /** WP-27: an auditor changes nothing; only the account's own gate exits (opts) stay open. */
+  function readOnlyRefusal(user, req, opts = {}) {
+    if (!user || !user.auditor || user.role === 'admin') return null;
+    if (SAFE_METHODS.has(String((req && req.method) || 'GET').toUpperCase())) return null;
+    if (opts.allowForcedChange || opts.allowPendingOnboarding) return null;
+    return { code: 'READ_ONLY_ACCOUNT', error: 'This is a read-only auditor account.' };
   }
 
   /*
@@ -121,19 +149,24 @@ function createAuthz({ store, sessions, workspaceDir, projectDirFor }) {
     const isAdmin = user.role === 'admin';
     const membership = store.getMembership(projectId, user.id);
     const folderRole = store.folderRoleForProject(projectId, user.id);
+    const groupRole = access && !isAdmin ? access.groupRoleForProject(String(projectId), user.id) : null;
+    const isAuditor = !!user.auditor && !isAdmin;
     /*
       The Common Information Repository's workspace (type 'CIR') belongs to everyone: any signed-in user can
       create and edit data modules in it - an Author as an editor, a Project Manager as a manager. Deleting
       is narrowed to Project Managers and administrators by the route that deletes (see project-content).
     */
     const isCir = row.type === 'CIR';
-    if (!membership && !folderRole && !isAdmin && !isCir) {
+    if (!membership && !folderRole && !groupRole && !isAdmin && !isCir && !isAuditor) {
       return { ok: false, http: 404, code: 'NOT_FOUND', error: 'Not found' };
     }
     const held = membership ? membership.role : null;
+    // the strongest of the three levels (project, folder, group); a tie keeps the earlier one, as before
+    const strongest = [held, folderRole, groupRole].reduce((a, b) => ((ROLE_RANK[b] || 0) > (ROLE_RANK[a] || 0) ? b : a), null);
     const role = isAdmin ? 'owner'
-      : isCir ? (user.role === 'project_manager' ? 'manager' : 'editor')
-        : (ROLE_RANK[folderRole] || 0) > (ROLE_RANK[held] || 0) ? folderRole : held;
+      : isAuditor ? 'viewer'                                   // read-only everywhere, whatever else the account holds (WP-27)
+        : isCir ? (user.role === 'project_manager' ? 'manager' : 'editor')
+          : strongest;
 
     const status = row.status || 'active';
     if (status !== 'active') {
@@ -154,10 +187,24 @@ function createAuthz({ store, sessions, workspaceDir, projectDirFor }) {
 
     const need = ROLE_RANK[minRole] || 1;
     const have = ROLE_RANK[role] || 0;
+    // WP-27: capability rules, deny first; never for administrators, owners or auditors.
+    if (access && !isAdmin && !isAuditor && role !== 'owner' && cap && cap !== 'project.access') {
+      const rules = access.rulesFor(String(projectId), user.id).filter((r) => r.capability === cap);
+      if (rules.some((r) => r.effect === 'deny')) {
+        return { ok: false, http: 403, code: 'CAPABILITY_DENIED', error: 'You do not have permission to do that on this project.' };
+      }
+      if (have < need && rules.some((r) => r.effect === 'allow')) return { ok: true, role, row, via: 'rule' };
+    }
     if (have < need) {
       return { ok: false, http: 403, code: 'INSUFFICIENT_ROLE', error: 'You do not have permission to do that.' };
     }
     return { ok: true, role, row };
+  }
+
+  /** WP-27: the capability rules of a project that apply to this person (the client's `can` map); none for administrators and auditors. */
+  function rulesFor(user, projectId) {
+    if (!access || !user || user.role === 'admin' || user.auditor) return [];
+    return access.rulesFor(String(projectId), user.id);
   }
 
   // ---- guard factories ----------------------------------------------------
@@ -168,6 +215,8 @@ function createAuthz({ store, sessions, workspaceDir, projectDirFor }) {
       if (!auth) return deny401(res, req);
       const gate = gateCheck(auth.user, opts);
       if (gate) return deny403(res, gate.code, gate.error);
+      const ro = readOnlyRefusal(auth.user, req, opts);
+      if (ro) return deny403(res, ro.code, ro.error);
       next();
     };
     mw.isAuthGuard = 'requireAuth';
@@ -201,9 +250,34 @@ function createAuthz({ store, sessions, workspaceDir, projectDirFor }) {
       const gate = gateCheck(auth.user);
       if (gate) return deny403(res, gate.code, gate.error);
       if (!roles.includes(auth.user.role)) return deny403(res, 'ROLE_REQUIRED', 'Your role does not allow that.');
+      const ro = readOnlyRefusal(auth.user, req);
+      if (ro) return deny403(res, ro.code, ro.error);
       next();
     };
     mw.isAuthGuard = `requireRoles(${roles.join(',')})`;
+    return mw;
+  }
+
+  /*
+    WP-27: a global capability that is not a project role. An administrator always holds it; the kinds of account GLOBAL_CAPS lists hold
+    it too (the read-only auditor reads the audit log and the access lists). Anyone but an administrator only reads through it.
+  */
+  function requireGlobal(cap) {
+    if (!GLOBAL_CAPS[cap]) throw new Error(`requireGlobal: unknown global capability ${cap}`);
+    const mw = function requireGlobalGuard(req, res, next) {
+      const auth = resolveAuth(req);
+      if (!auth) return deny401(res, req);
+      const gate = gateCheck(auth.user);
+      if (gate) return deny403(res, gate.code, gate.error);
+      const u = auth.user;
+      const holds = u.role === 'admin' || (GLOBAL_CAPS[cap].includes('auditor') && !!u.auditor);
+      if (!holds) return deny403(res, 'ADMIN_ONLY', 'Software administrator access required.');
+      const ro = readOnlyRefusal(u, req);
+      if (ro) return deny403(res, ro.code, ro.error);
+      next();
+    };
+    mw.isAuthGuard = `requireGlobal(${cap})`;
+    mw.globalCap = cap;
     return mw;
   }
 
@@ -221,6 +295,8 @@ function createAuthz({ store, sessions, workspaceDir, projectDirFor }) {
       const id = from === 'active' ? auth.user.activeProjectId
         : from === 'param' ? req.params.id
           : from(req);
+      const ro = readOnlyRefusal(auth.user, req);
+      if (ro) return deny403(res, ro.code, ro.error);
       if (from === 'active' && !id) {
         return res.status(400).json({ error: 'No active project. Open one first.', code: 'NO_ACTIVE_PROJECT' });
       }
@@ -253,7 +329,7 @@ function createAuthz({ store, sessions, workspaceDir, projectDirFor }) {
     return sessions.resolveFromCookieHeader(req.headers.cookie || '') || null;
   }
 
-  return { evaluate, requireAuth, requireAdmin, requireRoles, requireProject, publicRoute, authForUpgrade, resolveAuth, ROLE_RANK };
+  return { evaluate, rulesFor, requireAuth, requireAdmin, requireRoles, requireGlobal, requireProject, publicRoute, authForUpgrade, resolveAuth, ROLE_RANK };
 }
 
-module.exports = { createAuthz, ROLE_RANK, PROJECT_ROLES };
+module.exports = { createAuthz, ROLE_RANK, PROJECT_ROLES, GLOBAL_CAPS };

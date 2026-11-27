@@ -106,7 +106,7 @@ test('the JSG sample project: a real filled handbook that validates, builds, pri
   assert.match(t, /Sr\. Document Title Document No\. Remark/, 'the associated handbooks table');
   // switching pages off: the page goes, the content stays in the file
   const off = doc.xml.replace('<front>', '<front omit="demolition associated listOfTables">');
-  assert.equal((await w.put(`${U}/jsg`, { xml: off })).json.report.errors, 0);
+  assert.equal((await w.put(`${U}/jsg`, { xml: off, baseHash: (await w.get(`${U}/jsg`)).json.hash })).json.report.errors, 0);
   assert.equal((await w.post(`${U}/jsg/build`, {})).status, 200);
   const t2 = (await text(pdf)).replace(/\s+/g, ' ');
   assert.ok(!t2.includes('DEMOLITION OF EQUIPMENT') && !t2.includes('ASSOCIATED HANDBOOKS') && !t2.includes('LIST OF TABLES'), 'pages switched off are not printed');
@@ -129,7 +129,7 @@ test('the ISPL sample: a real filled spare parts list that validates, prints the
   assert.match(t, /contains \d+ pages which have been serially numbered/, 'the certificate cites the page count');
   // the checklist: pages switched off are not printed, their content stays
   const off = doc.xml.replace('<front>', '<front omit="certificate preface supplied">');
-  assert.equal((await w.put(`${U}/jsg`, { xml: off })).json.report.errors, 0);
+  assert.equal((await w.put(`${U}/jsg`, { xml: off, baseHash: (await w.get(`${U}/jsg`)).json.hash })).json.report.errors, 0);
   assert.equal((await w.post(`${U}/jsg/build`, {})).status, 200);
   const t2 = (await text(pdf)).replace(/\s+/g, ' ');
   assert.ok(!t2.includes('CERTIFICATE') && !t2.includes('PREFACE') && !t2.includes('LIST OF EQUIPMENT ALREADY'), 'pages switched off are not printed');

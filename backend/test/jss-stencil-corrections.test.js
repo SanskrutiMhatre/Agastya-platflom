@@ -41,7 +41,7 @@ test.before(async () => {
     const pid = r.json.project.id; const U = `/api/projects/${pid}`; const g = (await w.get(`${U}/jss`)).json;
     let xml = g.xml.replace('<systemName></systemName>', '<systemName>COMPARISON SYSTEM</systemName>').replace('</bookmeta>', '<codeNo>DT0042_U0100_0007</codeNo><revNo>R2</revNo></bookmeta>');
     xml = into(xml, t.section, `<para>${MARK}</para>`);
-    assert.equal((await w.put(`${U}/jss`, { xml })).status, 200);
+    assert.equal((await w.put(`${U}/jss`, { xml, baseHash: (await w.get(`${U}/jss`)).json.hash })).status, 200);
     const b = await w.post(`${U}/publish`, {}); assert.equal(b.status, 200, JSON.stringify(b.json).slice(0, 300));
     const dir = path.join(h.ws, 'projects', pid); const buf = (await w.get(`${U}/publish/pdf`)).buf;
     built[id] = { pid, U, dir, pdf: buf, file: pdfFile(buf), fo: fs.readFileSync(path.join(dir, 'jss-output.fo'), 'utf8'), book: fs.readFileSync(path.join(dir, '_jss-book.xml'), 'utf8') };
@@ -216,12 +216,12 @@ test('branding: the emblem and the publishers still come from Settings; a second
   const b = built.uhb; assert.match(b.book, /<emblem src="[^"]*artwork\/emblem\.png"\/>/, 'the project has no Media/Satya.png (the house template\'s emblem), so the stencil\'s emblem is printed; a project\'s own file wins (jss-authoring: default artwork)');
   assert.equal((b.book.match(/<publisher>/g) ?? []).length, 1); assert.ok(!composedPages(b.book).includes('titlePageJoint'));
   const cfg = (await w.get(`${b.U}/settings`)).json; const project = { ...cfg.project, publishers: [{ name: 'L&T Defence,', addressLines: ['LARSEN & TOUBRO LIMITED'], logo: 'Media/JACKSON.png' }, { name: 'Partner Ltd', addressLines: ['Pune'], logo: 'Media/partner.png' }] };
-  assert.equal((await w.put(`${b.U}/settings`, { project })).status, 200);
+  assert.equal((await w.put(`${b.U}/settings`, { project, baseHash: (await w.get(`${b.U}/settings`)).json.version })).status, 200);
   const after = await w.post(`${b.U}/publish`, {}); assert.equal(after.status, 200, JSON.stringify(after.json).slice(0, 200));
   const book = fs.readFileSync(path.join(b.dir, '_jss-book.xml'), 'utf8'); assert.equal((book.match(/<publisher>/g) ?? []).length, 2, 'two publishers from Settings'); assert.match(book, /Partner Ltd/);
   assert.ok(composedPages(book).includes('titlePageJoint'), 'and the joint cover is printed again');
   assert.equal(JSON.parse(fs.readFileSync(path.join(b.dir, 'project.json'), 'utf8')).authoring, 'jss-xml', 'saving Settings keeps the project a JSS document project');
-  await w.put(`${b.U}/settings`, { project: cfg.project });
+  await w.put(`${b.U}/settings`, { project: cfg.project, baseHash: (await w.get(`${b.U}/settings`)).json.version });
 });
 
 // ── 10. order ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -236,11 +236,11 @@ test('content order: a file that lists content after a sub-section is an error e
   const refused = await w.post(`${b.U}/publish`, {}); assert.equal(refused.status, 422); assert.ok(refused.json.findings.some((f) => f.rule === 'JSS-ORDER'));
   // the same content in the order the pipeline prints it: valid, and the PDF puts it ahead of the sub-section
   const ok = late.replace('<section id="zsub"><title>Zeta sub-section</title></section><para>After the sub-section</para>', '<para>After the sub-section</para><section id="zsub"><title>Zeta sub-section</title></section>');
-  assert.equal((await w.put(`${b.U}/jss`, { xml: ok })).json.report.errors, 0);
+  assert.equal((await w.put(`${b.U}/jss`, { xml: ok, baseHash: (await w.get(`${b.U}/jss`)).json.hash })).json.report.errors, 0);
   assert.equal((await w.post(`${b.U}/publish`, {})).status, 200);
   const text = (await pdftext((await w.get(`${b.U}/publish/pdf`)).buf, 1, 80)).replace(/\s+/g, ' ');
   assert.ok(text.indexOf('After the sub-section') > 0 && text.indexOf('After the sub-section') < text.lastIndexOf('Zeta sub-section'), 'own content before the sub-section in the PDF (the contents page also lists the sub-section, so the last mention is the heading)');
-  await w.put(`${b.U}/jss`, { xml: g.xml });
+  await w.put(`${b.U}/jss`, { xml: g.xml, baseHash: (await w.get(`${b.U}/jss`)).json.hash });
 });
 
 // ── 9. merged cells ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -250,7 +250,7 @@ test('merged cells: a table with merged cells is valid and builds; a grid that d
   const table = (rows, extra = '') => `<table id="tm"${extra}><title>Merged</title><thead><row><cell colspan="2">Head merged</cell><cell>C</cell></row></thead><tbody>${rows}</tbody></table>`;
   const good = table('<row><cell rowspan="2">Tall cell</cell><cell>b1</cell><cell>c1</cell></row><row><cell>b2</cell><cell>c2</cell></row><row><cell colspan="3">Wide cell</cell></row>');
   const withTable = (t) => into(g.xml, 'Importance of Routine Maintenance', t);
-  const put = await w.put(`${b.U}/jss`, { xml: withTable(good) }); assert.equal(put.json.report.errors, 0, JSON.stringify(put.json.report.findings.filter((f) => f.severity === 'error')));
+  const put = await w.put(`${b.U}/jss`, { xml: withTable(good), baseHash: (await w.get(`${b.U}/jss`)).json.hash }); assert.equal(put.json.report.errors, 0, JSON.stringify(put.json.report.findings.filter((f) => f.severity === 'error')));
   assert.equal((await w.post(`${b.U}/publish`, {})).status, 200);
   const text = await pdftext((await w.get(`${b.U}/publish/pdf`)).buf, 1, 80);
   for (const s of ['Head merged', 'Tall cell', 'Wide cell']) assert.equal((text.match(new RegExp(s, 'g')) ?? []).length, 1, `"${s}" is printed once`);
@@ -262,10 +262,10 @@ test('merged cells: a table with merged cells is valid and builds; a grid that d
     'a header whose merged cell does not fit': good.replace('<cell colspan="2">Head merged</cell><cell>C</cell>', '<cell colspan="3">Head merged</cell><cell>C</cell>'),
   };
   for (const [what, t] of Object.entries(bad)) {
-    const r = (await w.put(`${b.U}/jss`, { xml: withTable(t) })).json.report; assert.ok(r.findings.some((f) => f.rule === 'JSS-TABLE-SHAPE' && f.severity === 'error'), `${what}: refused (${JSON.stringify(r.findings.map((f) => f.rule))})`);
+    const r = (await w.put(`${b.U}/jss`, { xml: withTable(t), baseHash: (await w.get(`${b.U}/jss`)).json.hash })).json.report; assert.ok(r.findings.some((f) => f.rule === 'JSS-TABLE-SHAPE' && f.severity === 'error'), `${what}: refused (${JSON.stringify(r.findings.map((f) => f.rule))})`);
   }
   assert.equal((await w.post(`${b.U}/publish`, {})).status, 422, 'and no PDF is built from a broken grid');
-  await w.put(`${b.U}/jss`, { xml: g.xml });
+  await w.put(`${b.U}/jss`, { xml: g.xml, baseHash: (await w.get(`${b.U}/jss`)).json.hash });
 });
 
 // ── the template ships with a revision ───────────────────────────────────────────────────────────────────────────────────────────

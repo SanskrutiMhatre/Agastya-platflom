@@ -27,7 +27,8 @@ const P = (id: string) => `/api/projects/${id}/jss`;
 
 export const jssApi = {
   read: (id: string) => get<JssDocument>(P(id)),
-  save: (id: string, xml: string, baseHash?: string) => put<{ hash: string; report: JssReport }>(P(id), { xml, baseHash }),
+  /** WP-11: `merged` = someone else had saved other chapters meanwhile; `xml` is then the merged document now on the server. */
+  save: (id: string, xml: string, baseHash?: string) => put<{ hash: string; report: JssReport; merged?: boolean; xml?: string }>(P(id), { xml, baseHash }),
   validate: (id: string, xml?: string) => post<JssReport>(`${P(id)}/validate`, xml === undefined ? {} : { xml }),
 };
 
@@ -50,7 +51,8 @@ const A = (id: string) => `/api/projects/${id}/ancillary`;
 export const ancillaryApi = {
   list: (id: string) => get<{ pages: AncillaryPage[] }>(A(id)).then((r) => r.pages),
   choose: (id: string, pages: Array<{ id: string; enabled?: boolean; title?: string }>) => put<{ pages: AncillaryPage[] }>(A(id), { pages }).then((r) => r.pages),
-  read: (id: string, page: string) => get<{ page: AncillaryPage; xml: string }>(`${A(id)}/${page}`),
-  save: (id: string, page: string, xml: string) => put<{ page: AncillaryPage }>(`${A(id)}/${page}`, { xml }).then((r) => r.page),
-  reset: (id: string, page: string) => post<{ page: AncillaryPage; xml: string }>(`${A(id)}/${page}/reset`, {}),
+  read: (id: string, page: string) => get<{ page: AncillaryPage; xml: string; hash: string }>(`${A(id)}/${page}`),
+  /** `baseHash`: the `hash` of the page as it was read (WP-11); the answer carries the new one. */
+  save: (id: string, page: string, xml: string, baseHash: string) => put<{ page: AncillaryPage; hash: string }>(`${A(id)}/${page}`, { xml, baseHash }),
+  reset: (id: string, page: string) => post<{ page: AncillaryPage; xml: string; hash: string }>(`${A(id)}/${page}/reset`, {}),
 };

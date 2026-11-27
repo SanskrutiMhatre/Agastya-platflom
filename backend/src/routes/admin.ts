@@ -12,8 +12,9 @@
 // =============================================================================
 
 import type { Express } from 'express';
-import { audit, requireAdmin, requireAuth, store, defaultContext } from '../context';
+import { audit, requireAdmin, requireAuth, requireGlobal, store, defaultContext } from '../context';
 import { exportAudit } from '../services/auditTrail';
+import { capabilityTable, readableCapabilities } from '../services/permissions';
 import { wrap, param } from '../services/http';
 import { COLLECTIONS, createItem, deleteItem, listItems, specOf, updateItem } from '../services/adminConfig';
 import * as platform from '../services/platform';
@@ -67,6 +68,8 @@ export function registerAdminRoutes(app: Express): void {
         { name: 'Administrator', description: 'Oversees the platform: creates Project Managers and Authors, manages reference data, sees every project. Does not create projects.', system: true },
         { name: 'Project Manager', description: 'Creates Authors and projects, reviews manuals, comments, sends them back and approves releases for the projects they manage.', system: true },
         { name: 'Author', description: 'Creates and edits data modules and manuals, shares projects, submits manuals for review.', system: true },
+        // WP-27 (PLT-016, ENT-023): a flag on an account rather than a fourth role
+        { name: 'Auditor (read-only)', description: 'Reads every project, the audit log and the access lists; changes nothing. Set on an account under Users, or by a directory group mapped to "auditor".', system: true },
       ],
       projectRoles: [
         { name: 'Owner', description: 'Everything in the project, including the shared house template and locking.' },
@@ -75,6 +78,10 @@ export function registerAdminRoutes(app: Express): void {
         { name: 'Reviewer', description: 'Builds previews and comments on a manual in review.' },
         { name: 'Viewer', description: 'Reads.' },
       ],
+      // WP-27: the permission catalogue - every capability a project route declares and the lowest project role that holds it. A project's
+      // managers can allow one capability to a person or group below that role, or deny it to anyone below owner (project > Access).
+      capabilities: Object.entries(capabilityTable()).sort(([a], [b]) => a.localeCompare(b))
+        .map(([capability, minRole]) => ({ capability, minRole, readable: readableCapabilities().has(capability) })),
     });
   }));
 
@@ -130,7 +137,7 @@ export function registerAdminRoutes(app: Express): void {
     res.status(202).json({ queued: ids.length });
   }));
   // WP-29 (ENT-003): the whole log, streamed oldest first in pages - formerly the newest 5 000 rows only
-  app.get('/api/admin/maintenance/audit.csv', requireAdmin(), wrap(async (req, res) => {
+  app.get('/api/admin/maintenance/audit.csv', requireGlobal('audit.read'), wrap(async (req, res) => {   // WP-27: auditors export it too (the export is audited)
     log(req, 'maintenance.audit-export');
     res.type('text/csv').attachment('agastya-audit-log.csv');
     try { await exportAudit(defaultContext(), {}, 'csv', res); } catch (e) { if (!res.headersSent) throw e; res.destroy(); return; }

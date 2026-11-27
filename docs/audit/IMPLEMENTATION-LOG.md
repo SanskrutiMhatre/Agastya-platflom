@@ -1059,6 +1059,99 @@ requests / 730 d audit (archived to a gzip file first); all are settings, 0 = of
 * Not done: the end-to-end acceptance "full 100-module publish at most 40 s" was not measured through the server (the FO stage it was
   dominated by is now under 1 s); a re-check on a newer libxslt if the toolchain changes.
 
+## Phase 2
+
+### WP-11 File integrity: atomic writes, history, mandatory version guards and check-out for all formats (REL-001, PLT-009, ARC-001, PUB-007, PUB-010, DEP-016, ENT-016, REL-002, PLT-020, PLT-021, REL-007, PERF-010, RES-001, FE-008, SEC-017; PUB-029 and PUB-021 not done) - done in part (see limits)
+
+Decisions taken from the audit (no owner question):
+* **D2 (compatibility window).** The audit recommends one release with a logged warning, then refusal. Taken as: the guard **refuses
+  by default** (428 `BASE_HASH_REQUIRED`), because the phase-2 exit asks for a mandatory guard and every client in this repository
+  (web screens, Studio, e2e specs, backend tests) now sends the hash. `AGASTYA_BASEHASH_COMPAT=1` is the window: a write without the
+  hash goes through with a `[version-guard]` warning in the log, for scripts outside the repository.
+* **D22 (lock granularity).** Taken as assumed: per chapter (JSS `<chapter>`) and per section (JSG `<section>`, `<plate>`,
+  `<appendix>`). A save from an older version is merged three ways by part under a short per-document write lock; the base comes from
+  the revision history by hash. Both sides changing the same part, or the frame (everything outside the parts: front matter, meta),
+  answers 409 `STALE_DOCUMENT` with `{ currentHash, conflicts, xml }`. A stale save that changes nothing of its own stays a conflict
+  (nothing to merge; the earlier contract, kept by `jsg-engine`). Check-out leases per part, with the whole document (part `''`) as the
+  fallback. RES-001: hash guard plus per-user lease, not CRDT/OT.
+
+What changed:
+* **Atomic writes (REL-001, PLT-009).** `storage/atomicWrite.ts` `writeFileAtomic`: sibling temporary file
+  `.<name>.tmp-<pid>-<12 hex>`, fsync, rename over the target (retried on Windows `EPERM`/`EACCES`/`EBUSY`), folder fsync on POSIX.
+  `ContentStore.writeText` and the new `writeBuffer` use it, so every content write behind the WP-10 seam is atomic. Writers that
+  bypassed the seam now go through it: `csdbObjects`, `jssdm/service`, `modelCode`, `pm`, `projects`, `sns/service`, `xengine/identity`,
+  `xengine/convert`, `importer/apply`, `projectArchive`, the JSS ancillary pages, the media upload and the PMC import; the house template
+  is written with `writeFileAtomic`. At start, `sweepTempFiles` removes temporary files older than one minute under `projects/`.
+* **History first (PLT-009, ENT-016, ARC-001, PUB-007).** `services/projectFiles.ts` `saveRevisioned`: content on disk that is not the
+  head revision is recorded as `on-disk` (a hand edit, or a crash after an old write), then the new content, then the atomic write. A
+  history that cannot be recorded fails the save with 500 `REVISION_FAILED` and leaves the file as it was. A new file is written, indexed
+  and recorded, and removed again if recording fails. Deleting a data module records its last content first and is refused the same way
+  (`recordBeforeDelete`; it used to log and delete anyway). Users: `csdb.writeDm`/`createDm`, `csdbObjects.writeObject`, the JSS and JSG
+  source.
+* **JSS/JSG history (ARC-001, PUB-007).** `services/oneFileDocument.ts` `saveOneFileDocument` (merge, lease check, revision, write) is
+  used by both engines' `writeSource`. `routes/documentHistory.ts` adds `GET <base>/history`, `GET <base>/history/:rev` and
+  `POST <base>/history/:rev/restore` (guarded) on `/api/projects/:id/jss` and `/jsg`; a restore adds a revision and removes none.
+  `POST /api/projects/:id/dms/:file/history/:rev/restore` does the same for data modules.
+* **Mandatory version guard (DEP-016, PLT-020, FE-008, ENT-016).** `services/versionGuard.ts` `versionGuard(what)` reads `baseHash` from
+  the body or `If-Match`. On PUT `dms/:file`, `objects/:file`, `pmc`, `settings`, `jss`, `jsg`, `ancillary/:page` and the three restore
+  routes. Routes that had no guard now refuse a stale version (409 `EDIT_CONFLICT`): `pm.writePm`, `ancillary.writeAncillary`, settings
+  (`version` = hash of project.json plus the house template); their reads return `hash`/`version`. The DM write is serialised per file
+  (`withDocumentLock`), so two saves from one version cannot both pass the check.
+* **Check-out leases (RES-001, PUB-010).** Migration `023-document-leases` (additive): table `document_leases` (key `document_id, part`)
+  and `cir_modules.updated_by`/`updated_at`. `repositories/leaseRepository.ts` takes a lease in one `INSERT … ON CONFLICT DO UPDATE …
+  WHERE` (same holder, or expired); contract case in `wp10-storage-contract`. `services/leases.ts`; routes `POST/DELETE/GET
+  …/checkout(s)` on DM, JSS and JSG. Default 60 minutes (`AGASTYA_LEASE_MINUTES`). Saving or deleting a part under another user's live
+  lease answers 423 `CHECKED_OUT` naming the holder; a project owner/manager or administrator can break a lease, audited
+  (`*.checkout-broken`).
+* **Common Information Repository (REL-002, SEC-017, PLT-021).** Only the uploader, a project manager or an administrator may replace a
+  module (others 403 `CIR_REPLACE_ROLE`). A replacement must name the current version in `baseHashes` (without it 409 `CIR_EXISTS` with
+  the current hashes; stale 409 `EDIT_CONFLICT`); all are checked before anything is written. Who replaced it and when are recorded and
+  shown (`updatedBy`, `updatedByName`, `updatedAt`) beside the original uploader.
+* **Uploads to disk with a whole-request cap (REL-007, PERF-010, PLT-021).** `services/uploads.ts` `CappedDiskStorage` streams to the
+  upload folder and stops a request as soon as its total passes the cap (`LIMIT_TOTAL_SIZE` → 413 `UPLOAD_TOO_LARGE`), removing the parts
+  already written; `discardWhenDone` removes the files when the response closes. Project uploads (64 MB per file, 1000 files, 1 GB in
+  all), the package importer (`MAX_PACKAGE_BYTES`) and the CIR (16 MB, 100 files, 256 MB; it was memory storage) use it.
+* **Clients.** Studio saves objects with the hash it opened (it sent `''`); Publication sends `pmc.hash`; Publish settings sends
+  `version` and keeps the new one; the ancillary page sends the page hash; the JSS and JSG editors reload the merged document after a
+  merged save (toast); the CIR upload asks "Replace …?" on `CIR_EXISTS` and resends with `baseHashes`. e2e specs `00-platform`,
+  `jsg-editor`, `publish-waivers` send the hash in their direct PUTs (not run).
+* **Merged with main 54874d8.** The JSS/JSG editor behaviour lives in WP-21's shared host (`editors/host/useDocEditor.tsx`): every save sends the loaded hash; a save the server merged (D22) reloads the merged document; a 409 `STALE_DOCUMENT` (an overlapping part) opens WP-21's banner and "Compare and merge…", whose save names the hash it compared against; a 423 `CHECKED_OUT` is shown as the server's message naming the holder. Migration 023 follows WP-12's 022; `wp12-migrations` takes the duplicate and gap cases from the tip of the list, and its pending-migration case makes 022 and every later step pending (it checks 022's index).
+
+Tests: new `test/wp11-integrity.test.js` (registered in `scripts/ci/test-plan.json`):
+* an injected failure before the rename leaves the old file and no temporary file; the start-up sweep;
+* **G-REL-2 kill harness**: a child process rewrites a 3 MB / 5 MB file in a loop and is SIGKILLed at 100 random points: 0 torn files;
+* **guard presence from the live route table** (`createApp()._router.stack`, marker `isVersionGuard`): the 10 content-write routes must
+  carry it; every other project PUT/PATCH must be on an exemption list with a stated reason, and every exemption must name a real route;
+* 428 without a version and 409 with a stale one on dms, pmc, settings, jss, jsg; `If-Match` accepted;
+* an injected history failure: save → 500 `REVISION_FAILED`, file unchanged; delete → refused, module kept; a hand edit on disk is kept
+  as `on-disk`;
+* JSS and JSG: 3 saves → 3 revisions, exact bytes back, restore guarded and adding a revision;
+* D22: two chapters (JSS) and two sections (JSG) merged; the same chapter → 409 `STALE_DOCUMENT` naming it;
+* leases: one holder, 423 naming the holder, another chapter free, renewal, an author's break refused, the owner's break audited, an
+  expired lease taken over, the holder still saves;
+* **G-REL-4**: 500 rounds of two authors saving a DM from one version (1,000 saves): 500 accepted, 500 refused, 0 silent overwrites;
+  JSS same chapter, 50 racing rounds: exactly one winner each;
+* an upload over the 256 MB CIR total → 413, no files left behind.
+
+Existing tests now name the version they read before each PUT (admin-ops, api, applic-external, brex-gate, dmtypes, fo-guard,
+golden-xignal, html-gate, jsg-engine, jsg-ispl, jsg-word, jss-authoring, jss-cover-isolation, jss-naval, jss-rwi-verify,
+jss-stencil-corrections, jssdm-http, pm-multi-ref, publish-gate, publish-waivers, wp02-routes, phase13, settings-hostile-input,
+cir-links); the `phase13` CIR test checks the new replace rules. `wp10-seams` lists `023-document-leases` (WP-12 holds 022).
+
+Limits / not done:
+* PERF-010 RSS acceptance not met: uploads stream to disk, but the package importer still reads the whole archive into memory for its
+  analysis. Not measured.
+* No lease UI (check-out button or holder badge in the file tree or editors); leases work through the API and the editors show the 423
+  message.
+* PUB-029 (derived files out of the project folder) deferred to WP-15 (job directories). PUB-021 not done, including the per-project
+  build lock (PUB-021 a).
+* The settings save still writes the house template before the project part is validated (a refused project part can leave a changed
+  template).
+* SEC-017 "guard-bypassing XML is accepted" not addressed beyond the replace rules.
+* The merge is by part only: cross-part data (numbering, front matter) is in the frame and conflicts as a whole; the identity record
+  (`doc-identity.json`) is a separate file, atomic but not merged.
+* Not run: Playwright, the full backend suite, the gate, full vitest.
+
 ## Phase 4
 
 ### WP-21 Editor host contract and unified editor chrome (UX-003, UX-002, UX-017, UX-012, UX-020, FE-021, FE-025, PRD-004, GAP-004) - done, with the limits listed
@@ -1116,6 +1209,60 @@ sheet) are kept as they are. No feature removed: the parity check reports 0 remo
   visual baselines of the three editors (`e2e/visual`) change (new header, folded ribbon, Write default) and need re-capturing by
   whoever runs the visual suite; the server still writes `t:` keys for id-less sections (preferring ids server-side is not in
   this package); the JSG compare-and-merge path is the JSS one (same hook) but only the JSS path has an e2e test.
+
+### WP-22 Navigation, project home, problems and review workflow (UX-007, UX-008, UX-009, UX-013, UX-014, UX-021, UX-024, UX-025, UX-029, FE-015, FE-016, PRD-003, GAP-003, GAP-006, GAP-008) - done in part (see limits)
+
+Branch `worktree-agent-ae54629ef365272f3` (from `fdfbc27`). Nothing was removed: `check:parity` PASS with no new explanation row.
+
+* **Where am I (UX-007, UX-009)**: every project page except the editor has a breadcrumb bar (`ProjectShell`, `project-bar`: Projects or
+  Repository / project name / section, plus Jump to). The rail gains a first item **Home** (not for CIR) and a pin at its foot (`rail-pin`,
+  remembered in `agastya.rail.pinned`) that writes the labels out (176 px rail); unpinned it stays icon-only with tooltips, as `00-platform.spec` guards.
+* **Project Home (UX-013, PRD-003 part)**: `/projects/:id/home` (`ProjectHomePage`): Continue (the last data module or document opened in this
+  browser, `lib/continueDoc.ts`), Check (counts of the last run, reviewed count, Run check for S1000D with `validate.run`), Review (state, round, open
+  comments), Build (last build); "Needs attention" (open comments, changes requested, a release waiting for the user's decision, errors, unplaced or
+  missing modules, a stale build) and "This week" (with `activity.read`). The summary route returns `review` and `problems.reviewed` for it.
+* **Quick switcher (UX-021)**: Ctrl/Cmd+K outside the editors (the editors keep Ctrl+K for their command palette) and a "Jump to… Ctrl K" button in
+  the top bar and in the project bar (`components/QuickSwitcher.tsx`, the WP-21 `CommandPalette` with its own wording): pages, the project's
+  sections, every project the user can open, and the S1000D project's data modules. Registered as `platform.jump` in `editorShortcuts.ts`; the
+  parity scanner reads its key handler.
+* **One problems model, team "reviewed" marks (UX-008, FE-015)**: `lib/problems.ts` (one `Problem` shape, one severity wording, adapters from the
+  Validation page, the document editors and the server). Backend `services/problems.ts` + `routes/problems.ts`: `GET /api/projects/:id/problems`
+  (last run joined with the marks and the brex waivers), `GET|PUT /api/projects/:id/problems/reviewed` (PUT: reviewer and up, capability
+  `problems.review`, audited `problems.reviewed` / `problems.unreviewed`). Marks are stored in `problem-reviews.json` in the project folder (atomic
+  write, as `publishWaivers.ts`), not a migration, to stay clear of WP-11/WP-16. The Validation page shows who marked and when; marks kept in the
+  browser before are moved to the server once.
+* **Comments in the editor (GAP-006 part, FE-016)**: a Comments button in the shared editor header of all three editors (S1000D, JSS, JSG) with the
+  open count; a side panel listing the open comments (those of the open data module first), Open the data module, Done/Reopen (`review.comment`),
+  "show done"; Alt+Shift+N / Alt+Shift+P step through them; Escape closes the panel. Same data as the Release page (`contentApi.release`).
+* **Problems drawer (WP-21 open item)**: the Studio's bottom pane is at most 25% of the window (CSS and the drag clamp, 60% -> 25%), Escape in it hides
+  it; the JSS problems list is capped at min(190px, 25vh) and closes with Escape.
+* **JSS Esc then Ctrl+S (WP-21 open item)**: the JSS editor listens for Ctrl+S on the document (not only inside the paper) unless a dialog is open or
+  the key was handled; unit test in `jss/editor.test.ts`, browser test in `wp22-navigation.spec`.
+* **Errors and connection (UX-025 part)**: an error boundary around the page outlet of both shells (`error-boundary`: Try again, Reload, Copy
+  details), reset on navigation. The existing `server-unreachable` banner now also follows failed fetches and 502/503/504 answers, clears on the next
+  good answer, polls every 5 s, and follows the browser `offline`/`online` events. The audit log adds filters by user and by day and shows an IPv4
+  address without `::ffff:`.
+* **Publication page (GAP-003)**: add a section to a chapter (only where the stencil leaves sections to the author), add an appendix and delete one
+  (JSG; a JSS document has no appendices in its model), and Redo beside Undo; the edits go into the document through the same `applyToJss`/`applyToJsg`
+  as the other edits (`lib/docPublication.ts`, tests in `docPublication.test.ts`).
+* **Wizard (UX-024)**: the model code and the enterprise code show an example and the rule before input; the model code last used in this browser
+  is offered (`wiz-mic-last`).
+* Recorded decisions: opening a project still lands in the Editor (owner rule; Home is the first rail item and in the switcher). Marking a finding
+  reviewed is now a team action for reviewers and up; a viewer used to keep private browser marks and now sees the button disabled. The drawer cap
+  also limits how far a user can drag the Studio's bottom pane (25% instead of 60%), in the platform and the standalone Studio. Rail labels are not
+  renamed and Explore/Publication are not merged into a Structure page (guarded by e2e and the owner's layout; left to WP-35).
+* Verified (2026-11-27): frontend `tsc --noEmit` clean; vitest `src/editors src/parity src/lib/editorShortcuts.test.ts src/components src/styles
+  src/jss src/lib/docPublication.test.ts src/lib/problems.test.ts` 22 files / 348 tests pass; `lint:theme` 0 literals; `vite build` OK;
+  `check:bundle` PASS (advisory: entry stylesheet over its 30 KB advisory budget, as before); `node scripts/ci/lint.mjs` ratchet unchanged;
+  `check:parity` PASS. Backend `tsc` clean; `wp22-problems` 4/4, `authz-matrix` 6/6 (snapshot regenerated for the 3 new routes, reviewed),
+  `wp10-seams` 11/11, `routes-guarded` 1/1, `wp13-permissions` 3/3. Browser: `e2e/wp22-navigation.spec.ts` alone on port 4091 (Edge) 7/7 (keyboard
+  for the pin, Home, Ctrl+K, marking reviewed, Alt+Shift+N, Esc+Ctrl+S). Visual/a11y suite on port 4092: first run 61 passed, 6 failed (the six screens below, all the intended project bar/rail change), baselines updated, then a full re-run 67 passed, 7 skipped (the keyboard tests skip the dark project by design: "keyboard behaviour does not depend on the theme"); axe and keyboard tests all pass, none allow-listed.
+* Baselines updated (looked at each diff: the 40 px project bar and the Home and pin rail items, nothing else): `e2e/visual/__screenshots__/{light,dark}/{publication,validation,release}.png`.
+* Not done: the Overview/Workspace/Projects merge and the sample buttons (UX-014: `00-platform.spec` creates samples from /workspace while projects
+  exist; left to WP-35 with the shell redesign); presence and edit leases on Home (PRD-003: needs WP-11's version guards); a per-user "show code"
+  preference (GAP-008: no per-user preference store yet, the switch stays per project); imported-fixture browser tests of comments (GAP-006 beyond
+  the sample); new screen captures for the user guide (UX-029); comment markers in the editing surface margin (only the panel list); ellipsis on
+  Activity card titles (UX-025 rest); the full e2e suite, the full vitest and the gate were not run (port 4050 belongs to the lead).
 
 ## Phase 8
 
@@ -1401,9 +1548,7 @@ signature per row, not an external timestamping service, which an air-gapped sit
 are flagged (ENT-003); a reason is kept for every waiver change, and a waiver may expire, at most 3 years ahead (ENT-017); stable event
 ids 4100-4199 written by the existing host program, no new agent (RES-004); the event source is registered at install time only.
 
-* **Migration 023-audit-chain** (additive; numbered 023 because `checkOrder` refuses gaps and 022 was the last on this branch - the lead
-  asked for 025+, see the hand-back: renumber at merge if WP-11/WP-27 take 023/024 - file name and `name`, `migrations/index.js` ORDER,
-  `wp10-seams` list, `wp12-migrations` `LAST_INDEX` key). `audit_log` gains `seq, prev_hash, row_hash, chain_key` (via the idempotent
+* **Migration 025-audit-chain** (additive; after WP-11's 023-document-leases and WP-27's 024-directory-groups-permissions). `audit_log` gains `seq, prev_hash, row_hash, chain_key` (via the idempotent
   `columns` mechanism); new `postSql` step (runs after columns; in the checksum only when present) adds the unique `ix_audit_seq` and
   `ix_audit_actor`; tables `audit_checkpoints`, `audit_chain_anchor` (one row), `publish_waiver_events`. Rows from before keep `seq` NULL
   and are counted "before the chain", never rewritten.
@@ -1412,7 +1557,7 @@ ids 4100-4199 written by the existing host program, no new agent (RES-004); the 
   savepoints. Key: `AGASTYA_AUDIT_KEY_FILE`, default `<data>\audit-key\audit-hmac.key`; the packaged host points it at
   `<state>\keys\audit-hmac.key`. Made on first start; a damaged key file stops the start; the offline tools never make one.
 * **Verification** (`services/auditTrail.ts`, `storage/auditOffline.ts`, `scripts/agastya-audit.js verify`, `AgastyaCtl --verify-audit`,
-  `POST /api/admin/audit/verify`, the daily housekeeping job, `npm run doctor` and `--doctor` rows): names edited, deleted, forged and
+  `GET /api/admin/audit/verify`, the daily housekeeping job, `npm run doctor` and `--doctor` rows): names edited, deleted, forged and
   outside-the-chain rows, rows under another key, invalid checkpoint signatures, a tail cut and a rebuilt chain against a checkpoint.
   Exit 0/1/2. A failure raises event 4101 and notifies administrators. Retention archives only a prefix of the chain and records the anchor
   in the same transaction. Checkpoints: with every backup, every `AGASTYA_AUDIT_CHECKPOINT_HOURS` (24), and on demand.
@@ -1446,7 +1591,7 @@ ids 4100-4199 written by the existing host program, no new agent (RES-004); the 
   with filters; events 4120/4110/4111, host line format, every id in OPERATIONS.md; waiver history, expiry, reasons; JSON log lines parse,
   seeded secrets absent, rotation keeps 2), new `wp29-audit-coverage` 2/2, `wp10-storage-contract` 12/12 (new audit/anchor/waiver-event
   case), `notifications` 6/6, `admin-ops` 8/8, `wp12-backup-restore` 7/7, `wp12-migrations` 10/10, `wp10-seams` 11/11, `authz-matrix` 6/6
-  (snapshot regenerated: exactly the 5 new requireAdmin audit routes added), `routes-guarded` 1/1, `auth-http` 10/10, `api` 17/17,
+  (snapshot regenerated: exactly the 5 new audit routes added), `routes-guarded` 1/1, `auth-http` 10/10, `api` 17/17,
   `publish-waivers` 2/2, `phase13` 12/12, `wp07-small-fixes` 4/4, `wp04-reset-admin` 1/1, `wp03-auth` 11/11, `auth-core` 11/11, `rbac` 7/7.
   Host: both executables compile with the packager's `csc` flags without warnings; new `scripts/release/host-audit.test.mjs` 2/2 (event-line
   parsing incl. refusals; `--verify-audit` 0/1/2 and the doctor OK/FAIL/WARN rows on a real data folder), `host.test.mjs` 6/6. Frontend:
@@ -1457,4 +1602,196 @@ ids 4100-4199 written by the existing host program, no new agent (RES-004); the 
   checkpoint taken after the cut rows (documented, OPERATIONS.md section 13). Playwright, the full backend suite, the gate and full vitest
   were not run (by instruction); `e2e/publish-waivers.spec.ts` was adapted to the new removal dialog but not executed. The host's event
   writing to a real Application log was not exercised (tests use `AGASTYA_HOST_EVENTLOG=off`); registering the source stays an install-time
-  step. The frontend was not rebuilt. Migration number 023 must be checked at merge.
+  step. The frontend was not rebuilt.
+* **Merge with main ea34c5b (WP-11, WP-22, WP-25, WP-27).** Migration renumbered 025. WP-27's read-only auditor: the reading audit routes -
+  verify (now `GET`, since an auditor may not POST), checkpoint list, export, event list - are `requireGlobal('audit.read')`; taking a
+  checkpoint stays `requireAdmin`; WP-27's guards on `GET /api/admin/audit` and `maintenance/audit.csv` kept, with WP-29's behaviour (no
+  cap, streamed, inclusive `to`); an auditor's verification and exports are audited (test). Fail closed extended to WP-27's group
+  membership, group deletion, project group grants, capability rules and directory mappings (`critical()` in `routes/access.ts`), and to
+  WP-11's check-out BREAK (`leases.checkIn` takes the transaction wrapper; the release and its row commit together). Security events: those
+  actions map to 4121/4120, a check-out break to 4150, and `user.updated` with WP-27's `auditor` or `auth_source` to 4120. Coverage: WP-27's
+  17 routes, WP-22's reviewed marks and WP-11's history/check-out routes all audit (directory sync is allow-listed: the service audits
+  every outcome). WP-25's `AgastyaCtl` scripts (first-admin, the backup tool) get the server's key file. The audit viewer keeps WP-22's
+  `plainIp`; its client-side who/day narrowing is replaced by the server-side person/project/date filters (which also reach the export).
+  Verified after the merge: backend `tsc` clean; `wp29-audit-trail` 11/11 (now incl. auditor access and group / group-grant fail-closed),
+  `wp29-audit-coverage` 2/2, `wp27-directory` 15/15, `wp27-permissions` 7/7, `wp11-integrity` 16/16, `wp22-problems` 4/4, `wp10-seams`
+  11/11, `wp10-storage-contract` 14/14, `wp12-migrations` 10/10, `wp12-backup-restore` 7/7, `authz-matrix` 6/6 (snapshot diff against
+  main: exactly the 5 audit routes), `routes-guarded` 1/1, `auth-http` 10/10, `api` 17/17, `admin-ops` 8/8, `publish-waivers` 2/2;
+  `host-audit` 2/2, `host` 6/6, `update` 6/6; both host executables compile without warnings; frontend `tsc` clean, vitest
+  `audit-viewer` + `publish-waivers-history` + `problems` 11/11, `frontend/scripts/parity/check.mjs` PASS; lint green; Playwright
+  `e2e/publish-waivers.spec.ts` alone (port 4098, Edge) 8/8.
+## Phase 8 (continued)
+
+### WP-27 Directory sign-on, central administration and fine-grained permissions (ENT-005, DEP-015, PLT-016, ENT-023; ENT-022 and RES-003 not done) - done in part (see limits)
+
+Branch `worktree-agent-ae6519e7918fa58ba` (from 54874d8). Owner approval: implement without asking; decisions below take the audit's
+recommendation.
+
+* **Directory sign-on (ENT-005, DEP-015).** A second provider behind the WP-03 `AuthProvider` seam (`core/auth/directory.js`), chosen when
+  `config.directory` is set; otherwise the local provider exactly as before (Mode A unchanged, proved by `wp27-permissions` test 1 and the
+  unchanged auth suites). LDAPv3 over **LDAPS only** (`core/auth/ldap.js`: BER encoder/decoder, simple bind, search, unbind; TLS 1.2+,
+  certificate verified against `AGASTYA_DIRECTORY_CA_FILE` or the system store). Service bind, then a typed filter search for the person
+  (user-supplied text is never pasted into a filter string; RFC 4515 escaping is not needed because filters are encoded as BER structures),
+  then a bind as the person's DN (an empty password is refused before any bind: no unauthenticated-bind bypass). Groups from `memberOf`,
+  or Active Directory's in-chain rule (`1.2.840.113556.1.4.1941`) when `AGASTYA_DIRECTORY_NESTED_GROUPS=1`. Several URLs are tried in order.
+* **Group-to-role mapping and JIT provisioning.** `directory_group_map` (Administrator > Directory sign-on): a directory group DN gives a
+  global role (admin / project_manager / author / auditor) and/or feeds a local group. Strongest role wins; auditor only when it is the only
+  role. First sign-in creates the account through `provisionUser` (no local password: hash `!directory`); later sign-ins update name, role
+  (never demoting the last active administrator) and the directory-fed group memberships (local memberships are kept).
+* **Offboarding.** At sign-in (unknown, disabled in AD via `userAccountControl`, or in no mapped group) and in a periodic sync
+  (`services/directorySync.ts`, every `AGASTYA_DIRECTORY_SYNC_HOURS`, first run 15 min after start; *Sync now*). Sessions end. An account the
+  directory disabled (`disabled_reason='directory'`) is reinstated when the directory lets it in again; one an administrator disabled is not.
+  A sync that would disable every directory account (2 or more) changes nothing (`directory.sync.failed`).
+* **Break-glass.** A local account name never consults the directory; directory down -> `503 DIRECTORY_UNAVAILABLE` for domain sign-ins
+  only; the last local administrator cannot be switched to the directory (`BREAK_GLASS_REQUIRED`). Password change / reset / forgot refuse
+  directory accounts (`409 DIRECTORY_ACCOUNT`).
+* **Central administration and fine-grained permissions (PLT-016, ENT-023)** through the existing guard/capability system, so the authz
+  matrix and the `can` map remain the single source of truth:
+  - Groups (`access_groups`, `access_group_members`) and project group grants (`project_group_grants`): a person's project role is the
+    strongest of membership, folder and group (`authz.evaluate`).
+  - Capability rules (`project_capability_rules`, per project, subject user or group, `allow` / `deny`): evaluated in `requireProject` for the
+    route's declared `cap`. Deny wins (`403 CAPABILITY_DENIED`); allow lifts the role-ladder refusal for that one capability. Owners and
+    software administrators are never affected; `project.access` itself is never subject to rules. The project card's `can` map applies the
+    same rules (`permissions.canFor`).
+  - Auditor (read-only) role: a flag on the account (`users.auditor`), not a fourth global role (keeps every `role` check unchanged). Viewer on
+    every active project, the user list and the audit log (`requireGlobal('access.read' | 'audit.read')`, a new guard class in the matrix);
+    every non-GET refused (`403 READ_ONLY_ACCOUNT`) except its own sign-in gates.
+  - No escalation: nobody grants a project role above their own (`ROLE_ABOVE_YOURS`).
+  - Administrator > Roles lists every capability with its minimum role (`/api/admin/roles` `capabilities`).
+  - Routes: `routes/access.ts`; SQL in `repositories/accessRepository.ts` (wp10 seam; contract case added); migration
+    `024-directory-groups-permissions` (additive).
+* **UI.** Administrator > Groups, Administrator > Directory sign-on (`pages/AccessAdmin.tsx`), Project settings > Access (group grants and
+  single-action rules), Users list shows *Directory* / *Auditor* / *Offboarded by the directory*, *Make auditor*, no *Reset password* for
+  directory accounts. Docs: OPERATIONS.md section 5 "Mode B: directory sign-on" and "Auditors and fine-grained permissions".
+* **Decisions recorded.**
+  - No LDAP library is in `node_modules` and none can be installed offline: a small own LDAPv3 client (bind/search/unbind only), tested
+    against an in-process fake LDAPS server (`test/helpers-ldap.js`).
+  - LDAPS only (no plain LDAP, no StartTLS): meets AD channel binding / signing requirements without SASL.
+  - A directory URL in Mode A is a start-up error (desktop keeps local accounts).
+  - Configuration by environment variables (`AGASTYA_DIRECTORY_*`, typed in `config.ts`); an `agastya.ini [directory]` section is left
+    to the launcher owner (WP-25 was changing the launcher in parallel).
+  - Migration 023 (`023-document-leases`) is WP-11's file copied verbatim (commit 0011621) because `checkOrder` refuses a gap; if WP-29 or
+    another package also took 024, the lead renumbers at merge (the file content is independent).
+* **Tests run** (each file alone, `node --test --test-concurrency=1`): `wp27-directory` 15/15, `wp27-permissions` 7/7, `authz-matrix` 6/6
+  (snapshot regenerated with `AGASTYA_UPDATE_AUTHZ_SNAPSHOT=1` and reviewed: 17 new routes, `GET /api/admin/users`, `/audit`,
+  `/maintenance/audit.csv` moved from `requireAdmin` to `requireGlobal(...)` with the same answers for every existing role plus the auditor
+  column; the auditor gets 403 on every write except the 7 `/api/auth/*` gate routes), `auth-core` 11/11, `auth-http` 10/10, `wp03-auth`
+  11/11, `rbac` 7/7, `routes-guarded` 1/1, `wp13-permissions` 3/3, `wp10-seams` 11/11, `wp10-storage-contract` 12/12, `admin-ops` 8/8,
+  `ws-broadcast` 5/5, `settings-hostile-input` 6/6, `wp06-lifecycle` 5/5, `wp26-network` 9/9 (one earlier run failed test 7, the
+  Mode B TLS test, under the parallel agents' load; a re-run alone passed 9/9, and the file was not changed). Backend `tsc` clean; lint ratchet unchanged
+  (any.backend 279, require 46). Frontend: `tsc --noEmit` clean, `vitest` `pages/AccessAdmin.test.tsx` 4/4, `PlatformBackups.test.tsx` 2/2;
+  `check:parity` PASS. Not run (per the brief): Playwright, the full backend suite, the gate, full vitest.
+* **Not done, and why.**
+  - A test against a real Active Directory: external (steps in OPERATIONS.md).
+  - Kerberos / NTLM integrated sign-on, TOTP second factor, OIDC/SAML (RES-003, optional): not in this package; LDAPS bind covers Mode B on a
+    domain network. OIDC would be a third provider behind the same seam.
+  - ENT-022 classification-based export control (P3, optional): not started.
+  - A Playwright journey for the new screens: not written or run (the brief excludes Playwright here).
+### WP-25 Standalone installer, launcher, offline update and rollback, Mode A (DEP-023, QA-009, PRD-005; gates G-DEP-1/2/5, G-REL-3) - done, with the limits listed
+
+* **Versioned program folder** (`packaging/host/Update.cs`, `AgastyaHost.cs`): each version's full tree lives in `<install>\versions\<version>\`.
+  `current` and `previous` are pointer files, written atomically. `AgastyaPlatform.exe` and `AgastyaCtl.exe` at the root are a launcher: copies of
+  the current version's, refreshed by renaming the old file aside, so a running launcher never blocks an update. A flat 2.0.0 install, portable copy
+  or dev tree is moved into `versions\<ver>` on its first update. `state.dir`, `portable.flag`, the `agastya.ini` lookup and the service binPath use
+  the install folder, never the version folder. New commands: `--versions`, `--prune-versions`, `--repair-launcher`. `--doctor` shows the version
+  folder, launcher drift, the versions kept and WebView2.
+* **Offline update package** `.agupdate` (`scripts/release/update-package.mjs`): the packager builds it as step 10b and lists it in SHA256SUMS.
+  `--no-update` skips it; release mode requires it to be signed. It is a ZIP holding:
+  - `update-info.txt`: format, product, app-id, version, min-from-version, commit, manifest hash, counts, notes;
+  - `update-info.txt.sig`: the WP-24 detached signature;
+  - `payload/`: the whole tree with its signed `MANIFEST.sha256`.
+
+  Each package carries the full tree; there are no deltas.
+* **`AgastyaCtl --verify-update <file>` and `--apply-update <file>`**:
+  - **Verified before anything changes:** safe entry names; signature; trust; product and app-id; newer version; min-from range; every payload file
+    streamed against the manifest; completeness; disk space. The signer is trusted when it matches the Authenticode signer of the installed
+    `AgastyaCtl.exe`, the signer of the installed manifest `.sig`, or a `[update] TrustedThumbprints` entry. An unsigned package needs
+    `--allow-unsigned`.
+  - **Apply:**
+    1. Stop everything. Stopped means the port no longer answers and `.agastya-server.lock` holds no live pid. There is no fixed wait.
+    2. Make a **pre-update platform backup** with `backend/scripts/agastya-backup.js --kind pre-update`, then verify it with a test restore.
+    3. Copy the DB files while the server is stopped.
+    4. Extract the package (zip-slip guard, new files only).
+    5. Switch the pointers and start the new version.
+    6. **Health check:** `/api/version` must report the expected version and `compatible:true`, then `/api/ready` must return 200, within
+       `HealthSeconds` (default 60).
+  - **On failure, automatic rollback:** the pointers go back, the DB files are restored from the stopped-state copy, and the old version is started
+    and checked. The failed DB is kept in `backups\failed-update-...`.
+  - Exit codes: 0/1/2/10/11/12/13/14/20/21/22 (`docs/OPERATIONS.md` section 8).
+  - Writes `update-history.txt` and `logs\update-*.log`. Keeps `KeepVersions` old versions (default 2). `--rollback [--restore-db]` rolls back by
+    hand.
+  - The Add/Remove Programs `DisplayVersion` follows updates and rollbacks, so the WP-24 detection rule stays right.
+* **Setup** (`packaging/installer/agastya.iss`):
+  - Installs into `versions\{#AppVersion}` plus the launcher.
+  - `PrepareToInstall` runs the new `AgastyaCtl --install-dir {app} --prepare-upgrade`, which stops the server and makes a verified pre-update
+    backup. If that fails, Setup exits with 7 and nothing has changed. The old `Sleep 4000` stop and the plain DB copy are gone.
+  - `ssPostInstall` runs `--activate`.
+  - Upgrades skip the data and port pages.
+  - The firewall rule is bound to the port, because node.exe moves with each version.
+  - `/ADMINUSER=` and `/ADMINPASSWORDFILE=` create the first administrator unattended through `backend/scripts/first-admin.js`. The password goes on
+    stdin only; it is temporary and must be changed at the first sign-in. Nothing happens if an admin already exists.
+  - Uninstall keeps the data unless `/PURGEDATA` is given or the user answers Yes (default No). `--remove-data --confirm` refuses drive roots,
+    profile and system folders, and the program folder.
+  - Version folders, pointers and history are removed with the program.
+* **Window and WebView2 (PRD-005)**:
+  - The host detects the Evergreen WebView2 runtime (the EdgeUpdate client `pv` value).
+  - It opens the UI as an Edge app window (`msedge --app=`). Without Edge it falls back to the default browser and shows a tray notice.
+    `[app] Window=auto|app|browser` chooses.
+  - `/api/version` reports `shell.webview2` and `shell.window` (`backend/src/config.ts`, `app.ts`).
+  - The build never downloads Microsoft's offline runtime installer. When `packaging/redist/MicrosoftEdgeWebView2RuntimeInstallerX64.exe` is present,
+    it ships in `redist\`. Setup runs it on a machine without the runtime, and every offline update runs it again.
+* **Other changes:**
+  - `scripts/verify-installer.mjs`, `Verify-Release.ps1 -Tree` and `verify-release.mjs --tree` follow `current` into the version folder.
+  - `Test-InstallerInVm.ps1` expects the version folder and the port-bound rule (parse-checked only).
+  - The support bundle carries the newest update, rollback and setup logs.
+  - `agastya.ini.template` gained an `[update]` section.
+  - Docs: `OPERATIONS.md` sections 1, 2, 8, 9 and 10; `DEPLOYMENT-KIT.md`; `PACKAGING.md`.
+* **Recorded decisions:**
+  - **An Edge app window, not an embedded WebView2 control.** The WebView2 SDK is not available offline. The Edge window uses the same engine, in a
+    separate window.
+  - Update packages carry the full tree, no deltas.
+  - The installed version's Ctl applies an update. The new version's backup tool is used only when the installed version has none.
+  - A Setup upgrade gets the verified backup and a one-command `--rollback`, but **no automatic health-checked rollback**: by then Inno has replaced
+    the launcher.
+  - A rollback restores the DB files only. Project files are covered by the pre-update platform backup.
+  - Trust on install: the installed signer is the anchor.
+  - KeepVersions 2; HealthSeconds 60.
+  - Migrations stay additive. `--rollback` without `--restore-db` refuses (exit 22) when the previous version cannot open the newer database.
+* **Verified (2026-11-27).** Every run used throwaway self-signed `.pfx` files in temp folders; no certificate store was touched. Every install went
+  into `%TEMP%`.
+  - `scripts/release/update.test.mjs`: 6/6, against the real `agastya-backup.js` and `first-admin.js` with the compiled backend. Covered:
+    - refusals (unsigned, stranger signer, tampered payload, older, same, min-from, truncated zip), with the program and DB byte-identical afterwards;
+    - a good update, with the pre-update backup re-verified and the launcher refreshed;
+    - a broken update (DB break, `/api/ready` 503): exit 20, the DB byte-identical, the failed DB kept aside;
+    - pruning with KeepVersions=1;
+    - `--rollback` twice, and `--restore-db`;
+    - flat adoption;
+    - `--prepare-upgrade` and `--activate`;
+    - first-admin run twice (the second run changes nothing);
+    - `--remove-data` refusals.
+  - `scripts/release/installer.test.mjs`: 1/1 with **the real Inno installer**.
+    - Two Setups (1.0.0 and 1.1.0, random AppId) built with ISCC.
+    - Installed with `/VERYSILENT /CURRENTUSER /DIR=%TEMP%\...` plus `/ADMINUSER` and `/ADMINPASSWORDFILE`: the admin was created.
+    - Upgraded with a verified backup.
+    - `--rollback`: the launcher and Add/Remove Programs back at 1.0.0.
+    - Uninstalled keeping the data, reinstalled, then uninstalled with `/PURGEDATA`.
+    - Afterwards its HKCU uninstall key, Start-menu folder and temp folder are gone (checked).
+    - A first run failed on a real bug: the ini template path after the move to `versions\`. It is fixed in `agastya.iss`, and a missing template is
+      now logged instead of passing silently. I removed that run's leftover Start-menu folder by hand.
+  - Also run and passing:
+    - `scripts/release/host.test.mjs` 6/6;
+    - `scripts/release/release.test.mjs` 8/8;
+    - backend `test/wp13-version.test.js` 4/4;
+    - `npx tsc -p .`;
+    - `node scripts/ci/lint.mjs` (exit 0);
+    - `node --check` on the changed scripts;
+    - the PowerShell parse of `Verify-Release.ps1` and `Test-InstallerInVm.ps1`.
+  - `installer.test.mjs` and `update.test.mjs` are registered in `test-plan.json` `scriptTests.release-tools`.
+* **Not done or blocked externally:**
+  - The clean-VM matrix (G-DEP-1/2 on Windows 10/11/Server, per-machine install, service path) and the VM harness changes were not executed.
+  - The **service** update path (stopping and starting the Windows service) is coded, but only the console path was run.
+  - No real certificate or time stamp (D4).
+  - The WebView2 offline redist binary is not in the repository (it is a Microsoft download, under Microsoft's licence). The WebView2-missing path on
+    a Server SKU was not tried.
+  - No full `npm run package:win` with the update package; it needs `frontend/dist` and the bundled runtimes.
+  - G-REL-3 was not run against a real previous release; only the synthetic 1.0.0/1.1.0 stages.

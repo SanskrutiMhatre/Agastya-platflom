@@ -50,7 +50,7 @@ describe('Audit viewer', () => {
     const r = render(<Audit />);
     await settle();
     click(r.$('[data-testid="audit-verify"]')); await settle(); await settle();
-    expect(calls.some((c) => c.method === 'POST' && c.url === '/api/admin/audit/verify')).toBe(true);
+    expect(calls.some((c) => c.method === 'GET' && c.url === '/api/admin/audit/verify')).toBe(true);
     expect(r.$('[data-testid="audit-verify-result"]').textContent).toBe('Intact: audit chain intact: 3 row(s) verified.');
     verifyAnswer = { ...base, ok: false, summary: 'audit chain BROKEN: 1 problem(s)', problemCount: 1, problems: [{ kind: 'content', id: 2, seq: 2, message: 'row id 2 (sequence 2) was changed after it was written' }] };
     click(r.$('[data-testid="audit-verify"]')); await settle(); await settle();

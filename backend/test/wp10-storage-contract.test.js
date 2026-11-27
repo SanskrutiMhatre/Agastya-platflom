@@ -235,6 +235,36 @@ function contract(engine, make) {
     assert.deepEqual(R.retention.auditRowsBefore(cut, 0, 10).map((r) => r.action), ['old.3', 'old.4']);
   });
 
+  withRepos('access (WP-27): groups, directory-fed memberships, strongest group grant, rules for a person and their groups, clean-up', (R, e) => {
+    const S = e.store;
+    for (const [id, name] of [['u1', 'alice'], ['u2', 'bob']]) S.createUser({ id, username: name, fullName: name, role: 'author', passwordHash: 'x', now });
+    const A = R.access;
+    A.createGroup({ id: 'g1', name: 'Pump', description: '', now, by: null });
+    A.createGroup({ id: 'g2', name: 'Valve', description: 'v', now, by: null });
+    assert.equal(A.findGroupByName('pump').id, 'g1', 'names compare without case');
+    A.addGroupMember('g1', 'u1', 'local', now, null);
+    assert.deepEqual(A.replaceDirectoryMemberships('u1', ['g1', 'g2'], now), { added: ['g2'], removed: [] }, 'a local row is kept, not duplicated');
+    assert.deepEqual(A.replaceDirectoryMemberships('u1', [], later), { added: [], removed: ['g2'] }, 'only directory rows are replaced');
+    assert.deepEqual(A.groupIdsForUser('u1'), ['g1']);
+    A.addGroupMember('g2', 'u1', 'directory', now, null);
+    A.setProjectGroupGrant('p1', 'g1', 'viewer', now, null); A.setProjectGroupGrant('p1', 'g2', 'editor', now, null);
+    assert.equal(A.groupRoleForProject('p1', 'u1'), 'editor', 'the strongest grant');
+    assert.equal(A.groupRoleForProject('p1', 'u2'), null);
+    assert.deepEqual(A.projectsGrantedToUser('u1'), [{ project_id: 'p1', role: 'editor' }]);
+    A.putRule({ id: 'r1', project_id: 'p1', subject_type: 'group', subject_id: 'g1', capability: 'dm.write', effect: 'allow', created_at: now, created_by: null });
+    A.putRule({ id: 'r2', project_id: 'p1', subject_type: 'user', subject_id: 'u2', capability: 'dm.write', effect: 'deny', created_at: now, created_by: null });
+    const again = A.putRule({ id: 'r3', project_id: 'p1', subject_type: 'group', subject_id: 'g1', capability: 'dm.write', effect: 'deny', created_at: later, created_by: null });
+    assert.equal(again.id, 'r1', 'one rule per subject and capability: replaced in place'); assert.equal(again.effect, 'deny');
+    assert.deepEqual(A.rulesFor('p1', 'u1').map((r) => r.id), ['r1']); assert.deepEqual(A.rulesFor('p1', 'u2').map((r) => r.id), ['r2']);
+    const m = A.addDirectoryMapping({ id: 'm1', groupDn: 'CN=Pump,DC=x', globalRole: 'author', groupId: 'g1', now, by: null });
+    assert.equal(m.group_name, 'Pump');
+    assert.equal(A.deleteGroup('g1'), true);
+    assert.deepEqual(A.rulesFor('p1', 'u1'), [], 'a deleted group takes its rules'); assert.equal(A.listDirectoryMappings()[0].group_id, null);
+    A.deleteProjectAccess('p1');
+    assert.deepEqual([A.listProjectGroupGrants('p1'), A.listRules('p1')], [[], []]);
+    assert.equal(A.deleteDirectoryMapping('m1'), true); assert.equal(A.deleteGroup('nope'), false);
+  });
+
   test(`[${engine}] sign-in throttle stores: the same answers from the database table and from memory`, () => {
     const e = make();
     try {
@@ -286,6 +316,26 @@ function contract(engine, make) {
     A.insertWaiverEvent({ project_id: 'p1', waiver_id: 'w1', event: 'removed', kind: 'brex-missing', subject: 'S', reason: 'done', expires_at: null, actor: 'alice', at: later });
     A.insertWaiverEvent({ project_id: 'p2', waiver_id: 'w2', event: 'added', kind: 'brex-missing', subject: 'T', reason: 'x', expires_at: later, actor: 'bob', at: now });
     assert.deepEqual(A.waiverEvents('p1', 10).map((w) => [w.event, w.reason]), [['removed', 'done'], ['added', 'why']], 'newest first, one project');
+  });
+
+  withRepos('check-out leases (WP-11): one holder at a time, the holder renews, an expired lease is taken over, release and purge', (R) => {
+    const t = (min) => new Date(Date.parse(now) + min * 60_000).toISOString();
+    const L = (userId, at, until, part = '') => ({ documentId: 'd1', part, projectId: 'p1', userId, username: userId, now: at, expiresAt: until });
+    assert.equal(R.leases.acquire(L('u1', now, t(60))), true);
+    assert.equal(R.leases.acquire(L('u2', t(1), t(61))), false, 'held by someone else');
+    assert.equal(R.leases.get('d1', '').user_id, 'u1');
+    assert.equal(R.leases.acquire(L('u1', t(30), t(90))), true, 'the holder renews');
+    const renewed = R.leases.get('d1', '');
+    assert.equal(renewed.acquired_at, now, 'a renewal keeps when it was taken'); assert.equal(renewed.expires_at, t(90));
+    assert.equal(R.leases.acquire(L('u2', t(91), t(151))), true, 'expired: taken over');
+    assert.equal(R.leases.get('d1', '').user_id, 'u2'); assert.equal(R.leases.get('d1', '').acquired_at, t(91));
+    assert.equal(R.leases.acquire(L('u1', t(92), t(152), 'c1')), true, 'parts are separate leases');
+    assert.deepEqual(R.leases.listForDocument('d1').map((r) => [r.part, r.user_id]), [['', 'u2'], ['c1', 'u1']]);
+    assert.deepEqual(R.leases.listActive('p1', t(100)).length, 2);
+    assert.equal(R.leases.release('d1', '', 'u1'), false, 'only the holder releases');
+    assert.equal(R.leases.release('d1', '', null), true, 'a break releases any holder');
+    assert.equal(R.leases.purgeExpired(t(200)), 1);
+    assert.deepEqual(R.leases.listForDocument('d1'), []);
   });
 }
 

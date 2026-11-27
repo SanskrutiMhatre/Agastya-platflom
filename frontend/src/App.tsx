@@ -31,6 +31,7 @@ const ValidationPage = page(() => import('./pages/project/ValidationPage'), 'Val
 const ReleasePage = page(() => import('./pages/project/ReleasePage'), 'ReleasePage');
 const AncillaryRoute = page(() => import('./pages/project/AncillaryRoute'), 'AncillaryRoute');
 const ProjectSettingsPage = page(() => import('./pages/project/ProjectSettingsPage'), 'ProjectSettingsPage');
+const ProjectHomePage = page(() => import('./pages/project/ProjectHomePage'), 'ProjectHomePage');
 const lazyEl = (el: ReactNode) => <Suspense fallback={<Loading />}>{el}</Suspense>;
 
 // The editors (the S1000D Studio: CodeMirror, pdfmake, the schema engine; the JSS editor) are large and only this route needs them: EditorRoute loads the one that fits.
@@ -94,6 +95,7 @@ export function App() {
       <Route path="preview/:id/:mode" element={lazyEl(<PreviewWindow />)} />
       <Route path="projects/:id" element={<ProjectShell />}>
         <Route index element={<Navigate to="editor" replace />} />
+        <Route path="home" element={lazyEl(<ProjectHomePage />)} />   {/* WP-22 (UX-007): the Project Home, first in the rail; opening a project still lands in the editor */}
         <Route path="editor" element={<EditorRoute />} />
         <Route path="explore" element={lazyEl(<ExploreRoute />)} />
         <Route path="publication" element={lazyEl(<PublicationRoute />)} />

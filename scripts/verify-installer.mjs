@@ -76,9 +76,13 @@ try {
   const r1 = install();
   check('Setup exits with code 0', r1.status === 0, `exit ${r1.status}; see ${setupLog}`);
   const ctl = path.join(inst, 'AgastyaCtl.exe');
-  check('the program is in the chosen folder (spaces, non-ASCII)', fs.existsSync(path.join(inst, 'AgastyaPlatform.exe')) && fs.existsSync(ctl) && fs.existsSync(path.join(inst, 'runtime', 'node.exe')) && fs.existsSync(path.join(inst, 'app', 'backend', 'dist', 'index.js')));
-  check('licences are installed', fs.existsSync(path.join(inst, 'THIRD-PARTY-NOTICES.txt')) && fs.existsSync(path.join(inst, 'licenses', 'node', 'LICENSE')));
-  check('no portable.flag and no sample config leaked into the installed program folder', !fs.existsSync(path.join(inst, 'portable.flag')) && !fs.existsSync(path.join(inst, 'config')));
+  // WP-25 (DEP-023): the program is in versions\<version>\ and "current" names it; the launcher sits beside it
+  const current = fs.existsSync(path.join(inst, 'current')) ? fs.readFileSync(path.join(inst, 'current'), 'utf8').trim() : '';
+  const prog = path.join(inst, 'versions', current || 'missing');
+  check('"current" names the installed version', current === expectedVersion, current || 'no current file');
+  check('the program is in the chosen folder (spaces, non-ASCII)', fs.existsSync(path.join(inst, 'AgastyaPlatform.exe')) && fs.existsSync(ctl) && fs.existsSync(path.join(prog, 'runtime', 'node.exe')) && fs.existsSync(path.join(prog, 'app', 'backend', 'dist', 'index.js')));
+  check('licences are installed', fs.existsSync(path.join(prog, 'THIRD-PARTY-NOTICES.txt')) && fs.existsSync(path.join(prog, 'licenses', 'node', 'LICENSE')));
+  check('no portable.flag and no sample config leaked into the installed program folder', !fs.existsSync(path.join(inst, 'portable.flag')) && !fs.existsSync(path.join(inst, 'config')) && !fs.existsSync(path.join(prog, 'portable.flag')) && !fs.existsSync(path.join(prog, 'config')));
   check('state.dir points at the chosen state folder', fs.existsSync(path.join(inst, 'state.dir')) && fs.readFileSync(path.join(inst, 'state.dir'), 'utf8').replace(/^﻿/, '').trim() === state, fs.existsSync(path.join(inst, 'state.dir')) ? fs.readFileSync(path.join(inst, 'state.dir'), 'utf8') : 'missing');
   const iniPath = path.join(state, 'agastya.ini');
   const ini = fs.existsSync(iniPath) ? fs.readFileSync(iniPath, 'utf8').replace(/^﻿/, '') : '';
@@ -120,16 +124,19 @@ try {
   check('Setup exits with code 0', r2.status === 0, `exit ${r2.status}; see ${setupLog}`);
   check('agastya.ini was kept, with the administrator\'s edit', fs.readFileSync(iniPath, 'utf8').includes('kept-across-upgrade-marker'));
   check('the data was kept', fs.readFileSync(path.join(data, 'user-file.txt'), 'utf8') === 'user data' && fs.existsSync(path.join(data, 'publisher.db')));
-  const backups = fs.existsSync(path.join(data, 'backups')) ? fs.readdirSync(path.join(data, 'backups')).filter((d) => d.startsWith('pre-upgrade-')) : [];
-  check('the database was backed up before the upgrade', backups.length === 1 && fs.existsSync(path.join(data, 'backups', backups[0], 'publisher.db')), JSON.stringify(backups));
-  if (backups.length) check('the backup is a real copy of the database', fs.statSync(path.join(data, 'backups', backups[0], 'publisher.db')).size > 0);
+  // WP-25 (DEP-001, G-DEP-5): a platform backup of kind pre-update, made and verified by a restore before Setup replaced anything
+  const pdir = path.join(data, 'backups', 'platform');
+  const backups = fs.existsSync(pdir) ? fs.readdirSync(pdir).filter((d) => /-pre-update(-\d+)?\.zip$/.test(d)) : [];
+  check('a platform backup was made before the upgrade', backups.length === 1, JSON.stringify(backups));
+  const upLog = fs.existsSync(path.join(state, 'logs')) ? fs.readdirSync(path.join(state, 'logs')).find((n) => n.startsWith('setup-upgrade-')) : null;
+  check('and verified by a restore before anything was replaced', !!upLog && /pre-update backup written and verified/.test(fs.readFileSync(path.join(state, 'logs', upLog), 'utf8')), upLog || 'no setup-upgrade log');
 
   // ---- uninstall
   console.log('\nUninstall:');
   const un = spawnSync(path.join(inst, 'unins000.exe'), ['/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'], { encoding: 'utf8', timeout: 300000 });
   check('the uninstaller exits with code 0', un.status === 0, `exit ${un.status}`);
   for (let i = 0; i < 20 && fs.existsSync(path.join(inst, 'AgastyaPlatform.exe')); i++) await sleep(500);
-  check('the program files are gone', !fs.existsSync(path.join(inst, 'AgastyaPlatform.exe')) && !fs.existsSync(path.join(inst, 'app')));
+  check('the program files are gone', !fs.existsSync(path.join(inst, 'AgastyaPlatform.exe')) && !fs.existsSync(path.join(inst, 'versions')) && !fs.existsSync(path.join(inst, 'app')));
   check('the Start menu shortcuts are gone', !fs.existsSync(path.join(startMenu, 'Agastya Platform.lnk')));
   check('the uninstall entry is gone', !regHas(uninstKey));
   check('the data and the configuration were KEPT', fs.existsSync(path.join(data, 'publisher.db')) && fs.existsSync(path.join(data, 'user-file.txt')) && fs.existsSync(iniPath));

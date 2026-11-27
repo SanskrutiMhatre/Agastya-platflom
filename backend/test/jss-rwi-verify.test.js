@@ -160,8 +160,8 @@ test('legacy S1000D writers cannot overwrite a JSS project\'s publication.xml wi
   await hit('POST', 'import/apply'); await hit('POST', 'import/assign', {}); await hit('PUT', 'pmc', { xml: pm }); await hit('POST', 'pmc/import'); await hit('POST', 'packages/import'); await hit('POST', 'dms-import');
   assert.equal(sha(fs.readFileSync(p.pub)), before, 'publication.xml is exactly as it was');
   // the JSS save path refuses a publication module or a contents list too
-  const put = await w.put(`${p.U}/jss`, { xml: pm }); assert.equal(put.status, 400); assert.equal(put.json.code, 'NOT_NATIVE_JSS');
-  const list = await w.put(`${p.U}/jss`, { xml: '<?xml version="1.0"?><packageContents><file name="a.xml"/></packageContents>' }); assert.equal(list.status, 400); assert.equal(list.json.code, 'NOT_NATIVE_JSS');
+  const put = await w.put(`${p.U}/jss`, { xml: pm, baseHash: (await w.get(`${p.U}/jss`)).json.hash }); assert.equal(put.status, 400); assert.equal(put.json.code, 'NOT_NATIVE_JSS');
+  const list = await w.put(`${p.U}/jss`, { xml: '<?xml version="1.0"?><packageContents><file name="a.xml"/></packageContents>', baseHash: (await w.get(`${p.U}/jss`)).json.hash }); assert.equal(list.status, 400); assert.equal(list.json.code, 'NOT_NATIVE_JSS');
   assert.equal(sha(fs.readFileSync(p.pub)), before);
   // a file that was already overwritten (by an older build) is reported, cannot be exported, and is replaced by Import project
   fs.writeFileSync(p.pub, pm);

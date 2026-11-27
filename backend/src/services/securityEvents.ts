@@ -51,6 +51,11 @@ const BY_ACTION: Record<string, Key> = {
   'user.import.committed': 'ROLE_CHANGED', 'user.bootstrap_admin_created': 'ROLE_CHANGED', 'user.setup_admin_created': 'ROLE_CHANGED',
   'member.added': 'MEMBERSHIP_CHANGED', 'member.assigned': 'MEMBERSHIP_CHANGED', 'member.role_changed': 'MEMBERSHIP_CHANGED',
   'member.removed': 'MEMBERSHIP_CHANGED', 'folder.access_changed': 'MEMBERSHIP_CHANGED', 'project.owner_reassigned': 'MEMBERSHIP_CHANGED',
+  // WP-27: groups, project group grants and capability rules change who may do what; a directory mapping can give a global role
+  'group.member.added': 'MEMBERSHIP_CHANGED', 'group.member.removed': 'MEMBERSHIP_CHANGED', 'group.deleted': 'MEMBERSHIP_CHANGED',
+  'project.access.group-granted': 'MEMBERSHIP_CHANGED', 'project.access.group-removed': 'MEMBERSHIP_CHANGED',
+  'project.access.rule-set': 'MEMBERSHIP_CHANGED', 'project.access.rule-removed': 'MEMBERSHIP_CHANGED',
+  'directory.mapping.added': 'ROLE_CHANGED', 'directory.mapping.removed': 'ROLE_CHANGED',
   'release.requested': 'RELEASE_REQUESTED', 'review.resubmitted': 'RELEASE_REQUESTED',
   'release.approved': 'RELEASE_DECIDED', 'release.rejected': 'RELEASE_DECIDED',
   'backup.created': 'BACKUP_CREATED', 'backup.failed': 'BACKUP_FAILED', 'backup.restored': 'BACKUP_RESTORED',
@@ -61,12 +66,12 @@ const BY_ACTION: Record<string, Key> = {
 };
 function keyForAction(action: string, meta: unknown): Key | null {
   if (BY_ACTION[action]) {
-    // a user.updated that changed only the display name is not a role change
-    if (action === 'user.updated' && !(meta && typeof meta === 'object' && 'role' in (meta as Record<string, unknown>))) return null;
+    // a user.updated that changed only the display name is not a role change (the role, WP-27's auditor flag or the sign-in source is)
+    if (action === 'user.updated' && !(meta && typeof meta === 'object' && ['role', 'auditor', 'auth_source'].some((k) => k in (meta as Record<string, unknown>)))) return null;
     return BY_ACTION[action];
   }
   if (action === 'backup.restore_tested' && meta && typeof meta === 'object' && (meta as { ok?: unknown }).ok === false) return 'BACKUP_FAILED';
-  if (/lease\.(broken|break)|lock\.broken|\.lock_broken$|\.lease_broken$/.test(action)) return 'LOCK_BROKEN';
+  if (/lease\.(broken|break)|lock\.broken|\.lock_broken$|\.lease_broken$|checkout-broken$/.test(action)) return 'LOCK_BROKEN';   // WP-11 check-out breaks too
   return null;
 }
 

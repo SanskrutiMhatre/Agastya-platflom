@@ -5,28 +5,31 @@
 // (projectId, relative path) through this interface instead of joining paths onto the workspace themselves, so a server build can put
 // the content on a shared volume, and WP-11 can make every write atomic and cut a revision in ONE place.
 //
-// The default, LocalFolderStore, does exactly what the services did before (fs read / write / list / unlink under
-// <workspace>/projects/<id>/): behaviour is unchanged. Paths are confined to the project folder; an escaping path is refused.
+// The default, LocalFolderStore, reads, lists and removes under <workspace>/projects/<id>/ as the services did before; since WP-11
+// every write is atomic (storage/atomicWrite.ts: temporary sibling, fsync, rename), so a crash never leaves a torn file. Paths are confined to the project folder; an escaping path is refused.
 // The document engines (xsltproc, FOP) still need a local folder: `projectDir()` materialises it (for a local folder, it is just
 // the folder).
 // =============================================================================
 
 import fs from 'fs';
 import path from 'path';
+import { writeFileAtomic } from './atomicWrite';
 
 export interface ContentStat { size: number; mtimeMs: number; isDirectory: boolean }
 
 export interface ContentStore {
   /** The local folder that holds this project's content (materialised for the engines). */
   projectDir(projectId: string): string;
-  /** The local path of a file in the project; throws when `rel` would leave the project folder. */
+  /** The local path of a file in the project; throws when `rel` would leave the project folder. `rel` may also be an absolute path, which must lie inside the project folder. */
   pathOf(projectId: string, rel: string): string;
   exists(projectId: string, rel: string): boolean;
   stat(projectId: string, rel: string): ContentStat | null;
   readText(projectId: string, rel: string): string;
   readBuffer(projectId: string, rel: string): Buffer;
-  /** Write a whole file. The folder must exist (a write never re-creates a deleted project). WP-11 makes this atomic and revisioned here, for every caller at once. */
+  /** Write a whole file, atomically (WP-11): a reader, or the disk after a crash, sees the old or the new file, never a torn one. The folder must exist (a write never re-creates a deleted project); `mkdir` a sub-folder first. */
   writeText(projectId: string, rel: string, text: string): void;
+  /** The same for binary content (pictures, uploaded files). */
+  writeBuffer(projectId: string, rel: string, data: Uint8Array): void;
   /** Names in a folder of the project; [] when the folder does not exist. */
   list(projectId: string, relDir: string): string[];
   remove(projectId: string, rel: string): void;
@@ -61,9 +64,9 @@ export class LocalFolderStore implements ContentStore {
 
   readBuffer(projectId: string, rel: string): Buffer { return fs.readFileSync(this.pathOf(projectId, rel)); }
 
-  writeText(projectId: string, rel: string, text: string): void {
-    fs.writeFileSync(this.pathOf(projectId, rel), text, 'utf8');
-  }
+  writeText(projectId: string, rel: string, text: string): void { writeFileAtomic(this.pathOf(projectId, rel), text, 'utf8'); }
+
+  writeBuffer(projectId: string, rel: string, data: Uint8Array): void { writeFileAtomic(this.pathOf(projectId, rel), data); }
 
   list(projectId: string, relDir: string): string[] {
     const abs = this.pathOf(projectId, relDir);

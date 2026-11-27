@@ -27,7 +27,9 @@ const ORDER = [
   '021-project-lifecycle',
   // WP-12: from here on every step is appended with the next number (storage/schema.ts checkOrder refuses anything else).
   '022-audit-project-index',
-  '023-audit-chain',               // WP-29 (renumber at merge when 023/024 are taken: see the MERGE NOTE in the file)
+  '023-document-leases',
+  '024-directory-groups-permissions',
+  '025-audit-chain',               // WP-29
 ];
 
 const MIGRATIONS = ORDER.map((name) => require(`./${name}`));

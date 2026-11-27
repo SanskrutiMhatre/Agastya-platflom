@@ -4,10 +4,13 @@
 
 import { tuneServer, sweepStaleUploads } from './services/uploads';
 import type http from 'http';
+import path from 'path';
+import { sweepTempFiles } from './storage/atomicWrite';
 import { config, nowIso } from './config';
 import { createApp } from './app';
 import { store, audit, workspaceDir, registryDb, defaultContext } from './context';
 import { startScheduler, stopScheduler } from './services/dataProtection';
+import { startDirectorySync } from './services/directorySync';
 import { acquireWorkspaceLock, releaseWorkspaceLock } from './services/workspaceLock';
 import * as broadcast from './services/broadcast';
 import { reconcileRegistry, sweepPendingImports } from './services/projects';
@@ -40,6 +43,7 @@ export async function start(port: number = config.port): Promise<number> {
   // in-process apps on one workspace on purpose opt out with AGASTYA_NO_WORKSPACE_LOCK=1.
   if (config.workspaceLock) acquireWorkspaceLock(workspaceDir);
   try { sweepPendingImports(); } catch (e) { console.warn('[start] unfinished imports:', (e as Error).message); }    // REL-004: an import cut off by a crash
+  try { const n = sweepTempFiles(path.join(workspaceDir, 'projects')); if (n) console.warn(`[start] removed ${n} temporary file(s) left by interrupted saves`); } catch { /* best effort */ }   // WP-11: a save cut off between write and rename
   await reconcileRegistry();
   await ensureBootstrapAdmin({ store, audit, env: config.initialAdmin, now: () => new Date() });
 
@@ -49,6 +53,7 @@ export async function start(port: number = config.port): Promise<number> {
   try { sweepStaleUploads(); } catch { /* the temp folder is a convenience */ }
   setInterval(() => { try { sweepStaleUploads(); } catch { /* best effort */ } }, 3600_000).unref();     // aborted uploads must not pile up on a server that stays up
   startScheduler(defaultContext());   // WP-12: scheduled backup, weekly restore test, retention (first run 10 minutes after start)
+  startDirectorySync(defaultContext());   // WP-27: directory offboarding sync (Mode B with a directory only; daily by default)
   // WP-26: Mode A listens on loopback only, Mode B on the network with TLS only (services/network.ts; the certificate was checked above).
   const l = await listen(app, port, config, material, (s) => { tuneServer(s); broadcast.attach(s); });
   servers = l.servers;

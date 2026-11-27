@@ -118,7 +118,7 @@ export function PublicationPage() {
     setBusy('save'); setError('');
     try {
       const allowEmpty = counts.total === 0 && window.confirm('This saves a publication with no content. Continue?');
-      const r = await pmcApi.save(id, { meta: data.data!.pm.meta, entries }, allowEmpty);
+      const r = await pmcApi.save(id, { meta: data.data!.pm.meta, entries }, allowEmpty, data.data!.pm.hash ?? 'new');      // WP-11: the version this screen loaded
       setDirty(false); setUndo(null);
       toast(`Saved: ${r.counts.dms} data module${r.counts.dms === 1 ? '' : 's'} in ${r.counts.folders} chapter${r.counts.folders === 1 ? '' : 's'}`, 'success');
       data.reload(); reload();

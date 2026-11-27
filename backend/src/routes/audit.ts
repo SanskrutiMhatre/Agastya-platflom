@@ -1,6 +1,8 @@
-// The audit trail for administrators (audit WP-29: ENT-003, RES-004). Everything here is requireAdmin().
+// The audit trail (audit WP-29: ENT-003, RES-004). Reading - verify, the checkpoint list, the export, the event list - is
+// requireGlobal('audit.read'): administrators and WP-27's read-only auditors. Taking a checkpoint writes, so it stays requireAdmin().
+// Every use is itself audited (an auditor's export and verification included).
 //
-//   POST /api/admin/audit/verify        walk the chain and compare it with the checkpoints; the report names every problem found
+//   GET  /api/admin/audit/verify        walk the chain and compare it with the checkpoints; the report names every problem found
 //   GET  /api/admin/audit/checkpoints   the newest signed checkpoints (database), and the backup folder's file name
 //   POST /api/admin/audit/checkpoint    take a checkpoint now (also raised as Application-log event 4102)
 //   GET  /api/admin/audit/export        every row matching the filters, streamed: ?format=csv|jsonl&action=&actor=&project=&from=&to=
@@ -9,7 +11,7 @@
 // The viewer itself is GET /api/admin/audit (core/auth/routes.js), which now filters by action, actor, project and time as well.
 
 import type { Express, Request } from 'express';
-import { requireAdmin, defaultContext } from '../context';
+import { requireAdmin, requireGlobal, defaultContext } from '../context';
 import { wrap, bad } from '../services/http';
 import { verifyAudit, writeCheckpoint, exportAudit, checkpointFileOf } from '../services/auditTrail';
 import { securityEventCatalogue } from '../services/securityEvents';
@@ -31,14 +33,15 @@ export function auditFilterOf(q: Record<string, unknown>): AuditFilter {
 }
 
 export function registerAuditRoutes(app: Express): void {
-  app.post('/api/admin/audit/verify', requireAdmin(), wrap((req, res) => {
+  // GET: verification only reads (and records that it ran), so a read-only auditor - who may not POST - runs it too
+  app.get('/api/admin/audit/verify', requireGlobal('audit.read'), wrap((req, res) => {
     const ctx = defaultContext();
     const report = verifyAudit(ctx);
     ctx.audit({ ...actor(req), action: 'audit.verified', targetType: 'audit', meta: { ok: report.ok, chained: report.chained, problems: report.problemCount } });
     res.json({ report });
   }));
 
-  app.get('/api/admin/audit/checkpoints', requireAdmin(), wrap((_req, res) => {
+  app.get('/api/admin/audit/checkpoints', requireGlobal('audit.read'), wrap((_req, res) => {
     const ctx = defaultContext();
     res.json({ checkpoints: ctx.repos.audit.checkpoints(50), file: checkpointFileOf(ctx), keyId: ctx.auditKey().id });
   }));
@@ -50,7 +53,7 @@ export function registerAuditRoutes(app: Express): void {
     res.json({ checkpoint: cp });
   }));
 
-  app.get('/api/admin/audit/export', requireAdmin(), wrap(async (req, res) => {
+  app.get('/api/admin/audit/export', requireGlobal('audit.read'), wrap(async (req, res) => {
     const ctx = defaultContext();
     const format = String(req.query.format ?? 'csv').toLowerCase();
     if (format !== 'csv' && format !== 'jsonl') throw bad('format must be csv or jsonl.', 'BAD_FORMAT');
@@ -64,7 +67,7 @@ export function registerAuditRoutes(app: Express): void {
     res.end();
   }));
 
-  app.get('/api/admin/audit/events', requireAdmin(), wrap((_req, res) => {
+  app.get('/api/admin/audit/events', requireGlobal('audit.read'), wrap((_req, res) => {
     res.json({ source: 'Agastya Platform', log: 'Application', events: securityEventCatalogue() });
   }));
 }

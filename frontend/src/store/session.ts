@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { authApi, type AdminQueues, type Gates, type User } from '../api';
-import { ApiError, setReauthHandler, setUnauthorizedHandler } from '../api/client';
+import { ApiError, setConnectionHandler, setReauthHandler, setUnauthorizedHandler } from '../api/client';
 import { useInbox } from './inbox';
 import { purgeDraftsOf } from '../lib/draftPurge';
 
@@ -141,3 +141,22 @@ setUnauthorizedHandler(() => {
   if (s.status === 'authed') void startReauth();
   else if (s.status === 'gated') { s.clear(); void s.load(); }
 });
+
+// WP-22 (FE-016): the connection banner is driven by the requests themselves, not only by the minute heartbeat. A request that cannot reach
+// the server (a network error, or the 502/503/504 of a proxy) shows "The server is not answering" at once; the session is then checked every
+// five seconds, and the first answer from the server (any request) takes the banner away. The browser's own offline/online events do the same.
+let probe: ReturnType<typeof setTimeout> | null = null;
+function lost(): void {
+  const s = useSession.getState();
+  if (s.status !== 'authed' && s.status !== 'gated') return;                 // before sign-in, load() has its own retry and wording
+  if (!s.unreachable) useSession.setState({ unreachable: true });
+  if (!probe) probe = setTimeout(() => { probe = null; if (useSession.getState().unreachable) void useSession.getState().check().finally(() => { if (useSession.getState().unreachable) lost(); }); }, 5000);
+}
+setConnectionHandler((ok) => {
+  if (!ok) { lost(); return; }
+  if (useSession.getState().unreachable && useSession.getState().status !== 'loading') useSession.setState({ unreachable: false });
+});
+if (typeof window !== 'undefined') {
+  window.addEventListener('offline', lost);
+  window.addEventListener('online', () => { if (useSession.getState().unreachable) void useSession.getState().check(); });
+}

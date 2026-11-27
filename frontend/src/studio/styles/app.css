@@ -107,7 +107,8 @@
 .pane { background: var(--bg-elev); min-height: 0; position: relative; display: flex; flex-direction: column; }
 .pane-left { width: 270px; border-right: 1px solid var(--border); flex: none; }
 .pane-right { width: 310px; border-left: 1px solid var(--border); flex: none; }
-.pane-bottom { height: 190px; border-top: 1px solid var(--border); }
+/* WP-22 (06 section 7.2): the Problems pane is a bottom drawer of at most a quarter of the screen's height; Escape closes it (panels.ts) */
+.pane-bottom { height: 190px; max-height: 25vh; border-top: 1px solid var(--border); }
 .pane-resize { position: absolute; top: 0; bottom: 0; width: 6px; cursor: col-resize; z-index: 5; }
 .pane-left .pane-resize { right: -3px; }
 .pane-right .pane-resize { left: -3px; }

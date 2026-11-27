@@ -56,7 +56,7 @@ test('an uploaded PM whose entry holds three references: the Explorer reads all 
   assert.ok(read.warnings.some((w) => /2 module references/.test(w)), `the read says what it added: ${JSON.stringify(read.warnings)}`);
 
   // the Explorer round trip: save what was read
-  const saved = await author.put(`/api/projects/${pid}/pmc`, { meta: read.meta, entries: read.entries });
+  const saved = await author.put(`/api/projects/${pid}/pmc`, { meta: read.meta, entries: read.entries, baseHash: (await author.get(`/api/projects/${pid}/pmc`)).json.hash });
   assert.equal(saved.status, 200, JSON.stringify(saved.json));
   const after = await author.get(`/api/projects/${pid}/pmc/export`);
   assert.equal(refsIn(after.buf.toString('utf8')), 4, 'all four references survive the save');
@@ -92,7 +92,7 @@ test('the importer\'s "reconstructed" mark survives a save from the Explorer (an
   fd.append('file', new Blob([marked], { type: 'application/xml' }), 'PMC-marked.xml');
   assert.equal((await author.req('POST', `/api/projects/${pid}/pmc/import`, fd)).status, 200);
   const read = (await author.get(`/api/projects/${pid}/pmc`)).json;
-  for (let i = 0; i < 2; i++) assert.equal((await author.put(`/api/projects/${pid}/pmc`, { meta: read.meta, entries: read.entries })).status, 200);
+  for (let i = 0; i < 2; i++) assert.equal((await author.put(`/api/projects/${pid}/pmc`, { meta: read.meta, entries: read.entries, baseHash: (await author.get(`/api/projects/${pid}/pmc`)).json.hash })).status, 200);
   const text = (await author.get(`/api/projects/${pid}/pmc/export`)).buf.toString('utf8');
   assert.equal((text.match(/agastya-import: reconstructed/g) || []).length, 1, 'kept once');
   assert.match(text, /<!-- agastya-import: reconstructed: synthesised from the data modules by the importer -->/, 'verbatim, reason included');
@@ -104,7 +104,7 @@ test('the importer\'s "reconstructed" mark survives a save from the Explorer (an
   fd2.append('file', new Blob([PM], { type: 'application/xml' }), 'PMC-plain.xml');
   await author.req('POST', `/api/projects/${pid}/pmc/import`, fd2);
   const plain = (await author.get(`/api/projects/${pid}/pmc`)).json;
-  await author.put(`/api/projects/${pid}/pmc`, { meta: plain.meta, entries: plain.entries });
+  await author.put(`/api/projects/${pid}/pmc`, { meta: plain.meta, entries: plain.entries, baseHash: (await author.get(`/api/projects/${pid}/pmc`)).json.hash });
   assert.doesNotMatch((await author.get(`/api/projects/${pid}/pmc/export`)).buf.toString('utf8'), /agastya-import/);
 });
 

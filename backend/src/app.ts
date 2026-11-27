@@ -40,12 +40,14 @@ import { registerJssRwiRoutes } from './routes/jss-rwi';
 import { registerIdentityRoutes } from './routes/identity';
 import { registerXengineRoutes } from './routes/xengine';
 import { registerWaiverRoutes } from './routes/waivers';
+import { registerProblemRoutes } from './routes/problems';
 import { registerBrandRoutes } from './routes/brand';
 import { registerBackupRoutes } from './routes/backups';
 import { notifyAccess } from './services/access-notify';
 import { API_VERSION, MIN_CLIENT_VERSION, CLIENT_VERSION_HEADER, buildInfo, clientAccepted, schemaLevel } from './services/version';
 import { hostAllowed, MISDIRECTED } from './services/network';
-import { capabilityTableFrom, setCapabilityTable } from './services/permissions';
+import { capabilityTableFrom, readableCapabilitiesFrom, setCapabilityTable } from './services/permissions';
+import { registerAccessRoutes } from './routes/access';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { registerAuthRoutes } = require('./core/auth/routes');
@@ -103,6 +105,8 @@ export function createApp(): express.Express {
       product: 'Agastya Platform', version: b.version, apiVersion: API_VERSION, minClientVersion: MIN_CLIENT_VERSION,
       schema: { level: schema.level, latest: schema.latest, applied: schema.applied, compatible: schema.unknown.length === 0 },
       build: { commit: b.commit, builtAt: b.builtAt, packaged: b.packaged },
+      // WP-25 (PRD-005): the WebView2 runtime the Windows host found, and whether the interface opened in an app window or the browser
+      shell: { webview2: config.shell.webview2, window: config.shell.window },
     });
   });
 
@@ -135,11 +139,13 @@ export function createApp(): express.Express {
   registerIdentityRoutes(app);
   registerXengineRoutes(app);
   registerWaiverRoutes(app);
+  registerProblemRoutes(app);            // WP-22: the one problems model and the team's reviewed marks
   registerBrandRoutes(app);
   registerBackupRoutes(app);             // WP-12: platform backup, verify, copy, restore into a new folder (administrators)
   registerAuditRoutes(app);              // WP-29: audit chain verification, checkpoints, streamed export, event catalogue (administrators)
+  registerAccessRoutes(app);             // WP-27: directory sign-on administration, groups, project group grants and capability rules
   // The client's `can` map is read from the guards just registered (WP-13, FE-019): one rule, stated once, on the server.
-  setCapabilityTable(capabilityTableFrom(app));
+  setCapabilityTable(capabilityTableFrom(app), readableCapabilitiesFrom(app));
 
   // Unknown API paths are JSON 404s, never the SPA shell.
   app.use('/api', (_req, res) => { res.status(404).json({ error: 'Not found' }); });

@@ -45,7 +45,14 @@ export function DocPublicationPage() {
   const rules = useAsync(async () => (jss ? await jssApi.read(id) : null), [id, jss]);     // the stencil's rules (are the chapters and sections the author's?) and its first chapter
   const base = useMemo(() => (codes.data ? buildPublication(codes.data) : null), [codes.data]);
 
-  const [edits, setEdits] = useState<Edit[]>([]);
+  const [edits, setEditsRaw] = useState<Edit[]>([]);
+  // WP-22 (GAP-003): undo is a stack with redo; a new edit clears what could be redone, as in the editors
+  const [undone, setUndone] = useState<Edit[]>([]);
+  const setEdits = (next: Edit[] | ((l: Edit[]) => Edit[])) => { setEditsRaw(next); setUndone([]); };
+  const undo = () => { if (!edits.length) return; setUndone([...undone, edits[edits.length - 1]]); setEditsRaw(edits.slice(0, -1)); };
+  const redo = () => { if (!undone.length) return; setEditsRaw([...edits, undone[undone.length - 1]]); setUndone(undone.slice(0, -1)); };
+  const [adding, setAdding] = useState<{ kind: 'section'; ch: number } | { kind: 'appendix' } | null>(null);
+  const [delApp, setDelApp] = useState<{ at: number; title: string } | null>(null);
   const view = useMemo(() => (base ? applyEdits(base, edits) : null), [base, edits]);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [over, setOver] = useState<{ key: string; where: Where } | null>(null);
@@ -211,6 +218,7 @@ export function DocPublicationPage() {
             <button className="icon-btn" aria-label={`Rename ${ch.title}`} title="Rename" onClick={() => setRename({ ch: ci, at: null, title: ch.title })}><Icon name="edit" size={14} /></button>
             <button className="icon-btn" aria-label={`Delete ${ch.title}`} title={view.chapters.length > 1 ? 'Delete this chapter and its sections' : 'A document needs at least one chapter'} disabled={view.chapters.length < 2} onClick={() => setDel({ ch: ci, at: null, title: ch.title, n: ch.modules.length })}><Icon name="trash" size={14} /></button>
           </> : null}
+          {sectionsFree ? <button className="icon-btn" aria-label={`Add a section to ${ch.title}`} title="Add a section at the end of this chapter" onClick={() => setAdding({ kind: 'section', ch: ci })} data-testid="add-section"><Icon name="plus" size={14} /></button> : null}
         </header>
         <div className="v2-chapter-body">
           {ch.modules.length === 0 ? <div className="v2-chapter-empty">This chapter has no section of its own yet.</div> : ch.modules.map((m) => moduleRow(m, ci, m.kind === 'section' ? ++si : null))}
@@ -231,10 +239,11 @@ export function DocPublicationPage() {
         <div className="v2-mod-main"><div className="v2-mod-title">{m.title}</div><div className="v2-hint v2-trunc">{detail(m)}</div></div>
         {code(m)}
         <span className="v2-mod-actions">
-          <button className="icon-btn" aria-label={`Open ${m.title} in the editor`} title="Open in editor" onClick={() => openInEditor(m.key)}><Icon name="editor" size={14} /></button>
+          {!m.fresh ? <button className="icon-btn" aria-label={`Open ${m.title} in the editor`} title="Open in editor" onClick={() => openInEditor(m.key)}><Icon name="editor" size={14} /></button> : null}
           {appendicesFree ? <>
             <button className="icon-btn" aria-label={`Move ${m.title} up`} title="Move up" onClick={() => ai > 0 && push({ op: 'moveAppendix', from: ai, to: ai - 1 })}><Icon name="up" size={14} /></button>
             <button className="icon-btn" aria-label={`Move ${m.title} down`} title="Move down" onClick={() => ai < view.appendices.length - 1 && push({ op: 'moveAppendix', from: ai, to: ai + 1 })}><Icon name="down" size={14} /></button>
+            <button className="icon-btn" aria-label={`Delete ${m.title}`} title="Delete this appendix" onClick={() => setDelApp({ at: ai, title: m.title })} data-testid="delete-appendix"><Icon name="trash" size={14} /></button>
           </> : null}
         </span>
       </div>
@@ -247,7 +256,8 @@ export function DocPublicationPage() {
       <PageHeader icon="book" title="Publication" sub={`“${c.pmc.title || summary.project.name}”: arrange the chapters, then build the ${jss ? 'publication' : 'document'}.`}
         actions={<>
           {chaptersFree ? <button className="btn" onClick={() => setNaming(true)} data-testid="add-chapter"><Icon name="plus" />Add chapter</button> : null}
-          {writable ? <button className="btn" onClick={() => setEdits((l) => l.slice(0, -1))} disabled={!dirty} data-testid="undo-arrangement">Undo</button> : null}
+          {writable ? <button className="btn" onClick={undo} disabled={!dirty} data-testid="undo-arrangement">Undo</button> : null}
+          {writable ? <button className="btn" onClick={redo} disabled={!undone.length} data-testid="redo-arrangement">Redo</button> : null}
           <button className="btn btn-primary" onClick={() => void build()} disabled={busy !== null || !canBuild(can)} data-testid="build-publication" title={canBuild(can) ? 'Save the arrangement, then build the PDF' : 'Reviewers, editors and owners can build the PDF'}>{busy === 'build' ? <Spinner /> : <Icon name="rocket" />}Build publication</button>
         </>}
         stats={[
@@ -275,10 +285,12 @@ export function DocPublicationPage() {
           {view.chapters.length === 0 && view.appendices.length === 0 && view.plates.length === 0 ? (
             <div className="v2-card"><Empty title="The document has no chapters yet">{chaptersFree ? <>Add a chapter to start the publication.<div style={{ marginTop: 12 }}><button className="btn btn-primary" onClick={() => setNaming(true)}><Icon name="plus" size={15} />Add the first chapter</button></div></> : 'Open the editor to start writing.'}</Empty></div>
           ) : view.chapters.map(chapterCard)}
-          {view.appendices.length ? (
+          {view.appendices.length || (appendicesFree && view.chapters.length) ? (
             <section className="v2-chapter" data-testid="appendices" aria-label="Appendices">
-              <header className="v2-chapter-head" style={{ cursor: 'default' }}><h3>Appendices</h3><Badge>{view.appendices.length}</Badge></header>
-              <div className="v2-chapter-body">{view.appendices.map(appendixRow)}</div>
+              <header className="v2-chapter-head" style={{ cursor: 'default' }}><h3>Appendices</h3><Badge>{view.appendices.length}</Badge><span className="spacer" />
+                {appendicesFree ? <button className="btn btn-sm" onClick={() => setAdding({ kind: 'appendix' })} data-testid="add-appendix"><Icon name="plus" size={13} />Add appendix</button> : null}
+              </header>
+              <div className="v2-chapter-body">{view.appendices.length ? view.appendices.map(appendixRow) : <div className="v2-chapter-empty">No appendices.</div>}</div>
             </section>
           ) : null}
           {view.plates.length ? (
@@ -339,6 +351,11 @@ export function DocPublicationPage() {
       {del ? <ConfirmModal title={del.at === null ? 'Delete this chapter?' : 'Delete this section?'} danger confirmLabel="Delete" onClose={() => setDel(null)}
         body={del.at === null ? `Chapter “${del.title}” and its ${del.n} section${del.n === 1 ? '' : 's'} are taken out of the document when you save, with all their text, tables and pictures. Cross-references to them will need fixing. Undo brings them back until you save.` : `Section “${del.title}” is taken out of the document when you save, with its text, tables and pictures. Cross-references to it will need fixing. Undo brings it back until you save.`}
         onConfirm={async () => { push(del.at === null ? { op: 'removeChapter', ch: del.ch } : { op: 'removeSection', ch: del.ch, at: del.at }); setDel(null); }} /> : null}
+      {adding ? <PromptModal title={adding.kind === 'section' ? 'New section' : 'New appendix'} label={adding.kind === 'section' ? 'Section title' : 'Appendix title'} confirmLabel={adding.kind === 'section' ? 'Add section' : 'Add appendix'}
+        onClose={() => setAdding(null)} onSubmit={async (t) => { push(adding.kind === 'section' ? { op: 'addSection', ch: adding.ch, title: t } : { op: 'addAppendix', title: t }); }} /> : null}
+      {delApp ? <ConfirmModal title="Delete this appendix?" danger confirmLabel="Delete" onClose={() => setDelApp(null)}
+        body={`Appendix “${delApp.title}” is taken out of the document when you save, with its text, tables and pictures. Undo brings it back until you save.`}
+        onConfirm={async () => { push({ op: 'removeAppendix', at: delApp.at }); setDelApp(null); }} /> : null}
       {guard}
       {rename ? <PromptModal title="Rename" label="Title" initial={rename.title} onClose={() => setRename(null)} onSubmit={async (t) => { push(rename.at === null ? { op: 'renameChapter', ch: rename.ch, title: t } : { op: 'renameSection', ch: rename.ch, at: rename.at, title: t }); }} /> : null}
     </div>

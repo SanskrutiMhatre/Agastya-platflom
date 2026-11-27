@@ -112,9 +112,11 @@ export function Users() {
                     <option value="author">Author</option><option value="project_manager">Project Manager</option><option value="admin">Software administrator</option>
                   </select>
                 </td>
-                <td>{u.disabled ? <Badge tone="bad">Disabled</Badge> : u.onboardingPending ? <Badge tone="warn">Awaiting first sign-in</Badge> : u.mustChangePassword ? <Badge tone="warn">Must change password</Badge> : <Badge tone="ok">Active</Badge>}</td>
+                <td>{u.disabled ? <Badge tone="bad" title={u.disabledReason === 'directory' ? 'Disabled by the directory (removed from its groups or disabled there)' : undefined}>{u.disabledReason === 'directory' ? 'Offboarded by the directory' : 'Disabled'}</Badge> : u.onboardingPending ? <Badge tone="warn">Awaiting first sign-in</Badge> : u.mustChangePassword ? <Badge tone="warn">Must change password</Badge> : <Badge tone="ok">Active</Badge>}
+                  {u.authSource === 'directory' ? <> <Badge title="Signs in with the domain password">Directory</Badge></> : null}{u.auditor ? <> <Badge tone="accent" title="Reads every project and the audit log, changes nothing">Auditor</Badge></> : null}</td>
                 <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                  <button className="btn btn-sm" onClick={() => setConfirm({ user: u, action: 'reset' })}><Icon name="key" size={13} />Reset password</button>{' '}
+                  {u.role !== 'admin' ? <><button className="btn btn-sm" data-testid={`auditor-${u.username}`} onClick={() => act(() => adminApi.updateUser(u.id, { auditor: !u.auditor }), u.auditor ? 'No longer read-only' : 'Now a read-only auditor')}>{u.auditor ? 'End auditor' : 'Make auditor'}</button>{' '}</> : null}
+                  {u.authSource !== 'directory' ? <><button className="btn btn-sm" onClick={() => setConfirm({ user: u, action: 'reset' })}><Icon name="key" size={13} />Reset password</button>{' '}</> : null}
                   {u.disabled
                     ? <button className="btn btn-sm" onClick={() => act(() => adminApi.enable(u.id), 'Account enabled')}>Enable</button>
                     : <button className="btn btn-sm" disabled={u.id === me?.id} onClick={() => setConfirm({ user: u, action: 'disable' })}>Disable</button>}
@@ -244,6 +246,9 @@ function Sessions() {
   );
 }
 
+/** "::ffff:127.0.0.1" is an IPv4 address written as IPv6; the log shows it as 127.0.0.1 (WP-22, UX-025). */
+export const plainIp = (ip: string | null): string => (ip ?? '').replace(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i, '$1');
+
 export function Audit() {
   const [typed, setTyped] = useState<AuditQuery>({});
   const [filter, setFilter] = useState<AuditQuery>({});
@@ -251,7 +256,10 @@ export function Audit() {
   useEffect(() => { const t = setTimeout(() => setFilter(typed), 300); return () => clearTimeout(t); }, [typed]);
   const key = auditQueryString(filter);
   const a = useAsync(() => adminApi.audit(300, filter), [key]);
-  const drawn = useProgressive(a.data?.length ?? 0, key);     // WP-18 (FE-030): first rows now, more on scroll
+  // WP-29 supersedes WP-22's client-side who/day narrowing: person, project and dates are asked of the server (and reach the export);
+  // WP-22's plainIp display is kept below
+  const rows = a.data ?? [];
+  const drawn = useProgressive(rows.length, key);     // WP-18 (FE-030): first rows now, more on scroll
   // WP-29: verify the chain, and export every row matching the filters (not only the 300 shown)
   const [verifying, setVerifying] = useState(false);
   const [report, setReport] = useState<AuditVerifyReport | null>(null);
@@ -286,10 +294,10 @@ export function Audit() {
         </Alert>
       ) : null}
       <div className="v2-card">
-        {a.loading && !a.data ? <Loading /> : !a.data?.length ? <Empty title="No entries" /> : (
+        {a.loading && !a.data ? <Loading /> : !rows.length ? <Empty title="No entries" /> : (
           <table className="v2-table"><thead><tr><th>When</th><th>Who</th><th>Action</th><th>Project</th><th>From</th></tr></thead>
-            <tbody>{a.data.slice(0, drawn.limit).map((e) => <tr key={e.id}><td title={fmtDate(e.at)}>{ago(e.at)}</td><td>{e.actor ?? '—'}</td><td title={e.action}>{actionLabel(e.action)} <span className="v2-hint v2-mono">{e.action}</span></td><td className="v2-mono">{e.projectId ?? ''}</td><td className="v2-mono">{e.ip ?? ''}</td></tr>)}
-              <MoreRows as="tr" colSpan={5} shown={drawn.limit} total={a.data.length} onMore={drawn.more} onAll={drawn.all} /></tbody></table>
+            <tbody>{rows.slice(0, drawn.limit).map((e) => <tr key={e.id}><td title={fmtDate(e.at)}>{ago(e.at)}</td><td>{e.actor ?? '—'}</td><td title={e.action}>{actionLabel(e.action)} <span className="v2-hint v2-mono">{e.action}</span></td><td className="v2-mono">{e.projectId ?? ''}</td><td className="v2-mono">{plainIp(e.ip)}</td></tr>)}
+              <MoreRows as="tr" colSpan={5} shown={drawn.limit} total={rows.length} onMore={drawn.more} onAll={drawn.all} /></tbody></table>
         )}
       </div>
     </div>

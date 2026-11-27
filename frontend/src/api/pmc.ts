@@ -25,8 +25,9 @@ const toPool = (d: DmSummary): PoolModule => ({
 });
 
 export const pmcApi = {
-  save: async (projectId: string, model: { meta?: any; entries: PmEntry[] }, allowEmpty = false) => {
-    const r = await contentApi.savePmc(projectId, { meta: model.meta, entries: model.entries }, allowEmpty);
+  /** `baseHash`: the version of the publication the screen loaded (`hash` of the read; 'new' when there was none). */
+  save: async (projectId: string, model: { meta?: any; entries: PmEntry[] }, allowEmpty = false, baseHash = 'new') => {
+    const r = await contentApi.savePmc(projectId, { meta: model.meta, entries: model.entries, baseHash }, allowEmpty);
     return { success: true, ...r };
   },
   exportUrl: (projectId: string, form: 'ietm' | 'pdf') => `/api/projects/${encodeURIComponent(projectId)}/pmc/export?form=${form}`,

@@ -13,7 +13,7 @@
 import fs from 'fs';
 import path from 'path';
 import { HttpError, bad, conflict } from './http';
-import { projectDirFor } from '../context';
+import { projectDirFor, content } from '../context';
 import { readProjectJson, csdbRel, pmRel } from './projects';
 import * as PC from './projectConfig';
 import { linkOf } from './cir';
@@ -90,7 +90,7 @@ export async function changeModelCode(projectId: string, toRaw: unknown, actorId
   for (const w of writes) fs.copyFileSync(w.abs, path.join(backup, w.rel.replace(/[\\/]/g, '__')));
   const created: string[] = [];
   try {
-    for (const w of writes) { fs.writeFileSync(w.newAbs, w.text, 'utf8'); if (w.newAbs !== w.abs) created.push(w.newAbs); }
+    for (const w of writes) { content.writeText(projectId, w.newAbs, w.text); if (w.newAbs !== w.abs) created.push(w.newAbs); }
   } catch (e) { for (const c of created) try { fs.unlinkSync(c); } catch { /* none */ } throw e; }
   for (const w of writes) if (w.newAbs !== w.abs) fs.unlinkSync(w.abs);
   const cfg = PC.getConfig(projectId); cfg.mic = to; PC.updateConfigRaw(projectId, cfg, actorId);

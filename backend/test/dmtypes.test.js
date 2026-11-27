@@ -131,7 +131,7 @@ test('full publication of all seven types builds one PDF containing all of them'
   const pmc = (await w.get(`/api/projects/${pid}/pmc`)).json;
   const list = (await w.get(`/api/projects/${pid}/dms`)).json.dms;
   const entries = [{ type: 'folder', title: 'All types', children: list.map((d) => ({ type: 'dm', dmCode: d.dmCodeAttrs, issueInfo: d.issueInfoAttrs, language: d.languageAttrs, techName: d.techName, infoName: d.infoName })) }];
-  assert.equal((await w.put(`/api/projects/${pid}/pmc`, { meta: pmc.meta, entries })).status, 200);
+  assert.equal((await w.put(`/api/projects/${pid}/pmc`, { meta: pmc.meta, entries, baseHash: (await w.get(`/api/projects/${pid}/pmc`)).json.hash })).status, 200);
   const build = await w.post(`/api/projects/${pid}/publish`, {});
   assert.equal(build.status, 200, JSON.stringify(build.json).slice(0, 800));
   const pdf = await w.get(`/api/projects/${pid}/publish/pdf`);

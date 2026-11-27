@@ -12,6 +12,8 @@ import { FindingsList } from './DocCodes';
 import { FORMAT_NAME, SOURCE_CHOICES, detectionSentence, guessedSource, sourceProblem, targetProblem, type SourceFormat } from './importSource';
 
 const ROLE_TONE: Record<ProjectRole, 'accent' | 'ok' | 'warn' | undefined> = { owner: 'accent', manager: 'accent', editor: 'ok', reviewer: 'warn', viewer: undefined };
+/** WP-22 (UX-024): the model code of the last S1000D project made in this browser, offered in the wizard */
+const LAST_MIC = 'agastya.wizard.lastMic';
 export const RoleBadge = ({ role }: { role: ProjectRole }) => <Badge tone={ROLE_TONE[role]}>{role === 'manager' ? 'project manager' : role}</Badge>;
 
 /** What a card says about the project's format: S1000D, or JSS Land - User Handbook. Never the name of an engine. */
@@ -51,6 +53,7 @@ export function CreateProjectModal({ folders, defaultFolder = '', startWith, onC
   const [domain, setDomain] = useState('');
   const [manualType, setManualType] = useState('');
   const [mic, setMic] = useState('');
+  const [lastMic] = useState(() => { try { return localStorage.getItem(LAST_MIC) ?? ''; } catch { return ''; } });
   const [issue, setIssue] = useState('4-2');
   const [language, setLanguage] = useState('en');
   const [country, setCountry] = useState('IN');
@@ -152,6 +155,7 @@ export function CreateProjectModal({ folders, defaultFolder = '', startWith, onC
         setBusy(false); return;
       }
       const card: ProjectCard = await workspaceApi.createProject({ name: name.trim(), folder: folder.trim(), format: fmt, ...(fmt === 's1000d' ? { s1000d: config() } : { domain, manualType }) });
+      if (fmt === 's1000d' && mic.trim()) { try { localStorage.setItem(LAST_MIC, mic.trim().toUpperCase()); } catch { /* private mode */ } }
       toast(`Created "${card.name}"`, 'success');
       onCreated(card); onClose();
     } catch (e) {
@@ -178,7 +182,8 @@ export function CreateProjectModal({ folders, defaultFolder = '', startWith, onC
       <select className="v2-select" value={v.code} onChange={(e) => set({ code: e.target.value, name: list.find((x) => x.cage === e.target.value)?.name ?? '' })}>
         <option value="">{optional ? '(same as the responsible partner)' : '(choose)'}</option>{list.map((x) => <option key={x.cage} value={x.cage}>{x.cage} – {x.name}</option>)}
       </select>
-    ) : <div className="v2-grid cols-2"><input className="v2-input v2-mono" maxLength={5} placeholder="Code (5)" value={v.code} onChange={(e) => set({ ...v, code: e.target.value })} aria-label="Enterprise code" /><input className="v2-input" placeholder="Name" value={v.name} onChange={(e) => set({ ...v, name: e.target.value })} aria-label="Enterprise name" /></div>;
+    ) : <div><div className="v2-grid cols-2"><input className="v2-input v2-mono" maxLength={5} placeholder="CAGE code, e.g. K0378" value={v.code} onChange={(e) => set({ ...v, code: e.target.value })} aria-label="Enterprise code" title="The enterprise's CAGE code: exactly 5 capital letters or digits" /><input className="v2-input" placeholder="Name, e.g. Agastya Systems" value={v.name} onChange={(e) => set({ ...v, name: e.target.value })} aria-label="Enterprise name" /></div>
+      <div className="v2-hint" style={{ marginTop: 4 }}>The CAGE code: exactly 5 capital letters or digits, for example K0378.</div></div>;
 
   /** Format, then (for JSS / JSG) domain and manual type: the three questions that decide the project's kind. Nothing about engines. */
   const formatPicker = (
@@ -262,8 +267,9 @@ export function CreateProjectModal({ folders, defaultFolder = '', startWith, onC
         </>) : null}
         {stepId === 'model' ? (<>
           <div className="v2-grid cols-2">
-            <Field label="Model code" hint="The first part of every data module code. A Project Manager can change it later, even after data modules exist."><input className="v2-input v2-mono" maxLength={14} autoFocus value={mic} onChange={(e) => setMic(e.target.value)} data-testid="wiz-mic" /></Field>
-            <div />
+            {/* WP-22 (UX-024): each code field shows an example and its rule before input, and the model code last used here */}
+            <Field label="Model code" hint="The first part of every data module code: 1 to 14 capital letters or digits, for example HYDRP. A Project Manager can change it later, even after data modules exist."><input className="v2-input v2-mono" maxLength={14} autoFocus value={mic} onChange={(e) => setMic(e.target.value)} placeholder="e.g. HYDRP" data-testid="wiz-mic" /></Field>
+            <div>{lastMic && !mic ? <button type="button" className="btn btn-sm" style={{ marginTop: 22 }} onClick={() => setMic(lastMic)} data-testid="wiz-mic-last" title="Use the model code of the last project made here">Use {lastMic} (last used)</button> : null}</div>
             <Field label="Language"><input className="v2-input" maxLength={3} value={language} onChange={(e) => setLanguage(e.target.value)} /></Field>
             <Field label="Country"><input className="v2-input" maxLength={2} value={country} onChange={(e) => setCountry(e.target.value)} /></Field>
           </div>

@@ -25,6 +25,7 @@ import { createItem } from '../services/adminConfig';
 import { objectHtml, objectPdf } from '../services/objectRender';
 import { coverage } from '../services/registry';
 import { FilePendingImportStore, type PendingImportStore } from '../storage/pendingImports';
+import { versionGuard } from '../services/versionGuard';
 
 const view = (min: string, cap = 'project.read'): RequestHandler => requireProject(min, { from: 'param', cap });
 const tmpRoot = uploadTmp;
@@ -127,8 +128,8 @@ export function registerPackageRoutes(app: Express): void {
     const out = await obj.writeObject(req.project.id, String(req.body?.file ?? ''), String(req.body?.xml ?? ''), actor(req), { overwrite: false, lenient: flag(req.body?.lenient) });
     log(req, 'object.created', { file: out.file }); res.status(201).json(out);
   }));
-  app.put(`${base}/objects/:file`, view('editor', 'dm.write'), wrap(async (req, res) => {
-    const out = await obj.writeObject(req.project.id, param(req, 'file'), String(req.body?.xml ?? ''), actor(req), { overwrite: true, lenient: flag(req.body?.lenient) });
+  app.put(`${base}/objects/:file`, view('editor', 'dm.write'), versionGuard('object'), wrap(async (req, res) => {
+    const out = await obj.writeObject(req.project.id, param(req, 'file'), String(req.body?.xml ?? ''), actor(req), { overwrite: true, lenient: flag(req.body?.lenient), baseHash: res.locals.baseHash });
     log(req, 'object.saved', { file: out.file }); res.json(out);
   }));
   app.delete(`${base}/objects/:file`, view('editor', 'dm.delete'), wrap((req, res) => { obj.deleteObject(req.project.id, param(req, 'file')); log(req, 'object.deleted', { file: param(req, 'file') }); res.json({ ok: true }); }));

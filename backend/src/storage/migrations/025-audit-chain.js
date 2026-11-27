@@ -1,14 +1,10 @@
 'use strict';
-// Migration 023-audit-chain (audit WP-29: ENT-003, ENT-017, RES-004). One file per migration, one body per database engine (WP-10).
+// Migration 025-audit-chain (audit WP-29: ENT-003, ENT-017, RES-004). One file per migration, one body per database engine (WP-10).
 // Never edit a migration that has shipped: add a new file instead (additive only; the framework in storage/schema.ts records a checksum).
-//
-// MERGE NOTE: WP-29 was written while WP-11 and WP-27 were reserving 023/024 on other branches. checkOrder() refuses a gap, so on this
-// branch the step is 023; when it is merged after them it is renamed to the next free number (file name, `name` below, the ORDER entry
-// in index.js and the list in test/wp10-seams.test.js) - nothing else refers to the number.
 
 const step = {
     /*
-      023 - a tamper-evident audit trail and durable waivers. Additive: four new columns on audit_log (NULL on every existing row: rows
+      025 - a tamper-evident audit trail and durable waivers. Additive: four new columns on audit_log (NULL on every existing row: rows
       written before the chain are never rewritten, the verifier counts them as "before the chain"), a unique index on the sequence
       number (two rows can never claim the same place), and three new tables:
         audit_checkpoints   "the chain had <seq> rows ending in <row_hash>" at a time, signed with the chain key; written with every
@@ -17,7 +13,7 @@ const step = {
         publish_waiver_events  append-only history of publication-gate waivers (added / removed / replaced / expired) with reason,
                             actor and time (ENT-017); the active set stays in the project's publish-waivers.json
     */
-    name: '023-audit-chain',
+    name: '025-audit-chain',
     // Every part is re-runnable: tables and indexes IF NOT EXISTS, columns added only when missing, the indexes on the new columns after them.
     columns: [
       ['audit_log', 'seq', 'INTEGER'],

@@ -54,6 +54,13 @@ export interface Config {
   limits: { maxUploadBytes: number; requestTimeoutMs: number; maxExpandedBytes: number; readyMinFreeBytes: number };
   /** WP-06: one server per data folder, unless a test harness opts out (AGASTYA_NO_WORKSPACE_LOCK=1). */
   workspaceLock: boolean;
+  /**
+   * WP-11 (decision D2): every content write must name the version it was made from (`baseHash` or If-Match). AGASTYA_BASEHASH_COMPAT=1 opens a
+   * compatibility window for an old script: a write without it is then accepted with a logged warning instead of refused with 428.
+   */
+  baseHashCompat: boolean;
+  /** WP-11 (RES-001): how long a check-out lease lasts unless it is renewed (AGASTYA_LEASE_MINUTES, default 60). */
+  leaseMinutes: number;
   /** The packaged launcher asks for a clean stop by closing standard input (AGASTYA_SHUTDOWN_ON_STDIN_CLOSE=1). */
   shutdownOnStdinClose: boolean;
   /** A pdfjs-dist folder to use for structure recovery before the bundled candidates (AGASTYA_PDFJS_DIR). */
@@ -76,6 +83,12 @@ export interface Config {
   serverNames: string[];
   /** Strict-Transport-Security max-age in seconds on TLS answers (AGASTYA_HSTS_MAX_AGE; 0 = no header). No includeSubDomains, no preload. */
   hstsMaxAge: number;
+  /**
+   * WP-25 (PRD-005): what the Windows host opened the interface in, reported by GET /api/version so support sees whether the WebView2 runtime is
+   * present (and how old it is) on an air-gapped machine. Set by packaging/host (AGASTYA_WEBVIEW2_VERSION, AGASTYA_SHELL_WINDOW); null in a
+   * source checkout or when the host found no runtime. A value that is not a version / a known window kind is dropped, never echoed.
+   */
+  shell: { webview2: string | null; window: 'app' | 'browser' | null };
   /**
    * WP-12 (PLT-001, ENT-006, PLT-006): platform backups. `dir` (AGASTYA_BACKUP_DIR, default <workspace>/backups/platform) holds the archives;
    * put it on a second disk in production. `intervalHours` (AGASTYA_BACKUP_INTERVAL_HOURS, default 24, 0 = no scheduled backup);
@@ -105,6 +118,11 @@ export interface Config {
    * which the Windows host turns into Application-log entries with stable ids (docs/OPERATIONS.md section 13).
    */
   log: { format: 'json' | 'text'; dir: string | null; maxBytes: number; keep: number; access: boolean; eventSink: 'host' | 'none' };
+  /**
+   * WP-27 (ENT-005, DEP-015): directory sign-on over LDAPS, Mode B only (null = local accounts only, as in Mode A). Set by
+   * AGASTYA_DIRECTORY_URL and its companions; the group-to-role mapping is kept in the database and edited by administrators.
+   */
+  directory: DirectoryConfig | null;
 }
 
 function parseLogFormat(raw: string | undefined, nodeEnv: string | undefined): 'json' | 'text' {
@@ -125,6 +143,67 @@ function parseEventSink(raw: string | undefined): 'host' | 'none' {
   if (v === '' || v === 'none') return 'none';
   if (v === 'host') return 'host';
   throw new ConfigError('AGASTYA_EVENT_SINK', `"${raw}" is not an event sink: use "host" (the Windows host writes the Application log) or "none".`);
+}
+
+/** The directory connection (AGASTYA_DIRECTORY_*). The service account's password and the CA come from files, never from the environment. */
+export interface DirectoryConfig {
+  /** ldaps://host[:port], tried in order (a second domain controller is the fallback). */
+  urls: string[];
+  /** The service account that searches for people (AGASTYA_DIRECTORY_BIND_DN) and the file holding its password (AGASTYA_DIRECTORY_BIND_PASSWORD_FILE). */
+  bindDn: string;
+  bindPasswordFile: string;
+  /** Where people are searched (AGASTYA_DIRECTORY_BASE_DN) and where nested groups are searched (AGASTYA_DIRECTORY_GROUP_BASE_DN, default the same). */
+  baseDn: string;
+  groupBaseDn: string;
+  /** The attribute a person types as user name (AGASTYA_DIRECTORY_LOGIN_ATTRIBUTE, default sAMAccountName) and the people's object class (AGASTYA_DIRECTORY_USER_CLASS, default user). */
+  loginAttribute: string;
+  userObjectClass: string;
+  /** Follow nested groups with Active Directory's LDAP_MATCHING_RULE_IN_CHAIN (AGASTYA_DIRECTORY_NESTED_GROUPS=1); off = memberOf only. */
+  nestedGroups: boolean;
+  /** PEM file of the CA(s) the directory's certificate must chain to (AGASTYA_DIRECTORY_CA_FILE); unset = the Windows/Node trust store. */
+  caFile: string | undefined;
+  /** Connect and per-operation timeout (AGASTYA_DIRECTORY_TIMEOUT_MS, default 10000). */
+  timeoutMs: number;
+  /** How often the offboarding sync runs, in hours (AGASTYA_DIRECTORY_SYNC_HOURS, default 24, 0 = only on demand). */
+  syncHours: number;
+}
+
+const ATTRIBUTE = /^[A-Za-z][A-Za-z0-9-]{0,63}$/;
+
+function parseDirectory(env: Env, mode: DeploymentMode): DirectoryConfig | null {
+  const pick = (n: string): string | undefined => { const v = env[n]; return v === undefined || v.trim() === '' ? undefined : v.trim(); };
+  const raw = pick('AGASTYA_DIRECTORY_URL');
+  if (!raw) return null;
+  if (mode !== 'server') {
+    throw new ConfigError('AGASTYA_DIRECTORY_URL', 'directory sign-on is for Mode B (AGASTYA_MODE=server). Mode A serves one person on this computer with a local account.');
+  }
+  const urls = raw.split(',').map((s) => s.trim()).filter(Boolean);
+  for (const u of urls) {
+    let parsed: URL | null = null;
+    try { parsed = new URL(u); } catch { parsed = null; }
+    if (!parsed || parsed.protocol !== 'ldaps:' || !parsed.hostname || parsed.pathname.replace(/\/$/, '') !== '') {
+      throw new ConfigError('AGASTYA_DIRECTORY_URL', `"${u}" is not an LDAPS address: use ldaps://host[:port] (636, or 3269 for the global catalogue). Plain ldap:// and StartTLS are not supported.`);
+    }
+  }
+  const baseDn = pick('AGASTYA_DIRECTORY_BASE_DN');
+  if (!baseDn) throw new ConfigError('AGASTYA_DIRECTORY_BASE_DN', 'is required with AGASTYA_DIRECTORY_URL: where people are searched, for example "OU=Staff,DC=corp,DC=local".');
+  const bindDn = pick('AGASTYA_DIRECTORY_BIND_DN');
+  const bindPasswordFile = pick('AGASTYA_DIRECTORY_BIND_PASSWORD_FILE');
+  if (!bindDn) throw new ConfigError('AGASTYA_DIRECTORY_BIND_DN', 'is required with AGASTYA_DIRECTORY_URL: the service account that searches for people.');
+  if (!bindPasswordFile) throw new ConfigError('AGASTYA_DIRECTORY_BIND_PASSWORD_FILE', 'is required with AGASTYA_DIRECTORY_BIND_DN: a file holding the service account\'s password (never the password itself).');
+  const loginAttribute = pick('AGASTYA_DIRECTORY_LOGIN_ATTRIBUTE') ?? 'sAMAccountName';
+  if (!ATTRIBUTE.test(loginAttribute)) throw new ConfigError('AGASTYA_DIRECTORY_LOGIN_ATTRIBUTE', `"${loginAttribute}" is not an attribute name.`);
+  const userObjectClass = pick('AGASTYA_DIRECTORY_USER_CLASS') ?? 'user';
+  if (!ATTRIBUTE.test(userObjectClass)) throw new ConfigError('AGASTYA_DIRECTORY_USER_CLASS', `"${userObjectClass}" is not an object class name.`);
+  const nested = (pick('AGASTYA_DIRECTORY_NESTED_GROUPS') ?? '0').toLowerCase();
+  if (!/^(0|1|true|false|on|off)$/.test(nested)) throw new ConfigError('AGASTYA_DIRECTORY_NESTED_GROUPS', `"${nested}" is not 0 or 1.`);
+  return {
+    urls, bindDn, bindPasswordFile, baseDn, groupBaseDn: pick('AGASTYA_DIRECTORY_GROUP_BASE_DN') ?? baseDn,
+    loginAttribute, userObjectClass, nestedGroups: /^(1|true|on)$/.test(nested),
+    caFile: pick('AGASTYA_DIRECTORY_CA_FILE'),
+    timeoutMs: envPositive('AGASTYA_DIRECTORY_TIMEOUT_MS', 10000, env),
+    syncHours: envCount('AGASTYA_DIRECTORY_SYNC_HOURS', 24, env),
+  };
 }
 
 export type DeploymentMode = 'local' | 'server';
@@ -267,6 +346,8 @@ export function buildConfig(env: Env = process.env): Config {
       readyMinFreeBytes: envPositive('AGASTYA_READY_MIN_FREE_BYTES', 256 * 1024 ** 2, env),
     },
     workspaceLock: env.AGASTYA_NO_WORKSPACE_LOCK !== '1',
+    baseHashCompat: env.AGASTYA_BASEHASH_COMPAT === '1',
+    leaseMinutes: envPositive('AGASTYA_LEASE_MINUTES', 60, env),
     shutdownOnStdinClose: env.AGASTYA_SHUTDOWN_ON_STDIN_CLOSE === '1',
     pdfjsDir: env.AGASTYA_PDFJS_DIR || undefined,
     initialAdmin: { INITIAL_ADMIN_USERNAME: env.INITIAL_ADMIN_USERNAME, INITIAL_ADMIN_PASSWORD: env.INITIAL_ADMIN_PASSWORD },
@@ -274,6 +355,10 @@ export function buildConfig(env: Env = process.env): Config {
     tls,
     serverNames: parseServerNames(env.AGASTYA_SERVER_NAMES),
     hstsMaxAge: parseHsts(env.AGASTYA_HSTS_MAX_AGE),
+    shell: {
+      webview2: /^\d{1,5}(\.\d{1,6}){1,3}$/.test(env.AGASTYA_WEBVIEW2_VERSION ?? '') ? String(env.AGASTYA_WEBVIEW2_VERSION) : null,
+      window: env.AGASTYA_SHELL_WINDOW === 'app' || env.AGASTYA_SHELL_WINDOW === 'browser' ? env.AGASTYA_SHELL_WINDOW : null,
+    },
     backup: {
       dir: env.AGASTYA_BACKUP_DIR || path.join(workspaceDir, 'backups', 'platform'),
       intervalHours: envCount('AGASTYA_BACKUP_INTERVAL_HOURS', 24, env),
@@ -303,6 +388,7 @@ export function buildConfig(env: Env = process.env): Config {
         eventSink: parseEventSink(env.AGASTYA_EVENT_SINK),
       };
     })(),
+    directory: parseDirectory(env, mode),
   };
 }
 

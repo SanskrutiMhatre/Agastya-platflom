@@ -23,13 +23,15 @@ const { boot } = require('./helpers');
 const PW = 'Correct-Horse-9!';
 const SNAPSHOT = path.join(__dirname, 'fixtures', 'authz-policy.snapshot.json');
 const ALLOW = path.join(__dirname, 'fixtures', 'authz-allow.json');
-const GLOBAL = ['anon', 'onboarding', 'pwchange', 'author', 'pm', 'admin'];
+// WP-27: 'auditor' is the read-only auditor account (an Author with the auditor flag, not a member of the matrix project).
+const GLOBAL = ['anon', 'onboarding', 'pwchange', 'author', 'pm', 'admin', 'auditor'];
 const MEMBERS = ['viewer', 'reviewer', 'editor', 'manager', 'owner'];
 const PRINCIPALS = [...GLOBAL, ...MEMBERS];
 const RANK = { viewer: 1, reviewer: 2, editor: 3, manager: 4, owner: 5 };
 const WRITE = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 // The 403 codes a guard answers with; a 403 with any other code comes from a handler (the request got past the guard).
-const GUARD_403 = new Set(['INSUFFICIENT_ROLE', 'ADMIN_ONLY', 'ROLE_REQUIRED', 'ONBOARDING_REQUIRED', 'PASSWORD_CHANGE_REQUIRED', 'PROJECT_PENDING', 'PROJECT_CLOSED']);
+const GUARD_403 = new Set(['INSUFFICIENT_ROLE', 'ADMIN_ONLY', 'ROLE_REQUIRED', 'ONBOARDING_REQUIRED', 'PASSWORD_CHANGE_REQUIRED', 'PROJECT_PENDING', 'PROJECT_CLOSED',
+  'READ_ONLY_ACCOUNT', 'CAPABILITY_DENIED']);   // WP-27
 
 let h; let app; let pid; const who = {};
 
@@ -56,6 +58,8 @@ test.before(async () => {
   assert.equal((await who.pwchange.get('/api/auth/me')).json.user.mustChangePassword, true, 'the reset forces a password change');
   who.author = await make('mxauthor');
   who.pm = await make('mxpm', 'project_manager');
+  who.auditor = await make('mxauditor');
+  assert.equal((await admin.req('PATCH', `/api/admin/users/${who.auditor.id}`, { auditor: true })).status, 200, 'the auditor flag is set');
   who.owner = await make('mxowner');
   for (const r of ['viewer', 'reviewer', 'editor', 'manager']) who[r] = await make(`mx${r}`);
   const mk = await who.owner.post('/api/projects', { name: 'Matrix', pipeline: 's1000dtofo', s1000d: { mic: 'EXAMPLE', issue: '5.0', responsiblePartner: { code: '00000', name: 'Example Company' } } });
@@ -152,13 +156,26 @@ test('policy rules hold for every route (100% of routes classified)', () => {
       if (cells[g] !== want) problems.push(`${r.key}: ${g} gets ${cells[g]}, expected ${want}`);
     }
     if (cells.admin !== 'ok') problems.push(`${r.key}: the administrator is refused (${cells.admin})`);
+    // WP-27: the read-only auditor never gets past a guard with a state-changing request, except its own account's gate exits; it reads
+    // every project at viewer level (without being a member) and nothing that needs more.
+    const auditorExits = new Set([...gateExits.onboarding, ...gateExits.pwchange]);
+    if (WRITE.has(r.method) && !auditorExits.has(r.key) && cells.auditor !== '403') problems.push(`${r.key}: the read-only auditor gets ${cells.auditor} on a write`);
+    if (!WRITE.has(r.method) && isProjectRoute(r)) {
+      const want = minRole(r) === 'viewer' ? 'ok' : '403';
+      if (cells.auditor !== want) problems.push(`${r.key}: the auditor gets ${cells.auditor} on a project read at ${minRole(r)} level, expected ${want}`);
+    }
     if (isProjectRoute(r)) {
       const need = RANK[minRole(r)];
       for (const p of ['author', 'pm']) if (cells[p] !== '404') problems.push(`${r.key}: non-member ${p} gets ${cells[p]}, not the uniform 404`);
       for (const m of MEMBERS) { const want = RANK[m] >= need ? 'ok' : '403'; if (cells[m] !== want) problems.push(`${r.key}: ${m} gets ${cells[m]}, expected ${want}`); }
       if (WRITE.has(r.method) && need === RANK.viewer && !allow.viewerWrites[r.key]) problems.push(`${r.key}: a state-changing project route guarded at viewer level needs a reason in authz-allow.json viewerWrites`);
     } else if (cls === 'requireAdmin') {
-      for (const p of ['author', 'pm', ...MEMBERS]) if (cells[p] !== '403') problems.push(`${r.key}: ${p} gets ${cells[p]} on an administrator route`);
+      for (const p of ['author', 'pm', 'auditor', ...MEMBERS]) if (cells[p] !== '403') problems.push(`${r.key}: ${p} gets ${cells[p]} on an administrator route`);
+    } else if (/^requireGlobal\(/.test(cls)) {
+      // WP-27: a global capability held by administrators and read-only auditors; reads only
+      if (WRITE.has(r.method)) problems.push(`${r.key}: a global-capability guard on a state-changing route (use requireAdmin)`);
+      if (cells.auditor !== 'ok') problems.push(`${r.key}: the auditor is refused (${cells.auditor})`);
+      for (const p of ['author', 'pm', ...MEMBERS]) if (cells[p] !== '403') problems.push(`${r.key}: ${p} gets ${cells[p]} on a global-capability route`);
     } else if (cls === 'requireRoles(admin,project_manager)') {
       if (cells.pm !== 'ok') problems.push(`${r.key}: the Project Manager is refused`);
       for (const p of ['author', ...MEMBERS]) if (cells[p] !== '403') problems.push(`${r.key}: ${p} gets ${cells[p]}`);
@@ -170,7 +187,8 @@ test('policy rules hold for every route (100% of routes classified)', () => {
   for (const k of [...Object.keys(allow.viewerWrites), ...Object.keys(allow.authOnlyWrites)]) if (!routeTable().some((r) => r.key === k)) problems.push(`authz-allow.json lists ${k}, which is not a route any more`);
   assert.deepEqual(problems, []);
   // the classes seen; every route falls in exactly one of them
-  assert.deepEqual(Object.keys(counts).sort(), ['project:editor', 'project:manager', 'project:owner', 'project:reviewer', 'project:viewer', 'public', 'requireAdmin', 'requireAuth', 'requireRoles(admin,project_manager)'].sort(), JSON.stringify(counts));
+  assert.deepEqual(Object.keys(counts).sort(), ['project:editor', 'project:manager', 'project:owner', 'project:reviewer', 'project:viewer', 'public', 'requireAdmin', 'requireAuth', 'requireRoles(admin,project_manager)',
+    'requireGlobal(access.read)', 'requireGlobal(audit.read)'].sort(), JSON.stringify(counts));
 });
 
 /** A URL for a route: the project id for :id on a project route, harmless placeholders for the rest. */
@@ -198,7 +216,7 @@ test('over HTTP: one step below the minimum role is refused with 403 by the guar
     if (isPublic(r)) continue;
     let below = null;
     if (isProjectRoute(r)) below = MEMBERS[RANK[minRole(r)] - 2] || null;
-    else if (guardLabel(r) === 'requireAdmin') below = 'pm';
+    else if (guardLabel(r) === 'requireAdmin' || /^requireGlobal\(/.test(guardLabel(r))) below = 'pm';
     else if (guardLabel(r) === 'requireRoles(admin,project_manager)') below = 'author';
     if (!below) continue;
     n++;
@@ -218,6 +236,7 @@ test('over HTTP: the minimum role gets past the guard on every GET route', async
     let p;
     if (isProjectRoute(r)) p = minRole(r);
     else if (guardLabel(r) === 'requireAdmin') p = 'admin';
+    else if (/^requireGlobal\(/.test(guardLabel(r))) p = 'auditor';          // WP-27: the weakest holder of a global capability
     else if (guardLabel(r) === 'requireRoles(admin,project_manager)') p = 'pm';
     else p = 'author';
     n++;

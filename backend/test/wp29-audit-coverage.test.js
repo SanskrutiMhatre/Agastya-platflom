@@ -11,11 +11,13 @@ const path = require('node:path');
 
 const SRC = path.resolve(__dirname, '..', 'src');
 const REG = /\bapp\.(get|post|put|patch|delete)\(\s*(`[^`]*`|'[^']*'|"[^"]*"|[A-Za-z_$][\w$.]*)/g;
-const AUDITS = /\baudit(Strict|edTx)?\(|[A-Za-z]*[lL]og\(req|\.audit\(/;
+// critical(req, ...) is access.ts's auditedTx wrapper (WP-27 changes that fail closed)
+const AUDITS = /\baudit(Strict|edTx)?\(|[A-Za-z]*[lL]og\(req|\.audit\(|\bcritical\(req/;
 
 // "<file> <METHOD> <path as written>": reason
 const ALLOWED = {
   // audited by the service the handler calls
+  "access.ts POST '/api/admin/directory/sync'": 'core/auth/directory.js runDirectorySync audits directory.sync / directory.sync.failed (every outcome)',
   "backups.ts POST '/api/admin/backups'": 'services/dataProtection.ts backupNow audits backup.created / backup.failed',
   "backups.ts POST '/api/admin/backups/:name/verify'": 'services/dataProtection.ts restoreTest audits backup.restore_tested',
   'project-content.ts POST `${base}/release/:relId/approve`': 'decide() above the registration writes release.approved with auditedTx',

@@ -148,7 +148,7 @@ test('import: preview shows everything and writes nothing; apply writes the sett
   pj.publication.bookName = 'My own name';
   pj.frontMatter.labels.titleJoint.contractNo = 'Contract: ';          // the project's own label...
   pj.frontMatter.labels.titleJoint.myOwnLabel = 'Kept';                 // ...and one the modules do not mention
-  assert.equal((await alice.put(`/api/projects/${pid}/settings`, { project: pj })).status, 200);
+  assert.equal((await alice.put(`/api/projects/${pid}/settings`, { project: pj, baseHash: (await alice.get(`/api/projects/${pid}/settings`)).json.version })).status, 200);
   const again = await alice.post(`${base}/import-frontmatter`, { apply: true });
   assert.ok(again.json.overwritten.includes('frontMatter.foreword'), again.json.overwritten.join(','));
   assert.ok(again.json.overwritten.includes('publication.bookName'));
@@ -205,7 +205,7 @@ test('generate: writes flagged modules, records them, is idempotent, and protect
   // an edit by the author is not overwritten
   const target = gen.json.written[1].file;
   const edited = (await alice.get(`/api/projects/${pid}/dms/${target}`)).json.xml.replace('Property of Gen Co.', 'Property of Gen Co. (edited by hand)');
-  assert.equal((await alice.put(`/api/projects/${pid}/dms/${target}`, { xml: edited })).status, 200);
+  assert.equal((await alice.put(`/api/projects/${pid}/dms/${target}`, { xml: edited, baseHash: (await alice.get(`/api/projects/${pid}/dms/${target}`)).json.hash })).status, 200);
   assert.equal((await alice.get(`${base}/status`)).json.generated.find((g) => g.file === target).editedSince, true);
   const third = await alice.post(`${base}/generate`, { frontMatter: FM, publication: PUB, ids: IDS });
   assert.equal(third.json.skipped.length, 1);
@@ -299,7 +299,7 @@ test('generating from the project\'s own saved settings when the request names n
   const s = await settings(pid);
   s.frontMatter = FM;
   s.publication = PUB;
-  assert.equal((await alice.put(`/api/projects/${pid}/settings`, { project: s })).status, 200);
+  assert.equal((await alice.put(`/api/projects/${pid}/settings`, { project: s, baseHash: (await alice.get(`/api/projects/${pid}/settings`)).json.version })).status, 200);
   const r = await alice.post(`/api/projects/${pid}/jssdm/generate`, { ids: IDS });
   assert.equal(r.status, 201);
   assert.deepEqual(r.json.written.map((w) => w.page), ['titlePage', 'proprietary', 'foreword']);
@@ -327,7 +327,7 @@ test('real data: JSS-0251 over HTTP - read into settings, then written out as se
   const other = await newProject('JSSDM sample copy');
   const o = await settings(other);
   Object.assign(o, { frontMatter: s.frontMatter, publication: s.publication, publishers: s.publishers });
-  assert.equal((await alice.put(`/api/projects/${other}/settings`, { project: o })).status, 200);
+  assert.equal((await alice.put(`/api/projects/${other}/settings`, { project: o, baseHash: (await alice.get(`/api/projects/${other}/settings`)).json.version })).status, 200);
   const gen = await alice.post(`/api/projects/${other}/jssdm/generate`, { ids: { modelIdentCode: prev.json.ids.modelIdentCode }, pm: 'merge' });
   assert.equal(gen.status, 201, JSON.stringify(gen.json).slice(0, 500));
   assert.equal(gen.json.written.filter((w) => w.action === 'created').length, 17);

@@ -209,6 +209,18 @@ test('G-REL-8: a critical action whose audit row cannot be written is refused an
     res = await pm.post(`/api/projects/${pid}/assign`, { username: 'bob', role: 'editor' });
     undo();
     assert.equal(res.status, 503); assert.equal(store.getMembership(pid, bob.id), null, 'no membership without its row');
+    // WP-27 access changes: group membership and a project group grant
+    const { repos } = D.ctx.defaultContext();
+    const gid = (await admin.post('/api/admin/groups', { name: 'WP29 reviewers' })).json.group.id;
+    undo = injectAuditFailure((r) => r.action === 'group.member.added');
+    res = await admin.post(`/api/admin/groups/${gid}/members`, { username: 'bob' });
+    undo();
+    assert.equal(res.status, 503); assert.equal(repos.access.listGroupMembers(gid).length, 0, 'no group member without its row');
+    undo = injectAuditFailure((r) => r.action === 'project.access.group-granted');
+    res = await pm.put(`/api/projects/${pid}/access/groups/${gid}`, { role: 'viewer' });
+    undo();
+    assert.equal(res.status, 503); assert.equal(repos.access.listProjectGroupGrants(pid).length, 0, 'no group grant without its row');
+    assert.equal((await pm.put(`/api/projects/${pid}/access/groups/${gid}`, { role: 'viewer' })).status, 200, 'and it works once the log does');
     // an ordinary action: it goes ahead, the failure is counted, written to audit-failures.log and raised as event 4100
     const health0 = (await admin.get('/api/admin/health')).json.audit.failures;
     undo = injectAuditFailure((r) => r.action === 'auth.logout');
@@ -221,7 +233,7 @@ test('G-REL-8: a critical action whose audit row cannot be written is refused an
     assert.ok(log.some((l) => l.action === 'user.updated' && l.critical === true));
     assert.ok(seen.filter((e) => e.id === 4100).length >= 5, 'every failed write raised event 4100');
     // and the chain is still intact: refused rows were never half-written
-    const rep = (await admin.post('/api/admin/audit/verify', {})).json.report;
+    const rep = (await admin.get('/api/admin/audit/verify')).json.report;
     assert.equal(rep.ok, true, rep.summary);
   } finally { D.events.setSecurityEventSink(prevSink); }
 });
@@ -278,7 +290,7 @@ test('ENT-003: the export streams every row (20 000 inserted), CSV and JSON Line
   const byProject = (await admin.get('/api/admin/audit?project=odd&limit=500')).json.entries;
   assert.equal(byProject.length, 500); assert.ok(byProject.every((e) => e.projectId === 'odd' && e.actor === 'bulk' && e.seq > 0));
   assert.equal((await admin.get(`/api/admin/audit?actor=bulk&to=2000-01-01`)).json.entries.length, 0);
-  const t0 = Date.now(); const rep = (await admin.post('/api/admin/audit/verify', {})).json.report;
+  const t0 = Date.now(); const rep = (await admin.get('/api/admin/audit/verify')).json.report;
   assert.equal(rep.ok, true, rep.summary); assert.ok(rep.chained > 20000, `verified ${rep.chained} rows in ${Date.now() - t0} ms`);
   const cp = (await admin.post('/api/admin/audit/checkpoint', {})).json.checkpoint;
   assert.equal(cp.seq, rep.head.seq + 1, 'the checkpoint covers the verification row written after it');
@@ -286,12 +298,20 @@ test('ENT-003: the export streams every row (20 000 inserted), CSV and JSON Line
   assert.equal((await admin.get('/api/admin/health')).json.audit.lastVerification.ok, true);
 });
 
-test('the audit routes are administrators only', async () => {
+test('the audit routes: administrators and read-only auditors read (and are audited doing it); only an administrator takes a checkpoint', async () => {
   const dan = await person('dan');
-  for (const [m, u] of [['POST', '/api/admin/audit/verify'], ['GET', '/api/admin/audit/export'], ['GET', '/api/admin/audit/events'], ['GET', '/api/admin/audit/checkpoints'], ['POST', '/api/admin/audit/checkpoint']]) {
+  const ida = await person('ida');
+  assert.equal((await admin.patch(`/api/admin/users/${ida.id}`, { auditor: true })).status, 200);
+  const reads = [['GET', '/api/admin/audit/verify'], ['GET', '/api/admin/audit/export?format=jsonl&action=auth.'], ['GET', '/api/admin/audit/events'], ['GET', '/api/admin/audit/checkpoints'],
+    ['GET', '/api/admin/audit?limit=5'], ['GET', '/api/admin/maintenance/audit.csv']];
+  for (const [m, u] of [...reads, ['POST', '/api/admin/audit/checkpoint']]) {
     assert.equal((await dan.req(m, u, m === 'POST' ? {} : undefined)).status, 403, `${m} ${u}`);
     assert.equal((await new h.Client('anon').req(m, u, m === 'POST' ? {} : undefined)).status, 401, `${m} ${u} anonymous`);
   }
+  for (const [m, u] of reads) assert.equal((await ida.req(m, u)).status, 200, `auditor ${m} ${u}`);
+  assert.equal((await ida.req('POST', '/api/admin/audit/checkpoint', {})).status, 403, 'an auditor never writes');
+  const byIda = (await admin.get('/api/admin/audit?actor=ida&limit=50')).json.entries.map((e) => e.action);
+  for (const a of ['audit.verified', 'audit.exported', 'maintenance.audit-export']) assert.ok(byIda.includes(a), `the auditor's ${a} is recorded`);
 });
 
 test('ENT-017: waiver history keeps add, remove and add again with their reasons; the audit rows carry the reason; an expired waiver no longer applies', async () => {

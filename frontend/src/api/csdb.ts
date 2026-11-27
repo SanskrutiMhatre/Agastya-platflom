@@ -7,8 +7,8 @@ export interface CoverageRow { schema: string; name: string; category: string; f
 
 const P = (id: string) => `/api/projects/${id}`;
 export const csdbApi = {
-  readObject: (id: string, file: string) => get<{ file: string; xml: string }>(`${P(id)}/objects/${encodeURIComponent(file)}`),
-  saveObject: (id: string, file: string, xml: string) => put<{ file: string }>(`${P(id)}/objects/${encodeURIComponent(file)}`, { xml }),
+  readObject: (id: string, file: string) => get<{ file: string; xml: string; hash: string }>(`${P(id)}/objects/${encodeURIComponent(file)}`),
+  saveObject: (id: string, file: string, xml: string, baseHash: string) => put<{ file: string; hash: string }>(`${P(id)}/objects/${encodeURIComponent(file)}`, { xml, baseHash }),
   adminExtensions: () => get<{ profiles: ExtProfile[] }>('/api/admin/extensions'),
   registerExtension: (b: { name: string; namespace: string; description?: string; xsd: string; xsdName?: string }) => post<ExtProfile>('/api/admin/extensions', b),
   deleteExtension: (id: string) => del(`/api/admin/extensions/${id}`),

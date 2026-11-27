@@ -38,9 +38,11 @@ export const revisions = ctx.revisions;
 export const registryDb = ctx.registryDb;
 export const workspace = ctx.workspace;
 
-export const { requireAuth, requireAdmin, requireRoles, requireProject, publicRoute } = ctx.authz as {
+export const { requireAuth, requireAdmin, requireRoles, requireProject, publicRoute, requireGlobal } = ctx.authz as {
   requireAuth: (o?: any) => any; requireAdmin: () => any; requireRoles: (...roles: string[]) => any;
   requireProject: (minRole: string, o?: any) => any; publicRoute: (reason: string) => any;
+  /** WP-27: a global capability (audit.read, access.read) held by administrators and read-only auditors. */
+  requireGlobal: (cap: 'audit.read' | 'access.read') => any;
 };
 
 export { redactAuditMeta };

@@ -87,7 +87,16 @@ function AddModal({ onClose, onDone }: { onClose: () => void; onDone: () => void
   const input = useRef<HTMLInputElement>(null);
   const submit = async () => {
     setBusy(true); setProblems([]); setErr('');
-    try { const r = await cirApi.add(files, note); toast(`Added ${r.added.length} data module${r.added.length === 1 ? '' : 's'} to the repository`, 'success'); onDone(); }
+    try {
+      let r;
+      try { r = await cirApi.add(files, note); }
+      catch (e) {
+        // WP-11: some are already in the repository. Replacing them is a deliberate step: ask, then send again naming the versions replaced.
+        const existing = (e as ApiError).code === 'CIR_EXISTS' ? (e as ApiError).body?.existing as Array<{ file: string; hash: string }> | undefined : undefined;
+        if (!existing?.length || !window.confirm(`${errText(e)}\n\nReplace ${existing.map((x) => x.file).join(', ')}?`)) throw e;
+        r = await cirApi.add(files, note, Object.fromEntries(existing.map((x) => [x.file, x.hash])));
+      }
+      toast(`Added ${r.added.length} data module${r.added.length === 1 ? '' : 's'} to the repository`, 'success'); onDone(); }
     catch (e) { const p = (e as ApiError).body?.problems as string[] | undefined; if (p?.length) setProblems(p); else setErr(errText(e)); setBusy(false); }
   };
   return (

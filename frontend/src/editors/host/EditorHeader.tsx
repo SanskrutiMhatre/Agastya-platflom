@@ -31,11 +31,13 @@ export interface EditorHeaderProps {
   actions?: ReactNode;
   onPalette: () => void;
   onShortcuts: () => void;
+  /** WP-22: beside the palette button, also in focus mode (the review comments) */
+  extra?: ReactNode;
   /** the layout switch can offer Split (not on a narrow window) */
   canSplit?: boolean;
 }
 
-export function EditorHeader({ layout, title, lead, crumb, state, actions, onPalette, onShortcuts, canSplit = true }: EditorHeaderProps) {
+export function EditorHeader({ layout, title, lead, crumb, state, actions, extra, onPalette, onShortcuts, canSplit = true }: EditorHeaderProps) {
   const { view, setView, narrow, focus, toggleFocus } = layout;
   return (
     <header className={`v2-top v2-edhead${focus ? ' is-focus' : ''}`} data-testid="editor-header">
@@ -45,6 +47,7 @@ export function EditorHeader({ layout, title, lead, crumb, state, actions, onPal
       {state}
       <span className="spacer" />
       {focus ? null : actions}
+      {extra}
       <button className="btn btn-sm v2-edcmd" onClick={onPalette} data-testid="chrome-palette" title="Command palette: every command of this editor by name (Ctrl+K)" aria-keyshortcuts="Control+K">
         <Icon name="command" size={12} /><span className="v2-edcmd-label">Commands</span><kbd className="v2-kbd">Ctrl K</kbd>
       </button>
