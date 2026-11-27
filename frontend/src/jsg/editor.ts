@@ -108,11 +108,19 @@ export class JsgEditor implements JsgEditorLike {
    */
   goToModule(key: string): boolean {
     const norm = (t: string): string => t.replace(/[‘’´`]/g, "'").replace(/\s+/g, ' ').trim().toLowerCase();
-    const m = /^t:(\d+):(.*?)(?:#\d+)?$/.exec(key); const id = key.startsWith('id:') ? key.slice(3) : '';
+    const m = /^t:(\d+):(.*?)(?:#(\d+))?$/.exec(key); const id = key.startsWith('id:') ? key.slice(3) : '';
+    // WP-21 (GAP-004): "#n" is the n-th section of that title without an id in that chapter (the server numbers them so, xengine/outline.ts keyOf)
+    const nth = Number(m?.[3] ?? 1);
     let target = '';
     this.doc.chapters.forEach((ch, ci) => {
       if (!target && id && ch.id === id) target = `jsg-ch-${ci}`;
-      ch.sections.forEach((s, si) => { if (!target && ((id && s.id === id) || (m && Number(m[1]) === ci + 1 && norm(s.title) === m[2]))) target = `jsg-sec-${ci}-${si}`; });
+      let seen = 0;
+      ch.sections.forEach((s, si) => {
+        if (target) return;
+        if (id && s.id === id) { target = `jsg-sec-${ci}-${si}`; return; }
+        if (m && Number(m[1]) === ci + 1 && !s.id && norm(s.title) === m[2] && ++seen === nth) target = `jsg-sec-${ci}-${si}`;
+      });
+      if (!target && m && !m[3] && Number(m[1]) === ci + 1) { const si = ch.sections.findIndex((s) => norm(s.title) === m[2]); if (si >= 0) target = `jsg-sec-${ci}-${si}`; }
     });
     this.doc.appendices.forEach((a, ai) => { if (!target && ((id && a.id === id) || (m && Number(m[1]) === this.doc.chapters.length + ai + 1 && norm(`${a.label ? `${a.label} ` : ''}${a.title}`) === m[2]))) target = `jsg-app-${ai}`; });
     const el = target ? document.getElementById(target) : null; if (!el) return false;

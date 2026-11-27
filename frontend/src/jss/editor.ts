@@ -131,9 +131,11 @@ export class JssEditor {
     const norm = (t: string): string => t.replace(/[‘’´`]/g, "'").replace(/\s+/g, ' ').trim().toLowerCase();
     let node: object | null = null;
     if (key.startsWith('id:')) node = this.nodeById(key.slice(3));
-    else { const m = /^t:(\d+):(.*?)(?:#\d+)?$/.exec(key); if (m) {
+    else { const m = /^t:(\d+):(.*?)(?:#(\d+))?$/.exec(key); if (m) {
       const ch = this.doc.chapters[Number(m[1]) - 1]; const title = m[2].replace(/ \(introduction\)$/, '');
-      node = ch ? (ch.children.filter(isSection).find((s) => norm(s.title) === title) ?? (norm(ch.title) === title ? ch : null)) : null;
+      // WP-21 (GAP-004): "#n" is the n-th section of that title without an id (the server numbers them so, xengine/outline.ts keyOf)
+      const same = ch ? ch.children.filter(isSection).filter((s) => !s.id && norm(s.title) === title) : [];
+      node = ch ? (same[Number(m[3] ?? 1) - 1] ?? (m[3] ? null : ch.children.filter(isSection).find((s) => norm(s.title) === title)) ?? (!m[3] && norm(ch.title) === title ? ch : null)) : null;
     } }
     if (!node) return false;
     this.setView('edit'); this.scrollToNode(node); return true;
