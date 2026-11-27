@@ -1,1612 +1,239 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <jsgdoc version="1.0" type="ispl">
   <meta>
-    <docNo>CQAE/IL/14/27/A</docNo>
+    <docNo>DUMMY/IL/001</docNo>
     <title>ILLUSTRATED SPARE PARTS LIST (ISPL)</title>
-    <projectName>100 METER INFANTRY FOOT BRIDGE FLOATING (IFBF)</projectName>
-    <atNo>52950/100M/IFB(F)/GS/CD-6</atNo>
-    <dated>25 Mar 2025</dated>
-    <nsn>14/5420-72-058-2758</nsn>
-    <supplier><line>LARSEN &amp; TOUBRO LIMITED,</line><line>PUNE 410507 INDIA</line></supplier>
-    <issuedBy><line>GOVERNMENT OF INDIA</line><line>(MIN.OF DEFENCE)</line><line>CONTROLLERATE OF QUALITY ASSURANCE (ENGG EQPT.)</line><line>AUNDH CAMP, PUNE – 411027</line></issuedBy>
-    <issueDate>JUNE, 2026</issueDate>
-    <equipmentLife>500 CYCLES OF LAUNCHING / RETRIEVAL OR 20 YEARS (WHICHEVER IS EARLIER)</equipmentLife>
-    <qtyUnit>for 100m</qtyUnit>
+    <projectName>DEMO EQUIPMENT DE-100</projectName>
+    <atNo>DUMMY/AT/0001</atNo>
+    <dated>01 Jan 2026</dated>
+    <nsn>00/0000-00-000-0000</nsn>
+    <supplier><line>DUMMY SUPPLIER LIMITED,</line><line>DUMMY CITY 000000</line></supplier>
+    <issuedBy><line>DUMMY ISSUING AUTHORITY</line><line>DUMMY DIRECTORATE</line></issuedBy>
+    <issueDate>JANUARY, 2026</issueDate>
+    <equipmentLife>10 YEARS (DUMMY VALUE)</equipmentLife>
+    <qtyUnit>for 1 unit</qtyUnit>
     <classification>RESTRICTED</classification>
   </meta>
   <front>
     <certificate>Certified that this document no. <b>{docNo}</b> contains {total} pages which have been serially numbered from (i) to (xiv) as ancillary pages and from 1 to {mainLast} as main content.</certificate>
-    <preface>
-      <para>This Illustrated Spare Parts List (ISPL) has been prepared for identifying any component, part or assembly of parts likely to be required as replacements. All concerned will use the Cat Sec. / Part No., NSN and DCAN and designations given in this list when demanding spare part or when referring in correspondence to any part of the equipment. All demands for items listed herein must be submitted to appropriate authority in accordance with standing instruction.</para>
-      <para>The Cat Sec. / Part No. (when quoted initially) and Designation of all ‘P’ marked items quoted in the list will be ssupercede by NSN and codified designation respectively as soon as such items will be codified:</para>
-      <para>When demanding spare parts, following particulars must be quoted:</para>
-      <list type="alpha" indent="3">
-        <item><text>Relevant Section / Sub-section of Catalogue of Ordnance Stores (i.e. COS) or Catalogue of Engineer Stores (i.e. COES) or Catalogue of Mechanical Transport Stores (i.e. CMTS) or Catalogue of Clothing (i.e. COC).</text><text>(NOTE – The above mentioned Catalogues belong to Army only. Navy and Air Force to mention their respective Catalogues under which the equipment/items are provided by them).</text></item>
-        <item><text>Cat Sec. / Part No. or NSN or DCAN of spare parts along with their designation.</text></item>
-        <item><text>Designation and Cat Sec. / Part No. or NSN or DCAN of the main equipment.</text></item>
-      </list>
-      <para>Certain items included in this ISPL have not been marked ‘P’ (Provided) by concerned MAG since they are not considered to be provisioned for maintenance of the equipment. But User Unit / EME workshop may demand certain non ‘P’ items which they consider essential for maintenance purpose.</para>
-      <para>All amendment to this list will be forwarded to all concerned by the concerned AHSP / department primarily responsible for providing the equipment. It is essential that this list should be carefully amended and date of each amendment entered.</para>
-      <para>Abbreviations and symbols appearing in this list are given further in Abbreviations.</para>
-      <para>Queries relating to this ISPL must be referred to Controller / HOE of the concerned office by whom this ISPL has been published. The name and address of the publisher is shown on cover page / cover leaf of this ISPL.</para>
-    </preface>
-    <amendments minRows="20"></amendments>
-    <abbreviations>
-      <abbr short="AISI" long="American Iron and Steel Institute"/>
-      <abbr short="ASME" long="American Society of Mechanical Engineers"/>
-      <abbr short="AWS" long="American Welding Society"/>
-      <abbr short="BIS" long="Bureau of Indian Standards"/>
-      <abbr short="DP" long="Dye Penetrant"/>
-      <abbr short="IFBF" long="Infantry Foot Bridge Floating"/>
-      <abbr short="IS" long="Indian Standards"/>
-      <abbr short="LCD" long="Liquid Crystal Display"/>
-      <abbr short="LED" long="Light Emitting Diode"/>
-      <abbr short="MIG" long="Metal Inert Gas"/>
-      <abbr short="OBM" long="Out Board Motor"/>
-      <abbr short="OEM" long="Original Equipment Manufacturer"/>
-      <abbr short="PU" long="Polyurethane"/>
-      <abbr short="TIG" long="Tungsten Inert Gas"/>
-      <abbr short="UHMPE" long="Ultra High Molecular Weight Polyethylene"/>
-    </abbreviations>
-    <supplied equipment="100 Meter Infantry Foot Bridge Floating"></supplied>
+    <preface><para>This Illustrated Spare Parts List (ISPL) is a dummy document made to show how a spare parts list looks.</para><para>All part numbers, quantities and prices in it are dummy data.</para><para>When demanding spare parts, following particulars must be quoted:</para><list type="alpha" indent="3"><item><text>Dummy catalogue section.</text></item><item><text>Dummy part number or NSN.</text></item><item><text>Designation of the dummy equipment.</text></item></list><para>Queries relating to this dummy ISPL are for the dummy issuing authority.</para></preface>
+    <amendments minRows="20"/>
+    <abbreviations><abbr short="DE" long="Demo Equipment"/><abbr short="DSP" long="Dummy Spare Part"/><abbr short="DRG" long="Drawing"/><abbr short="NSN" long="Dummy Stock Number"/></abbreviations>
+    <supplied equipment="Demo Equipment DE-100"/>
   </front>
   <plates>
-    <plate id="p1" ref="I" title="General Assembly" divider="true" caption="GENERAL ASSY OF 100M INFANTRY FOOT BRIDGE FLOATING">
-      <view caption="GENERAL ASSEMBLY: 100M INFANTRY FOOT BRIDGE FLOATING (VIEW 1)">
-        <graphic src="Media/image3.jpg"/>
+    <plate id="p1" ref="I" title="General Assembly" divider="true" setColumn="true" caption="GENERAL ASSY OF DEMO EQUIPMENT DE-100">
+      <view caption="GENERAL ASSEMBLY (DUMMY VIEW 1)">
+        <graphic src="Media/dummy-1.png"/>
+        <part item="01" plateRef="I/1" provide="P" nsn="00/0000-00-000-0001" designation="DUMMY PART 1-1" qty="1" qtySet="2" drg="DUMMY-DRG-11" firmPart="DFP-11" price="100"/>
+        <part item="02" plateRef="I/2" provide="" nsn="00/0000-00-000-0002" designation="DUMMY PART 1-2" qty="2" qtySet="3" drg="DUMMY-DRG-12" firmPart="DFP-12" price="200"/>
+        <part item="03" plateRef="I/3" provide="P" nsn="00/0000-00-000-0003" designation="DUMMY PART 1-3" qty="3" qtySet="4" drg="DUMMY-DRG-13" firmPart="DFP-13" price="300"/>
+        <part item="04" plateRef="I/4" provide="" nsn="00/0000-00-000-0004" designation="DUMMY PART 1-4" qty="4" qtySet="5" drg="DUMMY-DRG-14" firmPart="DFP-14" price="400"/>
+        <part item="05" plateRef="I/5" provide="P" nsn="00/0000-00-000-0005" designation="DUMMY PART 1-5" qty="5" qtySet="6" drg="DUMMY-DRG-15" firmPart="DFP-15" price="500"/>
+        <part item="06" plateRef="I/6" provide="" nsn="00/0000-00-000-0006" designation="DUMMY PART 1-6" qty="6" qtySet="7" drg="DUMMY-DRG-16" firmPart="DFP-16" price="600"/>
+        <note><b>Note:</b> Above mentioned quantity is for one General Assembly. Dummy data.</note>
       </view>
     </plate>
-    <plate id="p2" ref="I-A" title="Bridging System" setColumn="true">
-      <view caption="100M INFANTRY FOOT BRIDGE FLOATING (ISOMETRIC VIEW 1)">
-        <graphic src="Media/image4.jpg"/>
-        <part item="01" plateRef="I-A/1" provide="P" nsn="14/5420-72-058-7193" designation="PONTOON ASSY" qty="26" qtySet="29" drg="AIF4100000000" price="204,930"/>
-        <part item="02" plateRef="I-A/2" provide="P" nsn="14/5420-72-058-7194" designation="DECK ASSY" qty="25" qtySet="28" drg="AIF4200000000" price="205,920"/>
-        <part item="03" plateRef="I-A/3" provide="P" nsn="14/5340-72-058-7197" designation="HANDRAIL ASSY" qty="150" qtySet="168" drg="AIF4300000000" price="9,310"/>
-      </view>
-      <view caption="100M INFANTRY FOOT BRIDGE FLOATING (ISOMETRIC VIEW 4)">
-        <graphic src="Media/image5.jpg"/>
-        <part item="04" plateRef="I-A/4" nsn="14/5340-72-058-7195" designation="LADDER ATTACHMENT ASSY" qty="2" qtySet="2" drg="AIF4400000000" price="56,010"/>
-        <part item="05" plateRef="I-A/5" nsn="14/4240-72-058-7196" designation="RAMP ASSY" qty="2" qtySet="3" drg="AIF4500000000" price="85,140"/>
-        <part item="06" plateRef="I-A/6" provide="P" nsn="14/4020-72-058-3833" designation="NYLON ROPE FOR HANDRAIL ASSY" qty="2" qtySet="3" drg="AIFSTD0000200" price="4,750" remark="STD"/>
-      </view>
-      <view caption="100M INFANTRY FOOT BRIDGE FLOATING (ISOMETRIC VIEW 6)">
-        <graphic src="Media/image6.jpg"/>
-        <part item="07" plateRef="I-A/7" nsn="14/5440-72-058-7200" designation="ALUMINIUM LADDER ASSY" qty="2" qtySet="2" drg="AIFSTD0000100" price="35,640" remark="STD"/>
+    <plate id="p2" ref="I-A" title="Dummy System A" setColumn="true">
+      <view caption="DUMMY SYSTEM A (DUMMY VIEW 1)">
+        <graphic src="Media/dummy-2.png"/>
+        <part item="01" plateRef="I-A/1" provide="P" nsn="00/0000-00-000-0011" designation="DUMMY PART 2-1" qty="1" qtySet="2" drg="DUMMY-DRG-21" firmPart="DFP-21" price="100"/>
+        <part item="02" plateRef="I-A/2" provide="" nsn="00/0000-00-000-0012" designation="DUMMY PART 2-2" qty="2" qtySet="3" drg="DUMMY-DRG-22" firmPart="DFP-22" price="200"/>
+        <part item="03" plateRef="I-A/3" provide="P" nsn="00/0000-00-000-0013" designation="DUMMY PART 2-3" qty="3" qtySet="4" drg="DUMMY-DRG-23" firmPart="DFP-23" price="300"/>
+        <part item="04" plateRef="I-A/4" provide="" nsn="00/0000-00-000-0014" designation="DUMMY PART 2-4" qty="4" qtySet="5" drg="DUMMY-DRG-24" firmPart="DFP-24" price="400"/>
+        <part item="05" plateRef="I-A/5" provide="P" nsn="00/0000-00-000-0015" designation="DUMMY PART 2-5" qty="5" qtySet="6" drg="DUMMY-DRG-25" firmPart="DFP-25" price="500"/>
+        <part item="06" plateRef="I-A/6" provide="" nsn="00/0000-00-000-0016" designation="DUMMY PART 2-6" qty="6" qtySet="7" drg="DUMMY-DRG-26" firmPart="DFP-26" price="600"/>
+        <note><b>Note:</b> Above mentioned quantity is for one Dummy System A. Dummy data.</note>
       </view>
     </plate>
-    <plate id="p3" ref="I-B" title="Anchoring System" setColumn="true">
-      <view>
-        <graphic src="Media/image7.jpg" label="I-B/1"/>
-        <graphic src="Media/image8.png" label="I-B/2"/>
-        <graphic src="Media/image9.png" label="I-B/3"/>
-        <graphic src="Media/image10.png" label="I-B/4"/>
-        <graphic src="Media/image11.png" label="I-B/5"/>
-        <part item="01" plateRef="I-B/1" nsn="14/5342-72-058-7198" designation="ANCHOR PLATE ASSY" qty="2" qtySet="3" drg="AIF4600000000" price="45,050"/>
-        <part item="02" plateRef="I-B/2" nsn="14/3950-72-058-7199" designation="WINCH ASSY" qty="1" qtySet="2" drg="AIF4700000000" price="681,120"/>
-        <part item="03" plateRef="I-B/3" provide="P" nsn="14/4020-72-058-7061" designation="GARWARE ROPE 12 MM DIA. 150 M LONG" qty="1" qtySet="2" drg="AIF4C00000000" price="136,620"/>
-        <part item="04" plateRef="I-B/4" provide="P" nsn="14/4020-72-058-6997" designation="GARWARE ROPE 12 MM DIA. 2 M LONG" qty="26" qtySet="60" drg="AIF4D00000000" price="5,210"/>
-        <part item="05" plateRef="I-B/5" provide="P" nsn="14/4020-72-058-6988" designation="GARWARE ROPE 12 MM DIA. 3 M LONG" qty="26" qtySet="30" drg="AIF4E00000000" price="8,490"/>
-      </view>
-      <view>
-        <graphic src="Media/image12.png" label="I-B/6"/>
-        <graphic src="Media/image13.png" label="I-B/7"/>
-        <graphic src="Media/image14.png" label="I-B/8"/>
-        <graphic src="Media/image15.png" label="I-B/9"/>
-        <graphic src="Media/image16.png" label="I-B/10"/>
-        <part item="06" plateRef="I-B/6" provide="P" nsn="14/5315-72-058-7201" designation="SPIKE" qty="32" qtySet="35" drg="AIF4000000100" price="7,550"/>
-        <part item="07" plateRef="I-B/7" nsn="14/5315-72-058-7215" designation="SPIKE FOR DRUM" qty="8" qtySet="8" drg="AIF4000000400" price="3,160"/>
-        <part item="08" plateRef="I-B/8" provide="P" nsn="14/4730-72-058-7214" designation="ANCHOR RING" qty="1" qtySet="2" drg="AIF4000000600" price="6,140"/>
-        <part item="09" plateRef="I-B/9" provide="P" nsn="14/5340-72-058-3834" designation="CARABINER HOOK" qty="104" qtySet="130" drg="AIFSTD0000300" price="1,780" remark="STD"/>
-        <part item="10" plateRef="I-B/10" provide="P" nsn="14/4030-72-058-3835" designation="BOW SHACKLE" qty="3" qtySet="4" drg="AIFSTD0000400" price="1,290" remark="STD"/>
+    <plate id="p3" ref="I-B" title="Dummy System B" setColumn="true">
+      <view caption="DUMMY SYSTEM B (DUMMY VIEW 1)">
+        <graphic src="Media/dummy-3.png"/>
+        <part item="01" plateRef="I-B/1" provide="P" nsn="00/0000-00-000-0021" designation="DUMMY PART 3-1" qty="1" qtySet="2" drg="DUMMY-DRG-31" firmPart="DFP-31" price="100"/>
+        <part item="02" plateRef="I-B/2" provide="" nsn="00/0000-00-000-0022" designation="DUMMY PART 3-2" qty="2" qtySet="3" drg="DUMMY-DRG-32" firmPart="DFP-32" price="200"/>
+        <part item="03" plateRef="I-B/3" provide="P" nsn="00/0000-00-000-0023" designation="DUMMY PART 3-3" qty="3" qtySet="4" drg="DUMMY-DRG-33" firmPart="DFP-33" price="300"/>
+        <part item="04" plateRef="I-B/4" provide="" nsn="00/0000-00-000-0024" designation="DUMMY PART 3-4" qty="4" qtySet="5" drg="DUMMY-DRG-34" firmPart="DFP-34" price="400"/>
+        <part item="05" plateRef="I-B/5" provide="P" nsn="00/0000-00-000-0025" designation="DUMMY PART 3-5" qty="5" qtySet="6" drg="DUMMY-DRG-35" firmPart="DFP-35" price="500"/>
+        <part item="06" plateRef="I-B/6" provide="" nsn="00/0000-00-000-0026" designation="DUMMY PART 3-6" qty="6" qtySet="7" drg="DUMMY-DRG-36" firmPart="DFP-36" price="600"/>
+        <note><b>Note:</b> Above mentioned quantity is for one Dummy System B. Dummy data.</note>
       </view>
     </plate>
-    <plate id="p4" ref="I-C" title="Instrumentation, Safety and Other Component" setColumn="true">
-      <view>
-        <graphic src="Media/image17.jpg" label="I-C/1"/>
-        <graphic src="Media/image18.jpg" label="I-C/2"/>
-        <graphic src="Media/image19.png" label="I-C/3"/>
-        <graphic src="Media/image20.png" label="I-C/4"/>
-        <graphic src="Media/image21.png" label="I-C/5"/>
-        <part item="01" plateRef="I-C/1" nsn="14/3950-72-058-7210" designation="DRUM FOR HANDRAIL ROPE ASSY" qty="2" qtySet="2" drg="AIF4800000000" price="83,830"/>
-        <part item="02" plateRef="I-C/2" nsn="14/3950-72-058-7211" designation="OBM ATTACHMENT ASSY" qty="2" qtySet="2" drg="AIF4900000000" price="68,730"/>
-        <part item="03" plateRef="I-C/3" nsn="14/5340-72-058-7098" designation="PROTECTING GUARD" qty="5" qtySet="5" drg="AIF4000000500" price="8,940"/>
-        <part item="04" plateRef="I-C/4" nsn="14/5420-72-058-7216" designation="BRIDGE LAUNCHER ASSY" qty="1" qtySet="1" drg="AIF4G00000000" price="182,240"/>
-        <part item="05" plateRef="I-C/5" nsn="14/4510-72-058-7218" designation="OBSTRUCTION CLEANING ROD" qty="2" qtySet="2" drg="AIF4000000300" price="7,520"/>
+    <plate id="p4" ref="I-C" title="Dummy System C" setColumn="true">
+      <view caption="DUMMY SYSTEM C (DUMMY VIEW 1)">
+        <graphic src="Media/dummy-4.png"/>
+        <part item="01" plateRef="I-C/1" provide="P" nsn="00/0000-00-000-0031" designation="DUMMY PART 4-1" qty="1" qtySet="2" drg="DUMMY-DRG-41" firmPart="DFP-41" price="100"/>
+        <part item="02" plateRef="I-C/2" provide="" nsn="00/0000-00-000-0032" designation="DUMMY PART 4-2" qty="2" qtySet="3" drg="DUMMY-DRG-42" firmPart="DFP-42" price="200"/>
+        <part item="03" plateRef="I-C/3" provide="P" nsn="00/0000-00-000-0033" designation="DUMMY PART 4-3" qty="3" qtySet="4" drg="DUMMY-DRG-43" firmPart="DFP-43" price="300"/>
+        <part item="04" plateRef="I-C/4" provide="" nsn="00/0000-00-000-0034" designation="DUMMY PART 4-4" qty="4" qtySet="5" drg="DUMMY-DRG-44" firmPart="DFP-44" price="400"/>
+        <part item="05" plateRef="I-C/5" provide="P" nsn="00/0000-00-000-0035" designation="DUMMY PART 4-5" qty="5" qtySet="6" drg="DUMMY-DRG-45" firmPart="DFP-45" price="500"/>
+        <part item="06" plateRef="I-C/6" provide="" nsn="00/0000-00-000-0036" designation="DUMMY PART 4-6" qty="6" qtySet="7" drg="DUMMY-DRG-46" firmPart="DFP-46" price="600"/>
+        <note><b>Note:</b> Above mentioned quantity is for one Dummy System C. Dummy data.</note>
       </view>
     </plate>
-    <plate id="p5" ref="I-D" title="Transportation Aids" setColumn="true">
-      <view>
-        <graphic src="Media/image22.png" label="I-D/1"/>
-        <graphic src="Media/image22.png" label="I-D/2"/>
-        <graphic src="Media/image23.png" label="I-D/3"/>
-        <part item="01" plateRef="I-D/1" provide="P" nsn="14/5340-72-058-4262" designation="RATCHET LASHING 15 M LONG STRAP" qty="6" qtySet="6" drg="AIFSTD0001600" price="990" remark="STD"/>
-        <part item="02" plateRef="I-D/2" provide="P" nsn="14/5340-72-058-4265" designation="RATCHET LASHING 10 M LONG STRAP" qty="6" qtySet="6" drg="AIFSTD0001700" price="920" remark="STD"/>
-        <part item="03" plateRef="I-D/3" provide="P" nsn="14/4240-72-058-7647" designation="BODY HARNESS" qty="20" qtySet="20" drg="AIF4A00000000" price="16,830" remark="STD"/>
+    <plate id="p5" ref="I-D" title="Dummy System D" setColumn="true">
+      <view caption="DUMMY SYSTEM D (DUMMY VIEW 1)">
+        <graphic src="Media/dummy-5.png"/>
+        <part item="01" plateRef="I-D/1" provide="P" nsn="00/0000-00-000-0041" designation="DUMMY PART 5-1" qty="1" qtySet="2" drg="DUMMY-DRG-51" firmPart="DFP-51" price="100"/>
+        <part item="02" plateRef="I-D/2" provide="" nsn="00/0000-00-000-0042" designation="DUMMY PART 5-2" qty="2" qtySet="3" drg="DUMMY-DRG-52" firmPart="DFP-52" price="200"/>
+        <part item="03" plateRef="I-D/3" provide="P" nsn="00/0000-00-000-0043" designation="DUMMY PART 5-3" qty="3" qtySet="4" drg="DUMMY-DRG-53" firmPart="DFP-53" price="300"/>
+        <part item="04" plateRef="I-D/4" provide="" nsn="00/0000-00-000-0044" designation="DUMMY PART 5-4" qty="4" qtySet="5" drg="DUMMY-DRG-54" firmPart="DFP-54" price="400"/>
+        <part item="05" plateRef="I-D/5" provide="P" nsn="00/0000-00-000-0045" designation="DUMMY PART 5-5" qty="5" qtySet="6" drg="DUMMY-DRG-55" firmPart="DFP-55" price="500"/>
+        <part item="06" plateRef="I-D/6" provide="" nsn="00/0000-00-000-0046" designation="DUMMY PART 5-6" qty="6" qtySet="7" drg="DUMMY-DRG-56" firmPart="DFP-56" price="600"/>
+        <note><b>Note:</b> Above mentioned quantity is for one Dummy System D. Dummy data.</note>
       </view>
     </plate>
-    <plate id="p6" ref="I-A/1" title="Pontoon Assy">
-      <view caption="PONTOON ASSY (VIEW 1)">
-        <graphic src="Media/image24.jpg"/>
-        <part item="01" plateRef="I-A/1/1" provide="P" nsn="14/5340-72-058-3836" designation="BUCKLE MALE" qty="8" drg="AIFSTD0002800" price="1,450" remark="Item No 1 and 2 in Assembled Condition (Male Buckle Assy)"/>
-        <part item="02" plateRef="I-A/1/2" provide="P" nsn="14/5340-72-058-7213" designation="SMALL STRAP" qty="8" drg="AIF4120000100" price="1,520"/>
-        <part item="03" plateRef="I-A/1/3" provide="P" nsn="14/5315-72-058-7097" designation="PIN" qty="8" drg="AIF4100000100" price="280"/>
-        <part item="04" plateRef="I-A/1/4" provide="P" nsn="14/5305-72-058-4260" designation="CAP SCREW M5X25" qty="16" drg="AIFSTD0002200" price="287" remark="STD"/>
-        <part item="05" plateRef="I-A/1/5" provide="P" nsn="14/5315-72-058-8292" designation="SPRING WASHER 6" qty="16" drg="AIFSTD0002100" price="80" remark="STD"/>
-        <part item="06" plateRef="I-A/1/6" provide="P" nsn="14/5310-72-058-4261" designation="SQUARE NUT" qty="16" drg="AIFSTD0002300" price="232" remark="STD"/>
-        <part item="07" plateRef="I-A/1/7" provide="P" nsn="14/5340-72-058-4208" designation="ROPE HOOK" qty="4" drg="AIFSTD0002500" price="80" remark="STD"/>
-        <part item="08" plateRef="I-A/1/8" nsn="14/5310-72-059-2843" designation="PLANE WASHER 5.5" qty="16" drg="AIFSTD0002000" price="30" remark="STD"/>
-        <part item="09" plateRef="I-A/1/9" nsn="14/5815-72-058-4230" designation="REFLECTOR TAPE" qty="4" drg="AIFSTD0002600" price="100" remark="STD"/>
-        <part item="10" plateRef="I-A/1/10" provide="P" nsn="14/5420-72-058-7207" designation="PONTOON STRUCTURE" qty="1" drg="AIF4110000000" price="174,160"/>
-        <part item="11" plateRef="I-A/1/11" provide="P" nsn="14/8470-72-058-7217" designation="MALE BUCKLE ASSY" qty="8" drg="AIF4120000000" price="1,930"/>
-        <part item="12" plateRef="I-A/1/12" nsn="14/4030-72-058-8190" designation="ROPE HOOK-1" qty="1" drg="AIFSTD0006600" price="85" remark="STD"/>
-        <note><b>Note</b>: Above mentioned quantity is for one Pontoon Assy.</note>
+    <plate id="p6" ref="I-A/1" title="Dummy Assembly A1">
+      <view caption="DUMMY ASSEMBLY A1 (DUMMY VIEW 1)">
+        <graphic src="Media/dummy-6.png"/>
+        <part item="01" plateRef="I-A/1/1" provide="P" nsn="00/0000-00-000-0051" designation="DUMMY PART 6-1" qty="1" drg="DUMMY-DRG-61" firmPart="DFP-61" price="100"/>
+        <part item="02" plateRef="I-A/1/2" provide="" nsn="00/0000-00-000-0052" designation="DUMMY PART 6-2" qty="2" drg="DUMMY-DRG-62" firmPart="DFP-62" price="200"/>
+        <part item="03" plateRef="I-A/1/3" provide="P" nsn="00/0000-00-000-0053" designation="DUMMY PART 6-3" qty="3" drg="DUMMY-DRG-63" firmPart="DFP-63" price="300"/>
+        <part item="04" plateRef="I-A/1/4" provide="" nsn="00/0000-00-000-0054" designation="DUMMY PART 6-4" qty="4" drg="DUMMY-DRG-64" firmPart="DFP-64" price="400"/>
+        <part item="05" plateRef="I-A/1/5" provide="P" nsn="00/0000-00-000-0055" designation="DUMMY PART 6-5" qty="5" drg="DUMMY-DRG-65" firmPart="DFP-65" price="500"/>
+        <part item="06" plateRef="I-A/1/6" provide="" nsn="00/0000-00-000-0056" designation="DUMMY PART 6-6" qty="6" drg="DUMMY-DRG-66" firmPart="DFP-66" price="600"/>
+        <note><b>Note:</b> Above mentioned quantity is for one Dummy Assembly A1. Dummy data.</note>
       </view>
     </plate>
-    <plate id="p7" ref="I-A/2" title="Deck Assy">
-      <view caption="DECK ASSY (VIEW 1)">
-        <graphic src="Media/image25.jpg"/>
-        <part item="01" plateRef="I-A/2/1" provide="P" nsn="14/2590-72-058-7204" designation="BALL LOCK JOINT" qty="2" drg="AIF4200000100" price="7,390"/>
-        <part item="02" plateRef="I-A/2/2" nsn="14/4730-72-058-7093" designation="SOCKET ASSY" qty="2" drg="AIF4220000000" price="28,120"/>
-        <part item="03" plateRef="I-A/2/3" provide="P" nsn="14/5305-72-058-8191" designation="BOLT M12X70" qty="8" drg="AIFSTD0002900" price="490" remark="STD"/>
-        <part item="04" plateRef="I-A/2/4" provide="P" nsn="14/5310-72-058-3839" designation="HEX NUT M12" qty="8" drg="AIFSTD0003100" price="240" remark="STD"/>
-        <part item="05" plateRef="I-A/2/5" provide="P" nsn="14/5310-72-058-6991" designation="WASHER 13" qty="8" drg="AIFSTD0003000" price="80" remark="STD"/>
-        <part item="06" plateRef="I-A/2/6" provide="P" nsn="14/5310-72-058-4213" designation="HEX THIN NUT M12" qty="8" drg="AIFSTD0003200" price="200" remark="STD"/>
-        <part item="07" plateRef="I-A/2/7" provide="P" nsn="14/5420-72-058-7209" designation="DECK STRUCTURE ASSY" qty="1" drg="AIF4210000000" price="199,770"/>
-        <part item="08" plateRef="I-A/2/8" nsn="14/5815-72-058-4230" designation="REFLECTOR TAPE" qty="4" drg="AIFSTD0002600" price="100" remark="STD"/>
-        <part item="09" plateRef="I-A/2/9" provide="P" nsn="14/5315-72-058-7096" designation="PIN" qty="8" drg="AIF4200000200" price="250"/>
-        <part item="10" plateRef="I-A/2/10" provide="P" nsn="14/5315-72-058-4212" designation="SPLIT PIN" qty="16" drg="AIFSTD0003400" price="80" remark="STD"/>
-        <note><b>Note:</b> Above mentioned quantity is for one Deck Assy.</note>
-      </view>
-      <view caption="DECK ASSY (VIEW 1)">
-        <graphic src="Media/image25.jpg"/>
-        <part item="11" plateRef="I-A/2/11" provide="P" nsn="14/5340-72-058-4208" designation="ROPE HOOK" qty="6" drg="AIFSTD0002500" price="80" remark="STD"/>
-        <part item="12" plateRef="I-A/2/12" provide="P" nsn="14/5340-72-058-7202" designation="STRAP" qty="8" drg="AIF4230000100" price="3,070" remark="Item 12 and 13 in Assembled Condition (Female Buckle Assy)"/>
-        <part item="13" plateRef="I-A/2/13" nsn="14/5340-72-058-3837" designation="BUCKLE FEMALE" qty="8" drg="AIFSTD0003300" price="700"/>
-        <part item="14" plateRef="I-A/2/14" provide="P" nsn="14/5340-72-058-7094" designation="FEMALE BUCKLE ASSY" qty="8" drg="AIF4230000000" price="4,190"/>
-        <part item="15" plateRef="I-A/2/15" nsn="14/9390-72-058-3838" designation="REFLECTOR TAPE B" qty="2" drg="AIFSTD0003500" price="100" remark="STD"/>
-        <part item="16" plateRef="I-A/2/16" nsn="14/9390-72-058-6835" designation="REFLECTOR TAPE A" qty="2" drg="AIFSTD0003600" price="100" remark="STD"/>
-        <part item="17" plateRef="I-A/2/17" nsn="14/5310-72-059-3254" designation="SPRING WASHER 12" qty="8" drg="AIFSTD0005800" price="30" remark="STD"/>
-        <note><b>Note:</b> Above mentioned quantity is for one Deck Assy.</note>
+    <plate id="p7" ref="I-A/2" title="Dummy Assembly A2">
+      <view caption="DUMMY ASSEMBLY A2 (DUMMY VIEW 1)">
+        <graphic src="Media/dummy-7.png"/>
+        <part item="01" plateRef="I-A/2/1" provide="P" nsn="00/0000-00-000-0061" designation="DUMMY PART 7-1" qty="1" drg="DUMMY-DRG-71" firmPart="DFP-71" price="100"/>
+        <part item="02" plateRef="I-A/2/2" provide="" nsn="00/0000-00-000-0062" designation="DUMMY PART 7-2" qty="2" drg="DUMMY-DRG-72" firmPart="DFP-72" price="200"/>
+        <part item="03" plateRef="I-A/2/3" provide="P" nsn="00/0000-00-000-0063" designation="DUMMY PART 7-3" qty="3" drg="DUMMY-DRG-73" firmPart="DFP-73" price="300"/>
+        <part item="04" plateRef="I-A/2/4" provide="" nsn="00/0000-00-000-0064" designation="DUMMY PART 7-4" qty="4" drg="DUMMY-DRG-74" firmPart="DFP-74" price="400"/>
+        <part item="05" plateRef="I-A/2/5" provide="P" nsn="00/0000-00-000-0065" designation="DUMMY PART 7-5" qty="5" drg="DUMMY-DRG-75" firmPart="DFP-75" price="500"/>
+        <part item="06" plateRef="I-A/2/6" provide="" nsn="00/0000-00-000-0066" designation="DUMMY PART 7-6" qty="6" drg="DUMMY-DRG-76" firmPart="DFP-76" price="600"/>
+        <note><b>Note:</b> Above mentioned quantity is for one Dummy Assembly A2. Dummy data.</note>
       </view>
     </plate>
-    <plate id="p8" ref="I-A/3" title="Handrail Assy">
-      <view caption="HANDRAIL ASSY (VIEW 1)">
-        <graphic src="Media/image26.png"/>
-        <part item="1" plateRef="I-A/3/1" nsn="14/5340-72-058-7091" designation="HANDRAIL STRUCTURE" qty="1" drg="AIF4310000000" price="9,480"/>
-        <part item="2" plateRef="I-A/3/2" provide="P" nsn="14/5355-72-058-4211" designation="SHANK HOOK" qty="1" drg="AIFSTD0003700" price="4,770" remark="STD"/>
-        <part item="3" plateRef="I-A/3/3" nsn="14/5815-72-058-4230" designation="REFLECTOR TAPE" qty="2" drg="AIFSTD0002600" price="100" remark="STD"/>
-        <note><b>Note:</b> Above mentioned quantity is for one Handrail Assy.</note>
+    <plate id="p8" ref="I-A/3" title="Dummy Assembly A3">
+      <view caption="DUMMY ASSEMBLY A3 (DUMMY VIEW 1)">
+        <graphic src="Media/dummy-8.png"/>
+        <part item="01" plateRef="I-A/3/1" provide="P" nsn="00/0000-00-000-0071" designation="DUMMY PART 8-1" qty="1" drg="DUMMY-DRG-81" firmPart="DFP-81" price="100"/>
+        <part item="02" plateRef="I-A/3/2" provide="" nsn="00/0000-00-000-0072" designation="DUMMY PART 8-2" qty="2" drg="DUMMY-DRG-82" firmPart="DFP-82" price="200"/>
+        <part item="03" plateRef="I-A/3/3" provide="P" nsn="00/0000-00-000-0073" designation="DUMMY PART 8-3" qty="3" drg="DUMMY-DRG-83" firmPart="DFP-83" price="300"/>
+        <part item="04" plateRef="I-A/3/4" provide="" nsn="00/0000-00-000-0074" designation="DUMMY PART 8-4" qty="4" drg="DUMMY-DRG-84" firmPart="DFP-84" price="400"/>
+        <part item="05" plateRef="I-A/3/5" provide="P" nsn="00/0000-00-000-0075" designation="DUMMY PART 8-5" qty="5" drg="DUMMY-DRG-85" firmPart="DFP-85" price="500"/>
+        <part item="06" plateRef="I-A/3/6" provide="" nsn="00/0000-00-000-0076" designation="DUMMY PART 8-6" qty="6" drg="DUMMY-DRG-86" firmPart="DFP-86" price="600"/>
+        <note><b>Note:</b> Above mentioned quantity is for one Dummy Assembly A3. Dummy data.</note>
       </view>
     </plate>
-    <plate id="p9" ref="I-A/5" title="Ramp Assy">
-      <view caption="RAMP ASSY (VIEW 1)">
-        <graphic src="Media/image27.jpg"/>
-        <part item="01" plateRef="I-A/5/1" provide="P" nsn="14/5310-72-058-4213" designation="HEX THIN NUT M12" qty="4" drg="AIFSTD0003200" price="200" remark="STD"/>
-        <part item="02" plateRef="I-A/5/2" nsn="14/4730-72-058-7093" designation="SOCKET ASSY" qty="1" drg="AIF4220000000" price="28,120"/>
-        <part item="03" plateRef="I-A/5/3" provide="P" nsn="14/2590-72-058-7204" designation="BALL LOCK JOINT" qty="1" drg="AIF4200000100" price="7,390"/>
-        <part item="04" plateRef="I-A/5/4" provide="P" nsn="14/5310-72-058-3839" designation="HEX NUT M12" qty="4" drg="AIFSTD0003100" price="240" remark="STD"/>
-        <part item="05" plateRef="I-A/5/5" provide="P" nsn="14/5305-72-058-8191" designation="BOLT M12X70" qty="4" drg="AIFSTD0002900" price="490" remark="STD"/>
-        <part item="06" plateRef="I-A/5/6" provide="P" nsn="14/5310-72-058-6991" designation="WASHER 13" qty="4" drg="AIFSTD0003000" price="80" remark="STD"/>
-        <part item="07" plateRef="I-A/5/7" nsn="14/4240-72-058-7090" designation="RAMP STRUCTURE" qty="1" drg="AIF4510000000" price="56,010"/>
-        <part item="08" plateRef="I-A/5/8" nsn="14/4240-72-058-7089" designation="RAMP STRUCTURE A" qty="1" drg="AIF4520000000" price="56,010"/>
-        <part item="09" plateRef="I-A/5/9" nsn="14/9390-72-058-3838" designation="REFLECTOR TAPE B" qty="1" drg="AIFSTD0003500" price="100" remark="STD"/>
-        <part item="10" plateRef="I-A/5/10" nsn="14/9390-72-058-6835" designation="REFLECTOR TAPE A" qty="1" drg="AIFSTD0003600" price="100" remark="STD"/>
-        <part item="11" plateRef="I-A/5/11" nsn="14/5310-72-059-3254" designation="SPRING WASHER 12" qty="4" drg="AIFSTD0005800" price="30" remark="STD"/>
-        <note><b>Note:</b> Above mentioned quantity is for one Ramp Assy.</note>
+    <plate id="p9" ref="I-B/1" title="Dummy Assembly B1">
+      <view caption="DUMMY ASSEMBLY B1 (DUMMY VIEW 1)">
+        <graphic src="Media/dummy-9.png"/>
+        <part item="01" plateRef="I-B/1/1" provide="P" nsn="00/0000-00-000-0081" designation="DUMMY PART 9-1" qty="1" drg="DUMMY-DRG-91" firmPart="DFP-91" price="100"/>
+        <part item="02" plateRef="I-B/1/2" provide="" nsn="00/0000-00-000-0082" designation="DUMMY PART 9-2" qty="2" drg="DUMMY-DRG-92" firmPart="DFP-92" price="200"/>
+        <part item="03" plateRef="I-B/1/3" provide="P" nsn="00/0000-00-000-0083" designation="DUMMY PART 9-3" qty="3" drg="DUMMY-DRG-93" firmPart="DFP-93" price="300"/>
+        <part item="04" plateRef="I-B/1/4" provide="" nsn="00/0000-00-000-0084" designation="DUMMY PART 9-4" qty="4" drg="DUMMY-DRG-94" firmPart="DFP-94" price="400"/>
+        <part item="05" plateRef="I-B/1/5" provide="P" nsn="00/0000-00-000-0085" designation="DUMMY PART 9-5" qty="5" drg="DUMMY-DRG-95" firmPart="DFP-95" price="500"/>
+        <part item="06" plateRef="I-B/1/6" provide="" nsn="00/0000-00-000-0086" designation="DUMMY PART 9-6" qty="6" drg="DUMMY-DRG-96" firmPart="DFP-96" price="600"/>
+        <note><b>Note:</b> Above mentioned quantity is for one Dummy Assembly B1. Dummy data.</note>
       </view>
     </plate>
-    <plate id="p10" ref="I-B/2" title="Winch">
-      <view caption="WINCH (VIEW 1)">
-        <graphic src="Media/image28.jpg"/>
-        <part item="01" plateRef="I-B/2/1" nsn="14/5340-72-058-7088" designation="HANDLE ASSY" qty="1" drg="AIF4740000000" firmPart="-" price="33,560"/>
-        <note><b>Note:</b> Above mentioned quantity is for one Winch.</note>
-      </view>
-      <view caption="WINCH (VIEW 2)">
-        <graphic src="Media/image29.jpg"/>
-        <part item="02" plateRef="I-B/2/2" nsn="14/9520-72-058-7063" designation="OUTER SUPPORT CHANNEL" qty="2" drg="AIF4700000200" price="4,060"/>
-        <part item="03" plateRef="I-B/2/3" provide="P" nsn="14/5306-72-058-3814" designation="BOLT M10X50" qty="8" drg="AIFSTD0003800" price="340" remark="STD"/>
-        <part item="04" plateRef="I-B/2/4" provide="P" nsn="14/5310-72-058-3815" designation="HEX NUT M10" qty="8" drg="AIFSTD0003900" price="160" remark="STD"/>
-        <part item="05" plateRef="I-B/2/5" nsn="14/4710-72-058-7086" designation="LOCKING PIPE" qty="2" drg="AIF4700000100" price="2,720"/>
-        <part item="06" plateRef="I-B/2/6" provide="P" nsn="14/5310-72-058-3813" designation="WASHER 10.5" qty="8" drg="AIFSTD0004000" price="100" remark="STD"/>
-        <note><b>Note:</b> Above mentioned quantity is for one Winch.</note>
-      </view>
-      <view caption="WINCH (VIEW 3)">
-        <graphic src="Media/image30.jpg"/>
-        <part item="07" plateRef="I-B/2/7" provide="P" nsn="14/2510-72-058-7087" designation="SAFETY CLIP" qty="2" drg="AIF4700000300" price="890"/>
-        <part item="08" plateRef="I-B/2/8" provide="P" nsn="14/5315-72-058-7080" designation="WINCH PIN" qty="2" drg="AIF4700000400" price="1,080"/>
-        <part item="09" plateRef="I-B/2/9" nsn="14/3950-72-058-7071" designation="ASSY TAIL END" qty="1" drg="AIF4730000000" price="218,200"/>
-        <part item="10" plateRef="I-B/2/10" nsn="14/4930-72-058-7078" designation="DRUM ASSY" qty="1" drg="AIF4720000000" price="151,470"/>
-        <note><b>Note:</b> Above mentioned quantity is for one Winch.</note>
-      </view>
-      <view caption="WINCH (VIEW 4)">
-        <graphic src="Media/image31.jpg"/>
-        <part item="11" plateRef="I-B/2/11" nsn="14/3950-72-058-7064" designation="ASSY HEAD END" qty="1" drg="AIF4710000000" price="277,200"/>
-        <note><b>Note:</b> Above mentioned quantity is for one Winch.</note>
+    <plate id="p10" ref="I-B/2" title="Dummy Assembly B2">
+      <view caption="DUMMY ASSEMBLY B2 (DUMMY VIEW 1)">
+        <graphic src="Media/dummy-10.png"/>
+        <part item="01" plateRef="I-B/2/1" provide="P" nsn="00/0000-00-000-0091" designation="DUMMY PART 10-1" qty="1" drg="DUMMY-DRG-101" firmPart="DFP-101" price="100"/>
+        <part item="02" plateRef="I-B/2/2" provide="" nsn="00/0000-00-000-0092" designation="DUMMY PART 10-2" qty="2" drg="DUMMY-DRG-102" firmPart="DFP-102" price="200"/>
+        <part item="03" plateRef="I-B/2/3" provide="P" nsn="00/0000-00-000-0093" designation="DUMMY PART 10-3" qty="3" drg="DUMMY-DRG-103" firmPart="DFP-103" price="300"/>
+        <part item="04" plateRef="I-B/2/4" provide="" nsn="00/0000-00-000-0094" designation="DUMMY PART 10-4" qty="4" drg="DUMMY-DRG-104" firmPart="DFP-104" price="400"/>
+        <part item="05" plateRef="I-B/2/5" provide="P" nsn="00/0000-00-000-0095" designation="DUMMY PART 10-5" qty="5" drg="DUMMY-DRG-105" firmPart="DFP-105" price="500"/>
+        <part item="06" plateRef="I-B/2/6" provide="" nsn="00/0000-00-000-0096" designation="DUMMY PART 10-6" qty="6" drg="DUMMY-DRG-106" firmPart="DFP-106" price="600"/>
+        <note><b>Note:</b> Above mentioned quantity is for one Dummy Assembly B2. Dummy data.</note>
       </view>
     </plate>
-    <plate id="p11" ref="I-B/2/1" title="Handle Assy">
-      <view caption="HANDLE ASSY (VIEW 1)">
-        <graphic src="Media/image32.png"/>
-        <part item="01" plateRef="I-B/2/1/1" provide="P" nsn="14/5315-72-058-7076" designation="HANDLE PIN" qty="1" drg="AIF4740000100" price="890"/>
-        <part item="02" plateRef="I-B/2/1/2" provide="P" nsn="14/4710-72-058-7075" designation="HANDLE PIPE" qty="1" drg="AIF4740000200" price="690"/>
-        <part item="03" plateRef="I-B/2/1/3" provide="P" nsn="14/5310-72-058-3813" designation="WASHER 10.5" qty="1" drg="AIFSTD0004000" price="100" remark="STD"/>
-        <part item="04" plateRef="I-B/2/1/4" provide="P" nsn="14/5310-72-058-3815" designation="HEX NUT M10" qty="2" drg="AIFSTD0003900" price="160" remark="STD"/>
-        <part item="05" plateRef="I-B/2/1/5" provide="P" nsn="14/5340-72-058-7072" designation="HANDLE ROD ASSY" qty="1" drg="AIF4741000000" price="6,830"/>
-        <note><b>Note:</b> Above mentioned quantity is for one Handle Assy.</note>
+    <plate id="p11" ref="I-B/3" title="Dummy Assembly B3">
+      <view caption="DUMMY ASSEMBLY B3 (DUMMY VIEW 1)">
+        <graphic src="Media/dummy-11.png"/>
+        <part item="01" plateRef="I-B/3/1" provide="P" nsn="00/0000-00-000-0101" designation="DUMMY PART 11-1" qty="1" drg="DUMMY-DRG-111" firmPart="DFP-111" price="100"/>
+        <part item="02" plateRef="I-B/3/2" provide="" nsn="00/0000-00-000-0102" designation="DUMMY PART 11-2" qty="2" drg="DUMMY-DRG-112" firmPart="DFP-112" price="200"/>
+        <part item="03" plateRef="I-B/3/3" provide="P" nsn="00/0000-00-000-0103" designation="DUMMY PART 11-3" qty="3" drg="DUMMY-DRG-113" firmPart="DFP-113" price="300"/>
+        <part item="04" plateRef="I-B/3/4" provide="" nsn="00/0000-00-000-0104" designation="DUMMY PART 11-4" qty="4" drg="DUMMY-DRG-114" firmPart="DFP-114" price="400"/>
+        <part item="05" plateRef="I-B/3/5" provide="P" nsn="00/0000-00-000-0105" designation="DUMMY PART 11-5" qty="5" drg="DUMMY-DRG-115" firmPart="DFP-115" price="500"/>
+        <part item="06" plateRef="I-B/3/6" provide="" nsn="00/0000-00-000-0106" designation="DUMMY PART 11-6" qty="6" drg="DUMMY-DRG-116" firmPart="DFP-116" price="600"/>
+        <note><b>Note:</b> Above mentioned quantity is for one Dummy Assembly B3. Dummy data.</note>
       </view>
     </plate>
-    <plate id="p12" ref="I-B/2/9" title="Assy Tail End">
-      <view caption="ASSY TAIL END (VIEW 1)">
-        <graphic src="Media/image33.jpg"/>
-        <part item="01" plateRef="I-B/2/9/1" provide="P" nsn="14/5306-72-058-3814" designation="BOLT M10X50" qty="8" drg="AIFSTD0003800" price="340" remark="STD"/>
-        <part item="02" plateRef="I-B/2/9/2" provide="P" nsn="14/5310-72-058-3815" designation="HEX NUT M10" qty="8" drg="AIFSTD0003900" price="160" remark="STD"/>
-        <part item="03" plateRef="I-B/2/9/3" provide="P" nsn="14/5310-72-058-3813" designation="WASHER 10.5" qty="8" drg="AIFSTD0004000" price="100" remark="STD"/>
-        <part item="04" plateRef="I-B/2/9/4" nsn="14/5340-72-058-7073" designation="WINCH STAND" qty="1" drg="AIF4711000000" price="200,970"/>
-        <part item="05" plateRef="I-B/2/9/5" nsn="14/5120-72-058-7069" designation="TAIL END SHAFT HOLDER" qty="1" drg="AIF4731000000" price="83,750"/>
-        <note><b>Note:</b> Above mentioned quantity is for one Assy Tail End.</note>
+    <plate id="p12" ref="I-C/1" title="Dummy Assembly C1">
+      <view caption="DUMMY ASSEMBLY C1 (DUMMY VIEW 1)">
+        <graphic src="Media/dummy-12.png"/>
+        <part item="01" plateRef="I-C/1/1" provide="P" nsn="00/0000-00-000-0111" designation="DUMMY PART 12-1" qty="1" drg="DUMMY-DRG-121" firmPart="DFP-121" price="100"/>
+        <part item="02" plateRef="I-C/1/2" provide="" nsn="00/0000-00-000-0112" designation="DUMMY PART 12-2" qty="2" drg="DUMMY-DRG-122" firmPart="DFP-122" price="200"/>
+        <part item="03" plateRef="I-C/1/3" provide="P" nsn="00/0000-00-000-0113" designation="DUMMY PART 12-3" qty="3" drg="DUMMY-DRG-123" firmPart="DFP-123" price="300"/>
+        <part item="04" plateRef="I-C/1/4" provide="" nsn="00/0000-00-000-0114" designation="DUMMY PART 12-4" qty="4" drg="DUMMY-DRG-124" firmPart="DFP-124" price="400"/>
+        <part item="05" plateRef="I-C/1/5" provide="P" nsn="00/0000-00-000-0115" designation="DUMMY PART 12-5" qty="5" drg="DUMMY-DRG-125" firmPart="DFP-125" price="500"/>
+        <part item="06" plateRef="I-C/1/6" provide="" nsn="00/0000-00-000-0116" designation="DUMMY PART 12-6" qty="6" drg="DUMMY-DRG-126" firmPart="DFP-126" price="600"/>
+        <note><b>Note:</b> Above mentioned quantity is for one Dummy Assembly C1. Dummy data.</note>
       </view>
     </plate>
-    <plate id="p13" ref="I-B/2/9/5" title="Tail End Shaft Holder">
-      <view caption="TAIL END SHAFT HOLDER (VIEW 1)">
-        <graphic src="Media/image34.jpg"/>
-        <part item="01" plateRef="I-B/2/9/5/1" nsn="14/3120-72-058-7068" designation="BEARING BUSH" qty="1" drg="AIF4731000100" price="11,680"/>
-        <part item="02" plateRef="I-B/2/9/5/2" provide="P" nsn="14/5310-72-058-7067" designation="SIDE WASHER" qty="1" drg="AIF4731000200" price="2,870"/>
-        <part item="03" plateRef="I-B/2/9/5/3" nsn="14/3040-72-058-7065" designation="SHAFT A" qty="1" drg="AIF4731000300" price="8,710"/>
-        <part item="04" plateRef="I-B/2/9/5/4" provide="P" nsn="14/3110-72-058-6797" designation="BEARING 6210-2Z" qty="1" drg="AIFSTD0005400" price="3,080" remark="STD"/>
-        <part item="05" plateRef="I-B/2/9/5/5" provide="P" nsn="14/5306-72-058-3812" designation="BOLT M6X30" qty="4" drg="AIFSTD0005200" price="280" remark="STD"/>
-        <part item="06" plateRef="I-B/2/9/5/6" provide="P" nsn="14/5305-72-058-3811" designation="CAP SCREW M4X12" qty="3" drg="AIFSTD0005300" price="240" remark="STD"/>
-        <part item="07" plateRef="I-B/2/9/5/7" provide="P" nsn="14/5310-72-058-3810" designation="WASHER 6.6" qty="4" drg="AIFSTD0005100" price="80" remark="STD"/>
-        <part item="08" plateRef="I-B/2/9/5/8" provide="P" nsn="14/5310-72-058-8194" designation="HEX NUT M6" qty="4" drg="AIFSTD0004900" price="160" remark="STD"/>
-        <part item="09" plateRef="I-B/2/9/5/9" nsn="14/6530-72-058-8195" designation="TAIL END SHAFT HOLDER STAND" qty="1" drg="AIF4731100000" price="48,510"/>
-        <note><b>Note:</b> Above mentioned quantity is for one Tail End Shaft Holder.</note>
+    <plate id="p13" ref="I-C/2" title="Dummy Assembly C2">
+      <view caption="DUMMY ASSEMBLY C2 (DUMMY VIEW 1)">
+        <graphic src="Media/dummy-13.png"/>
+        <part item="01" plateRef="I-C/2/1" provide="P" nsn="00/0000-00-000-0121" designation="DUMMY PART 13-1" qty="1" drg="DUMMY-DRG-131" firmPart="DFP-131" price="100"/>
+        <part item="02" plateRef="I-C/2/2" provide="" nsn="00/0000-00-000-0122" designation="DUMMY PART 13-2" qty="2" drg="DUMMY-DRG-132" firmPart="DFP-132" price="200"/>
+        <part item="03" plateRef="I-C/2/3" provide="P" nsn="00/0000-00-000-0123" designation="DUMMY PART 13-3" qty="3" drg="DUMMY-DRG-133" firmPart="DFP-133" price="300"/>
+        <part item="04" plateRef="I-C/2/4" provide="" nsn="00/0000-00-000-0124" designation="DUMMY PART 13-4" qty="4" drg="DUMMY-DRG-134" firmPart="DFP-134" price="400"/>
+        <part item="05" plateRef="I-C/2/5" provide="P" nsn="00/0000-00-000-0125" designation="DUMMY PART 13-5" qty="5" drg="DUMMY-DRG-135" firmPart="DFP-135" price="500"/>
+        <part item="06" plateRef="I-C/2/6" provide="" nsn="00/0000-00-000-0126" designation="DUMMY PART 13-6" qty="6" drg="DUMMY-DRG-136" firmPart="DFP-136" price="600"/>
+        <note><b>Note:</b> Above mentioned quantity is for one Dummy Assembly C2. Dummy data.</note>
       </view>
     </plate>
-    <plate id="p14" ref="I-B/2/11" title="Assy Head End">
-      <view caption="ASSY HEAD END (VIEW 1)">
-        <graphic src="Media/image35.jpg"/>
-        <part item="01" plateRef="I-B/2/11/1" provide="P" nsn="14/5306-72-058-3814" designation="BOLT M10X50" qty="8" drg="AIFSTD0003800" price="340" remark="STD"/>
-        <part item="02" plateRef="I-B/2/11/2" provide="P" nsn="14/5310-72-058-3815" designation="HEX NUT M10" qty="8" drg="AIFSTD0003900" price="160" remark="STD"/>
-        <part item="03" plateRef="I-B/2/11/3" provide="P" nsn="14/5310-72-058-3813" designation="WASHER 10.5" qty="8" drg="AIFSTD0004000" price="100" remark="STD"/>
-        <part item="04" plateRef="I-B/2/11/4" nsn="14/5340-72-058-7073" designation="WINCH STAND" qty="1" drg="AIF4711000000" price="200,970"/>
-        <part item="05" plateRef="I-B/2/11/5" provide="P" nsn="14/3010-72-058-8196" designation="GEAR BOX ASSY" qty="1" drg="AIF4712000000" price="187,110"/>
-        <note><b>Note:</b> Above mentioned quantity is for one Assy Head End.</note>
+    <plate id="p14" ref="I-C/3" title="Dummy Assembly C3">
+      <view caption="DUMMY ASSEMBLY C3 (DUMMY VIEW 1)">
+        <graphic src="Media/dummy-14.png"/>
+        <part item="01" plateRef="I-C/3/1" provide="P" nsn="00/0000-00-000-0131" designation="DUMMY PART 14-1" qty="1" drg="DUMMY-DRG-141" firmPart="DFP-141" price="100"/>
+        <part item="02" plateRef="I-C/3/2" provide="" nsn="00/0000-00-000-0132" designation="DUMMY PART 14-2" qty="2" drg="DUMMY-DRG-142" firmPart="DFP-142" price="200"/>
+        <part item="03" plateRef="I-C/3/3" provide="P" nsn="00/0000-00-000-0133" designation="DUMMY PART 14-3" qty="3" drg="DUMMY-DRG-143" firmPart="DFP-143" price="300"/>
+        <part item="04" plateRef="I-C/3/4" provide="" nsn="00/0000-00-000-0134" designation="DUMMY PART 14-4" qty="4" drg="DUMMY-DRG-144" firmPart="DFP-144" price="400"/>
+        <part item="05" plateRef="I-C/3/5" provide="P" nsn="00/0000-00-000-0135" designation="DUMMY PART 14-5" qty="5" drg="DUMMY-DRG-145" firmPart="DFP-145" price="500"/>
+        <part item="06" plateRef="I-C/3/6" provide="" nsn="00/0000-00-000-0136" designation="DUMMY PART 14-6" qty="6" drg="DUMMY-DRG-146" firmPart="DFP-146" price="600"/>
+        <note><b>Note:</b> Above mentioned quantity is for one Dummy Assembly C3. Dummy data.</note>
       </view>
     </plate>
-    <plate id="p15" ref="I-B/2/11/5" title="Gear Box Assy">
-      <view caption="GEAR BOX ASSY (VIEW 1)">
-        <graphic src="Media/image36.jpg"/>
-        <part item="01" plateRef="I-B/2/11/5/1" provide="P" nsn="14/5305-72-058-9808" designation="CAP SCREW M8X16" qty="4" drg="AIFSTD0004800" price="309" remark="STD"/>
-        <part item="02" plateRef="I-B/2/11/5/2" provide="P" nsn="14/1560-72-058-8299" designation="HANDLE FLANGE" qty="1" drg="AIF4712200000" price="26,730"/>
-        <part item="03" plateRef="I-B/2/11/5/3" provide="P" nsn="14/5315-72-058-8294" designation="SPLIT PIN 4X30" qty="3" drg="AIFSTD0004500" price="80" remark="STD"/>
-        <part item="04" plateRef="I-B/2/11/5/4" provide="P" nsn="14/5310-72-058-8293" designation="HEX NUT M14" qty="9" drg="AIFSTD0004700" price="240" remark="STD"/>
-        <part item="05" plateRef="I-B/2/11/5/5" provide="P" nsn="14/5310-72-058-8295" designation="WASHER 15" qty="9" drg="AIFSTD0004600" price="80" remark="STD"/>
-        <part item="06" plateRef="I-B/2/11/5/6" provide="P" nsn="14/3020-72-058-7404" designation="DRIVER" qty="1" drg="AIF4712001800" price="9,110"/>
-        <part item="07" plateRef="I-B/2/11/5/7" provide="P" nsn="14/3040-72-058-7405" designation="LOCKING FLANGE" qty="1" drg="AIF4712001700" price="21,580"/>
-        <part item="08" plateRef="I-B/2/11/5/8" nsn="14/5310-72-058-7397" designation="FRICTION WASHER THICK" qty="1" drg="AIF4712001600" price="890"/>
-        <part item="09" plateRef="I-B/2/11/5/9" provide="P" nsn="14/3020-72-058-7395" designation="RATCHET WHEEL" qty="1" drg="AIF4712001500" price="15,050"/>
-        <part item="10" plateRef="I-B/2/11/5/10" nsn="14/5310-72-058-7396" designation="FRICTION WASHER THIN" qty="1" drg="AIF4712001400" price="890"/>
-        <part item="11" plateRef="I-B/2/11/5/11" provide="P" nsn="14/3120-72-058-9809" designation="RATCHET BUSH" qty="1" drg="AIF4712001300" price="690"/>
-        <part item="12" plateRef="I-B/2/11/5/12" provide="P" nsn="14/5340-72-058-7385" designation="LOCKING SPINDLE" qty="1" drg="AIF4712001200" price="16,240"/>
-        <note><b>Note:</b> Above mentioned quantity is for one Gear Box Assy.</note>
-      </view>
-      <view caption="GEAR BOX ASSY (VIEW 2)">
-        <graphic src="Media/image37.jpg"/>
-        <part item="13" plateRef="I-B/2/11/5/13" provide="P" nsn="14/5340-72-058-7384" designation="RATCHET PAWL MOUNTING PLATE" qty="1" drg="AIF4712000800" price="17,420"/>
-        <part item="14" plateRef="I-B/2/11/5/14" provide="P" nsn="14/3040-72-058-7383" designation="GEAR BOX HOUSING" qty="1" drg="AIF4712000700" price="16,240"/>
-        <part item="15" plateRef="I-B/2/11/5/15" provide="P" nsn="14/5310-72-058-8194" designation="HEX NUT M6" qty="2" drg="AIFSTD0004900" price="160" remark="STD"/>
-        <part item="16" plateRef="I-B/2/11/5/16" provide="P" nsn="14/5315-72-058-8292" designation="SPRING WASHER 6" qty="2" drg="AIFSTD0002100" price="80" remark="STD"/>
-        <part item="17" plateRef="I-B/2/11/5/17" provide="P" nsn="14/5360-72-058-8192" designation="PAWL SPRING" qty="2" drg="AIFSTD0004400" price="470" remark="STD"/>
-        <part item="18" plateRef="I-B/2/11/5/18" provide="P" nsn="14/3040-72-058-7382" designation="PAWL ROD" qty="2" drg="AIF4712001100" price="7,130"/>
-        <part item="19" plateRef="I-B/2/11/5/19" provide="P" nsn="14/5365-72-058-7381" designation="PAWL BASE" qty="2" drg="AIF4712000900" price="2,380"/>
-        <part item="20" plateRef="I-B/2/11/5/20" provide="P" nsn="14/3040-72-058-7206" designation="PAWL" qty="2" drg="AIF4712001000" price="10,100"/>
-        <part item="21" plateRef="I-B/2/11/5/21" provide="P" nsn="14/5310-72-058-7203" designation="PAWL BASE WASHER" qty="2" drg="AIF4712001900" price="290"/>
-        <part item="22" plateRef="I-B/2/11/5/22" provide="P" nsn="14/3040-72-058-7380" designation="PAWL LOCKING PIN" qty="2" drg="AIF4712300000" price="1,540"/>
-        <note><b>Note:</b> Above mentioned quantity is for one Gear Box Assy.</note>
-      </view>
-      <view caption="GEAR BOX ASSY (VIEW 3)">
-        <graphic src="Media/image38.jpg"/>
-        <part item="23" plateRef="I-B/2/11/5/23" provide="P" nsn="14/5365-72-058-7205" designation="SIDE DRUM BLOCK" qty="4" drg="AIF4720000600" price="19,800"/>
-        <part item="24" plateRef="I-B/2/11/5/24" provide="P" nsn="14/5340-72-058-7212" designation="GEAR HOLDING PLATE ASSY" qty="1" drg="AIF4712400000" price="22,280"/>
-        <part item="25" plateRef="I-B/2/11/5/25" provide="P" nsn="14/3040-72-058-7379" designation="MAIN SHAFT" qty="1" drg="AIF4712000100" price="24,160"/>
-        <part item="26" plateRef="I-B/2/11/5/26" provide="P" nsn="14/3010-72-058-7377" designation="INTERMEDIATE GEAR" qty="2" drg="AIF4712000200" price="22,180"/>
-        <part item="27" plateRef="I-B/2/11/5/27" provide="P" nsn="14/3020-72-058-7378" designation="INTERMEDIATE PINION" qty="2" drg="AIF4712000300" price="20,990"/>
-        <part item="28" plateRef="I-B/2/11/5/28" provide="P" nsn="14/4940-72-058-7376" designation="SIDE PINION PLATE BUSH" qty="2" drg="AIF4712000500" price="14,950"/>
-        <part item="29" plateRef="I-B/2/11/5/29" provide="P" nsn="14/3020-72-058-7375" designation="COUNTER GEAR" qty="1" drg="AIF4712000400" price="35,640"/>
-        <part item="30" plateRef="I-B/2/11/5/30" provide="P" nsn="14/5325-72-058-6796" designation="CIRCLIP 45.8X2 N IS:3075 (PART 1)" qty="1" drg="AIFSTD0004300" price="310" remark="STD"/>
-        <part item="31" plateRef="I-B/2/11/5/31" provide="P" nsn="14/3110-72-058-7374" designation="BEARING 6010-2Z" qty="1" drg="AIFSTD0004200" price="3,240" remark="STD"/>
-        <part item="32" plateRef="I-B/2/11/5/32" provide="P" nsn="14/5445-72-058-7208" designation="STAND ASSY HEAD END" qty="1" drg="AIF4712100000" price="37,620"/>
-        <note><b>Note:</b> Above mentioned quantity is for one Gear Box Assy.</note>
+    <plate id="p15" ref="I-D/1" title="Dummy Assembly D1">
+      <view caption="DUMMY ASSEMBLY D1 (DUMMY VIEW 1)">
+        <graphic src="Media/dummy-15.png"/>
+        <part item="01" plateRef="I-D/1/1" provide="P" nsn="00/0000-00-000-0141" designation="DUMMY PART 15-1" qty="1" drg="DUMMY-DRG-151" firmPart="DFP-151" price="100"/>
+        <part item="02" plateRef="I-D/1/2" provide="" nsn="00/0000-00-000-0142" designation="DUMMY PART 15-2" qty="2" drg="DUMMY-DRG-152" firmPart="DFP-152" price="200"/>
+        <part item="03" plateRef="I-D/1/3" provide="P" nsn="00/0000-00-000-0143" designation="DUMMY PART 15-3" qty="3" drg="DUMMY-DRG-153" firmPart="DFP-153" price="300"/>
+        <part item="04" plateRef="I-D/1/4" provide="" nsn="00/0000-00-000-0144" designation="DUMMY PART 15-4" qty="4" drg="DUMMY-DRG-154" firmPart="DFP-154" price="400"/>
+        <part item="05" plateRef="I-D/1/5" provide="P" nsn="00/0000-00-000-0145" designation="DUMMY PART 15-5" qty="5" drg="DUMMY-DRG-155" firmPart="DFP-155" price="500"/>
+        <part item="06" plateRef="I-D/1/6" provide="" nsn="00/0000-00-000-0146" designation="DUMMY PART 15-6" qty="6" drg="DUMMY-DRG-156" firmPart="DFP-156" price="600"/>
+        <note><b>Note:</b> Above mentioned quantity is for one Dummy Assembly D1. Dummy data.</note>
       </view>
     </plate>
-    <plate id="p16" ref="I-C/1" title="Drum for Handrail Rope Assy">
-      <view caption="DRUM FOR HANDRAIL ROPE ASSY (VIEW 1)">
-        <graphic src="Media/image39.jpg"/>
-        <part item="01" plateRef="I-C/1/1" provide="P" nsn="14/5306-72-058-7371" designation="BOLT M12X55" qty="2" drg="AIFSTD0005500" price="420" remark="STD"/>
-        <part item="02" plateRef="I-C/1/2" provide="P" nsn="14/5310-72-058-3839" designation="HEX NUT M12" qty="2" drg="AIFSTD0003100" price="240" remark="STD"/>
-        <part item="03" plateRef="I-C/1/3" nsn="14/5340-72-058-6996" designation="BOTTOM CHANNEL STAND" qty="2" drg="AIF4810000000" price="33,260"/>
-        <part item="04" plateRef="I-C/1/4" nsn="14/3950-72-058-6989" designation="DRUM ASSY" qty="1" drg="AIF4820000000" price="28,910"/>
-        <part item="05" plateRef="I-C/1/5" nsn="14/5340-72-058-6992" designation="LOCKING BRACKET ASSY" qty="2" drg="AIF4830000000" price="22,770"/>
-        <part item="06" plateRef="I-C/1/6" nsn="14/5340-72-058-6990" designation="HANDLE ASSY" qty="1" drg="AIF4840000000" price="9,110"/>
-        <note><b>Note:</b> Above mentioned quantity is for one Drum for Railing Rope Assy.</note>
+    <plate id="p16" ref="I-D/2" title="Dummy Assembly D2">
+      <view caption="DUMMY ASSEMBLY D2 (DUMMY VIEW 1)">
+        <graphic src="Media/dummy-16.png"/>
+        <part item="01" plateRef="I-D/2/1" provide="P" nsn="00/0000-00-000-0151" designation="DUMMY PART 16-1" qty="1" drg="DUMMY-DRG-161" firmPart="DFP-161" price="100"/>
+        <part item="02" plateRef="I-D/2/2" provide="" nsn="00/0000-00-000-0152" designation="DUMMY PART 16-2" qty="2" drg="DUMMY-DRG-162" firmPart="DFP-162" price="200"/>
+        <part item="03" plateRef="I-D/2/3" provide="P" nsn="00/0000-00-000-0153" designation="DUMMY PART 16-3" qty="3" drg="DUMMY-DRG-163" firmPart="DFP-163" price="300"/>
+        <part item="04" plateRef="I-D/2/4" provide="" nsn="00/0000-00-000-0154" designation="DUMMY PART 16-4" qty="4" drg="DUMMY-DRG-164" firmPart="DFP-164" price="400"/>
+        <part item="05" plateRef="I-D/2/5" provide="P" nsn="00/0000-00-000-0155" designation="DUMMY PART 16-5" qty="5" drg="DUMMY-DRG-165" firmPart="DFP-165" price="500"/>
+        <part item="06" plateRef="I-D/2/6" provide="" nsn="00/0000-00-000-0156" designation="DUMMY PART 16-6" qty="6" drg="DUMMY-DRG-166" firmPart="DFP-166" price="600"/>
+        <note><b>Note:</b> Above mentioned quantity is for one Dummy Assembly D2. Dummy data.</note>
       </view>
     </plate>
-    <plate id="p17" ref="I-C/2" title="Obm Attachment">
-      <view caption="OBM ATTACHMENT (VIEW 1)">
-        <graphic src="Media/image40.jpg"/>
-        <part item="01" plateRef="I-C/2/1" nsn="14/5445-72-058-6993" designation="HORIZONTAL PLATE" qty="2" drg="AIF4900000100" price="6,140"/>
-        <part item="02" plateRef="I-C/2/2" provide="P" nsn="14/5310-72-058-6991" designation="WASHER 13" qty="4" drg="AIFSTD0003000" price="80" remark="STD"/>
-        <part item="03" plateRef="I-C/2/3" provide="P" nsn="14/5305-72-058-6994" designation="BOLT M12X85" qty="4" drg="AIFSTD0005600" price="620" remark="STD"/>
-        <part item="*04" plateRef="I-C/2/4" provide="P" nsn="14/5310-72-058-3839" designation="*HEX NUT M12" qty="4" drg="*AIFSTD0003100" price="240" remark="STD"/>
-        <part item="05" plateRef="I-C/2/5" provide="P" nsn="14/5310-72-058-4213" designation="HEX THIN NUT M12" qty="4" drg="AIFSTD0003200" price="200" remark="STD"/>
-        <part item="06" plateRef="I-C/2/6" nsn="14/1005-72-058-6995" designation="OBM ATTACHMENT STRUCTURE" qty="1" drg="AIF4910000000" price="51,720"/>
-        <part item="07" plateRef="I-C/2/7" nsn="14/8135-72-058-6987" designation="STRAP OBM TO PONTOON" qty="2" drg="AIF4900000200" price="2,970"/>
-        <part item="08" plateRef="I-C/2/8" nsn="14/5340-72-058-3837" designation="BUCKLE FEMALE" qty="2" drg="AIFSTD0003300" price="3,810" remark="STD"/>
-        <part item="09" plateRef="I-C/2/9" nsn="14/8465-72-058-9473" designation="BRASS BUCKLE" qty="2" drg="AIFSTD0005700" price="690" remark="STD"/>
-        <note><b>Note:</b> Above mentioned quantity is for one OBM Attachment.</note>
-        <note>*: Total 4 Nos. of Nuts are fitted on Job, however 2 Nos. of Nuts are additional spare with Each OBM.</note>
-      </view>
-    </plate>
-    <plate id="p18" ref="I-C/4" title="Bridge Launcher">
-      <view caption="BRIDGE LAUNCHER (VIEW 1)">
-        <graphic src="Media/image41.jpg"/>
-        <part item="01" plateRef="I-C/4/1" nsn="14/5445-72-058-7372" designation="BASE ASSY" qty="1" drg="AIF4G10000000" price="69,300"/>
-        <part item="02" plateRef="I-C/4/2" nsn="14/5411-72-058-7042" designation="VERTICAL SUPPORT ASSY" qty="2" drg="AIF4G20000000" price="31,680"/>
-        <part item="03" plateRef="I-C/4/3" nsn="14/1730-72-058-6795" designation="LADDER ASSY" qty="3" drg="AIF4G30000000" price="111,870"/>
-        <note><b>Note:</b> Above mentioned quantity is for one bridge launcher.</note>
-      </view>
-      <view caption="BRIDGE LAUNCHER (VIEW 2)">
-        <graphic src="Media/image42.jpg"/>
-        <part item="04" plateRef="I-C/4/4" provide="P" nsn="14/5305-72-058-8191" designation="BOLT M12X70" qty="8" drg="AIFSTD0002900" price="490" remark="STD"/>
-        <part item="05" plateRef="I-C/4/5" provide="P" nsn="14/5310-72-058-6991" designation="WASHER 13" qty="14" drg="AIFSTD0003000" price="80" remark="STD"/>
-        <part item="06" plateRef="I-C/4/6" provide="P" nsn="14/5310-72-058-3839" designation="HEX NUT M12" qty="14" drg="AIFSTD0003100" price="240" remark="STD"/>
-        <part item="07" plateRef="I-C/4/7" provide="P" nsn="14/5305-72-058-7373" designation="BOLT M12X100" qty="6" drg="AIFSTD0006400" price="1,110" remark="STD"/>
-        <part item="08" plateRef="I-C/4/8" nsn="14/5315-72-058-7215" designation="SPIKE FOR DRUM" qty="4" drg="AIF4000000400" price="2,870"/>
-        <note><b>Note:</b> Above mentioned quantity is for one bridge launcher.</note>
+    <plate id="p17" ref="I-D/3" title="Dummy Assembly D3">
+      <view caption="DUMMY ASSEMBLY D3 (DUMMY VIEW 1)">
+        <graphic src="Media/dummy-17.png"/>
+        <part item="01" plateRef="I-D/3/1" provide="P" nsn="00/0000-00-000-0161" designation="DUMMY PART 17-1" qty="1" drg="DUMMY-DRG-171" firmPart="DFP-171" price="100"/>
+        <part item="02" plateRef="I-D/3/2" provide="" nsn="00/0000-00-000-0162" designation="DUMMY PART 17-2" qty="2" drg="DUMMY-DRG-172" firmPart="DFP-172" price="200"/>
+        <part item="03" plateRef="I-D/3/3" provide="P" nsn="00/0000-00-000-0163" designation="DUMMY PART 17-3" qty="3" drg="DUMMY-DRG-173" firmPart="DFP-173" price="300"/>
+        <part item="04" plateRef="I-D/3/4" provide="" nsn="00/0000-00-000-0164" designation="DUMMY PART 17-4" qty="4" drg="DUMMY-DRG-174" firmPart="DFP-174" price="400"/>
+        <part item="05" plateRef="I-D/3/5" provide="P" nsn="00/0000-00-000-0165" designation="DUMMY PART 17-5" qty="5" drg="DUMMY-DRG-175" firmPart="DFP-175" price="500"/>
+        <part item="06" plateRef="I-D/3/6" provide="" nsn="00/0000-00-000-0166" designation="DUMMY PART 17-6" qty="6" drg="DUMMY-DRG-176" firmPart="DFP-176" price="600"/>
+        <note><b>Note:</b> Above mentioned quantity is for one Dummy Assembly D3. Dummy data.</note>
       </view>
     </plate>
   </plates>
   <appendices>
-    <appendix label="A" title="LIST OF CARRIED SPARES" orientation="landscape">
-      <para>There are no separate spares defined for this system. Spares required for IFBF system are already included in Bridging System, Anchoring Components, Instrumentation, Safety and Other Components and Transportation Aids. Details are given below.</para>
-      <table widths="713 983 566 2837 2550 1134 1134 1999 838 1173 1195">
-        <head>
-          <row>
-            <cell align="center"><text>Item No.</text></cell>
-            <cell align="center"><text>Plate Ref. No.</text></cell>
-            <cell align="center"><text>'P'</text></cell>
-            <cell align="center"><text>NSN</text></cell>
-            <cell><text>Designation</text></cell>
-            <cell align="center"><text>No. Off (for 100m)</text></cell>
-            <cell align="center"><text>No. Off (for 1 set)</text></cell>
-            <cell align="center"><text>Drg. No.</text></cell>
-            <cell align="center"><text>Firms Part No.</text></cell>
-            <cell align="center"><text>Unit Price Rs.</text></cell>
-            <cell align="center"><text>Remark</text></cell>
-          </row>
-        </head>
-        <body>
-          <row>
-            <cell colspan="11"><text>Bridging System</text></cell>
-          </row>
-          <row>
-            <cell><text>1.</text></cell>
-            <cell align="center"><text>I-A/1</text></cell>
-            <cell align="center"><text>P</text></cell>
-            <cell align="center"><text>14/5420-72-058-7193</text></cell>
-            <cell><text>Pontoon Assy</text></cell>
-            <cell align="center"><text>26 Nos.</text></cell>
-            <cell><text>29 Nos</text></cell>
-            <cell><text>AIF4100000000</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>204,930</text></cell>
-            <cell align="center"></cell>
-          </row>
-          <row>
-            <cell><text>2.</text></cell>
-            <cell align="center"><text>I-A/2</text></cell>
-            <cell align="center"><text>P</text></cell>
-            <cell align="center"><text>14/5420-72-058-7194</text></cell>
-            <cell><text>Deck Assy</text></cell>
-            <cell align="center"><text>25 Nos.</text></cell>
-            <cell><text>28 Nos</text></cell>
-            <cell><text>AIF4200000000</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>205,920</text></cell>
-            <cell align="center"></cell>
-          </row>
-          <row>
-            <cell><text>3.</text></cell>
-            <cell align="center"><text>I-A/3</text></cell>
-            <cell align="center"><text>P</text></cell>
-            <cell align="center"><text>14/5340-72-058-7197</text></cell>
-            <cell><text>Handrail Assy</text></cell>
-            <cell align="center"><text>150 Nos.</text></cell>
-            <cell><text>168 Nos</text></cell>
-            <cell><text>AIF4300000000</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>9,310</text></cell>
-            <cell align="center"></cell>
-          </row>
-          <row>
-            <cell><text>4.</text></cell>
-            <cell align="center"><text>I-A/5</text></cell>
-            <cell align="center"></cell>
-            <cell align="center"><text>14/4240-72-058-7196</text></cell>
-            <cell><text>Ramp Assy</text></cell>
-            <cell align="center"><text>2 Nos.</text></cell>
-            <cell><text>3 Nos</text></cell>
-            <cell><text>AIF4500000000</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>85,140</text></cell>
-            <cell align="center"></cell>
-          </row>
-          <row>
-            <cell><text>5.</text></cell>
-            <cell align="center"><text>I-A/7</text></cell>
-            <cell align="center"></cell>
-            <cell align="center"><text>14/5440-72-058-7200</text></cell>
-            <cell><text>Aluminium Ladder Assy</text></cell>
-            <cell align="center"><text>2 Nos.</text></cell>
-            <cell><text>2 Nos</text></cell>
-            <cell><text>AIFSTD0000100</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>35,640</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell><text>6.</text></cell>
-            <cell align="center"><text>I-A/4</text></cell>
-            <cell align="center"></cell>
-            <cell align="center"><text>14/5340-72-058-7195</text></cell>
-            <cell><text>Ladder Attachment Assy</text></cell>
-            <cell align="center"><text>2 Nos.</text></cell>
-            <cell><text>2 Nos</text></cell>
-            <cell><text>AIF4400000000</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>56,010</text></cell>
-            <cell align="center"></cell>
-          </row>
-          <row>
-            <cell colspan="11"><text>Anchoring Components</text></cell>
-          </row>
-          <row>
-            <cell><text>1.</text></cell>
-            <cell align="center"><text>I-B/1</text></cell>
-            <cell align="center"></cell>
-            <cell align="center"><text>14/5342-72-058-7198</text></cell>
-            <cell><text>Anchor Plate Assy</text></cell>
-            <cell align="center"><text>2 Nos</text></cell>
-            <cell><text>3 Nos</text></cell>
-            <cell><text>AIF4600000000</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>45,050</text></cell>
-            <cell align="center"></cell>
-          </row>
-          <row>
-            <cell><text>2.</text></cell>
-            <cell align="center"><text>I-B/2</text></cell>
-            <cell align="center"></cell>
-            <cell align="center"><text>14/3950-72-058-7199</text></cell>
-            <cell><text>Winch Assy</text></cell>
-            <cell align="center"><text>1 Nos</text></cell>
-            <cell><text>2 Nos</text></cell>
-            <cell><text>AIF4700000000</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>681,120</text></cell>
-            <cell align="center"></cell>
-          </row>
-          <row>
-            <cell><text>3.</text></cell>
-            <cell align="center"><text>I-B/6</text></cell>
-            <cell align="center"><text>P</text></cell>
-            <cell align="center"><text>14/5315-72-058-7201</text></cell>
-            <cell><text>Spike</text></cell>
-            <cell align="center"><text>32 Nos</text></cell>
-            <cell><text>35 Nos</text></cell>
-            <cell><text>AIF4000000100</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>7,550</text></cell>
-            <cell align="center"></cell>
-          </row>
-          <row>
-            <cell><text>4.</text></cell>
-            <cell align="center"><text>I-B/8</text></cell>
-            <cell align="center"><text>P</text></cell>
-            <cell align="center"><text>14/4730-72-058-7214</text></cell>
-            <cell><text>Anchor Ring</text></cell>
-            <cell align="center"><text>1 Nos</text></cell>
-            <cell><text>2 Nos</text></cell>
-            <cell><text>AIF4000000600</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>6,140</text></cell>
-            <cell align="center"></cell>
-          </row>
-          <row>
-            <cell colspan="11"><text>Instrumentation, Safety and Other Components</text></cell>
-          </row>
-          <row>
-            <cell><text>1.</text></cell>
-            <cell align="center"><text>I-C/1</text></cell>
-            <cell align="center"></cell>
-            <cell align="center"><text>14/3950-72-058-7210</text></cell>
-            <cell><text>Drum for Railing Rope Assy</text></cell>
-            <cell align="center"><text>2 Nos.</text></cell>
-            <cell><text>2 Nos.</text></cell>
-            <cell><text>AIF4800000000</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>83,830</text></cell>
-            <cell align="center"></cell>
-          </row>
-          <row>
-            <cell><text>2.</text></cell>
-            <cell align="center"><text>I-C/2</text></cell>
-            <cell align="center"></cell>
-            <cell align="center"><text>14/3950-72-058-7211</text></cell>
-            <cell><text>OBM Attachment</text></cell>
-            <cell align="center"><text>2 Nos.</text></cell>
-            <cell><text>2 Nos.</text></cell>
-            <cell><text>AIF4900000000</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>68,730</text></cell>
-            <cell align="center"></cell>
-          </row>
-          <row>
-            <cell><text>3.</text></cell>
-            <cell align="center"><text>I-B/7</text></cell>
-            <cell align="center"></cell>
-            <cell align="center"><text>14/5315-72-058-7215</text></cell>
-            <cell><text>Spike for Drum</text></cell>
-            <cell align="center"><text>8 Nos.</text></cell>
-            <cell><text>8 Nos.</text></cell>
-            <cell><text>AIF4000000400</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>3,160</text></cell>
-            <cell align="center"></cell>
-          </row>
-          <row>
-            <cell><text>4.</text></cell>
-            <cell align="center"><text>I-C/4</text></cell>
-            <cell align="center"></cell>
-            <cell align="center"><text>14/5420-72-058-7216</text></cell>
-            <cell><text>Bridge Launcher</text></cell>
-            <cell align="center"><text>1 Set</text></cell>
-            <cell><text>1 Set</text></cell>
-            <cell><text>AIF4G00000000</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>182,240</text></cell>
-            <cell align="center"></cell>
-          </row>
-          <row>
-            <cell><text>5.</text></cell>
-            <cell align="center"><text>I-C/5</text></cell>
-            <cell align="center"></cell>
-            <cell align="center"><text>14/4510-72-058-7218</text></cell>
-            <cell><text>Obstruction Clearing Rod</text></cell>
-            <cell align="center"><text>2 Nos.</text></cell>
-            <cell><text>2 Nos.</text></cell>
-            <cell><text>AIF4000000300</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>7,520</text></cell>
-            <cell align="center"></cell>
-          </row>
-          <row>
-            <cell colspan="11"><text>Transportation Aids</text></cell>
-          </row>
-          <row>
-            <cell><text>1.</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell align="center"><text>14/LTD/AIFSTD0001900</text></cell>
-            <cell><text>Galvanised Box</text></cell>
-            <cell align="center"><text>9 Nos.</text></cell>
-            <cell><text>9 Nos.</text></cell>
-            <cell><text>AIFSTD0001800</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>7,998</text></cell>
-            <cell align="center"></cell>
-          </row>
-          <row>
-            <cell><text>2.</text></cell>
-            <cell align="center"><text>I-C/3</text></cell>
-            <cell align="center"></cell>
-            <cell align="center"><text>14/5340-72-058-7098</text></cell>
-            <cell><text>Protecting Guard</text></cell>
-            <cell align="center"><text>5 Nos.</text></cell>
-            <cell><text>5 Nos.</text></cell>
-            <cell><text>AIF4000000500</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>8,940</text></cell>
-            <cell align="center"></cell>
-          </row>
-        </body>
-      </table>
-    </appendix>
-    <appendix label="B" title="LIST OF STANDARD ACCESSORIES" orientation="landscape">
-      <para>There are no separate accessories defined for this system. Accessories required for IFBF system are already included in Bridging System, Anchoring Components, Instrumentation, Safety and Other Components and Transportation Aids. Details are given below.</para>
-      <table widths="714 1007 575 2867 2441 1149 1149 2011 1004 1113 1092">
-        <head>
-          <row>
-            <cell align="center"><text>Item No.</text></cell>
-            <cell align="center"><text>Plate Ref. No.</text></cell>
-            <cell align="center"><text>'P'</text></cell>
-            <cell align="center"><text>NSN</text></cell>
-            <cell><text>Designation</text></cell>
-            <cell align="center"><text>No. Off (for 100m)</text></cell>
-            <cell align="center"><text>No. Off (for 1 set)</text></cell>
-            <cell align="center"><text>Drg. No.</text></cell>
-            <cell align="center"><text>Firms Part No.</text></cell>
-            <cell align="center"><text>Unit Price Rs.</text></cell>
-            <cell align="center"><text>Remark</text></cell>
-          </row>
-        </head>
-        <body>
-          <row>
-            <cell colspan="11"><text>Bridging Component</text></cell>
-          </row>
-          <row>
-            <cell><text>1.</text></cell>
-            <cell align="center"><text>I-A/6</text></cell>
-            <cell align="center"><text>P</text></cell>
-            <cell align="center"><text>14/4020-72-058-3833</text></cell>
-            <cell><text>Nylon Rope for Hand Rail</text></cell>
-            <cell align="center"><text>2 Nos.</text></cell>
-            <cell><text>3 Nos.</text></cell>
-            <cell><text>AIFSTD0000200</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>4,750</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell colspan="11"><text>Anchoring Components</text></cell>
-          </row>
-          <row>
-            <cell><text>1.</text></cell>
-            <cell align="center"><text>I-B/3</text></cell>
-            <cell align="center"><text>P</text></cell>
-            <cell align="center"><text>14/4020-72-058-7061</text></cell>
-            <cell><text>Garware Rope 12 mm Dia. 150 m Long</text></cell>
-            <cell align="center"><text>1 No.</text></cell>
-            <cell><text>2 Nos.</text></cell>
-            <cell><text>AIF4C00000000</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>136,620</text></cell>
-            <cell align="center"></cell>
-          </row>
-          <row>
-            <cell><text>2.</text></cell>
-            <cell align="center"><text>I-B/4</text></cell>
-            <cell align="center"><text>P</text></cell>
-            <cell align="center"><text>14/4020-72-058-6997</text></cell>
-            <cell><text>Garware Rope 12 mm Dia. 2 m Long</text></cell>
-            <cell align="center"><text>26 Nos.</text></cell>
-            <cell><text>30 Nos.</text></cell>
-            <cell><text>AIF4D00000000</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>5,210</text></cell>
-            <cell align="center"></cell>
-          </row>
-          <row>
-            <cell><text>3.</text></cell>
-            <cell align="center"><text>I-B/5</text></cell>
-            <cell align="center"><text>P</text></cell>
-            <cell align="center"><text>14/4020-72-058-6988</text></cell>
-            <cell><text>Garware Rope 12 mm Dia. 3 m Long</text></cell>
-            <cell align="center"><text>26 Nos.</text></cell>
-            <cell><text>30 Nos.</text></cell>
-            <cell><text>AIF4E00000000</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>8,490</text></cell>
-            <cell align="center"></cell>
-          </row>
-          <row>
-            <cell><text>4.</text></cell>
-            <cell align="center"><text>I-B/9</text></cell>
-            <cell align="center"><text>P</text></cell>
-            <cell align="center"><text>14/5340-72-058-3834</text></cell>
-            <cell><text>Carabiner Hook</text></cell>
-            <cell align="center"><text>104 Nos.</text></cell>
-            <cell><text>130 Nos.</text></cell>
-            <cell><text>AIFSTD0000300</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>1,780</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell><text>5.</text></cell>
-            <cell align="center"><text>I-B/10</text></cell>
-            <cell align="center"><text>P</text></cell>
-            <cell align="center"><text>14/4030-72-058-3835</text></cell>
-            <cell><text>Bow Shackle</text></cell>
-            <cell align="center"><text>3 Nos.</text></cell>
-            <cell><text>4 Nos.</text></cell>
-            <cell><text>AIFSTD0000400</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>1,290</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell colspan="11"><text>Instrumentation, Safety and Other Components</text></cell>
-          </row>
-          <row>
-            <cell><text>1.</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell align="center"><text>14/LTD/AIFSTD0000800</text></cell>
-            <cell><text>Handheld Digital Water Velocity Meter</text></cell>
-            <cell align="center"><text>1 No.</text></cell>
-            <cell><text>1 No.</text></cell>
-            <cell><text>AIFSTD0000800</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>5,73,114</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell><text>2.</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell align="center"><text>14/LTD/AIFSTD0000500</text></cell>
-            <cell><text>Life Jacket</text></cell>
-            <cell align="center"><text>30 Nos.</text></cell>
-            <cell><text>30 Nos.</text></cell>
-            <cell><text>AIFSTD0000500</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>1,849</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell><text>3.</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell align="center"><text>14/LTD/AIFSTD0000600</text></cell>
-            <cell><text>Head Torch</text></cell>
-            <cell align="center"><text>30 Nos.</text></cell>
-            <cell><text>30 Nos.</text></cell>
-            <cell><text>AIFSTD0000600</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>2,996</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell><text>4.</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell align="center"><text>14/LTD/AIFSTD0000700</text></cell>
-            <cell><text>Safety Gloves</text></cell>
-            <cell align="center"><text>20 Pair</text></cell>
-            <cell><text>20 Pair</text></cell>
-            <cell><text>AIFSTD0000700</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>165</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell colspan="11"><text>Transportation Aids</text></cell>
-          </row>
-          <row>
-            <cell><text>1.</text></cell>
-            <cell align="center"><text>I-D/1</text></cell>
-            <cell align="center"><text>P</text></cell>
-            <cell align="center"><text>14/5340-72-058-4262</text></cell>
-            <cell><text>Ratchet Lashing 15 m Long Strap</text></cell>
-            <cell align="center"><text>6 Nos.</text></cell>
-            <cell><text>6 Nos.</text></cell>
-            <cell><text>AIFSTD0001600</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>990</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell><text>2.</text></cell>
-            <cell align="center"><text>I-D/2</text></cell>
-            <cell align="center"><text>P</text></cell>
-            <cell align="center"><text>14/5340-72-058-4265</text></cell>
-            <cell><text>Ratchet Lashing 10 m Long Strap</text></cell>
-            <cell align="center"><text>6 Nos.</text></cell>
-            <cell><text>6 Nos.</text></cell>
-            <cell><text>AIFSTD0001700</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>920</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell><text>3.</text></cell>
-            <cell align="center"><text>I-D/3</text></cell>
-            <cell align="center"><text>P</text></cell>
-            <cell align="center"><text>14/4240-72-058-7647</text></cell>
-            <cell><text>Body Harness</text></cell>
-            <cell align="center"><text>20 Nos.</text></cell>
-            <cell><text>20 Nos.</text></cell>
-            <cell><text>AIFSTD0001600</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>990</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell><text>4.</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell align="center"><text>14/LTD/AIFSTD0001900</text></cell>
-            <cell><text>Nylon Bag</text></cell>
-            <cell align="center"><text>4 Nos.</text></cell>
-            <cell><text>4 Nos.</text></cell>
-            <cell><text>AIFSTD0001900</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>2,208</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-        </body>
-      </table>
-    </appendix>
-    <appendix label="C" title="LIST OF CARRIED TOOL" orientation="landscape">
-      <para>There are no separate tools defined for this system. Tools required for IFBF system are already included in Bridging System, Anchoring Components, Instrumentation, Safety and Other Components and Transportation Aids. Details are given below.</para>
-      <table widths="714 862 575 2873 2577 1155 1007 2011 1004 1149 1195">
-        <head>
-          <row>
-            <cell align="center"><text>Item No.</text></cell>
-            <cell align="center"><text>Plate Ref. No.</text></cell>
-            <cell align="center"><text>'P'</text></cell>
-            <cell align="center"><text>NSN</text></cell>
-            <cell><text>Designation</text></cell>
-            <cell align="center"><text>No. Off (for 100m)</text></cell>
-            <cell align="center"><text>No. Off (for 1 set)</text></cell>
-            <cell align="center"><text>Drg. No.</text></cell>
-            <cell align="center"><text>Firms Part No.</text></cell>
-            <cell align="center"><text>Unit Price Rs.</text></cell>
-            <cell align="center"><text>Remark</text></cell>
-          </row>
-          <row>
-            <cell colspan="11"><text>Instrumentation, Safety and Other Components</text></cell>
-          </row>
-        </head>
-        <body>
-          <row>
-            <cell><text>1.</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell align="center"><text>14/LTD/AI4F000000000</text></cell>
-            <cell><text>Hammer Assy</text></cell>
-            <cell align="center"><text>2 Nos.</text></cell>
-            <cell><text>2 Nos.</text></cell>
-            <cell><text>AI4F000000000</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>3,592</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell><text>2.</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell align="center"><text>14/LTD/AIFSTD0000900</text></cell>
-            <cell><text>Ring Spanners</text></cell>
-            <cell align="center"><text>1 Set</text></cell>
-            <cell><text>1 Set</text></cell>
-            <cell><text>AIFSTD0000900</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>3,223</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell><text>3.</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell align="center"><text>14/LTD/AIFSTD0001000</text></cell>
-            <cell><text>Open End Spanners</text></cell>
-            <cell align="center"><text>1 Set</text></cell>
-            <cell><text>1 Set</text></cell>
-            <cell><text>AIFSTD0001000</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>603</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell><text>4.</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell align="center"><text>14/LTD/AIFSTD0001100</text></cell>
-            <cell><text>Ratchet Spanners</text></cell>
-            <cell align="center"><text>1 Set</text></cell>
-            <cell><text>1 Set</text></cell>
-            <cell><text>AIFSTD0001100</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>13,725</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell><text>5.</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell align="center"><text>14/LTD/AIFSTD0001300</text></cell>
-            <cell><text>Screw Driver</text></cell>
-            <cell align="center"><text>1 No.</text></cell>
-            <cell><text>1 No.</text></cell>
-            <cell><text>AIFSTD0001300</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>118</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell><text>6.</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell align="center"><text>14/LTD/AIFSTD0001400</text></cell>
-            <cell><text>Plier</text></cell>
-            <cell align="center"><text>1 No.</text></cell>
-            <cell><text>1 No.</text></cell>
-            <cell><text>AIFSTD0001400</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>519</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell><text>7.</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell align="center"><text>14/LTD/AIFSTD0001200</text></cell>
-            <cell><text>Hammer</text></cell>
-            <cell align="center"><text>1 No.</text></cell>
-            <cell><text>1 No.</text></cell>
-            <cell><text>AIFSTD0001200</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>571</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell><text>8.</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell align="center"><text>14/LTD/AIFSTD0001500</text></cell>
-            <cell><text>Allen Key</text></cell>
-            <cell align="center"><text>1 Set</text></cell>
-            <cell><text>1 Set</text></cell>
-            <cell><text>AIFSTD0001500</text></cell>
-            <cell align="center"></cell>
-            <cell align="right"><text>382</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-        </body>
-      </table>
-    </appendix>
-    <appendix label="D" title="LIST OF SPECIAL MAINTENANCE TOOL" orientation="landscape">
-      <para>No special maintenance tool required for this system.</para>
-      <table widths="705 850 565 712 1558 993 849 712 847 851 1134">
-        <head>
-          <row>
-            <cell align="center"><text>Item No.</text></cell>
-            <cell align="center"><text>Plate Ref. No.</text></cell>
-            <cell align="center"><text>'P'</text></cell>
-            <cell align="center"><text>NSN</text></cell>
-            <cell><text>Designation</text></cell>
-            <cell align="center"><text>No. Off (for 100m)</text></cell>
-            <cell align="center"><text>No. Off (for 1 set)</text></cell>
-            <cell align="center"><text>Drg. No.</text></cell>
-            <cell align="center"><text>Firms Part No.</text></cell>
-            <cell align="center"><text>Unit Price Rs.</text></cell>
-            <cell align="center"><text>Remark</text></cell>
-          </row>
-        </head>
-        <body>
-          <row>
-            <cell><text>-</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell><text>-</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell><text>-</text></cell>
-            <cell><text>-</text></cell>
-            <cell align="center"><text>-</text></cell>
-            <cell align="right"><text>-</text></cell>
-            <cell align="center"><text>-</text></cell>
-          </row>
-        </body>
-      </table>
-    </appendix>
-    <appendix label="E" title="RECOMMENDED LIST OF SPARES FOR TWO YEARS MAINTENANCE AND ONE OVERHAUL" orientation="landscape">
-      <table widths="609 2363 1985 2443 1074 1074 1471 883 851 850 851 668">
-        <head>
-          <row>
-            <cell rowspan="2" align="center"><text>Sr. No.</text></cell>
-            <cell><text>NSN</text></cell>
-            <cell rowspan="2"><text>Manufacturer’s Part No.</text></cell>
-            <cell rowspan="2"><text>Nomenclature</text></cell>
-            <cell rowspan="2" align="center"><text>Nos. Fitted in 100 m Bridge</text></cell>
-            <cell rowspan="2" align="center"><text>Nos. Fitted in 1 Set Bridge</text></cell>
-            <cell rowspan="2" align="center"><text>Illustrated Spare Part List Ref</text></cell>
-            <cell colspan="3" align="center"><text>Recommended qty. of spares for 65 Nos. for Two Years</text></cell>
-            <cell><text>Unit Price Rs</text></cell>
-            <cell rowspan="2" align="center"><text>Remark</text></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell align="center"><text>For 01 Set (*)</text></cell>
-            <cell align="center"><text>(65 Sets)</text></cell>
-            <cell align="center"><text>Total</text></cell>
-            <cell></cell>
-          </row>
-        </head>
-        <body>
-          <row>
-            <cell></cell>
-            <cell><text>14/5310-72-058-4261</text></cell>
-            <cell><text>AIFSTD0002300</text></cell>
-            <cell><text>SQUARE NUT</text></cell>
-            <cell align="center"><text>416</text></cell>
-            <cell align="center"><text>464</text></cell>
-            <cell align="center"><text>I-A/1/6</text></cell>
-            <cell align="center"><text>46</text></cell>
-            <cell align="center"><text>2990</text></cell>
-            <cell align="center"><text>2990</text></cell>
-            <cell align="right"><text>232</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/5315-72-058-7097</text></cell>
-            <cell><text>AIF4100000100</text></cell>
-            <cell><text>PIN</text></cell>
-            <cell align="center"><text>208</text></cell>
-            <cell align="center"><text>232</text></cell>
-            <cell align="center"><text>I-A/1/3</text></cell>
-            <cell align="center"><text>23</text></cell>
-            <cell align="center"><text>1495</text></cell>
-            <cell align="center"><text>1495</text></cell>
-            <cell align="right"><text>280</text></cell>
-            <cell align="center"></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/5315-72-058-8292</text></cell>
-            <cell><text>AIFSTD0002100</text></cell>
-            <cell><text>SPRING WASHER 6</text></cell>
-            <cell align="center"><text>418</text></cell>
-            <cell align="center"><text>468</text></cell>
-            <cell align="center"><text>I-A/1/5, I-B/2/11/5/16</text></cell>
-            <cell align="center"><text>46</text></cell>
-            <cell align="center"><text>2990</text></cell>
-            <cell align="center"><text>2990</text></cell>
-            <cell align="right"><text>80</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/5305-72-058-4260</text></cell>
-            <cell><text>AIFSTD0002200</text></cell>
-            <cell><text>CAP SCREW M5X25</text></cell>
-            <cell align="center"><text>416</text></cell>
-            <cell align="center"><text>464</text></cell>
-            <cell align="center"><text>I-A/1/4</text></cell>
-            <cell align="center"><text>46</text></cell>
-            <cell align="center"><text>2990</text></cell>
-            <cell align="center"><text>2990</text></cell>
-            <cell align="right"><text>287</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/5340-72-058-4208</text></cell>
-            <cell><text>AIFSTD0002500</text></cell>
-            <cell><text>ROPE HOOK</text></cell>
-            <cell align="center"><text>254</text></cell>
-            <cell align="center"><text>284</text></cell>
-            <cell align="center"><text>I-A/1/7, I-A/2/11</text></cell>
-            <cell align="center"><text>14</text></cell>
-            <cell align="center"><text>910</text></cell>
-            <cell align="center"><text>910</text></cell>
-            <cell align="right"><text>80</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/8470-72-058-7217</text></cell>
-            <cell><text>AIF4120000000</text></cell>
-            <cell><text>MALE BUCKLE ASSY</text></cell>
-            <cell align="center"><text>208</text></cell>
-            <cell align="center"><text>232</text></cell>
-            <cell align="center"><text>I-A/1/11</text></cell>
-            <cell align="center"><text>23</text></cell>
-            <cell align="center"><text>1495</text></cell>
-            <cell align="center"><text>1495</text></cell>
-            <cell align="right"><text>1,930</text></cell>
-            <cell align="center"></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/2590-72-058-7204</text></cell>
-            <cell><text>AIF4200000100</text></cell>
-            <cell><text>BALL LOCK JOINT</text></cell>
-            <cell align="center"><text>52</text></cell>
-            <cell align="center"><text>59</text></cell>
-            <cell align="center"><text>I-A/2/1, I-A/5/3</text></cell>
-            <cell align="center"><text>6</text></cell>
-            <cell align="center"><text>390</text></cell>
-            <cell align="center"><text>390</text></cell>
-            <cell align="right"><text>7,390</text></cell>
-            <cell align="center"></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/5315-72-058-7096</text></cell>
-            <cell><text>AIF4200000200</text></cell>
-            <cell><text>PIN</text></cell>
-            <cell align="center"><text>200</text></cell>
-            <cell align="center"><text>224</text></cell>
-            <cell align="center"><text>I-A/2/9</text></cell>
-            <cell align="center"><text>22</text></cell>
-            <cell align="center"><text>1430</text></cell>
-            <cell align="center"><text>1430</text></cell>
-            <cell align="right"><text>250</text></cell>
-            <cell align="center"></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/5310-72-058-6991</text></cell>
-            <cell><text>AIFSTD000300</text></cell>
-            <cell><text>WASHER 13</text></cell>
-            <cell align="center"><text>230</text></cell>
-            <cell align="center"><text>258</text></cell>
-            <cell align="center"><text>I-A/2/5, I-A/5/6, I-C/2/2, I-C/4/5</text></cell>
-            <cell align="center"><text>24</text></cell>
-            <cell align="center"><text>1560</text></cell>
-            <cell align="center"><text>1560</text></cell>
-            <cell align="right"><text>80</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/5305-72-058-8191</text></cell>
-            <cell><text>AIFSTD0002900</text></cell>
-            <cell><text>BOLT M12X70</text></cell>
-            <cell align="center"><text>216</text></cell>
-            <cell align="center"><text>244</text></cell>
-            <cell align="center"><text>I-A/2/3, I-A/5/5 I-C/4/4</text></cell>
-            <cell align="center"><text>23</text></cell>
-            <cell align="center"><text>1495</text></cell>
-            <cell align="center"><text>1495</text></cell>
-            <cell align="right"><text>490</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/5310-72-058-3839</text></cell>
-            <cell><text>AIFSTD0003100</text></cell>
-            <cell><text>HEX NUT M12</text></cell>
-            <cell align="center"><text>234</text></cell>
-            <cell align="center"><text>266</text></cell>
-            <cell align="center"><text>I-A/2/4, I-A/5/4, I-C/1/2, I-C/2/4, I-C/4/6</text></cell>
-            <cell align="center"><text>24</text></cell>
-            <cell align="center"><text>1560</text></cell>
-            <cell align="center"><text>1560</text></cell>
-            <cell align="right"><text>240</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/5310-72-058-4213</text></cell>
-            <cell><text>AIFSTD0003200</text></cell>
-            <cell><text>HEX THIN NUT M12</text></cell>
-            <cell align="center"><text>216</text></cell>
-            <cell align="center"><text>244</text></cell>
-            <cell align="center"><text>I-A/2/6, I-A/5/1, I-C/2/5</text></cell>
-            <cell align="center"><text>24</text></cell>
-            <cell align="center"><text>1560</text></cell>
-            <cell align="center"><text>1560</text></cell>
-            <cell align="right"><text>200</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/5315-72-058-4212</text></cell>
-            <cell><text>AIFSTD0003400</text></cell>
-            <cell><text>SPLIT PIN</text></cell>
-            <cell align="center"><text>400</text></cell>
-            <cell align="center"><text>448</text></cell>
-            <cell align="center"><text>I-A/2/10</text></cell>
-            <cell align="center"><text>44</text></cell>
-            <cell align="center"><text>2860</text></cell>
-            <cell align="center"><text>2860</text></cell>
-            <cell align="right"><text>80</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/5340-72-058-7094</text></cell>
-            <cell><text>AIF4230000000</text></cell>
-            <cell><text>FEMALE BUCKLE ASSY</text></cell>
-            <cell align="center"><text>200</text></cell>
-            <cell align="center"><text>224</text></cell>
-            <cell align="center"><text>I-A/2/14</text></cell>
-            <cell align="center"><text>22</text></cell>
-            <cell align="center"><text>1430</text></cell>
-            <cell align="center"><text>1430</text></cell>
-            <cell align="right"><text>4,190</text></cell>
-            <cell align="center"></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/5355-72-058-4211</text></cell>
-            <cell><text>AIFSTD0003700</text></cell>
-            <cell><text>SHANK HOOK</text></cell>
-            <cell align="center"><text>150</text></cell>
-            <cell align="center"><text>168</text></cell>
-            <cell align="center"><text>I-A/3/2</text></cell>
-            <cell align="center"><text>16</text></cell>
-            <cell align="center"><text>1040</text></cell>
-            <cell align="center"><text>1040</text></cell>
-            <cell align="right"><text>4,770</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/5315-72-058-7080</text></cell>
-            <cell><text>AIF4700000400</text></cell>
-            <cell><text>WINCH PIN</text></cell>
-            <cell align="center"><text>2</text></cell>
-            <cell align="center"><text>4</text></cell>
-            <cell align="center"><text>I-B/2/8</text></cell>
-            <cell align="center"><text>1</text></cell>
-            <cell align="center"><text>65</text></cell>
-            <cell align="center"><text>65</text></cell>
-            <cell align="right"><text>1,080</text></cell>
-            <cell align="center"></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/5310-72-058-3815</text></cell>
-            <cell><text>AIFSTD0003900</text></cell>
-            <cell><text>HEX NUT M10</text></cell>
-            <cell align="center"><text>26</text></cell>
-            <cell align="center"><text>52</text></cell>
-            <cell align="center"><text>I-B/2/4, I-B/2/1/4, I-B/2/9/2, I-B/2/11/2</text></cell>
-            <cell align="center"><text>5</text></cell>
-            <cell align="center"><text>325</text></cell>
-            <cell align="center"><text>325</text></cell>
-            <cell align="right"><text>160</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/5306-72-058-3814</text></cell>
-            <cell><text>AIFSTD0003800</text></cell>
-            <cell><text>BOLT M10X50</text></cell>
-            <cell align="center"><text>24</text></cell>
-            <cell align="center"><text>48</text></cell>
-            <cell align="center"><text>I-B/2/3, I-B/2/9/1, I-B/2/11/1</text></cell>
-            <cell align="center"><text>5</text></cell>
-            <cell align="center"><text>325</text></cell>
-            <cell align="center"><text>325</text></cell>
-            <cell align="right"><text>340</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/5310-72-058-3813</text></cell>
-            <cell><text>AIFSTD0004000</text></cell>
-            <cell><text>WASHER 10.5</text></cell>
-            <cell align="center"><text>25</text></cell>
-            <cell align="center"><text>50</text></cell>
-            <cell align="center"><text>I-B/2/6, I-B/2/1/3, I-B/2/9/3, I-B/2/11/3</text></cell>
-            <cell align="center"><text>5</text></cell>
-            <cell align="center"><text>325</text></cell>
-            <cell align="center"><text>325</text></cell>
-            <cell align="right"><text>100</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/3110-72-058-7374</text></cell>
-            <cell><text>AIFSTD0004200</text></cell>
-            <cell><text>BEARING 6010-2Z</text></cell>
-            <cell align="center"><text>1</text></cell>
-            <cell align="center"><text>2</text></cell>
-            <cell align="center"><text>I-B/2/11/5/31</text></cell>
-            <cell align="center"><text>1</text></cell>
-            <cell align="center"><text>65</text></cell>
-            <cell align="center"><text>65</text></cell>
-            <cell align="right"><text>3,240</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/5360-72-058-8192</text></cell>
-            <cell><text>AIFSTD0004400</text></cell>
-            <cell><text>PAWL SPRING</text></cell>
-            <cell align="center"><text>2</text></cell>
-            <cell align="center"><text>4</text></cell>
-            <cell align="center"><text>I-B/2/11/5/17</text></cell>
-            <cell align="center"><text>1</text></cell>
-            <cell align="center"><text>65</text></cell>
-            <cell align="center"><text>65</text></cell>
-            <cell align="right"><text>470</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/5315-72-058-8294</text></cell>
-            <cell><text>AIFSTD0004500</text></cell>
-            <cell><text>SPLIT PIN 4X30</text></cell>
-            <cell align="center"><text>3</text></cell>
-            <cell align="center"><text>6</text></cell>
-            <cell align="center"><text>I-B/2/11/5/3</text></cell>
-            <cell align="center"><text>1</text></cell>
-            <cell align="center"><text>65</text></cell>
-            <cell align="center"><text>65</text></cell>
-            <cell align="right"><text>80</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/5325-72-058-6796</text></cell>
-            <cell><text>AIFSTD0004300</text></cell>
-            <cell><text>CIRCLIP 45.8X2 N IS:3075 (PART 1)</text></cell>
-            <cell align="center"><text>1</text></cell>
-            <cell align="center"><text>2</text></cell>
-            <cell align="center"><text>I-B/2/11/5/30</text></cell>
-            <cell align="center"><text>1</text></cell>
-            <cell align="center"><text>65</text></cell>
-            <cell align="center"><text>65</text></cell>
-            <cell align="right"><text>310</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/5310-72-058-8295</text></cell>
-            <cell><text>AIFSTD0004600</text></cell>
-            <cell><text>WASHER 15</text></cell>
-            <cell align="center"><text>9</text></cell>
-            <cell align="center"><text>18</text></cell>
-            <cell align="center"><text>I-B/2/11/5/5</text></cell>
-            <cell align="center"><text>2</text></cell>
-            <cell align="center"><text>130</text></cell>
-            <cell align="center"><text>130</text></cell>
-            <cell align="right"><text>80</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/5310-72-058-8293</text></cell>
-            <cell><text>AIFSTD0004700</text></cell>
-            <cell><text>HEX NUT M14</text></cell>
-            <cell align="center"><text>9</text></cell>
-            <cell align="center"><text>18</text></cell>
-            <cell align="center"><text>I-B/2/11/5/4</text></cell>
-            <cell align="center"><text>2</text></cell>
-            <cell align="center"><text>130</text></cell>
-            <cell align="center"><text>130</text></cell>
-            <cell align="right"><text>240</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/5310-72-058-8194</text></cell>
-            <cell><text>AIFSTD0004900</text></cell>
-            <cell><text>HEX NUT M6</text></cell>
-            <cell align="center"><text>6</text></cell>
-            <cell align="center"><text>12</text></cell>
-            <cell align="center"><text>I-B/2/9/5/8, I-B/2/11/5/15</text></cell>
-            <cell align="center"><text>1</text></cell>
-            <cell align="center"><text>65</text></cell>
-            <cell align="center"><text>65</text></cell>
-            <cell align="right"><text>160</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/5305-72-058-9808</text></cell>
-            <cell><text>AIFSTD0004800</text></cell>
-            <cell><text>CAP SCREW M8X16</text></cell>
-            <cell align="center"><text>4</text></cell>
-            <cell align="center"><text>8</text></cell>
-            <cell align="center"><text>I-B/2/11/5/1</text></cell>
-            <cell align="center"><text>2</text></cell>
-            <cell align="center"><text>130</text></cell>
-            <cell align="center"><text>130</text></cell>
-            <cell align="right"><text>309</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/3110-72-058-6797</text></cell>
-            <cell><text>AIFSTD0005400</text></cell>
-            <cell><text>BEARING 6210-2Z</text></cell>
-            <cell align="center"><text>1</text></cell>
-            <cell align="center"><text>2</text></cell>
-            <cell align="center"><text>I-B/2/9/5/4</text></cell>
-            <cell align="center"><text>1</text></cell>
-            <cell align="center"><text>65</text></cell>
-            <cell align="center"><text>65</text></cell>
-            <cell align="right"><text>3,080</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/5306-72-058-3812</text></cell>
-            <cell><text>AIFSTD0005200</text></cell>
-            <cell><text>BOLT M6X30</text></cell>
-            <cell align="center"><text>4</text></cell>
-            <cell align="center"><text>8</text></cell>
-            <cell align="center"><text>I-B/2/9/5/5</text></cell>
-            <cell align="center"><text>1</text></cell>
-            <cell align="center"><text>65</text></cell>
-            <cell align="center"><text>65</text></cell>
-            <cell align="right"><text>280</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/5305-72-058-3811</text></cell>
-            <cell><text>AIFSTD0005300</text></cell>
-            <cell><text>CAP SCREW M4X12</text></cell>
-            <cell align="center"><text>3</text></cell>
-            <cell align="center"><text>6</text></cell>
-            <cell align="center"><text>I-B/2/9/5/6</text></cell>
-            <cell align="center"><text>1</text></cell>
-            <cell align="center"><text>65</text></cell>
-            <cell align="center"><text>65</text></cell>
-            <cell align="right"><text>240</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/5310-72-058-3810</text></cell>
-            <cell><text>AIFSTD0005100</text></cell>
-            <cell><text>WASHER 6.6</text></cell>
-            <cell align="center"><text>4</text></cell>
-            <cell align="center"><text>8</text></cell>
-            <cell align="center"><text>I-B/2/9/5/7</text></cell>
-            <cell align="center"><text>1</text></cell>
-            <cell align="center"><text>65</text></cell>
-            <cell align="center"><text>65</text></cell>
-            <cell align="right"><text>80</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/5306-72-058-7371</text></cell>
-            <cell><text>AIFSTD0005500</text></cell>
-            <cell><text>BOLT M12X55</text></cell>
-            <cell align="center"><text>4</text></cell>
-            <cell align="center"><text>4</text></cell>
-            <cell align="center"><text>I-C/1/1</text></cell>
-            <cell align="center"><text>1</text></cell>
-            <cell align="center"><text>65</text></cell>
-            <cell align="center"><text>65</text></cell>
-            <cell align="right"><text>420</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-          <row>
-            <cell></cell>
-            <cell><text>14/5305-72-058-6994</text></cell>
-            <cell><text>AIFSTD0005600</text></cell>
-            <cell><text>BOLT M12X85</text></cell>
-            <cell align="center"><text>8</text></cell>
-            <cell align="center"><text>8</text></cell>
-            <cell align="center"><text>I-C/2/3</text></cell>
-            <cell align="center"><text>1</text></cell>
-            <cell align="center"><text>65</text></cell>
-            <cell align="center"><text>65</text></cell>
-            <cell align="right"><text>620</text></cell>
-            <cell align="center"><text>STD</text></cell>
-          </row>
-        </body>
-      </table>
-    </appendix>
-    <appendix label="F" title="LIST OF SUPPLIERS FOR PROPRIETARY ITEMS" orientation="landscape">
-      <table widths="999 2289 2585 4165 1293 1733 2058">
-        <head>
-          <row>
-            <cell align="center"><text>SR. NO.</text></cell>
-            <cell><text>ITEM</text></cell>
-            <cell><text>NSN</text></cell>
-            <cell><text>DESIGNATION</text></cell>
-            <cell align="center"><text>NO. OFF</text></cell>
-            <cell><text>SUPPLIERS</text></cell>
-            <cell><text>REMARK</text></cell>
-          </row>
-        </head>
-        <body>
-          <row>
-            <cell><text>1.</text></cell>
-            <cell><text>AIFSTD0000200</text></cell>
-            <cell><text>14/4020-72-058-3833</text></cell>
-            <cell><text>Nylon Rope for Handrail Assy</text></cell>
-            <cell align="center"><text>3</text></cell>
-            <cell><text>Garware</text></cell>
-            <cell></cell>
-          </row>
-          <row>
-            <cell><text>2.</text></cell>
-            <cell><text>AIF4C00000000</text></cell>
-            <cell><text>14/4020-72-058-7061</text></cell>
-            <cell><text>Garware 12 mm Dia. 150 m Long</text></cell>
-            <cell align="center"><text>2</text></cell>
-            <cell><text>Garware</text></cell>
-            <cell></cell>
-          </row>
-          <row>
-            <cell><text>3.</text></cell>
-            <cell><text>AIF4D00000000</text></cell>
-            <cell><text>14/4020-72-058-6997</text></cell>
-            <cell><text>Garware Rope 12 mm Dia. 2 m Long</text></cell>
-            <cell align="center"><text>29</text></cell>
-            <cell><text>Garware</text></cell>
-            <cell></cell>
-          </row>
-          <row>
-            <cell><text>4.</text></cell>
-            <cell><text>AIF4E00000000</text></cell>
-            <cell><text>14/4020-72-058-6988</text></cell>
-            <cell><text>Garware Rope 12 mm Dia. 3 m Long</text></cell>
-            <cell align="center"><text>29</text></cell>
-            <cell><text>Garware</text></cell>
-            <cell></cell>
-          </row>
-          <row>
-            <cell><text>5.</text></cell>
-            <cell><text>AIFSTD0000300</text></cell>
-            <cell><text>14/5340-72-058-3834</text></cell>
-            <cell><text>Carabiner Hook</text></cell>
-            <cell align="center"><text>130</text></cell>
-            <cell><text>Edelrid</text></cell>
-            <cell></cell>
-          </row>
-          <row>
-            <cell><text>6.</text></cell>
-            <cell><text>AIFSTD0000400</text></cell>
-            <cell><text>14/4030-72-058-3835</text></cell>
-            <cell><text>Bow Shackle</text></cell>
-            <cell align="center"><text>4</text></cell>
-            <cell><text>Sealinkers</text></cell>
-            <cell></cell>
-          </row>
-          <row>
-            <cell><text>7.</text></cell>
-            <cell><text>AIFSTD0001600</text></cell>
-            <cell><text>14/5340-72-058-4262</text></cell>
-            <cell><text>Ratchet Lashing 15 m Long Strap</text></cell>
-            <cell align="center"><text>6</text></cell>
-            <cell><text>Sealinkers</text></cell>
-            <cell></cell>
-          </row>
-          <row>
-            <cell><text>8.</text></cell>
-            <cell><text>AIFSTD0001700</text></cell>
-            <cell><text>14/5340-72-058-4265</text></cell>
-            <cell><text>Ratchet Lashing 10 m Long Strap</text></cell>
-            <cell align="center"><text>6</text></cell>
-            <cell><text>Sealinkers</text></cell>
-            <cell></cell>
-          </row>
-          <row>
-            <cell><text>9.</text></cell>
-            <cell><text>AIF4A00000000</text></cell>
-            <cell><text>14/4240-72-058-7647</text></cell>
-            <cell><text>Body Harness</text></cell>
-            <cell align="center"><text>20</text></cell>
-            <cell><text>Garware</text></cell>
-            <cell></cell>
-          </row>
-        </body>
-      </table>
-    </appendix>
-    <appendix label="G" title="NUMERICAL INDEX OF PARTS (FIRM PART NO.)" orientation="landscape">
-      <table widths="2435 2203 2416 2571">
-        <head>
-          <row>
-            <cell><text>FIRM PART NO</text></cell>
-            <cell><text>ITEM NO.</text></cell>
-            <cell><text>PAGE NO</text></cell>
-            <cell><text>REMARK</text></cell>
-          </row>
-        </head>
-        <body>
-          <row>
-            <cell><text>-</text></cell>
-            <cell><text>-</text></cell>
-            <cell><text>-</text></cell>
-            <cell><text>-</text></cell>
-          </row>
-        </body>
-      </table>
-    </appendix>
+    <appendix label="A" title="LIST OF CARRIED SPARES" orientation="landscape"><para>Dummy list of carried spares for the Demo Equipment DE-100.</para><table widths="1 2 5 1 3"><head><row><cell><text>Sl. No.</text></cell><cell><text>Part No.</text></cell><cell><text>Designation</text></cell><cell><text>Qty</text></cell><cell><text>Remark</text></cell></row></head><body><row><cell><text>1</text></cell><cell><text>DFP-11</text></cell><cell><text>Dummy item 1-1</text></cell><cell><text>1</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>2</text></cell><cell><text>DFP-12</text></cell><cell><text>Dummy item 1-2</text></cell><cell><text>2</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>3</text></cell><cell><text>DFP-13</text></cell><cell><text>Dummy item 1-3</text></cell><cell><text>3</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>4</text></cell><cell><text>DFP-14</text></cell><cell><text>Dummy item 1-4</text></cell><cell><text>4</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>5</text></cell><cell><text>DFP-15</text></cell><cell><text>Dummy item 1-5</text></cell><cell><text>5</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>6</text></cell><cell><text>DFP-16</text></cell><cell><text>Dummy item 1-6</text></cell><cell><text>6</text></cell><cell><text>Dummy</text></cell></row></body></table></appendix>
+    <appendix label="B" title="LIST OF STANDARD ACCESSORIES" orientation="landscape"><para>Dummy list of standard accessories for the Demo Equipment DE-100.</para><table widths="1 2 5 1 3"><head><row><cell><text>Sl. No.</text></cell><cell><text>Part No.</text></cell><cell><text>Designation</text></cell><cell><text>Qty</text></cell><cell><text>Remark</text></cell></row></head><body><row><cell><text>1</text></cell><cell><text>DFP-21</text></cell><cell><text>Dummy item 2-1</text></cell><cell><text>1</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>2</text></cell><cell><text>DFP-22</text></cell><cell><text>Dummy item 2-2</text></cell><cell><text>2</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>3</text></cell><cell><text>DFP-23</text></cell><cell><text>Dummy item 2-3</text></cell><cell><text>3</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>4</text></cell><cell><text>DFP-24</text></cell><cell><text>Dummy item 2-4</text></cell><cell><text>4</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>5</text></cell><cell><text>DFP-25</text></cell><cell><text>Dummy item 2-5</text></cell><cell><text>5</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>6</text></cell><cell><text>DFP-26</text></cell><cell><text>Dummy item 2-6</text></cell><cell><text>6</text></cell><cell><text>Dummy</text></cell></row></body></table></appendix>
+    <appendix label="C" title="LIST OF CARRIED TOOL" orientation="landscape"><para>Dummy list of carried tool for the Demo Equipment DE-100.</para><table widths="1 2 5 1 3"><head><row><cell><text>Sl. No.</text></cell><cell><text>Part No.</text></cell><cell><text>Designation</text></cell><cell><text>Qty</text></cell><cell><text>Remark</text></cell></row></head><body><row><cell><text>1</text></cell><cell><text>DFP-31</text></cell><cell><text>Dummy item 3-1</text></cell><cell><text>1</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>2</text></cell><cell><text>DFP-32</text></cell><cell><text>Dummy item 3-2</text></cell><cell><text>2</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>3</text></cell><cell><text>DFP-33</text></cell><cell><text>Dummy item 3-3</text></cell><cell><text>3</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>4</text></cell><cell><text>DFP-34</text></cell><cell><text>Dummy item 3-4</text></cell><cell><text>4</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>5</text></cell><cell><text>DFP-35</text></cell><cell><text>Dummy item 3-5</text></cell><cell><text>5</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>6</text></cell><cell><text>DFP-36</text></cell><cell><text>Dummy item 3-6</text></cell><cell><text>6</text></cell><cell><text>Dummy</text></cell></row></body></table></appendix>
+    <appendix label="D" title="LIST OF SPECIAL MAINTENANCE TOOL" orientation="landscape"><para>Dummy list of special maintenance tool for the Demo Equipment DE-100.</para><table widths="1 2 5 1 3"><head><row><cell><text>Sl. No.</text></cell><cell><text>Part No.</text></cell><cell><text>Designation</text></cell><cell><text>Qty</text></cell><cell><text>Remark</text></cell></row></head><body><row><cell><text>1</text></cell><cell><text>DFP-41</text></cell><cell><text>Dummy item 4-1</text></cell><cell><text>1</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>2</text></cell><cell><text>DFP-42</text></cell><cell><text>Dummy item 4-2</text></cell><cell><text>2</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>3</text></cell><cell><text>DFP-43</text></cell><cell><text>Dummy item 4-3</text></cell><cell><text>3</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>4</text></cell><cell><text>DFP-44</text></cell><cell><text>Dummy item 4-4</text></cell><cell><text>4</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>5</text></cell><cell><text>DFP-45</text></cell><cell><text>Dummy item 4-5</text></cell><cell><text>5</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>6</text></cell><cell><text>DFP-46</text></cell><cell><text>Dummy item 4-6</text></cell><cell><text>6</text></cell><cell><text>Dummy</text></cell></row></body></table></appendix>
+    <appendix label="E" title="RECOMMENDED LIST OF SPARES" orientation="landscape"><para>Dummy recommended list of spares for the Demo Equipment DE-100.</para><table widths="1 2 5 1 3"><head><row><cell><text>Sl. No.</text></cell><cell><text>Part No.</text></cell><cell><text>Designation</text></cell><cell><text>Qty</text></cell><cell><text>Remark</text></cell></row></head><body><row><cell><text>1</text></cell><cell><text>DFP-51</text></cell><cell><text>Dummy item 5-1</text></cell><cell><text>1</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>2</text></cell><cell><text>DFP-52</text></cell><cell><text>Dummy item 5-2</text></cell><cell><text>2</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>3</text></cell><cell><text>DFP-53</text></cell><cell><text>Dummy item 5-3</text></cell><cell><text>3</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>4</text></cell><cell><text>DFP-54</text></cell><cell><text>Dummy item 5-4</text></cell><cell><text>4</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>5</text></cell><cell><text>DFP-55</text></cell><cell><text>Dummy item 5-5</text></cell><cell><text>5</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>6</text></cell><cell><text>DFP-56</text></cell><cell><text>Dummy item 5-6</text></cell><cell><text>6</text></cell><cell><text>Dummy</text></cell></row></body></table></appendix>
+    <appendix label="F" title="LIST OF SUPPLIERS FOR PROPRIETARY ITEMS" orientation="landscape"><para>Dummy list of suppliers for proprietary items for the Demo Equipment DE-100.</para><table widths="1 2 5 1 3"><head><row><cell><text>Sl. No.</text></cell><cell><text>Part No.</text></cell><cell><text>Designation</text></cell><cell><text>Qty</text></cell><cell><text>Remark</text></cell></row></head><body><row><cell><text>1</text></cell><cell><text>DFP-61</text></cell><cell><text>Dummy item 6-1</text></cell><cell><text>1</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>2</text></cell><cell><text>DFP-62</text></cell><cell><text>Dummy item 6-2</text></cell><cell><text>2</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>3</text></cell><cell><text>DFP-63</text></cell><cell><text>Dummy item 6-3</text></cell><cell><text>3</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>4</text></cell><cell><text>DFP-64</text></cell><cell><text>Dummy item 6-4</text></cell><cell><text>4</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>5</text></cell><cell><text>DFP-65</text></cell><cell><text>Dummy item 6-5</text></cell><cell><text>5</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>6</text></cell><cell><text>DFP-66</text></cell><cell><text>Dummy item 6-6</text></cell><cell><text>6</text></cell><cell><text>Dummy</text></cell></row></body></table></appendix>
+    <appendix label="G" title="NUMERICAL INDEX OF PARTS" orientation="landscape"><para>Dummy numerical index of parts for the Demo Equipment DE-100.</para><table widths="1 2 5 1 3"><head><row><cell><text>Sl. No.</text></cell><cell><text>Part No.</text></cell><cell><text>Designation</text></cell><cell><text>Qty</text></cell><cell><text>Remark</text></cell></row></head><body><row><cell><text>1</text></cell><cell><text>DFP-71</text></cell><cell><text>Dummy item 7-1</text></cell><cell><text>1</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>2</text></cell><cell><text>DFP-72</text></cell><cell><text>Dummy item 7-2</text></cell><cell><text>2</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>3</text></cell><cell><text>DFP-73</text></cell><cell><text>Dummy item 7-3</text></cell><cell><text>3</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>4</text></cell><cell><text>DFP-74</text></cell><cell><text>Dummy item 7-4</text></cell><cell><text>4</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>5</text></cell><cell><text>DFP-75</text></cell><cell><text>Dummy item 7-5</text></cell><cell><text>5</text></cell><cell><text>Dummy</text></cell></row><row><cell><text>6</text></cell><cell><text>DFP-76</text></cell><cell><text>Dummy item 7-6</text></cell><cell><text>6</text></cell><cell><text>Dummy</text></cell></row></body></table></appendix>
   </appendices>
 </jsgdoc>

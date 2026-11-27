@@ -1,6 +1,5 @@
-// The JSG User Handbook sample: the filled "Modular Bridge" handbook (backend/samples/jsg-uhb), made by scripts/make-jsg-sample.js from JSG_UHB_Format.docx with the Word importer.
-// A person tries the editor, the ancillary pages and the PDF on a real handbook (cover, certificate, 28 associated handbooks, 37 abbreviations, five chapters, 244 figures,
-// 126 tables) instead of an empty stencil.
+// The JSG samples (User Handbook and Illustrated Spare Parts List): dummy data about an invented "Demo Equipment DE-100" (backend/samples/jsg-*, made by scripts/make-jsg-sample.js),
+// so a person can try the editor, the ancillary pages and the PDF without a real document.
 
 import fs from 'fs';
 import path from 'path';
@@ -12,8 +11,8 @@ import { SOURCE_NAME } from './service';
 
 export type SampleKind = 'uhb' | 'ispl';
 const SAMPLES: Record<SampleKind, { dir: string; name: string }> = {
-  uhb: { dir: 'jsg-uhb', name: 'Sample - JSG User Handbook (Modular Bridge)' },
-  ispl: { dir: 'jsg-ispl', name: 'Sample - JSG Illustrated Spare Parts List (Foot Bridge)' },
+  uhb: { dir: 'jsg-uhb', name: 'Sample - JSG User Handbook (Dummy Data)' },
+  ispl: { dir: 'jsg-ispl', name: 'Sample - JSG Illustrated Spare Parts List (Dummy Data)' },
 };
 export const sampleDir = (kind: SampleKind): string => path.resolve(__dirname, '..', '..', '..', 'samples', SAMPLES[kind].dir);
 export const SAMPLE_DIR = sampleDir('uhb');

@@ -101,7 +101,7 @@ function AuthorOverview() {
   return (
     <div className="v2-page">
       <PageHeader icon="dashboard" title={`Welcome back, ${user?.fullName.split(' ')[0]}`} sub="Your projects"
-        actions={<><SampleButton /><SampleButton kind="jsg" /><SampleButton kind="jsg-ispl" /><BackupButton /><button className="btn" onClick={() => nav('/workspace')}><Icon name="folderOpen" />Workspace</button><button className="btn btn-primary" onClick={() => setCreating(true)}><Icon name="plus" />New project</button></>}
+        actions={<><SampleButton /><SampleButton kind="jss-land" /><SampleButton kind="jss-naval" /><SampleButton kind="jsg" /><SampleButton kind="jsg-ispl" /><BackupButton /><button className="btn" onClick={() => nav('/workspace')}><Icon name="folderOpen" />Workspace</button><button className="btn btn-primary" onClick={() => setCreating(true)}><Icon name="plus" />New project</button></>}
         stats={[{ label: 'Projects', value: counts.projects }, { label: 'Data modules', value: counts.dataModules }, { label: 'Publications built', value: counts.published }, { label: 'Folders', value: counts.folders }]} />
 
       {inv.data && inv.data.length > 0 ? (

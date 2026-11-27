@@ -82,7 +82,7 @@ export function Workspace() {
         <div><h2>Workspace</h2><p className="v2-sub">{total} project{total === 1 ? '' : 's'} in {folders.length} folder{folders.length === 1 ? '' : 's'}.</p></div>
         <div className="v2-row">
           <input className="v2-input" style={{ width: 220 }} placeholder="Filter projects…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Filter projects" />
-          {isAdmin ? null : <><SampleButton onCreated={() => ws.reload()} /><SampleButton kind="jsg" onCreated={() => ws.reload()} /><SampleButton kind="jsg-ispl" onCreated={() => ws.reload()} /></>}
+          {isAdmin ? null : <><SampleButton onCreated={() => ws.reload()} /><SampleButton kind="jss-land" onCreated={() => ws.reload()} /><SampleButton kind="jss-naval" onCreated={() => ws.reload()} /><SampleButton kind="jsg" onCreated={() => ws.reload()} /><SampleButton kind="jsg-ispl" onCreated={() => ws.reload()} /></>}
           <button className="btn" onClick={() => setNewFolder(true)}><Icon name="folderPlus" />New folder</button>
           {isAdmin ? null : <button className="btn btn-primary" onClick={() => setCreating('')}><Icon name="plus" />New project</button>}
         </div>

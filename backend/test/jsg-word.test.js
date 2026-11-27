@@ -87,18 +87,18 @@ test('Import from Word: the JSG styles become chapters, sections, clauses, parag
 });
 
 const sampleThere = fs.existsSync(path.join(__dirname, '..', 'samples', 'jsg-uhb', 'jsg-document.xml'));
-test('the JSG sample project: a real filled handbook that validates, builds, prints its ancillary pages in the real order and counts its own pages', { skip: !sampleThere && 'the sample is not installed', timeout: 600000 }, async () => {
+test('the JSG sample project: a dummy-data handbook that validates, builds, prints its ancillary pages in the real order and counts its own pages', { skip: !sampleThere && 'the sample is not installed', timeout: 600000 }, async () => {
   const r = await w.post('/api/projects/sample-jsg', {}); assert.equal(r.status, 201, JSON.stringify(r.json).slice(0, 300));
   const U = `/api/projects/${r.json.project.id}`; const dir = path.join(h.ws, 'projects', r.json.project.id);
   const doc = (await w.get(`${U}/jsg`)).json; assert.equal(doc.report.errors, 0, JSON.stringify(doc.report.findings.slice(0, 3)));
-  assert.match(doc.xml, /<associated intro="Modular Bridge System has following associated handbooks:">/); assert.match(doc.xml, /<certificate>/);
+  assert.match(doc.xml, /<associated intro="Demo Equipment DE-100 has the following associated handbooks:">/); assert.match(doc.xml, /<certificate>/);
   assert.equal((await w.post(`${U}/jsg/build`, {})).status, 200);
   const pdf = path.join(dir, 'jsg-output.pdf'); const t = text(pdf).replace(/\s+/g, ' ');
   const at = (s) => t.indexOf(s);
   assert.ok(at('CERTIFICATE') > 0 && at('CERTIFICATE') < at('ASSOCIATED HANDBOOKS') && at('ASSOCIATED HANDBOOKS') < at('AMENDMENTS') && at('AMENDMENTS') < at('WARNING') && at('WARNING') < at('FIRST AID IN CASE OF ELECTRICAL SHOCK') && at('FIRST AID IN CASE OF ELECTRICAL SHOCK') < at('ABBREVIATIONS') && at('ABBREVIATIONS') < at('PREFACE') && at('PREFACE') < at('LIST OF FIGURES'), 'the real handbook\'s order');
   const total = pages(pdf);
   assert.match(t, new RegExp(`contains ${total} pages which have been serially numbered from \\(i\\) to \\([ivxlc]+\\) as ancillary pages and from 1 to \\d+ as main content`), 'the certificate cites the page count the build printed');
-  assert.match(t, /CQAE\/UH\/E2\/24\/1A contains/, 'and the document number');
+  assert.match(t, /DUMMY\/UH\/001 contains/, 'and the document number');
   assert.match(t, /Sr\. Document Title Document No\. Remark/, 'the associated handbooks table');
   // switching pages off: the page goes, the content stays in the file
   const off = doc.xml.replace('<front>', '<front omit="demolition associated listOfTables">');
@@ -111,7 +111,7 @@ test('the JSG sample project: a real filled handbook that validates, builds, pri
 });
 
 const isplThere = fs.existsSync(path.join(__dirname, '..', 'samples', 'jsg-ispl', 'jsg-document.xml'));
-test('the ISPL sample: a real filled spare parts list that validates, prints the stencil\'s pages and appendices, and follows the ancillary checklist', { skip: !isplThere && 'the ISPL sample is not installed', timeout: 600000 }, async () => {
+test('the ISPL sample: a dummy-data spare parts list that validates, prints the stencil\'s pages and appendices, and follows the ancillary checklist', { skip: !isplThere && 'the ISPL sample is not installed', timeout: 600000 }, async () => {
   const r = await w.post('/api/projects/sample-jsg', { kind: 'ispl' }); assert.equal(r.status, 201, JSON.stringify(r.json).slice(0, 300));
   const U = `/api/projects/${r.json.project.id}`; const dir = path.join(h.ws, 'projects', r.json.project.id);
   assert.equal(r.json.project.manualType, 'ispl');

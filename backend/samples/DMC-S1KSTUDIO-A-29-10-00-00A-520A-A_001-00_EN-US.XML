@@ -10,7 +10,7 @@
       <dmAddressItems>
         <issueDate year="2026" month="11" day="06"/>
         <dmTitle>
-          <techName>Hydraulic pump</techName>
+          <techName>Dummy equipment</techName>
           <infoName>Remove procedure</infoName>
         </dmTitle>
       </dmAddressItems>
@@ -18,10 +18,10 @@
     <dmStatus issueType="new">
       <security securityClassification="01"/>
       <responsiblePartnerCompany enterpriseCode="S1K01">
-        <enterpriseName>S1000D Studio Sample Data</enterpriseName>
+        <enterpriseName>Dummy Data Enterprise</enterpriseName>
       </responsiblePartnerCompany>
       <originator enterpriseCode="S1K01">
-        <enterpriseName>S1000D Studio Sample Data</enterpriseName>
+        <enterpriseName>Dummy Data Enterprise</enterpriseName>
       </originator>
       <applic>
         <displayText>
@@ -45,13 +45,13 @@
       <preliminaryRqmts>
         <reqCondGroup>
           <reqCondNoRef>
-            <reqCond>Aircraft on wheels with hydraulic power off</reqCond>
+            <reqCond>Dummy equipment switched off</reqCond>
           </reqCondNoRef>
         </reqCondGroup>
         <reqSupportEquips>
           <supportEquipDescrGroup>
             <supportEquipDescr id="seq-0001">
-              <name>Torque wrench, 10-100 Nm</name>
+              <name>Dummy tool, size A</name>
               <identNumber>
                 <manufacturerCode>S1K01</manufacturerCode>
                 <partAndSerialNumber>
@@ -61,7 +61,7 @@
               <reqQuantity>1</reqQuantity>
             </supportEquipDescr>
             <supportEquipDescr id="seq-0002">
-              <name>Container, 5 l</name>
+              <name>Dummy container</name>
               <identNumber>
                 <manufacturerCode>S1K01</manufacturerCode>
                 <partAndSerialNumber>
@@ -81,40 +81,40 @@
         <reqSafety>
           <safetyRqmts>
             <warning>
-              <warningAndCautionPara>Make sure that the hydraulic system is depressurized before you disconnect the lines. Fluid under pressure can cause injury.</warningAndCautionPara>
+              <warningAndCautionPara>Dummy warning: make sure that the dummy system is made safe before you disconnect any line. This sentence is sample data only.</warningAndCautionPara>
             </warning>
           </safetyRqmts>
         </reqSafety>
       </preliminaryRqmts>
       <mainProcedure>
         <proceduralStep id="stp-0001">
-          <para>Release the hydraulic pressure of the green system.</para>
+          <para>Make dummy system A safe.</para>
         </proceduralStep>
         <proceduralStep id="stp-0002">
-          <para>Put the container (<internalRef internalRefId="seq-0002" internalRefTargetType="irtt05"/>) below the pump.</para>
+          <para>Put the dummy container (<internalRef internalRefId="seq-0002" internalRefTargetType="irtt05"/>) below the dummy unit.</para>
         </proceduralStep>
         <proceduralStep id="stp-0003">
           <caution>
-            <warningAndCautionPara>Install blanking caps on all open ports immediately to prevent contamination.</warningAndCautionPara>
+            <warningAndCautionPara>Fit dummy caps on all open dummy ports.</warningAndCautionPara>
           </caution>
-          <para>Disconnect the hydraulic lines:</para>
+          <para>Disconnect the dummy lines:</para>
           <proceduralStep id="stp-0004">
-            <para>Disconnect the pressure line.</para>
+            <para>Disconnect dummy line 1.</para>
           </proceduralStep>
           <proceduralStep id="stp-0005">
-            <para>Disconnect the case drain line.</para>
+            <para>Disconnect dummy line 2.</para>
           </proceduralStep>
           <proceduralStep id="stp-0006">
-            <para>Disconnect the suction line.</para>
+            <para>Disconnect dummy line 3.</para>
           </proceduralStep>
         </proceduralStep>
         <proceduralStep id="stp-0007">
-          <para>Remove the six nuts and washers with the torque wrench (<internalRef internalRefId="seq-0001" internalRefTargetType="irtt05"/>).</para>
+          <para>Remove the six dummy fasteners with the dummy tool (<internalRef internalRefId="seq-0001" internalRefTargetType="irtt05"/>).</para>
         </proceduralStep>
         <proceduralStep id="stp-0008">
-          <para>Remove the pump from the gearbox pad.</para>
+          <para>Remove the dummy unit from its dummy mounting.</para>
           <note>
-            <notePara>Keep the pump in the horizontal position to prevent fluid spillage.</notePara>
+            <notePara>Keep the dummy unit level.</notePara>
           </note>
         </proceduralStep>
       </mainProcedure>

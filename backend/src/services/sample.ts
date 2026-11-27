@@ -1,5 +1,5 @@
 // =============================================================================
-// Sample project - a ready-made project for trying the platform: three real
+// Sample project - a ready-made project for trying the platform: three dummy-data
 // S1000D data modules (description, procedure, fault isolation), the figure they
 // use, a publication with three chapters, and filled-in publication details, so
 // every screen has something to show and a PDF can be built straight away.
@@ -21,7 +21,7 @@ const CHAPTERS: Array<{ title: string; infoCode: string }> = [
 ];
 
 export async function createSampleProject(user: P.User, folder?: string): Promise<P.ProjectCard> {
-  const base = 'Sample - Hydraulic Pump';
+  const base = 'Sample - S1000D (Dummy Data)';
   let name = base;
   for (let n = 2; workspace.nameTaken(workspaceDir, name); n++) name = `${base} (${n})`;
 
@@ -43,12 +43,12 @@ export async function createSampleProject(user: P.User, folder?: string): Promis
     })),
   })).filter((c) => c.children.length);
   const model = pm.readPm(id);
-  pm.writePm(id, { meta: { ...model.meta, pmTitle: 'Hydraulic Pump Maintenance Manual', shortPmTitle: 'Hydraulic Pump' }, entries });
+  pm.writePm(id, { meta: { ...model.meta, pmTitle: 'Dummy Equipment Maintenance Manual', shortPmTitle: 'Dummy Equipment' }, entries });
 
   P.updateProjectJson(id, (pj) => {
     pj.publication = {
       ...(pj.publication || {}),
-      bookName: 'Hydraulic Pump Maintenance Manual', systemName: 'Hydraulic Pump', publicationNo: 'SAMPLE-001',
+      bookName: 'Dummy Equipment Maintenance Manual', systemName: 'Dummy Equipment', publicationNo: 'DUMMY-001',
       securityClassification: 'RESTRICTED', month: String(new Date().getMonth() + 1).padStart(2, '0'), year: String(new Date().getFullYear()),
     };
   });

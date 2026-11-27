@@ -14,18 +14,18 @@
       <dmAddressItems>
         <issueDate year="2026" month="11" day="06"/>
         <dmTitle>
-          <techName>Hydraulic pump</techName>
-          <infoName>Description of how it is made and its function</infoName>
+          <techName>Dummy equipment</techName>
+          <infoName>Dummy description of the equipment</infoName>
         </dmTitle>
       </dmAddressItems>
     </dmAddress>
     <dmStatus issueType="new">
       <security securityClassification="01"/>
       <responsiblePartnerCompany enterpriseCode="S1K01">
-        <enterpriseName>S1000D Studio Sample Data</enterpriseName>
+        <enterpriseName>Dummy Data Enterprise</enterpriseName>
       </responsiblePartnerCompany>
       <originator enterpriseCode="S1K01">
-        <enterpriseName>S1000D Studio Sample Data</enterpriseName>
+        <enterpriseName>Dummy Data Enterprise</enterpriseName>
       </originator>
       <applic>
         <displayText>
@@ -48,36 +48,36 @@
     <description>
       <levelledPara id="par-0001">
         <title>General</title>
-        <para>The engine-driven hydraulic pump (EDP) supplies the <emphasis emphasisType="em01">green hydraulic system</emphasis> with fluid at a nominal pressure of 3000 psi (206 bar). The pump is a variable displacement, pressure-compensated axial piston pump. Refer to <internalRef internalRefId="fig-0001" internalRefTargetType="irtt01"/> for the location of the components.</para>
-        <para>The pump has these main characteristics:</para>
+        <para>This is dummy text. The demonstration unit (DDU) supplies the <emphasis emphasisType="em01">dummy system A</emphasis> with dummy output at a nominal value of 100 units. The dummy unit is a placeholder assembly used only to show the layout. Refer to <internalRef internalRefId="fig-0001" internalRefTargetType="irtt01"/> for the location of the components.</para>
+        <para>The dummy unit has these dummy characteristics:</para>
         <para>
           <randomList>
             <listItem>
-              <para>Rated flow: 37 US gal/min at 3750 rpm</para>
+              <para>Dummy rating: 100 units at 1000 rpm</para>
             </listItem>
             <listItem>
-              <para>Case drain flow: less than 1.5 l/min</para>
+              <para>Dummy tolerance: less than 1.0 unit</para>
             </listItem>
             <listItem>
-              <para>Fluid: phosphate ester, type <emphasis emphasisType="em02">IV</emphasis></para>
+              <para>Dummy medium: sample grade, type <emphasis emphasisType="em02">IV</emphasis></para>
             </listItem>
           </randomList>
         </para>
         <note>
-          <notePara>The removal and installation procedure is given in <dmRef><dmRefIdent><dmCode modelIdentCode="S1KSTUDIO" systemDiffCode="A" systemCode="29" subSystemCode="1" subSubSystemCode="0" assyCode="00" disassyCode="00" disassyCodeVariant="A" infoCode="520" infoCodeVariant="A" itemLocationCode="A"/></dmRefIdent><dmRefAddressItems><dmTitle><techName>Hydraulic pump</techName><infoName>Remove procedure</infoName></dmTitle></dmRefAddressItems></dmRef>.</notePara>
+          <notePara>The dummy removal and installation procedure is given in <dmRef><dmRefIdent><dmCode modelIdentCode="S1KSTUDIO" systemDiffCode="A" systemCode="29" subSystemCode="1" subSubSystemCode="0" assyCode="00" disassyCode="00" disassyCodeVariant="A" infoCode="520" infoCodeVariant="A" itemLocationCode="A"/></dmRefIdent><dmRefAddressItems><dmTitle><techName>Dummy equipment</techName><infoName>Remove procedure</infoName></dmTitle></dmRefAddressItems></dmRef>.</notePara>
         </note>
       </levelledPara>
       <levelledPara id="par-0002">
         <title>Description</title>
         <levelledPara id="par-0003">
           <title>Components</title>
-          <para>The pump assembly has the components given in <internalRef internalRefId="tab-0001" internalRefTargetType="irtt02"/>.</para>
+          <para>The dummy assembly has the components given in <internalRef internalRefId="tab-0001" internalRefTargetType="irtt02"/>.</para>
           <figure id="fig-0001">
-            <title>Hydraulic pump - Component location</title>
+            <title>Dummy equipment - Component location</title>
             <graphic infoEntityIdent="ICN-S1KSTUDIO-A-291000-A-00001-00001-A-001-01"/>
           </figure>
           <table id="tab-0001" frame="all">
-            <title>Pump components</title>
+            <title>Dummy components</title>
             <tgroup cols="3">
               <colspec colname="col1" colwidth="1*"/>
               <colspec colname="col2" colwidth="3*"/>
@@ -92,26 +92,26 @@
               <tbody>
                 <row>
                   <entry colname="col1"><para>1</para></entry>
-                  <entry colname="col2"><para>Pressure compensator</para></entry>
-                  <entry colname="col3" morerows="1"><para>Controls the pump displacement</para></entry>
+                  <entry colname="col2"><para>Dummy component A</para></entry>
+                  <entry colname="col3" morerows="1"><para>Dummy function A</para></entry>
                 </row>
                 <row>
                   <entry colname="col1"><para>2</para></entry>
-                  <entry colname="col2"><para>Yoke and piston assembly</para></entry>
+                  <entry colname="col2"><para>Dummy component B</para></entry>
                 </row>
                 <row>
                   <entry colname="col1"><para>3</para></entry>
-                  <entry colname="col2"><para>Depressurization solenoid valve</para></entry>
-                  <entry colname="col3"><para>Off-loads the pump</para></entry>
+                  <entry colname="col2"><para>Dummy component C</para></entry>
+                  <entry colname="col3"><para>Dummy function C</para></entry>
                 </row>
                 <row>
                   <entry colname="col1"><para>4</para></entry>
-                  <entry namest="col2" nameend="col3"><para>Pressure outlet port with check valve</para></entry>
+                  <entry namest="col2" nameend="col3"><para>Dummy component D</para></entry>
                 </row>
                 <row>
                   <entry colname="col1"><para>5</para></entry>
-                  <entry colname="col2"><para>Case drain line</para></entry>
-                  <entry colname="col3"><para>Returns case flow to the reservoir</para></entry>
+                  <entry colname="col2"><para>Dummy component E</para></entry>
+                  <entry colname="col3"><para>Dummy function E</para></entry>
                 </row>
               </tbody>
             </tgroup>
@@ -120,45 +120,45 @@
         <levelledPara id="par-0004">
           <title>Operation</title>
           <warning>
-            <warningAndCautionPara>Do not touch the pump case during operation. The case temperature can be more than 100 °C and can cause burns.</warningAndCautionPara>
+            <warningAndCautionPara>Dummy warning: do not touch the dummy unit during operation. This sentence is sample data only.</warningAndCautionPara>
           </warning>
           <caution>
-            <warningAndCautionPara>Do not operate the pump without fluid. Operation without fluid causes damage to the pump in less than 30 seconds.</warningAndCautionPara>
+            <warningAndCautionPara>Dummy caution: do not operate the dummy unit without its dummy medium. This sentence is sample data only.</warningAndCautionPara>
           </caution>
-          <para>When the engine turns, the drive shaft turns the cylinder block. The pistons move in and out of their bores and supply fluid to the pressure port. The sequence of operation is:</para>
+          <para>This is dummy text that describes how the dummy unit operates. The dummy sequence of operation is:</para>
           <para>
             <sequentialList>
               <listItem>
-                <para>The compensator senses the outlet pressure.</para>
+                <para>Dummy step one is sensed.</para>
               </listItem>
               <listItem>
-                <para>When the pressure increases, the yoke angle decreases:</para>
+                <para>When dummy value X increases, dummy value Y decreases:</para>
                 <para>
                   <sequentialList>
                     <listItem>
-                      <para>the piston stroke becomes shorter,</para>
+                      <para>dummy effect one,</para>
                     </listItem>
                     <listItem>
-                      <para>the flow decreases.</para>
+                      <para>dummy effect two.</para>
                     </listItem>
                   </sequentialList>
                 </para>
               </listItem>
               <listItem>
-                <para>At full pressure the pump supplies only the internal leakage flow.</para>
+                <para>At the dummy limit the dummy unit gives only its minimum output.</para>
               </listItem>
             </sequentialList>
           </para>
-          <para>The output power is calculated with the formula P = p × Q, where p is the pressure in N/m<superScript>2</superScript> and Q is the flow in m<superScript>3</superScript>/s. The fluid temperature T<subScript>max</subScript> must not exceed 107 °C.</para>
-          <para>The pump status message on the maintenance display is:</para>
+          <para>The dummy result is calculated with the formula P = p × Q, where p is dummy value p in N/m<superScript>2</superScript> and Q is dummy value Q in m<superScript>3</superScript>/s. The dummy temperature T<subScript>max</subScript> must not exceed the dummy limit of 100 °C.</para>
+          <para>The dummy status message on the display is:</para>
           <para>
-            <verbatimText>HYD G EDP 1 PRESS LO</verbatimText>
+            <verbatimText>DUMMY UNIT 1 STATUS LOW</verbatimText>
           </para>
         </levelledPara>
       </levelledPara>
       <levelledPara id="par-0005">
         <title>Abbreviations</title>
-        <para>The <acronym><acronymTerm>EDP</acronymTerm><acronymDefinition>Engine-driven pump</acronymDefinition></acronym> is monitored by the <acronym><acronymTerm>HSMU</acronymTerm><acronymDefinition>Hydraulic system monitoring unit</acronymDefinition></acronym>. For the hydraulic system schematic, refer to <internalRef internalRefId="par-0004" internalRefTargetType="irtt07"/>.</para>
+        <para>The <acronym><acronymTerm>EDP</acronymTerm><acronymDefinition>Dummy demonstration unit</acronymDefinition></acronym> is monitored by the <acronym><acronymTerm>HSMU</acronymTerm><acronymDefinition>Dummy system monitoring unit</acronymDefinition></acronym>. For the dummy system diagram, refer to <internalRef internalRefId="par-0004" internalRefTargetType="irtt07"/>.</para>
       </levelledPara>
     </description>
   </content>

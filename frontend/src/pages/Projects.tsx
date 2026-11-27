@@ -46,7 +46,7 @@ export function Projects() {
             <option value="recent">Recently opened</option><option value="name">Name</option><option value="dms">Most data modules</option>
           </select>
           <BackupButton />
-          {role === 'admin' ? null : <><button className="btn" onClick={() => setImporting(true)} data-testid="import-as-open" title="Import a package of S1000D documents (or the older publishing tool's export), or a JSS / JSG document, as a new S1000D, JSS or JSG project"><Icon name="upload" />Import package</button><SampleButton onCreated={() => list.reload()} /><SampleButton kind="jsg" onCreated={() => list.reload()} /><SampleButton kind="jsg-ispl" onCreated={() => list.reload()} /><button className="btn btn-primary" onClick={() => setCreating(true)}><Icon name="plus" />New project</button></>}
+          {role === 'admin' ? null : <><button className="btn" onClick={() => setImporting(true)} data-testid="import-as-open" title="Import a package of S1000D documents (or the older publishing tool's export), or a JSS / JSG document, as a new S1000D, JSS or JSG project"><Icon name="upload" />Import package</button><SampleButton onCreated={() => list.reload()} /><SampleButton kind="jss-land" onCreated={() => list.reload()} /><SampleButton kind="jss-naval" onCreated={() => list.reload()} /><SampleButton kind="jsg" onCreated={() => list.reload()} /><SampleButton kind="jsg-ispl" onCreated={() => list.reload()} /><button className="btn btn-primary" onClick={() => setCreating(true)}><Icon name="plus" />New project</button></>}
         </div>
       </div>
 

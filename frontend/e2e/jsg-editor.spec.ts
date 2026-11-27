@@ -209,7 +209,7 @@ test('JSG sample and ancillary pages: create the sample from the button, tick pa
   lap('editor open');
   await expect(page.getByTestId('jsg-status')).toContainText('words');
   await page.getByRole('button', { name: /^Find and replace/ }).click();
-  await page.getByLabel('Find', { exact: true }).fill('Modular Bridge');
+  await page.getByLabel('Find', { exact: true }).fill('Demo Equipment');
   await expect(page.locator('.jsg-find .cnt')).toHaveText(/^1 of \d+$/);
   lap('found');
   await page.keyboard.press('Escape');

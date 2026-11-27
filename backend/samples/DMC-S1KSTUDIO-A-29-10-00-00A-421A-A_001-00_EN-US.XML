@@ -10,18 +10,18 @@
       <dmAddressItems>
         <issueDate year="2026" month="11" day="06"/>
         <dmTitle>
-          <techName>Hydraulic pump</techName>
-          <infoName>Fault isolation - Low pressure</infoName>
+          <techName>Dummy equipment</techName>
+          <infoName>Fault isolation - Dummy low value</infoName>
         </dmTitle>
       </dmAddressItems>
     </dmAddress>
     <dmStatus issueType="new">
       <security securityClassification="01"/>
       <responsiblePartnerCompany enterpriseCode="S1K01">
-        <enterpriseName>S1000D Studio Sample Data</enterpriseName>
+        <enterpriseName>Dummy Data Enterprise</enterpriseName>
       </responsiblePartnerCompany>
       <originator enterpriseCode="S1K01">
-        <enterpriseName>S1000D Studio Sample Data</enterpriseName>
+        <enterpriseName>Dummy Data Enterprise</enterpriseName>
       </originator>
       <applic>
         <displayText>
@@ -63,7 +63,7 @@
           </preliminaryRqmts>
           <isolationMainProcedure>
             <isolationStep id="isol-0001">
-              <action>Check the system indicator.</action>
+              <action>Check the dummy indicator.</action>
               <isolationStepQuestion>Is the indicator on?</isolationStepQuestion>
               <isolationStepAnswer>
                 <yesNoAnswer>
@@ -73,10 +73,10 @@
               </isolationStepAnswer>
             </isolationStep>
             <isolationProcedureEnd id="isol-end1">
-              <action>The system is serviceable.</action>
+              <action>The dummy system is serviceable.</action>
             </isolationProcedureEnd>
             <isolationProcedureEnd id="isol-end2">
-              <action>Replace the unit.</action>
+              <action>Replace the dummy unit.</action>
             </isolationProcedureEnd>
           </isolationMainProcedure>
           <closeRqmts>
