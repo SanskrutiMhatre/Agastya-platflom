@@ -53,6 +53,13 @@ export interface Config {
   limits: { maxUploadBytes: number; requestTimeoutMs: number; maxExpandedBytes: number; readyMinFreeBytes: number };
   /** WP-06: one server per data folder, unless a test harness opts out (AGASTYA_NO_WORKSPACE_LOCK=1). */
   workspaceLock: boolean;
+  /**
+   * WP-11 (decision D2): every content write must name the version it was made from (`baseHash` or If-Match). AGASTYA_BASEHASH_COMPAT=1 opens a
+   * compatibility window for an old script: a write without it is then accepted with a logged warning instead of refused with 428.
+   */
+  baseHashCompat: boolean;
+  /** WP-11 (RES-001): how long a check-out lease lasts unless it is renewed (AGASTYA_LEASE_MINUTES, default 60). */
+  leaseMinutes: number;
   /** The packaged launcher asks for a clean stop by closing standard input (AGASTYA_SHUTDOWN_ON_STDIN_CLOSE=1). */
   shutdownOnStdinClose: boolean;
   /** A pdfjs-dist folder to use for structure recovery before the bundled candidates (AGASTYA_PDFJS_DIR). */
@@ -230,6 +237,8 @@ export function buildConfig(env: Env = process.env): Config {
       readyMinFreeBytes: envPositive('AGASTYA_READY_MIN_FREE_BYTES', 256 * 1024 ** 2, env),
     },
     workspaceLock: env.AGASTYA_NO_WORKSPACE_LOCK !== '1',
+    baseHashCompat: env.AGASTYA_BASEHASH_COMPAT === '1',
+    leaseMinutes: envPositive('AGASTYA_LEASE_MINUTES', 60, env),
     shutdownOnStdinClose: env.AGASTYA_SHUTDOWN_ON_STDIN_CLOSE === '1',
     pdfjsDir: env.AGASTYA_PDFJS_DIR || undefined,
     initialAdmin: { INITIAL_ADMIN_USERNAME: env.INITIAL_ADMIN_USERNAME, INITIAL_ADMIN_PASSWORD: env.INITIAL_ADMIN_PASSWORD },

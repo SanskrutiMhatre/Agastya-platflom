@@ -16,7 +16,7 @@ import { resolveFormat, type ResolvedFormat } from './formats';
 import fs from 'fs';
 import path from 'path';
 import { config, nowIso, vendor } from '../config';
-import { store, registryDb, workspace, projectDirFor, workspaceDir, docIndex, audit, authz } from '../context';
+import { store, registryDb, workspace, projectDirFor, workspaceDir, docIndex, audit, authz, content } from '../context';
 import { documentCreator } from './documentCreators';
 import { bad, conflict, forbidden, notFound } from './http';
 import { removeReleasingRenderer } from './renderer';
@@ -212,7 +212,7 @@ export async function createProject(user: User, input: CreateProjectInput): Prom
   } else if (!fromId && fmt?.jsgType) {
     // a JSG document is authored as JSG XML (services/jsg), in its own file: no S1000D publication module
     documentCreator('jsg')(id, fmt.jsgType, { projectName: name.toUpperCase() });
-  } else if (!fromId && !fs.existsSync(pmFile)) fs.writeFileSync(pmFile, EMPTY_PM(name, profile ? chapterEntries(profile) : ''), 'utf8');
+  } else if (!fromId && !fs.existsSync(pmFile)) content.writeText(id, pmFile, EMPTY_PM(name, profile ? chapterEntries(profile) : ''));
   if (!fromId && cfgPatch?.mic && fs.existsSync(pmFile)) {
     // the publication module's own code: model code - issuer (the responsible partner) - number - volume, and the language and partner it names
     const rpcCode = String(cfgPatch.responsiblePartner?.code ?? '').toUpperCase(); const rpcName = String(cfgPatch.responsiblePartner?.name ?? '');
@@ -220,7 +220,7 @@ export async function createProject(user: User, input: CreateProjectInput): Prom
     pm = pm.replace('modelIdentCode="MODEL" pmIssuer="00000" pmNumber="00000"', `modelIdentCode="${String(cfgPatch.mic).toUpperCase()}" pmIssuer="${rpcCode || '00000'}" pmNumber="00001"`)
       .replace('<language countryIsoCode="IN" languageIsoCode="en"/>', `<language countryIsoCode="${String(cfgPatch.country ?? 'IN').toUpperCase()}" languageIsoCode="${String(cfgPatch.language ?? 'en').toLowerCase()}"/>`)
       .replace('<responsiblePartnerCompany enterpriseCode="00000"/>', rpcCode ? `<responsiblePartnerCompany enterpriseCode="${rpcCode}">${rpcName ? `<enterpriseName>${rpcName.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</enterpriseName>` : ''}</responsiblePartnerCompany>` : '<responsiblePartnerCompany enterpriseCode="00000"/>');
-    fs.writeFileSync(pmFile, pm, 'utf8');
+    content.writeText(id, pmFile, pm);
   }
   for (const sub of ['csdb', 'Media']) fs.mkdirSync(path.join(dir, sub), { recursive: true });
 

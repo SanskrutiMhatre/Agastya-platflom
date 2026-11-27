@@ -42,7 +42,8 @@ export interface DocEditorHandle {
 export interface DocAdapter<L extends DocLoaded> {
   kind: 'jss' | 'jsg';
   read(id: string): Promise<L>;
-  save(id: string, xml: string, hash: string): Promise<{ hash: string; report: DocReport }>;
+  /** WP-11: `merged` = the server merged this save with another author's changes to other parts (D22); `xml` is then the document now on the server. */
+  save(id: string, xml: string, hash: string): Promise<{ hash: string; report: DocReport; merged?: boolean; xml?: string }>;
   validate(id: string, xml: string): Promise<DocReport>;
   build(id: string): Promise<{ totalMs?: number; releaseLabel?: string | null }>;
   pdfUrl(id: string, download?: boolean): string;
@@ -102,6 +103,9 @@ export function useDocEditor<L extends DocLoaded>(ctx: ProjectCtx, adapter: DocA
       hashRef.current = out.hash; baseRef.current = xml; ed.markSaved(); void draft.clear(); setSavedAt(new Date()); setFailed(false); applyFindings(out.report.findings);
       if (adapter.reloadProject) ctx.reload();
       if (out.report.errors) toast(`Saved as a draft: ${out.report.errors} error${out.report.errors === 1 ? '' : 's'} to fix before a PDF can be built.`, 'info');
+      // WP-11 (D22): saved from an older version and merged on the server with another author's changes to other chapters or sections:
+      // the merged document is what is saved now, so the editor shows it (and the next save and a later merge start from it)
+      if (out.merged) { toast('Saved. Another author had changed other parts meanwhile; their changes are kept and shown now.', 'info'); await load(); }
       return true;
     } catch (e) {
       if (e instanceof ApiError && e.code === 'STALE_DOCUMENT') setStale(true); else { setFailed(true); toast(errText(e), 'error'); }

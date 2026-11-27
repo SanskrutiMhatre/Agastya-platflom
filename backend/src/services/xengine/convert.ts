@@ -14,7 +14,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { projectDirFor } from '../../context';
+import { projectDirFor, content } from '../../context';
 import { bad } from '../http';
 import { placeholderPng } from '../importer/png';
 import { applyImport } from '../importer/apply';
@@ -247,7 +247,7 @@ async function toJsg(user: User, hub: Hub, name: string, opts: TargetOpts): Prom
     if (hub.from === 's1000d') {
       const m = await mapS1000d(hub, hub.findings); doc = m.doc; close = m.close;
       fs.mkdirSync(media, { recursive: true });
-      for (const p of m.pictures) { const dest = path.join(media, p.media); if (path.relative(media, dest).startsWith('..')) continue; if (p.read) { fs.writeFileSync(dest, await p.read()); pictures++; } else if (p.placeholder !== undefined) fs.writeFileSync(dest, placeholderPng(p.placeholder)); }
+      for (const p of m.pictures) { const dest = path.join(media, p.media); if (path.relative(media, dest).startsWith('..')) continue; if (p.read) { content.writeBuffer(id, dest, await p.read()); pictures++; } else if (p.placeholder !== undefined) content.writeBuffer(id, dest, placeholderPng(p.placeholder)); }
     } else pictures = copyMedia(hub.mediaDir, media);
     const body = jsgBodyXml(doc!, hub.appendices, hub.findings);
     const xml = withJsgBody(readJsg(id).xml, body, doc!.meta);

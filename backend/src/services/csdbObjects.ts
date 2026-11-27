@@ -14,7 +14,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { projectDirFor } from '../context';
+import { projectDirFor, content } from '../context';
 import { csdbRel, readProjectJson } from './projects';
 import { bad, notFound } from './http';
 import { headOf } from './xmlHead';
@@ -128,18 +128,19 @@ export function listObjects(projectId: string, kind?: ObjectKind): ObjectSummary
   return out.sort((a, b) => a.file.localeCompare(b.file));
 }
 
-export function readObject(projectId: string, file: string): { file: string; xml: string } {
+export function readObject(projectId: string, file: string): { file: string; xml: string; hash: string } {
   const abs = resolveObjectFile(projectId, file);
   if (!fs.existsSync(abs)) throw notFound('No such CSDB object.');
-  return { file, xml: fs.readFileSync(abs, 'utf8') };
+  const xml = fs.readFileSync(abs, 'utf8');
+  return { file, xml, hash: sha(xml) };            // hash: the version a save names (WP-11)
 }
 
 // ── Writing ─────────────────────────────────────────────────────────────────
 
 import { checkXmlSafetyOf, contentCheck } from './csdbGuard';
-import { cut, sha } from './csdb';
-import { docIndex } from '../context';
-import { nowIso } from '../config';
+import { sha } from './csdbIndex';
+import { saveRevisioned, withDocumentLock } from './projectFiles';
+import { conflict } from './http';
 import { readAttrs as attrs } from './xmlHead';
 
 export interface ObjectActor { id: string; username: string; role?: string }
@@ -157,19 +158,20 @@ export function validateObject(file: string, xml: string, lenient = false): Obje
   return kind;
 }
 
-export async function writeObject(projectId: string, file: string, xml: string, actor: ObjectActor, opts: { overwrite?: boolean; lenient?: boolean } = {}) {
+/** `baseHash` (mandatory on the PUT route, WP-11 FE-008): the version the editor loaded; a newer file refuses the save (409 EDIT_CONFLICT). */
+export async function writeObject(projectId: string, file: string, xml: string, actor: ObjectActor, opts: { overwrite?: boolean; lenient?: boolean; baseHash?: string } = {}) {
   const abs = resolveObjectFile(projectId, file);
   validateObject(file, xml, opts.lenient);
-  const existed = fs.existsSync(abs);
-  if (existed && !opts.overwrite) throw bad(`${file} already exists in this project.`, 'ALREADY_EXISTS');
-  fs.mkdirSync(path.dirname(abs), { recursive: true });
-  fs.writeFileSync(abs, xml, 'utf8');
-  try {
-    const rel = `${csdbRel(readProjectJson(projectId))}/${file}`;
-    await docIndex.syncProject(projectId, projectDirFor(projectId), nowIso());
-    await cut(projectId, rel, xml, actor, existed ? 'save' : 'create');
-  } catch (e) { console.error('[csdb-objects] history not recorded:', (e as Error).message); }
-  return { file, hash: sha(xml), created: !existed };
+  return withDocumentLock(`${projectId}:${abs}`, async () => {
+    const existed = fs.existsSync(abs);
+    if (existed && !opts.overwrite) throw bad(`${file} already exists in this project.`, 'ALREADY_EXISTS');
+    if (existed && opts.baseHash !== undefined) {
+      const current = fs.readFileSync(abs, 'utf8');
+      if (sha(current) !== opts.baseHash) throw conflict('This object was changed by someone else since you opened it.', 'EDIT_CONFLICT', { currentHash: sha(current) });
+    }
+    await saveRevisioned(projectId, abs, xml, actor, existed ? 'save' : 'create');   // WP-11: revision first, then the atomic write; a history failure refuses the save
+    return { file, hash: sha(xml), created: !existed };
+  });
 }
 
 export function deleteObject(projectId: string, file: string): void {

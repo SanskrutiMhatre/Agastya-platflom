@@ -16,7 +16,7 @@
 import type { Express, RequestHandler } from 'express';
 import fs from 'fs';
 import path from 'path';
-import multer from 'multer';
+import { cappedDiskUpload, uploadedBytes, discardWhenDone } from '../services/uploads';
 import { requireProject, audit, projectDirFor } from '../context';
 import { wrap, bad, notFound, HttpError } from '../services/http';
 import * as csdb from '../services/csdb';
@@ -36,17 +36,19 @@ import { REPAIR_RULES, type PackageEntry, type RepairRuleId } from '../services/
 
 /** A package is many files (the Xignal sample is 710, mostly graphics) - far more than the data module import's 1000-file cap allows for. */
 export const MAX_PACKAGE_FILES = 5000;
-/** One upload, all files together. The platform holds it in memory while it works, so the ceiling is explicit. */
+/** One upload, all files together: checked while it streams to disk (WP-11). The analysis still reads the files into memory, so the ceiling stays explicit. */
 export const MAX_PACKAGE_BYTES = 1024 * 1024 * 1024;
 const MAX_FILE_BYTES = 512 * 1024 * 1024;
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX_FILE_BYTES, files: MAX_PACKAGE_FILES } });
+// WP-11 (REL-007, PERF-010): the files stream to disk and the whole request is capped while it arrives (uploads.ts), never buffered in memory first.
+const upload = cappedDiskUpload({ fileSize: MAX_FILE_BYTES, files: MAX_PACKAGE_FILES, totalBytes: MAX_PACKAGE_BYTES });
 const packageUpload: RequestHandler = (req, res, next) => {
   upload.array('files', MAX_PACKAGE_FILES)(req, res, (err: unknown) => {
-    if (!err) return next();
+    if (!err) { discardWhenDone(req, res); return next(); }
     const code = (err as { code?: string }).code;
     if (code === 'LIMIT_UNEXPECTED_FILE' || code === 'LIMIT_FILE_COUNT') return res.status(413).json({ error: `Too many files: one import takes at most ${MAX_PACKAGE_FILES}. Send the package as a zip, or in parts.`, code: 'TOO_MANY_FILES', max: MAX_PACKAGE_FILES });
     if (code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: `A file is larger than the ${MAX_FILE_BYTES / 1024 / 1024} MB limit.`, code: 'FILE_TOO_LARGE' });
+    if (code === 'LIMIT_TOTAL_SIZE') return res.status(413).json({ error: `The upload is larger than ${MAX_PACKAGE_BYTES / 1048576} MB in total; one import takes at most that.`, code: 'UPLOAD_TOO_LARGE' });
     return next(err);
   });
 };
@@ -97,7 +99,7 @@ export function entriesFromUpload(files: Express.Multer.File[], body: Record<str
   else if (Array.isArray(raw)) paths = raw;
   const total = files.reduce((n, f) => n + f.size, 0);
   if (total > MAX_PACKAGE_BYTES) throw new HttpError(413, `The upload is ${(total / 1048576).toFixed(0)} MB; one import takes at most ${MAX_PACKAGE_BYTES / 1048576} MB.`, 'UPLOAD_TOO_LARGE');
-  return files.map((f, i) => ({ name: typeof paths[i] === 'string' && paths[i] ? String(paths[i]) : f.originalname, bytes: f.buffer }));
+  return files.map((f, i) => ({ name: typeof paths[i] === 'string' && paths[i] ? String(paths[i]) : f.originalname, bytes: uploadedBytes(f) }));
 }
 
 export function registerImporterRoutes(app: Express): void {

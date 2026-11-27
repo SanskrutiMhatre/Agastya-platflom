@@ -83,7 +83,7 @@ test('validation: a resolvable externalized reference is clean; a broken one is 
   assert.deepEqual(p.filter((x) => /EXT-REF|REFID/.test(x.code)), [], JSON.stringify(p));
 
   const bad = USER('', 'app-NOPE').replace('<description>', '<description>').replace(/t10040/, 'x');
-  await w.put(`${URL()}/dms/${FILE('10', '040')}`, { xml: bad });
+  await w.put(`${URL()}/dms/${FILE('10', '040')}`, { xml: bad, baseHash: (await w.get(`${URL()}/dms/${FILE('10', '040')}`)).json.hash });
   p = (await w.get(`${URL()}/applicability/validate`)).json.problems;
   const ext = p.filter((x) => x.code === 'APPLIC-EXT-REF');
   assert.equal(ext.length, 1); assert.equal(ext[0].severity, 'error');

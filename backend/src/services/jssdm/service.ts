@@ -10,7 +10,7 @@
 import fs from 'fs';
 import path from 'path';
 import { nowIso } from '../../config';
-import { projectDirFor, workspaceDir } from '../../context';
+import { projectDirFor, workspaceDir, content } from '../../context';
 import { bad } from '../http';
 import { readProjectJson, updateProjectJson, csdbRel, mediaRel } from '../projects';
 import { assertS1000dPublication } from '../projectRecord';
@@ -252,12 +252,12 @@ function mergeFrontMatterIntoPm(projectId: string, gen: GenerateResult, writtenF
     const want = pmc.countEntries(merged);
     if (check.total !== want.total) throw new Error('Internal check failed: the merged publication does not read back identically. Nothing was written.');
     fs.copyFileSync(abs, abs + '.bak');
-    fs.writeFileSync(abs, xml, 'utf8');
+    content.writeText(projectId, abs, xml);
     return { action: 'merged', backup: path.basename(abs) + '.bak', entries: check };
   }
   const meta = defaultPmMeta(gen.pmMeta.pmTitle || pj.name || 'Publication', { ...gen.pmMeta });
   const xml = buildPmXml([folder], meta);
-  fs.writeFileSync(abs, xml, 'utf8');
+  content.writeText(projectId, abs, xml);
   return { action: 'created', backup: null, entries: pmc.countEntries(pmc.parsePm(xml).entries) };
 }
 

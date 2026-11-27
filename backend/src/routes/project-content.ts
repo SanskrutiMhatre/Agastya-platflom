@@ -14,9 +14,9 @@ import { placeNewDm } from '../services/pm';
 import type { Express, RequestHandler } from 'express';
 import fs from 'fs';
 import path from 'path';
-import multer from 'multer';
+import { cappedDiskUpload, discardWhenDone, uploadedBytes } from '../services/uploads';
 import { nowIso, vendor } from '../config';
-import { requireProject, requireAdmin, store, audit, projectDirFor, workspaceDir, docIndex, authz, securityPolicy } from '../context';
+import { requireProject, requireAdmin, store, audit, projectDirFor, workspaceDir, docIndex, authz, securityPolicy, content } from '../context';
 import { headOf, rootStart } from '../services/xmlHead';
 import { wrap, param, bad, notFound, forbidden, conflict, HttpError } from '../services/http';
 import { pageRequest, searchText, windowOf } from '../services/paging';
@@ -37,20 +37,36 @@ import * as publisher from '../services/publisher';
 import { assertPublishable } from '../services/publishGate';
 import { readProjectJson, updateProjectJson, csdbRel, mediaRel, isCirProject, assertNotCir, PROTECTED_PROJECT_KEYS, unsafeInputFields, sameSetting, unsafeArtwork } from '../services/projects';
 import * as cir from '../services/cir';
+import * as leases from '../services/leases';
+import { versionGuard } from '../services/versionGuard';
+import { writeFileAtomic } from '../storage/atomicWrite';
+import { mayBreak } from './documentHistory';
 import { notify, approversOf, adminIds } from '../services/notifications';
 
 const { CATALOGUE } = vendor('engine/frontMatterPages');
+// WP-11 (REL-007, PERF-010): uploads stream to disk with a cap on each file and on the whole request; the files are removed when the response is over.
+const MAX_IMPORT_TOTAL = 1024 * 1024 * 1024;
 const IMAGE_EXT = /\.(png|jpe?g|gif|svg|bmp|webp)$/i;
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 64 * 1024 * 1024 } });
 
 /** Most data modules one import request may carry. A bigger set is imported in batches. */
 export const MAX_IMPORT_FILES = 1000;
+const upload = cappedDiskUpload({ fileSize: 64 * 1024 * 1024, files: MAX_IMPORT_FILES, totalBytes: MAX_IMPORT_TOTAL });
+/** One file (a picture, a publication module). */
+const singleUpload: RequestHandler = (req, res, next) => {
+  upload.single('file')(req, res, (err: unknown) => {
+    if (!err) { discardWhenDone(req, res); return next(); }
+    const code = (err as { code?: string }).code;
+    if (code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'The file is larger than the 64 MB limit.', code: 'FILE_TOO_LARGE' });
+    return next(err);
+  });
+};
 /** Multer's own errors (too many files, a file too large) are the sender's mistake: say what is wrong instead of a bare 500. */
 const importUpload: RequestHandler = (req, res, next) => {
   upload.array('files', MAX_IMPORT_FILES)(req, res, (err: unknown) => {
-    if (!err) return next();
+    if (!err) { discardWhenDone(req, res); return next(); }
     const code = (err as { code?: string }).code;
-    if (code === 'LIMIT_UNEXPECTED_FILE') return res.status(413).json({ error: `Too many files: one import takes at most ${MAX_IMPORT_FILES}. Select fewer files (for example, import in batches).`, code: 'TOO_MANY_FILES', max: MAX_IMPORT_FILES });
+    if (code === 'LIMIT_TOTAL_SIZE') return res.status(413).json({ error: `The files are larger than ${MAX_IMPORT_TOTAL / 1048576} MB together. Import them in batches.`, code: 'UPLOAD_TOO_LARGE' });
+    if (code === 'LIMIT_UNEXPECTED_FILE' || code === 'LIMIT_FILE_COUNT') return res.status(413).json({ error: `Too many files: one import takes at most ${MAX_IMPORT_FILES}. Select fewer files (for example, import in batches).`, code: 'TOO_MANY_FILES', max: MAX_IMPORT_FILES });
     if (code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'A file is larger than the 64 MB limit.', code: 'FILE_TOO_LARGE' });
     return next(err);
   });
@@ -86,9 +102,9 @@ export function registerProjectContentRoutes(app: Express): void {
 
   app.get(`${base}/dms/:file`, view('viewer'), wrap((req, res) => { res.json(csdb.readDm(req.project.id, param(req, 'file'))); }));
 
-  app.put(`${base}/dms/:file`, view('editor', 'dm.write'), wrap(async (req, res) => {
+  app.put(`${base}/dms/:file`, view('editor', 'dm.write'), versionGuard('data module'), wrap(async (req, res) => {
     cir.assertNotLinked(req.project.id, param(req, 'file'));                        // a linked copy is changed in the repository, not here
-    const out = await csdb.writeDm(req.project.id, param(req, 'file'), String(req.body?.xml ?? ''), req.body?.baseHash, actor(req), req.project.role);
+    const out = await csdb.writeDm(req.project.id, param(req, 'file'), String(req.body?.xml ?? ''), res.locals.baseHash, actor(req), req.project.role);
     if (isCirProject(req.project.id)) await cir.announceChange(out.file, actor(req));    // projects that link this module are told an update is available
     log(req, 'dm.saved', { file: out.file });
     res.json(out);
@@ -114,6 +130,30 @@ export function registerProjectContentRoutes(app: Express): void {
   app.get(`${base}/dms/:file/history/:rev`, view('viewer'), wrap((req, res) => {
     res.json({ xml: csdb.revisionContent(req.project.id, param(req, 'file'), Number(param(req, 'rev'))) });
   }));
+  // WP-11: restore a previous version (saved as the newest revision, guarded like a save), and check-out leases (RES-001, ENT-016)
+  app.post(`${base}/dms/:file/history/:rev/restore`, view('editor', 'dm.write'), versionGuard('data module'), wrap(async (req, res) => {
+    cir.assertNotLinked(req.project.id, param(req, 'file'));
+    const rev = Number(param(req, 'rev'));
+    const xml = csdb.revisionContent(req.project.id, param(req, 'file'), rev);
+    const out = await csdb.writeDm(req.project.id, param(req, 'file'), xml, res.locals.baseHash, actor(req), req.project.role, true);
+    log(req, 'dm.restored', { file: out.file, revision: rev });
+    res.json(out);
+  }));
+  const dmRel = (projectId: string, file: string): string => { csdb.resolveDmFile(projectId, file); return `${csdbRel(readProjectJson(projectId))}/${file}`; };
+  app.get(`${base}/dms/:file/checkout`, view('viewer'), wrap(async (req, res) => { res.json({ leases: await leases.leasesOf(req.project.id, dmRel(req.project.id, param(req, 'file')), req.auth.user.id) }); }));
+  app.post(`${base}/dms/:file/checkout`, view('editor', 'dm.write'), wrap(async (req, res) => {
+    const lease = await leases.checkOut(req.project.id, dmRel(req.project.id, param(req, 'file')), '', actor(req));
+    log(req, 'dm.checked-out', { file: param(req, 'file'), expiresAt: lease.expiresAt });
+    res.json({ lease });
+  }));
+  app.delete(`${base}/dms/:file/checkout`, view('editor', 'dm.write'), wrap(async (req, res) => {
+    const breakIt = req.query.break === '1';
+    if (breakIt && !mayBreak(req)) throw forbidden('Only a project owner, a manager or an administrator can break another author\'s check-out.', 'BREAK_NOT_ALLOWED');
+    const out = await leases.checkIn(req.project.id, dmRel(req.project.id, param(req, 'file')), '', actor(req), breakIt);
+    if (out.released) log(req, breakIt ? 'dm.checkout-broken' : 'dm.checked-in', { file: param(req, 'file'), holder: out.holder });
+    res.json(out);
+  }));
+  app.get(`${base}/checkouts`, view('viewer'), wrap((req, res) => { res.json({ leases: leases.projectLeases(req.project.id, req.auth.user.id) }); }));
 
   // Lock: only a project owner may then edit the module.
   app.post(`${base}/dms/:file/lock`, view('owner', 'doc.lock'), wrap(async (req, res) => {
@@ -159,7 +199,7 @@ export function registerProjectContentRoutes(app: Express): void {
       let name = path.basename(f.originalname).replace(/[^\w.\- ]/g, '_');
       if (!csdb.DM_FILE_RE.test(name)) { problems.push(`${f.originalname}: data module files are named DMC-<code>.xml`); continue; }
       if (!overwrite && fs.existsSync(csdb.resolveDmFile(req.project.id, name))) { problems.push(`${name}: already exists in this project`); continue; }
-      let xml = f.buffer.toString('utf8');
+      let xml = uploadedBytes(f).toString('utf8');
       const ownMic = (csdb.parseIdent(headOf(xml), name).dmc.split('-')[0] ?? '').toUpperCase();
       const isForeign = !!projectMic && !!ownMic && ownMic !== projectMic;
       if (isForeign && otherModel === 'recode') {
@@ -197,7 +237,7 @@ export function registerProjectContentRoutes(app: Express): void {
     if (!abs) throw notFound();
     res.sendFile(abs);
   }));
-  app.post(`${base}/media`, view('editor', 'graphics.write'), upload.single('file'), wrap((req, res) => {
+  app.post(`${base}/media`, view('editor', 'graphics.write'), singleUpload, wrap((req, res) => {
     if (!req.file) throw bad('No file uploaded.');
     const safe = path.basename(req.file.originalname).replace(/[^\w.\- ]/g, '_');
     if (!IMAGE_EXT.test(safe)) throw bad('Unsupported image type.');
@@ -206,7 +246,7 @@ export function registerProjectContentRoutes(app: Express): void {
     const target = req.body?.dir === 'csdb' ? csdbRel(pj) : mediaRel(pj);
     const dir = path.join(projectDirFor(req.project.id), target);
     fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, safe), req.file.buffer);
+    content.writeBuffer(req.project.id, path.join(dir, safe), uploadedBytes(req.file));
     log(req, 'media.uploaded', { name: safe, dir: target });
     res.json({ ok: true, name: safe, path: `${target}/${safe}` });
   }));
@@ -216,19 +256,20 @@ export function registerProjectContentRoutes(app: Express): void {
 
   app.get(`${base}/pmc`, view('viewer'), wrap((req, res) => {
     const { meta, entries, warnings, counts, pool } = pm.readPm(req.project.id);
-    res.json({ meta, entries, warnings, counts, pool });
+    const abs = pm.pmPath(req.project.id);
+    res.json({ meta, entries, warnings, counts, pool, hash: fs.existsSync(abs) ? csdb.sha(fs.readFileSync(abs, 'utf8')) : null });     // hash: the version a save names (WP-11)
   }));
 
-  app.put(`${base}/pmc`, view('editor', 'pm.write'), wrap((req, res) => {
-    const out = pm.writePm(req.project.id, { meta: req.body?.meta, entries: req.body?.entries }, req.query.allowEmpty === '1');
+  app.put(`${base}/pmc`, view('editor', 'pm.write'), versionGuard('publication'), wrap((req, res) => {
+    const out = pm.writePm(req.project.id, { meta: req.body?.meta, entries: req.body?.entries }, req.query.allowEmpty === '1', res.locals.baseHash);
     log(req, 'pm.saved', out.counts);
     res.json(out);
   }));
 
   // Replace the publication module with an uploaded file (kept as .bak). Parsed before anything is written.
-  app.post(`${base}/pmc/import`, view('editor', 'pm.write'), upload.single('file'), wrap((req, res) => {
+  app.post(`${base}/pmc/import`, view('editor', 'pm.write'), singleUpload, wrap((req, res) => {
     if (!req.file) throw bad('No file uploaded.');
-    const text = req.file.buffer.toString('utf8');
+    const text = uploadedBytes(req.file).toString('utf8');
     if (rootStart(text, 'pm') < 0) throw bad('That is not a publication module (no <pm> root element) - was a data module or the PDF picked by mistake?', 'NOT_A_PM');
     const guard = require('../core/auth/xmlGuard').checkXmlSafety(text);
     if (!guard.ok) throw bad(guard.error, 'UNSAFE_XML');
@@ -237,7 +278,7 @@ export function registerProjectContentRoutes(app: Express): void {
     assertS1000dPublication(req.project.id);                           // WP-16 (PUB-022): refused by the writer itself, not only by routes/jss-guard.ts
     const abs = pm.pmPath(req.project.id);
     if (fs.existsSync(abs)) fs.copyFileSync(abs, abs + '.bak');
-    fs.writeFileSync(abs, text, 'utf8');
+    content.writeText(req.project.id, abs, text);
     const ex = pm.explore(req.project.id);
     log(req, 'pm.imported', ex.counts);
     res.json({ counts: ex.counts, warnings: ex.warnings, backup: path.basename(abs) + '.bak', missingModules: ex.missing });
@@ -435,19 +476,21 @@ export function registerProjectContentRoutes(app: Express): void {
     let house: any = {};
     try { house = JSON.parse(fs.readFileSync(path.join(tdir, `${ref}.house.json`), 'utf8')); } catch { /* falls back to stylesheet defaults */ }
     const templates = fs.existsSync(tdir) ? fs.readdirSync(tdir).filter((f) => /\.house\.json$/i.test(f)).map((f) => f.replace(/\.house\.json$/i, '')).sort() : [];
-    res.json({
+    res.json({ version: settingsVersion(req.project.id),     // the version a save names (WP-11, FE-008)
       projectId: req.project.id, templateRef: ref, house, project, templates,
       canEditHouse: req.project.role === 'owner' || req.project.role === 'manager' || req.auth.user.role === 'admin',
       frontMatterCatalogue: CATALOGUE.map((p: any) => ({ id: p.id, label: p.label, title: p.title, generated: !!p.generated, required: !!p.required })),
     });
   }));
 
-  app.put(`${base}/settings`, view('editor', 'settings.write'), wrap((req, res) => {
+  app.put(`${base}/settings`, view('editor', 'settings.write'), versionGuard('settings'), wrap((req, res) => {
     const { house, project } = req.body ?? {};
     if (!house && !project) throw bad('Nothing to save.');
     const current = readProjectJson(req.project.id);
     const ref = project?.templateRef || current.templateRef || 'default';
     if (!/^[\w.-]+$/.test(ref)) throw bad('Bad template name.');
+    // WP-11 (FE-008): the settings (the project file and its house template) are saved only over the version the editor loaded
+    if (res.locals.baseHash !== undefined && res.locals.baseHash !== settingsVersion(req.project.id)) throw conflict('The settings were changed by someone else since you opened them. Reload to see their changes.', 'EDIT_CONFLICT', { currentVersion: settingsVersion(req.project.id) });
 
     if (house) {
       // The house template is shared by every project that uses it, so changing it is the owner's call.
@@ -457,7 +500,7 @@ export function registerProjectContentRoutes(app: Express): void {
       const tdir = path.join(workspaceDir, 'templates');
       fs.mkdirSync(tdir, { recursive: true });
       if (!house.id) house.id = ref;
-      fs.writeFileSync(path.join(tdir, `${ref}.house.json`), JSON.stringify(house, null, 2) + '\n', 'utf8');
+      writeFileAtomic(path.join(tdir, `${ref}.house.json`), JSON.stringify(house, null, 2) + '\n');
     }
     if (project) {
       if (typeof project !== 'object' || Array.isArray(project)) throw bad('The project settings must be an object.');
@@ -482,8 +525,22 @@ export function registerProjectContentRoutes(app: Express): void {
       });
     }
     log(req, 'settings.saved', { house: !!house, project: !!project });
-    res.json({ ok: true, templateRef: ref });
+    res.json({ ok: true, templateRef: ref, version: settingsVersion(req.project.id) });
   }));
 
   void authz;
+}
+
+/**
+ * The version of a project's settings (WP-11, FE-008): the project file and the house template it uses, hashed together. The settings
+ * screen loads it with the settings and names it when it saves; a change by anyone else in between (also to the shared house template
+ * from another project) makes the save a conflict instead of a silent overwrite.
+ */
+export function settingsVersion(projectId: string): string {
+  const read = (p: string): string => { try { return fs.readFileSync(p, 'utf8'); } catch { return ''; } };
+  const pjText = read(content.pathOf(projectId, 'project.json'));
+  let ref = 'default';
+  try { ref = String(JSON.parse(pjText).templateRef || 'default'); } catch { /* default */ }
+  const house = /^[\w.-]+$/.test(ref) ? read(path.join(workspaceDir, 'templates', `${ref}.house.json`)) : '';
+  return csdb.sha(`${csdb.sha(pjText)}:${csdb.sha(house)}`);
 }

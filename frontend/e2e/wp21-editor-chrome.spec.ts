@@ -196,9 +196,10 @@ test('a refused JSS save can be compared and merged: both changes kept, checked,
     const purpose = page.getByTestId('jss-paper').locator('.jss-sec').filter({ has: page.locator('.jss-sec-title', { hasText: 'Purpose' }) });
     await purpose.locator('.jss-para, .jss-empty').first().click(); await page.keyboard.press('End'); await page.keyboard.type(' MINE-MERGE');
     await expect(page.getByTestId('jss-state')).toHaveText(/Unsaved changes/);
-    // someone else saves meanwhile, far from the author's change (before the document's last section ends)
+    // someone else saves meanwhile, in the same chapter but another section (Features, after Purpose). WP-11 (D22): the server merges saves
+    // that touch different chapters by itself, so the refusal - and this compare-and-merge - is for two changes in one chapter.
     const cur = await (await author.api.get(`/api/projects/${ids.jss}/jss`)).json();
-    const xml = cur.xml as string; const at = xml.lastIndexOf('</section>'); expect(at).toBeGreaterThan(0);
+    const xml = cur.xml as string; const at = xml.indexOf('</section>', xml.indexOf('>Features<')); expect(xml.indexOf('>Features<')).toBeGreaterThan(0); expect(at).toBeGreaterThan(0);
     expect((await author.api.put(`/api/projects/${ids.jss}/jss`, { data: { xml: `${xml.slice(0, at)}<para>THEIRS-MERGE</para>${xml.slice(at)}`, baseHash: cur.hash } })).ok()).toBeTruthy();
     await page.getByTestId('jss-save').click();
     await expect(page.getByTestId('jss-conflict')).toBeVisible({ timeout: 15_000 });

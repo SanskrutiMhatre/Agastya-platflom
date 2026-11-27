@@ -4,14 +4,25 @@
 // needs the right to write data modules in that project.
 // =============================================================================
 
-import type { Express } from 'express';
-import multer from 'multer';
+import type { Express, RequestHandler } from 'express';
+import { cappedDiskUpload, discardWhenDone, uploadedBytes } from '../services/uploads';
 import { audit, authz, requireAuth } from '../context';
 import { wrap, param, bad, notFound } from '../services/http';
 import * as cir from '../services/cir';
 import { requireProject } from '../context';
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 16 * 1024 * 1024 } });
+// WP-11 (PLT-021, REL-007): the files stream to disk, at most 100 of 16 MB and 256 MB together, and are removed when the response is over.
+const upload = cappedDiskUpload({ fileSize: 16 * 1024 * 1024, files: 100, totalBytes: 256 * 1024 * 1024 });
+const cirUpload: RequestHandler = (req, res, next) => {
+  upload.array('files', 100)(req, res, (err: unknown) => {
+    if (!err) { discardWhenDone(req, res); return next(); }
+    const code = (err as { code?: string }).code;
+    if (code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'A file is larger than the 16 MB limit.', code: 'FILE_TOO_LARGE' });
+    if (code === 'LIMIT_TOTAL_SIZE') return res.status(413).json({ error: 'The files are larger than 256 MB together. Add them in batches.', code: 'UPLOAD_TOO_LARGE' });
+    if (code === 'LIMIT_UNEXPECTED_FILE' || code === 'LIMIT_FILE_COUNT') return res.status(413).json({ error: 'Too many files: add at most 100 at a time.', code: 'TOO_MANY_FILES', max: 100 });
+    return next(err);
+  });
+};
 
 export function registerCirRoutes(app: Express): void {
   const who = (req: any) => ({ id: req.auth.user.id, username: req.auth.user.username, role: req.auth.user.role });
@@ -23,9 +34,15 @@ export function registerCirRoutes(app: Express): void {
 
   app.get('/api/cir/:id', requireAuth(), wrap(async (req, res) => { res.json(await cir.read(param(req, 'id'))); }));
 
-  app.post('/api/cir', requireAuth(), upload.array('files', 100), wrap(async (req, res) => {
-    const files = ((req as any).files as Express.Multer.File[] ?? []).map((f) => ({ name: f.originalname, xml: f.buffer.toString('utf8') }));
-    const added = await cir.add(who(req), files, String(req.body?.note ?? ''));
+  // WP-11: a replacement names the current versions in `baseHashes` (a JSON object, file -> hash); see cir.add
+  app.post('/api/cir', requireAuth(), cirUpload, wrap(async (req, res) => {
+    const files = ((req as any).files as Express.Multer.File[] ?? []).map((f) => ({ name: f.originalname, xml: uploadedBytes(f).toString('utf8') }));
+    let baseHashes: Record<string, string> = {};
+    if (typeof req.body?.baseHashes === 'string' && req.body.baseHashes.trim()) {
+      try { const parsed: unknown = JSON.parse(req.body.baseHashes); if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) baseHashes = Object.fromEntries(Object.entries(parsed).filter(([, v]) => typeof v === 'string')) as Record<string, string>; }
+      catch { throw bad('`baseHashes` must be a JSON object of file name -> hash.', 'BAD_BODY'); }
+    }
+    const added = await cir.add(who(req), files, String(req.body?.note ?? ''), baseHashes);
     log(req, 'cir.added', { files: added.map((a: any) => a.file) });
     for (const a of added) await cir.announceChange(a.file, who(req));
     res.status(201).json({ added });

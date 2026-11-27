@@ -18,8 +18,9 @@ import {
   type ActivityRepository, type CirLinkRepository, type ExtensionRepository, type LifecycleRepository,
 } from './s1000dRecords';
 import { SqliteRetentionRepository, type RetentionRepository } from './retentionRepository';
+import { SqliteLeaseRepository, type LeaseRepository, type LeaseRow } from './leaseRepository';
 
-export type { ProjectRegistry, SnsRepository, ProjectConfigRepository, ReferenceRepository, ActivityRepository, CirLinkRepository, ExtensionRepository, LifecycleRepository, RetentionRepository, UnitOfWork };
+export type { ProjectRegistry, SnsRepository, ProjectConfigRepository, ReferenceRepository, ActivityRepository, CirLinkRepository, ExtensionRepository, LifecycleRepository, RetentionRepository, UnitOfWork, LeaseRepository, LeaseRow };
 
 export interface Repositories extends UnitOfWork {
   /** The engine behind these repositories ('sqlite'); a contract test and the migration runner use it to pick a dialect. */
@@ -36,6 +37,8 @@ export interface Repositories extends UnitOfWork {
   lifecycle: LifecycleRepository;
   extensions: ExtensionRepository;
   activity: ActivityRepository;
+  /** Check-out leases of documents and document parts (WP-11). */
+  leases: LeaseRepository;
   /** WP-12 (PLT-007, ENT-015): housekeeping rows past their retention. */
   retention: RetentionRepository;
 }
@@ -56,6 +59,7 @@ export function createSqliteRepositories(db: SqlDatabase): Repositories {
     lifecycle: new SqliteLifecycleRepository(db),
     extensions: new SqliteExtensionRepository(db),
     activity: new SqliteActivityRepository(db),
+    leases: new SqliteLeaseRepository(db),
     retention: new SqliteRetentionRepository(db),
   };
 }

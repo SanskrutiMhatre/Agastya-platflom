@@ -1059,6 +1059,99 @@ requests / 730 d audit (archived to a gzip file first); all are settings, 0 = of
 * Not done: the end-to-end acceptance "full 100-module publish at most 40 s" was not measured through the server (the FO stage it was
   dominated by is now under 1 s); a re-check on a newer libxslt if the toolchain changes.
 
+## Phase 2
+
+### WP-11 File integrity: atomic writes, history, mandatory version guards and check-out for all formats (REL-001, PLT-009, ARC-001, PUB-007, PUB-010, DEP-016, ENT-016, REL-002, PLT-020, PLT-021, REL-007, PERF-010, RES-001, FE-008, SEC-017; PUB-029 and PUB-021 not done) - done in part (see limits)
+
+Decisions taken from the audit (no owner question):
+* **D2 (compatibility window).** The audit recommends one release with a logged warning, then refusal. Taken as: the guard **refuses
+  by default** (428 `BASE_HASH_REQUIRED`), because the phase-2 exit asks for a mandatory guard and every client in this repository
+  (web screens, Studio, e2e specs, backend tests) now sends the hash. `AGASTYA_BASEHASH_COMPAT=1` is the window: a write without the
+  hash goes through with a `[version-guard]` warning in the log, for scripts outside the repository.
+* **D22 (lock granularity).** Taken as assumed: per chapter (JSS `<chapter>`) and per section (JSG `<section>`, `<plate>`,
+  `<appendix>`). A save from an older version is merged three ways by part under a short per-document write lock; the base comes from
+  the revision history by hash. Both sides changing the same part, or the frame (everything outside the parts: front matter, meta),
+  answers 409 `STALE_DOCUMENT` with `{ currentHash, conflicts, xml }`. A stale save that changes nothing of its own stays a conflict
+  (nothing to merge; the earlier contract, kept by `jsg-engine`). Check-out leases per part, with the whole document (part `''`) as the
+  fallback. RES-001: hash guard plus per-user lease, not CRDT/OT.
+
+What changed:
+* **Atomic writes (REL-001, PLT-009).** `storage/atomicWrite.ts` `writeFileAtomic`: sibling temporary file
+  `.<name>.tmp-<pid>-<12 hex>`, fsync, rename over the target (retried on Windows `EPERM`/`EACCES`/`EBUSY`), folder fsync on POSIX.
+  `ContentStore.writeText` and the new `writeBuffer` use it, so every content write behind the WP-10 seam is atomic. Writers that
+  bypassed the seam now go through it: `csdbObjects`, `jssdm/service`, `modelCode`, `pm`, `projects`, `sns/service`, `xengine/identity`,
+  `xengine/convert`, `importer/apply`, `projectArchive`, the JSS ancillary pages, the media upload and the PMC import; the house template
+  is written with `writeFileAtomic`. At start, `sweepTempFiles` removes temporary files older than one minute under `projects/`.
+* **History first (PLT-009, ENT-016, ARC-001, PUB-007).** `services/projectFiles.ts` `saveRevisioned`: content on disk that is not the
+  head revision is recorded as `on-disk` (a hand edit, or a crash after an old write), then the new content, then the atomic write. A
+  history that cannot be recorded fails the save with 500 `REVISION_FAILED` and leaves the file as it was. A new file is written, indexed
+  and recorded, and removed again if recording fails. Deleting a data module records its last content first and is refused the same way
+  (`recordBeforeDelete`; it used to log and delete anyway). Users: `csdb.writeDm`/`createDm`, `csdbObjects.writeObject`, the JSS and JSG
+  source.
+* **JSS/JSG history (ARC-001, PUB-007).** `services/oneFileDocument.ts` `saveOneFileDocument` (merge, lease check, revision, write) is
+  used by both engines' `writeSource`. `routes/documentHistory.ts` adds `GET <base>/history`, `GET <base>/history/:rev` and
+  `POST <base>/history/:rev/restore` (guarded) on `/api/projects/:id/jss` and `/jsg`; a restore adds a revision and removes none.
+  `POST /api/projects/:id/dms/:file/history/:rev/restore` does the same for data modules.
+* **Mandatory version guard (DEP-016, PLT-020, FE-008, ENT-016).** `services/versionGuard.ts` `versionGuard(what)` reads `baseHash` from
+  the body or `If-Match`. On PUT `dms/:file`, `objects/:file`, `pmc`, `settings`, `jss`, `jsg`, `ancillary/:page` and the three restore
+  routes. Routes that had no guard now refuse a stale version (409 `EDIT_CONFLICT`): `pm.writePm`, `ancillary.writeAncillary`, settings
+  (`version` = hash of project.json plus the house template); their reads return `hash`/`version`. The DM write is serialised per file
+  (`withDocumentLock`), so two saves from one version cannot both pass the check.
+* **Check-out leases (RES-001, PUB-010).** Migration `023-document-leases` (additive): table `document_leases` (key `document_id, part`)
+  and `cir_modules.updated_by`/`updated_at`. `repositories/leaseRepository.ts` takes a lease in one `INSERT … ON CONFLICT DO UPDATE …
+  WHERE` (same holder, or expired); contract case in `wp10-storage-contract`. `services/leases.ts`; routes `POST/DELETE/GET
+  …/checkout(s)` on DM, JSS and JSG. Default 60 minutes (`AGASTYA_LEASE_MINUTES`). Saving or deleting a part under another user's live
+  lease answers 423 `CHECKED_OUT` naming the holder; a project owner/manager or administrator can break a lease, audited
+  (`*.checkout-broken`).
+* **Common Information Repository (REL-002, SEC-017, PLT-021).** Only the uploader, a project manager or an administrator may replace a
+  module (others 403 `CIR_REPLACE_ROLE`). A replacement must name the current version in `baseHashes` (without it 409 `CIR_EXISTS` with
+  the current hashes; stale 409 `EDIT_CONFLICT`); all are checked before anything is written. Who replaced it and when are recorded and
+  shown (`updatedBy`, `updatedByName`, `updatedAt`) beside the original uploader.
+* **Uploads to disk with a whole-request cap (REL-007, PERF-010, PLT-021).** `services/uploads.ts` `CappedDiskStorage` streams to the
+  upload folder and stops a request as soon as its total passes the cap (`LIMIT_TOTAL_SIZE` → 413 `UPLOAD_TOO_LARGE`), removing the parts
+  already written; `discardWhenDone` removes the files when the response closes. Project uploads (64 MB per file, 1000 files, 1 GB in
+  all), the package importer (`MAX_PACKAGE_BYTES`) and the CIR (16 MB, 100 files, 256 MB; it was memory storage) use it.
+* **Clients.** Studio saves objects with the hash it opened (it sent `''`); Publication sends `pmc.hash`; Publish settings sends
+  `version` and keeps the new one; the ancillary page sends the page hash; the JSS and JSG editors reload the merged document after a
+  merged save (toast); the CIR upload asks "Replace …?" on `CIR_EXISTS` and resends with `baseHashes`. e2e specs `00-platform`,
+  `jsg-editor`, `publish-waivers` send the hash in their direct PUTs (not run).
+* **Merged with main 54874d8.** The JSS/JSG editor behaviour lives in WP-21's shared host (`editors/host/useDocEditor.tsx`): every save sends the loaded hash; a save the server merged (D22) reloads the merged document; a 409 `STALE_DOCUMENT` (an overlapping part) opens WP-21's banner and "Compare and merge…", whose save names the hash it compared against; a 423 `CHECKED_OUT` is shown as the server's message naming the holder. Migration 023 follows WP-12's 022; `wp12-migrations` takes the duplicate and gap cases from the tip of the list, and its pending-migration case makes 022 and every later step pending (it checks 022's index).
+
+Tests: new `test/wp11-integrity.test.js` (registered in `scripts/ci/test-plan.json`):
+* an injected failure before the rename leaves the old file and no temporary file; the start-up sweep;
+* **G-REL-2 kill harness**: a child process rewrites a 3 MB / 5 MB file in a loop and is SIGKILLed at 100 random points: 0 torn files;
+* **guard presence from the live route table** (`createApp()._router.stack`, marker `isVersionGuard`): the 10 content-write routes must
+  carry it; every other project PUT/PATCH must be on an exemption list with a stated reason, and every exemption must name a real route;
+* 428 without a version and 409 with a stale one on dms, pmc, settings, jss, jsg; `If-Match` accepted;
+* an injected history failure: save → 500 `REVISION_FAILED`, file unchanged; delete → refused, module kept; a hand edit on disk is kept
+  as `on-disk`;
+* JSS and JSG: 3 saves → 3 revisions, exact bytes back, restore guarded and adding a revision;
+* D22: two chapters (JSS) and two sections (JSG) merged; the same chapter → 409 `STALE_DOCUMENT` naming it;
+* leases: one holder, 423 naming the holder, another chapter free, renewal, an author's break refused, the owner's break audited, an
+  expired lease taken over, the holder still saves;
+* **G-REL-4**: 500 rounds of two authors saving a DM from one version (1,000 saves): 500 accepted, 500 refused, 0 silent overwrites;
+  JSS same chapter, 50 racing rounds: exactly one winner each;
+* an upload over the 256 MB CIR total → 413, no files left behind.
+
+Existing tests now name the version they read before each PUT (admin-ops, api, applic-external, brex-gate, dmtypes, fo-guard,
+golden-xignal, html-gate, jsg-engine, jsg-ispl, jsg-word, jss-authoring, jss-cover-isolation, jss-naval, jss-rwi-verify,
+jss-stencil-corrections, jssdm-http, pm-multi-ref, publish-gate, publish-waivers, wp02-routes, phase13, settings-hostile-input,
+cir-links); the `phase13` CIR test checks the new replace rules. `wp10-seams` lists `023-document-leases` (WP-12 holds 022).
+
+Limits / not done:
+* PERF-010 RSS acceptance not met: uploads stream to disk, but the package importer still reads the whole archive into memory for its
+  analysis. Not measured.
+* No lease UI (check-out button or holder badge in the file tree or editors); leases work through the API and the editors show the 423
+  message.
+* PUB-029 (derived files out of the project folder) deferred to WP-15 (job directories). PUB-021 not done, including the per-project
+  build lock (PUB-021 a).
+* The settings save still writes the house template before the project part is validated (a refused project part can leave a changed
+  template).
+* SEC-017 "guard-bypassing XML is accepted" not addressed beyond the replace rules.
+* The merge is by part only: cross-part data (numbering, front matter) is in the frame and conflicts as a whole; the identity record
+  (`doc-identity.json`) is a separate file, atomic but not merged.
+* Not run: Playwright, the full backend suite, the gate, full vitest.
+
 ## Phase 4
 
 ### WP-21 Editor host contract and unified editor chrome (UX-003, UX-002, UX-017, UX-012, UX-020, FE-021, FE-025, PRD-004, GAP-004) - done, with the limits listed

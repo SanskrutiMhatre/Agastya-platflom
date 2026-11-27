@@ -250,6 +250,26 @@ function contract(engine, make) {
       }
     } finally { e.close(); }
   });
+
+  withRepos('check-out leases (WP-11): one holder at a time, the holder renews, an expired lease is taken over, release and purge', (R) => {
+    const t = (min) => new Date(Date.parse(now) + min * 60_000).toISOString();
+    const L = (userId, at, until, part = '') => ({ documentId: 'd1', part, projectId: 'p1', userId, username: userId, now: at, expiresAt: until });
+    assert.equal(R.leases.acquire(L('u1', now, t(60))), true);
+    assert.equal(R.leases.acquire(L('u2', t(1), t(61))), false, 'held by someone else');
+    assert.equal(R.leases.get('d1', '').user_id, 'u1');
+    assert.equal(R.leases.acquire(L('u1', t(30), t(90))), true, 'the holder renews');
+    const renewed = R.leases.get('d1', '');
+    assert.equal(renewed.acquired_at, now, 'a renewal keeps when it was taken'); assert.equal(renewed.expires_at, t(90));
+    assert.equal(R.leases.acquire(L('u2', t(91), t(151))), true, 'expired: taken over');
+    assert.equal(R.leases.get('d1', '').user_id, 'u2'); assert.equal(R.leases.get('d1', '').acquired_at, t(91));
+    assert.equal(R.leases.acquire(L('u1', t(92), t(152), 'c1')), true, 'parts are separate leases');
+    assert.deepEqual(R.leases.listForDocument('d1').map((r) => [r.part, r.user_id]), [['', 'u2'], ['c1', 'u1']]);
+    assert.deepEqual(R.leases.listActive('p1', t(100)).length, 2);
+    assert.equal(R.leases.release('d1', '', 'u1'), false, 'only the holder releases');
+    assert.equal(R.leases.release('d1', '', null), true, 'a break releases any holder');
+    assert.equal(R.leases.purgeExpired(t(200)), 1);
+    assert.deepEqual(R.leases.listForDocument('d1'), []);
+  });
 }
 
 contract('sqlite', makeSqlite);

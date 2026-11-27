@@ -96,7 +96,7 @@ test('JSS-authored UHB, MM and ORM: the cover has Code No. and Rev No. and no IN
     const r = await w.post('/api/projects', { name: `Cover ${type}`, format: 'jss', domain: 'land', manualType: type }); assert.equal(r.status, 201);
     const U = `/api/projects/${r.json.project.id}`; const g = (await w.get(`${U}/jss`)).json;
     const xml = g.xml.replace('</bookmeta>', '<codeNo>DT0042_U0100_0007</codeNo><revNo>R2</revNo></bookmeta>');
-    assert.equal((await w.put(`${U}/jss`, { xml })).status, 200);
+    assert.equal((await w.put(`${U}/jss`, { xml, baseHash: (await w.get(`${U}/jss`)).json.hash })).status, 200);
     const out = await build(r.json.project.id);
     const cover = (await page1(out.pdf)).replace(/\s+/g, ' ');
     assert.match(cover, /Code No\.: DT0042_U0100_0007 Rev No\.: R2 THE INFORMATION GIVEN IN THIS DOCUMENT/, `${type}: the cover opens with Code No. and Rev No., then the notice`);

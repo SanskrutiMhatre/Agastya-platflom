@@ -209,7 +209,7 @@ test('configuration routes: validate-config, SNS preset export/import, a project
   assert.equal(jss.status, 201, JSON.stringify(jss.json)); const J = `/api/projects/${jss.json.project.id}`;
   const page = (await a.get(`${J}/ancillary`)).json.pages.find((x) => x.file && x.enabled);
   const cur = (await a.get(`${J}/ancillary/${page.id}`)).json.xml;
-  assert.equal((await a.put(`${J}/ancillary/${page.id}`, { xml: `${cur.trimEnd()}\n<!-- WP09 EDIT -->\n` })).status, 200);
+  assert.equal((await a.put(`${J}/ancillary/${page.id}`, { xml: `${cur.trimEnd()}\n<!-- WP09 EDIT -->\n`, baseHash: (await a.get(`${J}/ancillary/${page.id}`)).json.hash })).status, 200);
   assert.ok((await a.get(`${J}/ancillary/${page.id}`)).json.xml.includes('WP09 EDIT'));
   const reset = await a.post(`${J}/ancillary/${page.id}/reset`, {});
   assert.equal(reset.status, 200); assert.ok(!JSON.stringify(reset.json).includes('WP09 EDIT'), 'the page is given back to Settings');

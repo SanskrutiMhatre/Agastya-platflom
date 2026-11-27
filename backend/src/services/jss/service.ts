@@ -13,6 +13,9 @@ import path from 'path';
 import { config, vendor } from '../../config';
 import { projectDirFor, content } from '../../context';
 import { bad, conflict, HttpError } from '../http';
+import { saveOneFileDocument, SYSTEM_ACTOR, type SaveActor } from '../oneFileDocument';
+import { JSS_PART_NAMES } from '../docParts';
+import { historyOf, revisionText, type RevisionSummary } from '../projectFiles';
 import { checkXmlSafetyOf } from '../csdbGuard';
 const { checkXmlSafety } = require('../../core/auth/xmlGuard');
 import { syncIdentity } from '../xengine/project';
@@ -133,8 +136,12 @@ export function readSource(projectId: string): { xml: string; hash: string } {
   return { xml, hash: sha(xml) };
 }
 
-/** Save the authored XML. Malformed text is refused; a draft that breaks the schema is kept and reported. `baseHash` guards against saving over someone else's newer save. */
-export async function writeSource(projectId: string, xml: string, baseHash?: string): Promise<{ hash: string; report: JssReport }> {
+/**
+ * Save the authored XML. Malformed text is refused; a draft that breaks the schema is kept and reported. `baseHash` is the version the
+ * text was made from (mandatory on the route, WP-11): a save from an older version is merged by chapter, or refused when it overlaps a
+ * newer save (oneFileDocument.ts). After a merge the answer carries the merged text (`merged`, `xml`), which the editor takes over.
+ */
+export async function writeSource(projectId: string, xml: string, baseHash?: string, actor: SaveActor = SYSTEM_ACTOR, reason?: string): Promise<{ hash: string; report: JssReport; merged?: boolean; xml?: string }> {
   if (typeof xml !== 'string' || !xml.trim()) throw bad('There is no document to save.', 'EMPTY');
   if (Buffer.byteLength(xml) > 50 * 1024 * 1024) throw bad('The document is larger than 50 MB.', 'TOO_LARGE');
   checkXmlSafetyOf(xml);                         // WP-02: the same guard as every S1000D write (XXE, xi:include, entity bombs)
@@ -142,16 +149,24 @@ export async function writeSource(projectId: string, xml: string, baseHash?: str
   const wf = wellFormedError(xml);
   if (wf) throw new HttpError(400, `The document is not well-formed XML: ${wf}`, 'MALFORMED_XML');
   assertNativeJssXml(xml);                       // publication.xml stays the JSS document: never a publication module or a package contents list
-  const at = sourceInProject(projectId);
-  const current = content.exists(projectId, at) ? content.readText(projectId, at) : null;
-  if (baseHash && current !== null && sha(current) !== baseHash) throw conflict('The document was saved by someone else since you opened it. Reload to see their changes.', 'STALE_DOCUMENT');
-  const declared = /<jssbook\b[^>]*\bdocType="([^"]+)"/.exec(xml)?.[1];
   const type = jssTypeOfProject(projectId);
-  if (type && declared && declared !== type.id) throw bad(`This project is a ${type.label}; the document says it is "${declared}".`, 'DOCTYPE_MISMATCH');
-  content.writeText(projectId, at, xml);
-  syncIdentity(projectId, 'jss', xml);                 // the document codes kept in the backend (services/xengine) follow the document; never refuses a save
-  return { hash: sha(xml), report: await validateJss(projectId, xml) };
+  const saved = await saveOneFileDocument({
+    projectId, at: sourceInProject(projectId), xml, baseHash, actor, reason, partNames: JSS_PART_NAMES,
+    check: (text) => {
+      const declared = /<jssbook\b[^>]*\bdocType="([^"]+)"/.exec(text)?.[1];
+      if (type && declared && declared !== type.id) throw bad(`This project is a ${type.label}; the document says it is "${declared}".`, 'DOCTYPE_MISMATCH');
+    },
+  });
+  syncIdentity(projectId, 'jss', saved.xml);           // the document codes kept in the backend (services/xengine) follow the document; never refuses a save
+  return { hash: sha(saved.xml), report: await validateJss(projectId, saved.xml), ...(saved.merged ? { merged: true, xml: saved.xml } : {}) };
 }
+
+/** The saved versions of the JSS document, newest first (WP-11, ARC-001). */
+export const sourceHistory = (projectId: string): RevisionSummary[] => historyOf(projectId, sourceInProject(projectId));
+/** One saved version's exact text. */
+export const sourceRevision = (projectId: string, revId: number): { text: string; hash: string; at: string } => revisionText(projectId, sourceInProject(projectId), revId);
+/** The document's path in the project (for check-outs). */
+export const sourceRel = (projectId: string): string => sourceInProject(projectId);
 
 // ── Validation: the schema, then the stencil's rules ────────────────────────────────────────────────────────────────────────────
 
@@ -475,7 +490,7 @@ registerDocumentCreator('jss', (projectId, typeId) => createInitialDocument(proj
 export function createInitialDocument(projectId: string, type: JssDocType, input: NewDocInput): void {
   const abs = sourcePath(projectId);
   fs.mkdirSync(path.dirname(abs), { recursive: true });
-  fs.writeFileSync(abs, skeletonXml(type, input), 'utf8');
+  content.writeText(projectId, abs, skeletonXml(type, input));
   // the publisher block of this stencil's cover, with the default publisher logo in the project's Media folder (Settings > Branding can change both)
   let logo: string | undefined;
   if (type.publisher) {

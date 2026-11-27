@@ -10,7 +10,7 @@ const FIX = path.join(DM21, '5-0');
 const f = fs.readdirSync(FIX).find((x) => x.includes('-00LA-D_')) || fs.readdirSync(FIX).find((x) => x.includes('-040A-D_'));
 let h; let w; let mgr; let pid; let admin;
 const U = () => `/api/projects/${pid}`;
-const upload = (c, name, text) => { const fd = new FormData(); fd.append('files', new Blob([text]), name); fd.append('note', 'test'); return c.req('POST', '/api/cir', fd); };
+const upload = (c, name, text, baseHashes) => { const fd = new FormData(); fd.append('files', new Blob([text]), name); fd.append('note', 'test'); if (baseHashes) fd.append('baseHashes', JSON.stringify(baseHashes)); return c.req('POST', '/api/cir', fd); };
 
 test.before(async () => {
   h = await boot();
@@ -39,7 +39,7 @@ test('repository change -> update available + notification; approval takes it ov
   const xml = fs.readFileSync(path.join(FIX, f), 'utf8');
   const changed = xml.replace(/(<(?:para|simplePara)>)/, '$1CIR-CHANGED ');
   assert.notEqual(changed, xml);
-  assert.equal((await upload(w, f, changed)).status, 201);
+  assert.equal((await upload(w, f, changed, { [f]: (await w.get(`/api/cir/${encodeURIComponent(f)}`)).json.hash })).status, 201, 'a replacement names the version it replaces (WP-11)');
   let l = (await w.get(`${U()}/cir-links`)).json.links; assert.equal(l[0].state, 'update-available');
   const notes = (await admin.get('/api/notifications')).json;      // no project manager member: the approvers are the administrators assert.ok(JSON.stringify(notes).includes('Update available for a shared module'), JSON.stringify(notes).slice(0, 300));
   const ap = await mgr.post(`${U()}/cir-links/${f}/update`, {}); assert.equal(ap.status, 200, JSON.stringify(ap.json)); assert.equal(ap.json.changed, true);

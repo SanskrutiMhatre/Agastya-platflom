@@ -1057,8 +1057,8 @@ class AuthStore {
   // ---- shared CIR ---------------------------------------------------------
 
   cirList() {
-    return this.stmt(`SELECT m.*, u.username AS added_by_username, u.full_name AS added_by_name
-                      FROM cir_modules m LEFT JOIN users u ON u.id = m.added_by ORDER BY m.file`).all();
+    return this.stmt(`SELECT m.*, u.username AS added_by_username, u.full_name AS added_by_name, v.username AS updated_by_username, v.full_name AS updated_by_name
+                      FROM cir_modules m LEFT JOIN users u ON u.id = m.added_by LEFT JOIN users v ON v.id = m.updated_by ORDER BY m.file`).all();
   }
 
   cirGet(id) {
@@ -1075,6 +1075,11 @@ class AuthStore {
                ON CONFLICT(file) DO UPDATE SET title = excluded.title, info_name = excluded.info_name, dmc = excluded.dmc,
                  info_code = excluded.info_code, kind = excluded.kind, note = excluded.note, added_by = excluded.added_by, added_at = excluded.added_at`)
       .run(id, file, title || null, infoName || null, dmc || null, infoCode || null, kind || null, note || null, addedBy || null, now);
+  }
+
+  // WP-11 (SEC-017): who last replaced a module; the first uploader (added_by) is kept.
+  cirTouch(file, userId, now) {
+    return Number(this.stmt('UPDATE cir_modules SET updated_by = ?, updated_at = ? WHERE file = ?').run(userId || null, now, String(file)).changes) === 1;
   }
 
   cirDelete(id) {

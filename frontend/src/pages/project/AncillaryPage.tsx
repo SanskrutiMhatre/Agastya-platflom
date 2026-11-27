@@ -27,6 +27,7 @@ export function AncillaryPage() {
 
   // the page being edited
   const [xml, setXml] = useState('');                    // as saved
+  const [hash, setHash] = useState('');                  // the version as saved (WP-11: a save names it)
   const [draft, setDraft] = useState('');                // as edited (XML view)
   const [values, setValues] = useState<Record<number, string>>({});
   const [mode, setMode] = useState<Mode>('text');
@@ -46,7 +47,7 @@ export function AncillaryPage() {
     setError(''); setValues({}); setDraft(''); setXml('');
     const p = pages.find((x) => x.id === pageId); if (!p?.file) return;
     setLoading(true);
-    try { const r = await ancillaryApi.read(id, pageId); setXml(r.xml); setDraft(r.xml); }
+    try { const r = await ancillaryApi.read(id, pageId); setXml(r.xml); setDraft(r.xml); setHash(r.hash); }
     catch (e) { setError(errText(e)); } finally { setLoading(false); }
   }, [id, pages]);
   useEffect(() => { if (sel) void load(sel); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [sel, pages.length]);
@@ -70,8 +71,9 @@ export function AncillaryPage() {
     if (!page) return false;
     setBusy(true); setError('');
     try {
-      const saved = await ancillaryApi.save(id, page.id, current);
-      setPages((all) => all.map((x) => (x.id === saved.id ? saved : x)));
+      const saved = await ancillaryApi.save(id, page.id, current, hash);
+      setHash(saved.hash);
+      setPages((all) => all.map((x) => (x.id === saved.page.id ? saved.page : x)));
       setXml(current); setDraft(current); setValues({});
       toast(`${page.label} saved. It is printed the next time you generate the PDF.`, 'success');
       return true;
@@ -86,7 +88,7 @@ export function AncillaryPage() {
     try {
       const r = await ancillaryApi.reset(id, page.id);
       setPages((all) => all.map((x) => (x.id === r.page.id ? r.page : x)));
-      setXml(r.xml); setDraft(r.xml); setValues({});
+      setXml(r.xml); setDraft(r.xml); setValues({}); setHash(r.hash);
       toast(`${page.label} is back to what Settings say.`, 'success');
     } catch (e) { setError(errText(e)); } finally { setBusy(false); }
   };

@@ -68,6 +68,8 @@ const view = (d: csdb.DmSummary, meta: Row | undefined) => {
     kind: CIR_KINDS[infoCode] ?? 'Common module', note: meta?.note ?? null,
     addedBy: meta?.added_by ?? null, addedByName: meta ? (meta.added_by_name ?? meta.added_by_username ?? null) : null,
     addedAt: meta?.added_at ?? d.modified,
+    // WP-11 (SEC-017): who last replaced it, beside who first added it
+    updatedBy: meta?.updated_by ?? null, updatedByName: meta?.updated_by ? (meta.updated_by_name ?? meta.updated_by_username ?? null) : null, updatedAt: meta?.updated_at ?? null,
   };
 };
 
@@ -84,14 +86,19 @@ export function noteAdded(file: string, userId: string, note = ''): void {
 }
 export const forget = (file: string): void => { const m = store.cirByFile(file); if (m) store.cirDelete(m.id); };
 
-export async function read(file: string): Promise<{ file: string; xml: string }> {
+export async function read(file: string): Promise<{ file: string; xml: string; hash: string }> {
   const id = await workspaceId();
   const out = csdb.readDm(id, file);
-  return { file: out.file, xml: out.xml };
+  return { file: out.file, xml: out.xml, hash: out.hash };      // hash: the version a replacement names (WP-11)
 }
 
-/** Add (or replace) modules from files, all or nothing. Everyone may; each is held to the same rules as an import. */
-export async function add(actor: Actor, files: Array<{ name: string; xml: string }>, note: string) {
+/**
+ * Add (or replace) modules from files, all or nothing. Everyone may add; each is held to the same rules as an import.
+ * WP-11 (REL-002, PLT-021, SEC-017): replacing a module that is already in the repository needs its current version in `baseHashes`
+ * (file name -> hash; without it the answer is 409 CIR_EXISTS with the current hashes, so the screen can ask "replace?"), a stale hash
+ * is a conflict like any save, and only the person who added it, a Project Manager or an administrator may replace it.
+ */
+export async function add(actor: Actor, files: Array<{ name: string; xml: string }>, note: string, baseHashes: Record<string, string> = {}) {
   if (!files.length) throw bad('No files uploaded.');
   const id = await workspaceId();
   const problems: string[] = [];
@@ -105,9 +112,22 @@ export async function add(actor: Actor, files: Array<{ name: string; xml: string
   }
   if (problems.length) throw new HttpError(400, 'Nothing was added to the repository.', 'CIR_REFUSED', { problems });
 
+  const replacing = staged.filter((s) => s.exists);
+  const mayReplaceAny = actor.role === 'project_manager' || actor.role === 'admin';
+  const notMine = replacing.filter((s) => !mayReplaceAny && (store.cirByFile(s.name)?.added_by ?? actor.id) !== actor.id);
+  if (notMine.length) throw forbidden(`Only the person who added a common module, a Project Manager or an administrator can replace it (${notMine.map((s) => s.name).join(', ')}). Nothing was changed.`, 'CIR_REPLACE_ROLE');
+  const unconfirmed = replacing.filter((s) => !baseHashes[s.name]);
+  if (unconfirmed.length) {
+    throw conflict(`The repository already has ${unconfirmed.map((s) => s.name).join(', ')}. Confirm to replace ${unconfirmed.length === 1 ? 'it' : 'them'}. Nothing was changed.`, 'CIR_EXISTS',
+      { existing: unconfirmed.map((s) => ({ file: s.name, hash: csdb.readDm(id, s.name).hash })) });
+  }
+
+  const stale = replacing.filter((s) => csdb.readDm(id, s.name).hash !== baseHashes[s.name]);       // all or nothing: every version is checked before anything is written
+  if (stale.length) throw conflict(`${stale.map((s) => s.name).join(', ')} changed in the repository since you looked. Nothing was changed.`, 'EDIT_CONFLICT', { existing: stale.map((s) => ({ file: s.name, hash: csdb.readDm(id, s.name).hash })) });
+
   const role = actor.role === 'project_manager' ? 'manager' : 'editor';
   for (const s of staged) {
-    if (s.exists) await csdb.writeDm(id, s.name, s.xml, undefined, actor, role);
+    if (s.exists) { await csdb.writeDm(id, s.name, s.xml, baseHashes[s.name], actor, role); store.cirTouch(s.name, actor.id, nowIso()); }
     else await csdb.createDm(id, s.name, s.xml, actor);
     noteAdded(s.name, actor.id, note);
   }
@@ -188,7 +208,7 @@ export async function approveUpdate(actor: Actor, projectId: string, file: strin
   const local = csdb.readDm(projectId, l.file);
   if (csdb.sha(local.xml) !== l.local_hash && !force) throw conflict('The project copy was changed after it was linked; taking the update would overwrite those changes. Confirm to overwrite.', 'LOCALLY_MODIFIED');
   if (csdb.sha(cirXml) === l.cir_hash && csdb.sha(local.xml) === l.local_hash) return { file, changed: false };
-  await csdb.writeDm(projectId, l.file, cirXml, undefined, actor, role, false);
+  await csdb.writeDm(projectId, l.file, cirXml, local.hash, actor, role, false);          // REL-002: against the copy that was checked above, never blind
   repos.cirLinks.approve(projectId, file, { issue: issueOf(cirXml), hash: csdb.sha(cirXml), by: actor.id, at: nowIso() });
   return { file, changed: true, issue: issueOf(cirXml) };
 }

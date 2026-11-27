@@ -4,6 +4,8 @@
 
 import { tuneServer, sweepStaleUploads } from './services/uploads';
 import type http from 'http';
+import path from 'path';
+import { sweepTempFiles } from './storage/atomicWrite';
 import { config, nowIso } from './config';
 import { createApp } from './app';
 import { store, audit, workspaceDir, registryDb, defaultContext } from './context';
@@ -34,6 +36,7 @@ export async function start(port: number = config.port): Promise<number> {
   // in-process apps on one workspace on purpose opt out with AGASTYA_NO_WORKSPACE_LOCK=1.
   if (config.workspaceLock) acquireWorkspaceLock(workspaceDir);
   try { sweepPendingImports(); } catch (e) { console.warn('[start] unfinished imports:', (e as Error).message); }    // REL-004: an import cut off by a crash
+  try { const n = sweepTempFiles(path.join(workspaceDir, 'projects')); if (n) console.warn(`[start] removed ${n} temporary file(s) left by interrupted saves`); } catch { /* best effort */ }   // WP-11: a save cut off between write and rename
   await reconcileRegistry();
   await ensureBootstrapAdmin({ store, audit, env: config.initialAdmin, now: () => new Date() });
 

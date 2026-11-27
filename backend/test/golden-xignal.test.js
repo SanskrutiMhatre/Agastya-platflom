@@ -74,7 +74,7 @@ test('the Xignal sample imports, passes the publish gate with one recorded waive
 
   // The reference carries L&T's logo and company line: the seeded pack `lnt-xignal` (the Xignal template's default since 2026-11-26), selected here for this project as well.
   const st = (await author.get(`/api/projects/${id}/settings`)).json;
-  assert.equal((await author.put(`/api/projects/${id}/settings`, { project: { ...st.project, brandPack: 'lnt-xignal' } })).status, 200);
+  assert.equal((await author.put(`/api/projects/${id}/settings`, { project: { ...st.project, brandPack: 'lnt-xignal' }, baseHash: (await author.get(`/api/projects/${id}/settings`)).json.version })).status, 200);
 
   // the gate is NOT bypassed: the package does not ship the organisation's BREX, so a first publish is refused for exactly that
   const first = await author.post(`/api/projects/${id}/publish`, {});

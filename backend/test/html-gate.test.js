@@ -39,7 +39,7 @@ test.before(async () => {
   const pmc = (await author.get(P('/pmc'))).json;
   const list = (await author.get(P('/dms'))).json.dms.filter((d) => d.file === file);
   const entries = [{ type: 'folder', title: 'All', children: list.map((d) => ({ type: 'dm', dmCode: d.dmCodeAttrs, issueInfo: d.issueInfoAttrs, language: d.languageAttrs, techName: d.techName, infoName: d.infoName })) }];
-  assert.equal((await author.put(P('/pmc'), { meta: pmc.meta, entries })).status, 200);
+  assert.equal((await author.put(P('/pmc'), { meta: pmc.meta, entries, baseHash: (await author.get(P('/pmc'))).json.hash })).status, 200);
 });
 test.after(async () => { await h.close(); });
 

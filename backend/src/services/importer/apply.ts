@@ -19,7 +19,7 @@
 import fs from 'fs';
 import path from 'path';
 import { nowIso, vendor } from '../../config';
-import { projectDirFor, docIndex, revisions } from '../../context';
+import { projectDirFor, docIndex, revisions, content } from '../../context';
 import { headOf } from '../xmlHead';
 import { HttpError } from '../http';
 import * as csdb from '../csdb';
@@ -130,9 +130,9 @@ export async function applyImport(projectId: string, entries: PackageEntry[], op
     const dest = path.join(originalsAbs, ...p.split('/'));
     if (path.relative(originalsAbs, dest).startsWith('..')) continue;
     fs.mkdirSync(path.dirname(dest), { recursive: true });
-    fs.writeFileSync(dest, orig.bytes);
+    content.writeBuffer(projectId, dest, orig.bytes);
   }
-  fs.writeFileSync(path.join(originalsAbs, 'change-log.json'), JSON.stringify({ batch: id, by: actor.username, rules: repair.rulesRun, changes: repair.changeLog }, null, 2), 'utf8');
+  content.writeText(projectId, path.join(originalsAbs, 'change-log.json'), JSON.stringify({ batch: id, by: actor.username, rules: repair.rulesRun, changes: repair.changeLog }, null, 2));
 
   // ── 3. data modules ──────────────────────────────────────────────────────
   fs.mkdirSync(csdbAbs, { recursive: true });
@@ -140,7 +140,7 @@ export async function applyImport(projectId: string, entries: PackageEntry[], op
   for (const s of staged) {
     const abs = csdb.resolveDmFile(projectId, s.name);
     if (s.existed) previous.set(s.name, fs.readFileSync(abs, 'utf8'));
-    fs.writeFileSync(abs, s.xml, 'utf8');
+    content.writeText(projectId, abs, s.xml);
   }
   await docIndex.syncProject(projectId, projectDir, nowIso());
   for (const s of staged) {
@@ -173,7 +173,7 @@ export async function applyImport(projectId: string, entries: PackageEntry[], op
       // A placeholder must never hide a real image; a real image replaces an earlier placeholder; two real ones need the overwrite flag.
       if (incomingIsPlaceholder || (!haveIsPlaceholder && !options.overwrite)) { mediaKept.push(name); continue; }
     }
-    fs.writeFileSync(dest, incoming);
+    content.writeBuffer(projectId, dest, incoming);
     media.push(name);
   }
 
@@ -195,7 +195,7 @@ export async function applyImport(projectId: string, entries: PackageEntry[], op
       fs.copyFileSync(pmAbs, `${pmAbs}.bak`); backup = `${path.basename(pmAbs)}.bak`;
       fs.copyFileSync(pmAbs, path.join(originalsAbs, 'previous-publication.xml'));
     }
-    fs.writeFileSync(pmAbs, xml, 'utf8');
+    content.writeText(projectId, pmAbs, xml);
     publication = { mode: 'replaced', counts, reconstructed: repair.publication.reconstructed, backup };
   }
 

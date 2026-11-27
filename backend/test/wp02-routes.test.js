@@ -67,7 +67,7 @@ test('JSS: an xi:include in an ancillary page is refused when saved, and a page 
   const pg = pages.find((x) => /foreword/i.test(x.id)) ?? pages[0]; const cur = (await w.get(`${p.U}/ancillary/${pg.id}`)).json.xml;
   assert.match(cur, /<para\b[^>]*>/, `${pg.id} has a paragraph`);
   const hostile = cur.replace(/(<para\b[^>]*>)/, `$1PROBE-START <xi:include xmlns:xi="${XI}" href="${canaryUrl}" parse="text"/> PROBE-END `);
-  const r = await w.put(`${p.U}/ancillary/${pg.id}`, { xml: hostile });
+  const r = await w.put(`${p.U}/ancillary/${pg.id}`, { xml: hostile, baseHash: (await w.get(`${p.U}/ancillary/${pg.id}`)).json.hash });
   assert.equal(r.status, 400, JSON.stringify(r.json).slice(0, 300)); assert.equal(r.json.code, 'UNSAFE_XML');
   // planted on disk, as an edit outside the program or an old archive could leave it
   const file = path.join(p.dir, 'jss', 'frontmatter', pg.file.replace(/^.*[\\/]/, ''));
