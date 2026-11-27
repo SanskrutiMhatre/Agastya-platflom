@@ -54,7 +54,6 @@ test('/api/health and /api/version (public) report the package version, API leve
 
 test('schemaLevel reports migrations from a newer build as unknown (downgrade detection)', () => {
   const { schemaLevel } = require('../dist/services/version');
-  const fake = { prepare: () => ({ all: () => [{ name: '001-a' }, { name: '002-b' }, { name: '999-from-the-future' }] }) };
-  const s = schemaLevel(fake, [{ name: '001-a' }, { name: '002-b' }]);
+  const s = schemaLevel(['001-a', '002-b', '999-from-the-future'], [{ name: '001-a' }, { name: '002-b' }]);
   assert.deepEqual(s, { level: 2, latest: '002-b', applied: 3, unknown: ['999-from-the-future'] });
 });

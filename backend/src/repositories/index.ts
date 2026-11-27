@@ -25,6 +25,8 @@ export interface Repositories extends UnitOfWork {
   readonly dialect: string;
   /** Throws when the database does not answer (the readiness probe, PLT-031). */
   ping(): void;
+  /** The names of the schema migrations this database has applied, in order; [] when none ran yet (the version handshake, WP-13). */
+  appliedMigrations(): string[];
   registry: ProjectRegistry;
   sns: SnsRepository;
   projectConfig: ProjectConfigRepository;
@@ -39,6 +41,9 @@ export function createSqliteRepositories(db: SqlDatabase): Repositories {
   return {
     dialect: 'sqlite',
     ping: (): void => { db.prepare('SELECT 1 AS ok').get(); },
+    appliedMigrations: (): string[] => {
+      try { return (db.prepare('SELECT name FROM schema_migrations ORDER BY name').all() as Array<{ name: unknown }>).map((r) => String(r.name)); } catch { return []; }
+    },
     transaction: <T>(fn: () => T): T => sqliteTransaction(db, fn),
     registry: new SqliteProjectRegistry(db),
     sns: new SqliteSnsRepository(db),

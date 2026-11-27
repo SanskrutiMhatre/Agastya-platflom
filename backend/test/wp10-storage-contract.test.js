@@ -32,6 +32,13 @@ function contract(engine, make) {
     assert.equal(typeof R.dialect, 'string');
   });
 
+  withRepos('schema level: every migration the code knows is applied after start(), in order (the version handshake, WP-13)', (R) => {
+    const { MIGRATIONS } = require('../dist/core/auth/store');
+    const applied = R.appliedMigrations();
+    assert.deepEqual(applied, [...applied].sort(), 'in name order');
+    for (const m of MIGRATIONS) assert.ok(applied.includes(m.name), `${m.name} applied`);
+  });
+
   withRepos('project registry: upsert keeps created_at, defaults type/template, lists most recently used first, file index replace', (R) => {
     R.registry.upsertProject({ id: 'p1', name: 'One', now });
     const a = R.registry.getProject('p1');

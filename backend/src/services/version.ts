@@ -44,10 +44,8 @@ export function buildInfo(): BuildInfo {
 
 export interface SchemaLevel { level: number; latest: string | null; applied: number; unknown: string[] }
 
-/** What the code knows (MIGRATIONS) against what the database has applied. `unknown` lists migrations from a newer build. */
-export function schemaLevel(db: { prepare(sql: string): { all(): any[] } }, migrations: Array<{ name: string }>): SchemaLevel {
+/** What the code knows (MIGRATIONS) against what the database has applied (`repos.appliedMigrations()`). `unknown` lists migrations from a newer build. */
+export function schemaLevel(applied: string[], migrations: Array<{ name: string }>): SchemaLevel {
   const known = new Set(migrations.map((m) => m.name));
-  let applied: string[] = [];
-  try { applied = db.prepare('SELECT name FROM schema_migrations ORDER BY name').all().map((r: any) => String(r.name)); } catch { applied = []; }
   return { level: migrations.length, latest: migrations.length ? migrations[migrations.length - 1].name : null, applied: applied.length, unknown: applied.filter((n) => !known.has(n)) };
 }

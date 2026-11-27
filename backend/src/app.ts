@@ -79,7 +79,7 @@ export function createApp(): express.Express {
     (_req, res) => { const r = readiness(defaultContext()); res.status(r.ready ? 200 : 503).json({ status: r.ready ? 'ready' : 'not-ready', checks: r.checks }); });
   // Version identity (WP-13, DEP-004): read by the installer's verification and by a client before it signs in (compatibility handshake).
   app.get('/api/version', publicRoute('Version handshake: product version, API level and database schema level; no user data.'), (_req, res) => {
-    const b = buildInfo(); const schema = schemaLevel(store.db, MIGRATIONS);
+    const b = buildInfo(); const schema = schemaLevel(defaultContext().repos.appliedMigrations(), MIGRATIONS);
     res.json({
       product: 'Agastya Platform', version: b.version, apiVersion: API_VERSION, minClientVersion: MIN_CLIENT_VERSION,
       schema: { level: schema.level, latest: schema.latest, applied: schema.applied, compatible: schema.unknown.length === 0 },
