@@ -60,7 +60,29 @@ The account must change the password at its next sign-in and every session is si
 ```
 
 (or Start menu → *Check this installation*). It lists what is wrong and changes nothing: missing files, the Node and Java runtimes, the port, whether the
-data folder is writable, free disk space, the service. Exit code 0 means no problem was found.
+data folder is writable, free disk space, the service, a value in `agastya.ini` it cannot use, and whether the program files are as shipped (sizes of
+every file and hashes of the executables, the runtime and the server code against `MANIFEST.sha256`). Exit code 0 means no problem was found.
+
+```
+"C:\Program Files\Agastya Platform\AgastyaCtl.exe" --verify [--require-signed]
+"C:\Program Files\Agastya Platform\AgastyaCtl.exe" --doctor --deep
+```
+
+`--verify` hashes **every** program file against the signed manifest `MANIFEST.sha256`, names any file that is missing, changed or not part of the
+product (a DLL planted beside the program, for example), checks the manifest's signature and that it was made by the certificate that signed
+`AgastyaCtl.exe`, and reports Windows' view of that signature (offline). Exit code 0 = intact. `--doctor --deep` puts the same full check into the
+self-check. Every start of the server runs the quick check in the background and writes the result to `logs\agastya-host.log` (`integrity: ...`); when
+the files are not as shipped it also writes a **warning** to the Windows Application log. It never stops the server. To repair, run the same `Setup.exe`
+again. More: `docs/SIGNING.md`.
+
+```
+"C:\Program Files\Agastya Platform\AgastyaCtl.exe" --support-bundle [<file.zip>]
+```
+
+writes one ZIP for support (default `C:\ProgramData\Agastya Platform\support\`): version, the `--doctor` report, the file check, `agastya.ini` with
+every value whose key names a secret masked, the last 2 MB of the host and server logs with passwords, tokens, cookies and password hashes masked,
+Windows, service, firewall and disk facts, and the server's public `/api/version` and `/api/ready` answers. It never contains `publisher.db`, project
+files or project names. Read it before you send it.
 
 ## 4. Configuration - `agastya.ini`
 
@@ -93,7 +115,7 @@ Every action needs a signed-in account; there is no anonymous access.
 
 | File | Content |
 | --- | --- |
-| `logs\agastya-host.log` | start, stop, restart and failure of the server by the host program |
+| `logs\agastya-host.log` | start, stop, restart and failure of the server by the host program; the program-file check at each start (`integrity:`) |
 | `logs\agastya-server.log` | everything the server prints, including errors (`[stderr]` lines) |
 | Windows Event Log → Application → *Agastya Platform* | service start/stop, restarts, "server keeps stopping" |
 
@@ -166,6 +188,8 @@ The exit code is the standard Inno Setup one (0 = success; anything else is a fa
 | "Port 4040 is used by another program" | change `[server] Port` |
 | The tray icon says *Stopped (see logs)* | `logs\agastya-host.log` - the server stopped six times in two minutes; the server log says why |
 | Publishing produces no PDF | `--doctor` (is Java found?), then the *Publication* page's log |
+| The Application log warns "the program files ... are not as shipped" | `--verify` names the files; antivirus quarantine or a hand edit are the usual causes. Run the same `Setup.exe` again (repair) |
+| Support asks for information | `--support-bundle` (section 3) |
 | A PDF uses Liberation Sans instead of Arial | the build was made without Arial (see PACKAGING.md); this changes shapes, not line or page breaks |
 | Service will not start | Event Viewer → Application → *Agastya Platform*; `--doctor`; is the data folder writable by LocalService? |
 | The server log says the data folder "is already in use by another Agastya Platform server (process N)" | only one server may use a data folder. Stop the other one (the tray, the service, or a second copy started by hand). A server that crashed leaves `.agastya-server.lock` in the data folder; the next start takes it over by itself. Delete the file by hand only when the process it names is not an Agastya server. |

@@ -10,8 +10,14 @@ For the person who produces the installer. (To install and run the product, read
 | --- | --- |
 | `Agastya-Platform-<version>-win-x64-Setup.exe` | the installer (Inno Setup): per-machine or per-user, optional Windows service, optional LAN firewall rule, upgrade in place, uninstall that keeps data |
 | `Agastya-Platform-<version>-win-x64-portable.zip` | unzip anywhere and run `AgastyaPlatform.exe`; data goes in `data\` beside it |
-| `Agastya-Platform-<version>-win-x64\` | the staged folder both of them are made from |
-| `SHA256SUMS.txt` | checksums of the two files above |
+| `Agastya-Platform-<version>-win-x64\` | the staged folder both of them are made from; it holds `MANIFEST.sha256` (SHA-256 of every shipped file, `.sig` when signed) and `SBOM.cdx.json` |
+| `Agastya-Platform-<version>-win-x64-SBOM.cdx.json` | the software bill of materials, CycloneDX 1.5 (WP-24) |
+| `Verify-Release.ps1`, `Detect-AgastyaPlatform.ps1` | the customer's offline verifier and the deployment detection rule (`DEPLOYMENT-KIT.md`) |
+| `SHA256SUMS.txt` (+ `SHA256SUMS.txt.sig` when signed) | checksums of all the files above |
+| `BUILD-INFO.json` | commit, clean/dirty tree, toolchain, signing set-up (no secrets), artefact hashes |
+
+At the end the packager verifies the finished release the way the customer will (`scripts/release/verify-release.mjs`) and fails when anything does
+not match.
 
 Both contain the same product, and it is self-contained: a 64-bit Node.js 22 (`runtime\node.exe`), the compiled backend with its production
 dependencies, the web client, the publishing engine with the Temurin 21 Java runtime and Apache FOP, `xsltproc`, the fonts, the host programs
@@ -94,18 +100,21 @@ a `Setup.exe` that was downloaded (that decision is Microsoft's reputation servi
 installer and executables carry no publisher name. Signing with your organisation's own certificate makes them show your organisation as the publisher and makes a
 tampered copy fail verification on PCs you have given your root certificate to.
 
-The repository includes what is needed, with no Windows SDK and no purchased certificate:
+Signing is one configured step (WP-24): set the variables, then build. With a certificate in a store or on a hardware token (the only way for a public
+certificate since March 2026):
 
 ```
-powershell -ExecutionPolicy Bypass -File scripts\signing\New-SigningCertificate.ps1 -OutDir D:\signing -Subject "CN=<Your organisation>, O=<Your organisation>, C=IN" -Mode InternalCa
-set AGASTYA_SIGN_PASSWORD=<the .pfx password>
-set AGASTYA_SIGN_CMD=powershell -NoProfile -ExecutionPolicy Bypass -File scripts\signing\Sign-File.ps1 -Pfx D:\signing\agastya-codesign.pfx -File $f
-npm run package:win -- --build
+set AGASTYA_SIGN_THUMBPRINT=<SHA-1 thumbprint>
+set AGASTYA_SIGN_TIMESTAMP_URL=<RFC 3161 time-stamp server>
+npm run package:win -- --build --release --node <pinned node.exe>
 ```
 
-`$f` stands for the file name. The command runs on `AgastyaPlatform.exe` and `AgastyaCtl.exe` before they are packed, and Inno Setup is told to run it on
-`Setup.exe` and the uninstaller. Any other signing command (`signtool sign ...`, an HSM tool) works in `AGASTYA_SIGN_CMD` the same way. The build tells you at the
-end when it is unsigned.
+or with an internal-CA / self-signed `.pfx` (made offline by `scripts\signing\New-SigningCertificate.ps1`): `AGASTYA_SIGN_PFX` and `AGASTYA_SIGN_PASSWORD`
+instead of the thumbprint. The packager signs every executable file of the product its vendor left unsigned (with `signtool` from an installed Windows SDK,
+or `Set-AuthenticodeSignature` without one), signs the file manifest and `SHA256SUMS.txt` with the same certificate, and has Inno Setup sign `Setup.exe` and
+the uninstaller. `--release` refuses an unsigned or untimestamped build, a tree with uncommitted changes, a `node_modules` that differs from the lockfile,
+empty `copyright`/`url` in `packaging/product.json` and a missing `docs/EULA.txt`. `node scripts/release/signing.mjs --show` prints the set-up. The older
+`AGASTYA_SIGN_CMD` (a command with `$f`) still signs the executables. The build tells you at the end when it is unsigned.
 
 **[SIGNING.md](SIGNING.md)** covers which kind of certificate to use, making one, pushing it to managed PCs by Group Policy or Intune, verifying signatures, renewal
 and timestamping, and exactly what was and was not tested.
@@ -162,7 +171,10 @@ now reads the command line itself). The evaluation Windows licence of the guest 
 
 1. Update `version` in the root `package.json`; update the changelog.
 2. `npm test` in `backend` and `frontend`, `npm run e2e` in `frontend`.
-3. `npm run package:win -- --build` (with `AGASTYA_SIGN_CMD` set for a public release).
-4. `node scripts/verify-installer.mjs` and `npm run verify:package`; both must end with every check passed.
+3. `npm ci` in `backend` (the release ships exactly the lockfile), then `npm run package:win -- --build --release` with the signing variables set
+   (section 6, SIGNING.md).
+4. `node scripts/verify-installer.mjs` and `npm run verify:package`; both must end with every check passed. `node scripts/ci/readiness.mjs`
+   (G-SEC-11a/b/c, RES-005, G-DEP-4; with `--install <folder>` also G-SEC-6, G-DEP-6, DEP-013, G-DEP-3) must pass.
 5. On a clean Windows machine or VM: run `Setup.exe` normally (not silently) once, open the application, create the administrator, publish the sample project.
-6. Publish `Setup.exe`, the ZIP and `SHA256SUMS.txt` together. Keep the installer of every released version: it is the way back (OPERATIONS.md, section 8).
+6. Publish `Setup.exe`, the ZIP, the SBOM, `Verify-Release.ps1`, `Detect-AgastyaPlatform.ps1`, `SHA256SUMS.txt` and `SHA256SUMS.txt.sig` together,
+   and the certificate thumbprint through a separate channel (DEPLOYMENT-KIT.md). Keep the installer of every released version: it is the way back (OPERATIONS.md, section 8).

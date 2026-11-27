@@ -42,6 +42,10 @@ export async function verifyRelease({ release, tree, thumbprint, requireSigned =
 
   if (release) {
     const dir = path.resolve(release);
+    if (!tree) for (const d of fs.existsSync(dir) ? fs.readdirSync(dir) : []) {
+      const p = path.join(dir, d);
+      if (/^Agastya-Platform-.*-win-x64$/.test(d) && fs.statSync(p).isDirectory()) trees.push(p);
+    }
     const sums = path.join(dir, 'SHA256SUMS.txt');
     if (!fs.existsSync(sums)) add('FAIL', 'SHA256SUMS.txt', `missing in ${dir}`);
     else {
@@ -57,13 +61,11 @@ export async function verifyRelease({ release, tree, thumbprint, requireSigned =
       const sbom = list.find((x) => /\.cdx\.json$/i.test(x.file));
       if (!sbom) add(requireSigned ? 'FAIL' : 'WARN', 'SBOM', 'no *.cdx.json listed in SHA256SUMS.txt');
       else {
-        const problems = checkSbom(path.join(dir, sbom.file));
-        add(problems.length ? 'FAIL' : 'PASS', 'SBOM', problems.join('; ') || `${sbom.file} is listed in the signed checksums and well formed`);
+        // with the staged product beside it, every shipped npm package must be listed and every hashed file must match
+        const stage = trees.find((t) => fs.existsSync(path.join(t, 'app', 'backend', 'node_modules')));
+        const problems = checkSbom(path.join(dir, sbom.file), { stage });
+        add(problems.length ? 'FAIL' : 'PASS', 'SBOM', problems.join('; ') || `${sbom.file} is listed in the checksums, well formed${stage ? `, and matches ${path.basename(stage)}` : ''}`);
       }
-    }
-    if (!tree) for (const d of fs.existsSync(dir) ? fs.readdirSync(dir) : []) {
-      const p = path.join(dir, d);
-      if (/^Agastya-Platform-.*-win-x64$/.test(d) && fs.statSync(p).isDirectory()) trees.push(p);
     }
     if (authenticodeCheck) {
       const exes = fs.existsSync(dir) ? fs.readdirSync(dir).filter((n) => /\.exe$/i.test(n)).map((n) => path.join(dir, n)) : [];

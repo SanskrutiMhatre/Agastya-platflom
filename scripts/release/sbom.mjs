@@ -53,6 +53,27 @@ export function lockfilePackages(pkgDir, { installedOnly = true } = {}) {
   return out.sort((a, b) => ordinal(a.key, b.key));
 }
 
+/** The npm packages present in a node_modules tree (nested ones too): [{ key: 'node_modules/a/node_modules/b', name, version }]. */
+export function stagedPackages(pkgDir) {
+  const out = [];
+  const visit = (nm, keyPre) => {
+    if (!fs.existsSync(nm)) return;
+    for (const e of fs.readdirSync(nm, { withFileTypes: true })) {
+      if (!e.isDirectory() || e.name.startsWith('.')) continue;
+      const dirs = e.name.startsWith('@') ? fs.readdirSync(path.join(nm, e.name), { withFileTypes: true }).filter((x) => x.isDirectory()).map((x) => `${e.name}/${x.name}`) : [e.name];
+      for (const d of dirs) {
+        const dir = path.join(nm, ...d.split('/'));
+        const key = `${keyPre}node_modules/${d}`;
+        const pjf = path.join(dir, 'package.json');
+        if (fs.existsSync(pjf)) { const pj = JSON.parse(fs.readFileSync(pjf, 'utf8')); if (pj.name && pj.version) out.push({ key, name: pj.name, version: pj.version }); }
+        visit(path.join(dir, 'node_modules'), `${key}/`);
+      }
+    }
+  };
+  visit(path.join(pkgDir, 'node_modules'), '');
+  return out.sort((a, b) => ordinal(a.key, b.key));
+}
+
 function readJreVersion(jreDir) {
   try {
     const t = fs.readFileSync(path.join(jreDir, 'release'), 'utf8');
@@ -75,7 +96,7 @@ export function buildSbom(opts = {}) {
     return null;   // runtime/node.exe, the host executables: only in a staged tree
   };
   const hashOf = (rel) => { const p = where(rel); return p && fs.existsSync(p) && fs.statSync(p).isFile() ? [{ alg: 'SHA-256', content: sha256File(p) }] : null; };
-  const components = []; const problems = [];
+  const components = []; const problems = []; const problemsNote = [];
   const prop = (name, value) => ({ name, value: String(value) });
 
   // first-party executables
@@ -85,22 +106,25 @@ export function buildSbom(opts = {}) {
     if (h) components.push({ 'bom-ref': `first-party:${exe}`, type: 'application', name: exe, version, supplier: { name: product.publisher }, hashes: h, properties: [prop('agastya:path', exe)] });
   }
 
-  // backend npm packages: the staged node_modules when packaging, the lockfile otherwise
-  const lockBe = lockfilePackages(path.join(ROOT, 'backend'), { installedOnly: false });
-  const lockByKey = new Map(lockBe.map((p) => [p.key, p]));
-  const beList = stage
-    ? listFiles(path.join(stage, 'app', 'backend', 'node_modules')).filter((r) => /(^|\/)package\.json$/.test(r))
-      .map((r) => `node_modules/${r.slice(0, -'/package.json'.length)}`).filter((k) => lockByKey.has(k)).map((k) => lockByKey.get(k))
-    : lockfilePackages(path.join(ROOT, 'backend'));
+  // backend npm packages: what the staged product really ships when packaging (the truth for the customer), the lockfile's production set
+  // otherwise. A staged package that the lockfile does not have at that place and version is listed too, with a property saying so.
+  const lockAll = JSON.parse(fs.readFileSync(path.join(ROOT, 'backend', 'package-lock.json'), 'utf8')).packages;
+  const beList = stage ? stagedPackages(path.join(stage, 'app', 'backend')) : lockfilePackages(path.join(ROOT, 'backend'));
   for (const p of beList) {
     const pjFile = path.join(stage ? path.join(stage, 'app', 'backend') : path.join(ROOT, 'backend'), ...p.key.split('/'), 'package.json');
     const pj = fs.existsSync(pjFile) ? JSON.parse(fs.readFileSync(pjFile, 'utf8')) : {};
-    const h = sriToHex(p.integrity);
+    const lock = lockAll[p.key];
+    const inLock = lock && lock.version === p.version;
+    const h = inLock ? sriToHex(lock.integrity) : null;
+    const props = [prop('agastya:path', `app/backend/${p.key}`)];
+    if (h) props.push(prop('agastya:hash-source', 'package-lock.json integrity (registry tarball)'));
+    if (!inLock) problemsNote.push(`${p.key}@${p.version}`), props.push(prop('agastya:lockfile', lock ? `differs: the lockfile has ${lock.version}` : 'not in backend/package-lock.json'));
+    else if (lock.dev) props.push(prop('agastya:lockfile', 'a development dependency in the lockfile, shipped anyway'));
     components.push({
       'bom-ref': `npm:backend:${p.key.slice('node_modules/'.length)}@${p.version}`, type: 'library', name: p.name, version: p.version, scope: 'required', purl: purlNpm(p.name, p.version),
       ...(licenseOf(pj) ? { licenses: licenseOf(pj) } : {}), ...(h ? { hashes: [h] } : {}),
-      ...(p.resolved ? { externalReferences: [{ type: 'distribution', url: p.resolved }] } : {}),
-      properties: [prop('agastya:path', `app/backend/${p.key}`), prop('agastya:hash-source', 'package-lock.json integrity (registry tarball)')],
+      ...(inLock && lock.resolved ? { externalReferences: [{ type: 'distribution', url: lock.resolved }] } : {}),
+      properties: props,
     });
   }
 
@@ -191,7 +215,8 @@ export function buildSbom(opts = {}) {
     components,
     dependencies: [{ ref: 'product', dependsOn: components.map((c) => c['bom-ref']) }],
   };
-  return { bom, problems };
+  // lockfileDrift: shipped packages the lockfile does not have at that place and version (the build's node_modules was not `npm ci` of this commit)
+  return { bom, problems, lockfileDrift: problemsNote };
 }
 
 /** Structural check of an SBOM file. Returns a list of problems (empty = good). */
@@ -220,12 +245,19 @@ export function checkSbom(file, { stage } = {}) {
     if (c.purl && !/^pkg:[a-z]+\/.+@.+/.test(c.purl)) p.push(`${c['bom-ref']}: malformed purl ${c.purl}`);
   }
   for (const d of bom.dependencies || []) for (const r of [d.ref, ...(d.dependsOn || [])]) if (r !== 'product' && !refs.has(r)) p.push(`dependency on unknown ref ${r}`);
-  // the backend npm set must be the lockfile's production set (the audit's acceptance: every shipped npm package listed)
-  const want = new Set(lockfilePackages(path.join(ROOT, 'backend'), { installedOnly: false }).map((x) => `${x.name}@${x.version}`));
+  // the audit's acceptance: every shipped npm package listed. Against the staged tree when one is given (what really ships), against the
+  // lockfile's production set for an SBOM of the repository; an SBOM of a staged tree checked without the tree is checked for structure only.
+  const source = (bom.metadata?.component?.properties || []).find((x) => x.name === 'agastya:source')?.value;
   const have = new Set(all.filter((c) => c['bom-ref'].startsWith('npm:backend:')).map((c) => `${c.name}@${c.version}`));
-  const missing = [...want].filter((x) => !have.has(x)); const unexpected = [...have].filter((x) => !want.has(x));
-  if (missing.length) p.push(`backend production packages missing from the SBOM: ${missing.slice(0, 10).join(', ')}${missing.length > 10 ? ` (+${missing.length - 10})` : ''}`);
-  if (unexpected.length) p.push(`SBOM lists backend packages the lockfile does not have as production: ${unexpected.slice(0, 10).join(', ')}`);
+  let want = null; let against = '';
+  if (stage) { want = new Set(stagedPackages(path.join(stage, 'app', 'backend')).map((x) => `${x.name}@${x.version}`)); against = 'the staged app/backend/node_modules'; }
+  else if (source !== 'staged product tree') { want = new Set(lockfilePackages(path.join(ROOT, 'backend'), { installedOnly: false }).map((x) => `${x.name}@${x.version}`)); against = 'the production set of backend/package-lock.json'; }
+  else if (!have.size) p.push('no backend npm package listed');
+  if (want) {
+    const missing = [...want].filter((x) => !have.has(x)); const unexpected = [...have].filter((x) => !want.has(x));
+    if (missing.length) p.push(`backend packages in ${against} missing from the SBOM: ${missing.slice(0, 10).join(', ')}${missing.length > 10 ? ` (+${missing.length - 10})` : ''}`);
+    if (unexpected.length) p.push(`SBOM lists backend packages that are not in ${against}: ${unexpected.slice(0, 10).join(', ')}`);
+  }
   for (const ref of ['nodejs', 'temurin-jre', 'libxslt', 'libxml2']) if (!refs.has(ref)) p.push(`bundled component ${ref} is missing`);
   if (![...refs].some((r) => r.startsWith('apache-fop:'))) p.push('Apache FOP is missing');
   if (stage) {

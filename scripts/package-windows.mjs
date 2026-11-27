@@ -349,6 +349,12 @@ if (signed) {
 const builtAt = new Date().toISOString();
 const sbomBuilt = buildSbom({ stage, commit: buildCommit, builtAt, product, version, nodeVersion: nodeVer });
 if (sbomBuilt.problems.length) fail(`SBOM: ${sbomBuilt.problems.join('; ')}`);
+if (sbomBuilt.lockfileDrift.length) {
+  // the shipped node_modules is not exactly backend/package-lock.json (install with `npm ci` before a release); the SBOM lists what ships
+  const msg = `${sbomBuilt.lockfileDrift.length} shipped npm package(s) are not in backend/package-lock.json at that place and version: ${sbomBuilt.lockfileDrift.slice(0, 6).join(', ')}${sbomBuilt.lockfileDrift.length > 6 ? ' ...' : ''}`;
+  if (releaseMode) fail(`${msg}. A release ships exactly the lockfile: run npm ci in backend/ and package again.`);
+  log(`NOTE: ${msg} (marked in the SBOM)`);
+}
 fs.writeFileSync(path.join(stage, 'SBOM.cdx.json'), JSON.stringify(sbomBuilt.bom, null, 2) + '\n');
 {
   const problems = checkSbom(path.join(stage, 'SBOM.cdx.json'), { stage });
