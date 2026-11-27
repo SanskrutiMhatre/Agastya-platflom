@@ -29,7 +29,9 @@ const UNINSTALL_KEY = `HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Unins
 const startMenu = path.join(process.env.APPDATA || '', 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Agastya Platform');
 const startMenuExisted = fs.existsSync(startMenu);
 after(() => {
+  // a failed run may leave the per-user install behind: its uninstall key, and the Start-menu folder when there was none before this test
   spawnSync('reg', ['delete', UNINSTALL_KEY, '/f'], { encoding: 'utf8' });
+  if (!startMenuExisted) fs.rmSync(startMenu, { recursive: true, force: true });
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 const put = (p, c) => { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, c); return p; };

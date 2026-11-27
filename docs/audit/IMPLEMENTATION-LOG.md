@@ -1390,3 +1390,114 @@ Behaviour-preserving unless stated; decisions taken from the audit's recommendat
     `zipio.ts`. PNG encoders: the vendor copy stays (ARC-007 says so).
   - `serial` (2 job chains) and `runTool` (process runner): WP-14's job service, as 03 section 3 recommends. `paths.ts` / `atomic.ts`: WP-11.
   - Frontend escapers (`studio/core/xml.ts` and the JSS/JSG editors' own) were not part of the PUB-028 count and were not touched.
+
+## Phase 8 (continued)
+
+### WP-25 Standalone installer, launcher, offline update and rollback, Mode A (DEP-023, QA-009, PRD-005; gates G-DEP-1/2/5, G-REL-3) - done, with the limits listed
+
+* **Versioned program folder** (`packaging/host/Update.cs`, `AgastyaHost.cs`): each version's full tree lives in `<install>\versions\<version>\`.
+  `current` and `previous` are pointer files, written atomically. `AgastyaPlatform.exe` and `AgastyaCtl.exe` at the root are a launcher: copies of
+  the current version's, refreshed by renaming the old file aside, so a running launcher never blocks an update. A flat 2.0.0 install, portable copy
+  or dev tree is moved into `versions\<ver>` on its first update. `state.dir`, `portable.flag`, the `agastya.ini` lookup and the service binPath use
+  the install folder, never the version folder. New commands: `--versions`, `--prune-versions`, `--repair-launcher`. `--doctor` shows the version
+  folder, launcher drift, the versions kept and WebView2.
+* **Offline update package** `.agupdate` (`scripts/release/update-package.mjs`): the packager builds it as step 10b and lists it in SHA256SUMS.
+  `--no-update` skips it; release mode requires it to be signed. It is a ZIP holding:
+  - `update-info.txt`: format, product, app-id, version, min-from-version, commit, manifest hash, counts, notes;
+  - `update-info.txt.sig`: the WP-24 detached signature;
+  - `payload/`: the whole tree with its signed `MANIFEST.sha256`.
+
+  Each package carries the full tree; there are no deltas.
+* **`AgastyaCtl --verify-update <file>` and `--apply-update <file>`**:
+  - **Verified before anything changes:** safe entry names; signature; trust; product and app-id; newer version; min-from range; every payload file
+    streamed against the manifest; completeness; disk space. The signer is trusted when it matches the Authenticode signer of the installed
+    `AgastyaCtl.exe`, the signer of the installed manifest `.sig`, or a `[update] TrustedThumbprints` entry. An unsigned package needs
+    `--allow-unsigned`.
+  - **Apply:**
+    1. Stop everything. Stopped means the port no longer answers and `.agastya-server.lock` holds no live pid. There is no fixed wait.
+    2. Make a **pre-update platform backup** with `backend/scripts/agastya-backup.js --kind pre-update`, then verify it with a test restore.
+    3. Copy the DB files while the server is stopped.
+    4. Extract the package (zip-slip guard, new files only).
+    5. Switch the pointers and start the new version.
+    6. **Health check:** `/api/version` must report the expected version and `compatible:true`, then `/api/ready` must return 200, within
+       `HealthSeconds` (default 60).
+  - **On failure, automatic rollback:** the pointers go back, the DB files are restored from the stopped-state copy, and the old version is started
+    and checked. The failed DB is kept in `backups\failed-update-...`.
+  - Exit codes: 0/1/2/10/11/12/13/14/20/21/22 (`docs/OPERATIONS.md` section 8).
+  - Writes `update-history.txt` and `logs\update-*.log`. Keeps `KeepVersions` old versions (default 2). `--rollback [--restore-db]` rolls back by
+    hand.
+  - The Add/Remove Programs `DisplayVersion` follows updates and rollbacks, so the WP-24 detection rule stays right.
+* **Setup** (`packaging/installer/agastya.iss`):
+  - Installs into `versions\{#AppVersion}` plus the launcher.
+  - `PrepareToInstall` runs the new `AgastyaCtl --install-dir {app} --prepare-upgrade`, which stops the server and makes a verified pre-update
+    backup. If that fails, Setup exits with 7 and nothing has changed. The old `Sleep 4000` stop and the plain DB copy are gone.
+  - `ssPostInstall` runs `--activate`.
+  - Upgrades skip the data and port pages.
+  - The firewall rule is bound to the port, because node.exe moves with each version.
+  - `/ADMINUSER=` and `/ADMINPASSWORDFILE=` create the first administrator unattended through `backend/scripts/first-admin.js`. The password goes on
+    stdin only; it is temporary and must be changed at the first sign-in. Nothing happens if an admin already exists.
+  - Uninstall keeps the data unless `/PURGEDATA` is given or the user answers Yes (default No). `--remove-data --confirm` refuses drive roots,
+    profile and system folders, and the program folder.
+  - Version folders, pointers and history are removed with the program.
+* **Window and WebView2 (PRD-005)**:
+  - The host detects the Evergreen WebView2 runtime (the EdgeUpdate client `pv` value).
+  - It opens the UI as an Edge app window (`msedge --app=`). Without Edge it falls back to the default browser and shows a tray notice.
+    `[app] Window=auto|app|browser` chooses.
+  - `/api/version` reports `shell.webview2` and `shell.window` (`backend/src/config.ts`, `app.ts`).
+  - The build never downloads Microsoft's offline runtime installer. When `packaging/redist/MicrosoftEdgeWebView2RuntimeInstallerX64.exe` is present,
+    it ships in `redist\`. Setup runs it on a machine without the runtime, and every offline update runs it again.
+* **Other changes:**
+  - `scripts/verify-installer.mjs`, `Verify-Release.ps1 -Tree` and `verify-release.mjs --tree` follow `current` into the version folder.
+  - `Test-InstallerInVm.ps1` expects the version folder and the port-bound rule (parse-checked only).
+  - The support bundle carries the newest update, rollback and setup logs.
+  - `agastya.ini.template` gained an `[update]` section.
+  - Docs: `OPERATIONS.md` sections 1, 2, 8, 9 and 10; `DEPLOYMENT-KIT.md`; `PACKAGING.md`.
+* **Recorded decisions:**
+  - **An Edge app window, not an embedded WebView2 control.** The WebView2 SDK is not available offline. The Edge window uses the same engine, in a
+    separate window.
+  - Update packages carry the full tree, no deltas.
+  - The installed version's Ctl applies an update. The new version's backup tool is used only when the installed version has none.
+  - A Setup upgrade gets the verified backup and a one-command `--rollback`, but **no automatic health-checked rollback**: by then Inno has replaced
+    the launcher.
+  - A rollback restores the DB files only. Project files are covered by the pre-update platform backup.
+  - Trust on install: the installed signer is the anchor.
+  - KeepVersions 2; HealthSeconds 60.
+  - Migrations stay additive. `--rollback` without `--restore-db` refuses (exit 22) when the previous version cannot open the newer database.
+* **Verified (2026-11-27).** Every run used throwaway self-signed `.pfx` files in temp folders; no certificate store was touched. Every install went
+  into `%TEMP%`.
+  - `scripts/release/update.test.mjs`: 6/6, against the real `agastya-backup.js` and `first-admin.js` with the compiled backend. Covered:
+    - refusals (unsigned, stranger signer, tampered payload, older, same, min-from, truncated zip), with the program and DB byte-identical afterwards;
+    - a good update, with the pre-update backup re-verified and the launcher refreshed;
+    - a broken update (DB break, `/api/ready` 503): exit 20, the DB byte-identical, the failed DB kept aside;
+    - pruning with KeepVersions=1;
+    - `--rollback` twice, and `--restore-db`;
+    - flat adoption;
+    - `--prepare-upgrade` and `--activate`;
+    - first-admin run twice (the second run changes nothing);
+    - `--remove-data` refusals.
+  - `scripts/release/installer.test.mjs`: 1/1 with **the real Inno installer**.
+    - Two Setups (1.0.0 and 1.1.0, random AppId) built with ISCC.
+    - Installed with `/VERYSILENT /CURRENTUSER /DIR=%TEMP%\...` plus `/ADMINUSER` and `/ADMINPASSWORDFILE`: the admin was created.
+    - Upgraded with a verified backup.
+    - `--rollback`: the launcher and Add/Remove Programs back at 1.0.0.
+    - Uninstalled keeping the data, reinstalled, then uninstalled with `/PURGEDATA`.
+    - Afterwards its HKCU uninstall key, Start-menu folder and temp folder are gone (checked).
+    - A first run failed on a real bug: the ini template path after the move to `versions\`. It is fixed in `agastya.iss`, and a missing template is
+      now logged instead of passing silently. I removed that run's leftover Start-menu folder by hand.
+  - Also run and passing:
+    - `scripts/release/host.test.mjs` 6/6;
+    - `scripts/release/release.test.mjs` 8/8;
+    - backend `test/wp13-version.test.js` 4/4;
+    - `npx tsc -p .`;
+    - `node scripts/ci/lint.mjs` (exit 0);
+    - `node --check` on the changed scripts;
+    - the PowerShell parse of `Verify-Release.ps1` and `Test-InstallerInVm.ps1`.
+  - `installer.test.mjs` and `update.test.mjs` are registered in `test-plan.json` `scriptTests.release-tools`.
+* **Not done or blocked externally:**
+  - The clean-VM matrix (G-DEP-1/2 on Windows 10/11/Server, per-machine install, service path) and the VM harness changes were not executed.
+  - The **service** update path (stopping and starting the Windows service) is coded, but only the console path was run.
+  - No real certificate or time stamp (D4).
+  - The WebView2 offline redist binary is not in the repository (it is a Microsoft download, under Microsoft's licence). The WebView2-missing path on
+    a Server SKU was not tried.
+  - No full `npm run package:win` with the update package; it needs `frontend/dist` and the bundled runtimes.
+  - G-REL-3 was not run against a real previous release; only the synthetic 1.0.0/1.1.0 stages.

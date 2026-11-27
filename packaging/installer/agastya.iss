@@ -365,7 +365,10 @@ begin
 
   if not FileExists(IniPath) then
   begin
-    if LoadStringFromFile(ExpandConstant('{app}\docs\agastya.ini.template'), Tpl) then
+    // WP-25: the template is in this version's folder (versions\<version>\docs); a missing one is logged, never silent
+    if not LoadStringFromFile(ExpandConstant('{app}\versions\{#AppVersion}\docs\agastya.ini.template'), Tpl) then
+      Log('agastya.ini.template is missing from the program folder: agastya.ini was not written (the defaults apply)')
+    else
     begin
       Text := String(Tpl);
       if LanWanted then Bind := 'lan' else Bind := 'loopback';
