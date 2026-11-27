@@ -157,6 +157,46 @@ test('PLT-006: when the copy cannot be made, the upgrade stops and nothing is mi
   after.close();
 });
 
+test('G-REL-3 migration matrix: a database stopped after any earlier step upgrades to the same schema as a new one, with its data, after a copy', () => {
+  const { openSqlite } = require('../dist/storage/sqlite');
+  /** The schema as SQLite stores it (tables, indexes; the bookkeeping columns of schema_migrations included). */
+  const norm = (sql) => (sql == null ? sql : String(sql).replace(/\s+/g, ' ').replace(/\( /g, '(').replace(/ ([,)])/g, '$1'));   // layout only, never content
+  const dump = (ws) => { const d = open(ws, { readOnly: true }); try { return d.prepare("SELECT type, name, tbl_name, sql FROM sqlite_master WHERE name NOT LIKE 'sqlite_%' ORDER BY type, name").all().map((r) => ({ ...r, sql: norm(r.sql) })); } finally { d.close(); } };
+  const fresh = tmp(); startOn(fresh);
+  const target = dump(fresh);
+  /** A database as an older build left it: the first `k` steps applied by the same rules as AuthStore.migrate, plus an account once one can exist. */
+  const olderBuild = (k) => {
+    const ws = tmp(); const db = openSqlite(ws);
+    db.exec('CREATE TABLE IF NOT EXISTS schema_migrations (name TEXT PRIMARY KEY, applied_at TEXT NOT NULL);');
+    for (const m of STEPS.slice(0, k)) {
+      if (m.fkOff) db.exec('PRAGMA foreign_keys = OFF');
+      if (m.sql) db.exec(m.sql);
+      for (const [table, col, def] of m.columns || []) if (!db.prepare('SELECT 1 FROM pragma_table_info(?) WHERE name = ?').get(table, col)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def};`);
+      db.prepare('INSERT INTO schema_migrations (name, applied_at) VALUES (?, ?)').run(m.name, '2026-01-01T00:00:00Z');
+      if (m.fkOff) db.exec('PRAGMA foreign_keys = ON');
+    }
+    const hasUsers = db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'users'").get();
+    if (hasUsers) db.prepare("INSERT INTO users (id, username, full_name, role, password_hash, created_at, updated_at) VALUES ('u1', 'keep', 'Keep Me', 'admin', 'h', 'x', 'x')").run();
+    db.prepare("INSERT INTO projects (id, name, created_at, updated_at) VALUES ('p1', 'Kept', 'x', 'x')").run();
+    db.close();
+    return { ws, hasUsers: !!hasUsers };
+  };
+  for (const k of [1, 3, 13, 15, 16, 18, STEPS.length - 2, STEPS.length - 1]) {
+    const { ws, hasUsers } = olderBuild(k);
+    const { snapshot } = startOn(ws);
+    assert.ok(snapshot && path.basename(snapshot) === `publisher-before-${STEPS[k].name}.db`, `k=${k}: the copy is named after the first pending step`);
+    assert.deepEqual(dump(ws), target, `k=${k}: the same schema as a new database`);
+    const d = open(ws, { readOnly: true });
+    try {
+      assert.equal(d.prepare("SELECT name FROM projects WHERE id = 'p1'").get().name, 'Kept', `k=${k}: data kept`);
+      if (hasUsers) assert.equal(d.prepare("SELECT username FROM users WHERE id = 'u1'").get().username, 'keep', `k=${k}: account kept`);
+      assert.equal(d.prepare('PRAGMA foreign_key_check').all().length, 0);
+      assert.equal(d.prepare('PRAGMA quick_check').get().quick_check, 'ok');
+      assert.equal(d.prepare('PRAGMA user_version').get().user_version, schema.migrationNumber(LAST));
+    } finally { d.close(); }
+  }
+});
+
 test('PLT-006 retention: only the newest N pre-migration copies are kept; other files in backups/ are never touched', () => {
   const dir = path.join(tmp(), 'backups'); fs.mkdirSync(dir);
   const t0 = Date.now() / 1000;

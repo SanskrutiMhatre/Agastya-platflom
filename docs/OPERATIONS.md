@@ -101,20 +101,104 @@ The *Audit log* inside the application (Administrator) records who did what; it 
 
 ## 7. Backups
 
-Everything worth keeping is in the **data folder**. Back it up with your normal tool while the server is stopped. To restore: stop the
-server, put the folder back, start it.
-The application's *Backup* page (and *Project data export* under Administrator) makes an export of the project data, not a backup: it holds
-the projects, the people and their memberships and the last 5,000 activity events, but no passwords, platform settings or release records,
-and it cannot be restored from the application.
-Before every upgrade the installer copies `publisher.db` (and its `-wal`/`-shm` files) to `<data folder>\backups\pre-upgrade-<old version>-<date-time>\`.
-That copy covers the database only; it is a safety net, not a replacement for a backup of the whole folder.
+Everything worth keeping is in the **data folder**: the database `publisher.db` (accounts and password hashes, sessions, revision history,
+releases and approvals, locks, grants, settings, the audit log) and the files (every project, the shared repository, house templates).
+
+### The platform backup
+
+*Administrator → Maintenance → Platform backup* makes **one archive that restores the whole platform**:
+`agastya-backup-<date>-<time>Z-<kind>.zip` in `<data folder>\backups\platform\` (or the folder in `AGASTYA_BACKUP_DIR`). It holds
+
+* `database/publisher.db` - a consistent image of the database taken with SQLite's online-backup API while the server runs, checked
+  (`integrity_check`) before it is added;
+* `workspace/...` - every file of the data folder, except the live database files, the server lock and the backups themselves;
+* `manifest.json` - the version that made it, the database schema it carries, per table the row count and a SHA-256 over every row, and per
+  file its size and SHA-256.
+
+The archive is written to disk as it is made (it is never held in memory, the server keeps answering) and works above 4 GB (ZIP64).
+Only administrators can make, download, copy, verify or restore one. **It contains every account's password hash: keep it, and every
+copy of it, where only administrators can read it.**
+
+* **Schedule.** The server makes a backup every 24 hours (`AGASTYA_BACKUP_INTERVAL_HOURS`; `0` switches it off; the first one 10 minutes
+  after a start) and keeps 7 daily, 4 weekly and 12 monthly scheduled backups (`AGASTYA_BACKUP_KEEP`, default `7/4/12`). Backups made by
+  hand or before an update are never removed automatically; delete them on the page when they are no longer needed.
+* **Restore test.** Once a week (`AGASTYA_RESTORE_TEST_DAYS`, `0` = off) the newest backup is restored into a scratch folder, every file and
+  table is compared with its manifest, and the folder is removed. *Verify* on the page does the same for one archive at once. A failed
+  backup or restore test appears on the page and in every administrator's notifications.
+* **Keep a copy elsewhere.** *Copy to…* copies an archive to another folder (a second disk, a USB stick) and checks the copy byte for
+  byte; *Download* saves it through the browser. A backup on the same disk as the data does not survive that disk.
+* The page warns when the newest backup is older than 7 days; `--doctor` (and `npm run doctor`) reports it too.
+
+From the command line (the server may be running or stopped):
+
+```
+"C:\Program Files\Agastya Platform\runtime\node.exe" "C:\Program Files\Agastya Platform\app\backend\scripts\agastya-backup.js" backup --workspace "C:\ProgramData\Agastya Platform\workspace" [--to E:\Backups]
+... agastya-backup.js verify  <archive>
+... agastya-backup.js restore <archive> <new folder>
+... agastya-backup.js check   --workspace <data folder>
+```
+
+Exit code 0 means done (or healthy), 1 refused or failed with the reason printed.
+
+### Restore
+
+A restore **never overwrites anything**: it goes into a new (or empty) folder, and the running data folder is not touched.
+
+1. *Administrator → Maintenance → Platform backup → Restore…* (or `agastya-backup.js restore <archive> <new folder>`). Every file is checked
+   against the manifest (size and SHA-256), the database is checked (`integrity_check`, `foreign_key_check`, every table's row count and
+   digest) and only then is the folder put in place. An archive that is damaged, changed, has entries its manifest does not list, or was
+   made by a **newer** version of the program is refused with the reason, and nothing is left behind.
+2. Stop the server.
+3. Point it at the restored folder: set `AGASTYA_WORKSPACE_DIR` to it (or, with the server stopped, rename the old data folder away and the
+   restored folder into its place).
+4. Start the server. It checks the database, takes a safety copy and runs any migration this version adds to an older backup.
+5. Sign in (the passwords are the ones at the time of the backup) and open a project.
+
+Restoring by copying a folder by hand still works: copy the whole data folder of a **stopped** server, and put it back while the server is
+stopped. A copy of a running server's folder is not consistent; use the platform backup for that.
+
+**Recovery objectives (state these to your users).** RPO - how much work can be lost: up to the backup interval (24 hours by default;
+a shorter `AGASTYA_BACKUP_INTERVAL_HOURS` shortens it). RTO - how long a recovery takes: the restore runs at roughly the speed of the disk
+(a few seconds for a small installation; measure yours with *Verify*, which performs the same work), plus stopping and starting the server.
+For a disaster (the machine is gone): install the **same or a newer** version, restore the newest archive from the off-machine copy into
+the new data folder, start. Keep the installer of the version you run with your backup copies.
+
+### What else is kept
+
+* **Before every database migration** (the first start of a newer version) the server writes a verified copy of `publisher.db` to
+  `<data folder>\backups\publisher-before-<first new migration>.db` (never overwriting an existing file; the newest 5 are kept,
+  `AGASTYA_KEEP_MIGRATION_SNAPSHOTS`). If that copy cannot be made, the server does **not** migrate and does not start; it says why.
+* Before every upgrade the installer also copies `publisher.db` to `<data folder>\backups\pre-upgrade-<old version>-<date-time>\`.
+* **Retention.** Once a day: sessions that ended more than 30 days ago, notifications read more than 90 days ago and decided password-reset
+  requests older than 90 days are removed; audit-log entries older than 2 years are first written to
+  `<data folder>\audit-archive\audit-<first id>-<last id>-<date>.jsonl.gz` (so they travel with the next backup) and then removed from the
+  live table. Settings: `AGASTYA_RETENTION_SESSIONS_DAYS`, `AGASTYA_RETENTION_NOTIFICATIONS_DAYS`, `AGASTYA_RETENTION_RESET_REQUESTS_DAYS`,
+  `AGASTYA_AUDIT_RETENTION_DAYS` (`0` keeps for ever). Revision history is never purged automatically.
+* The *Backup* page and *Project files export* (Administrator) make an **export** of project files for reading or handing on - not a backup:
+  no passwords, settings, history or release records, and it cannot be restored.
 
 ## 8. Upgrading
 
 Run the new `Setup.exe` over the old one (same install folder is offered). It closes the running copy, backs up the database (section 7), replaces the
-program, keeps `agastya.ini` and the data, and starts the service again if one was installed. **To go back:** uninstall, install the older version, and put
-the `publisher.db` from `backups\pre-upgrade-...` back into the data folder. (A newer version may have changed the database; do not point an older
-version at a database a newer one has opened without restoring this copy.)
+program, keeps `agastya.ini` and the data, and starts the service again if one was installed. At its first start the new version takes a verified copy
+of the database before it changes anything (section 7). Migrations only ever add tables, columns and indexes; there are no "down" migrations - **the way
+back is a copy taken before the upgrade**.
+
+**To go back:** uninstall, install the older version, and restore the platform backup made before the upgrade (section 7), or put the `publisher.db`
+from `backups\publisher-before-...db` (or `backups\pre-upgrade-...`) back into the data folder. An older version **refuses to start** on a database a
+newer version has migrated ("This database was written by a newer version of Agastya Platform ...") instead of damaging it; it also refuses to restore
+a backup made by a newer version. Either install the newer version again or restore a copy taken with the older one.
+
+The database is checked (`quick_check`) at every start. A damaged file stops the start with "The database failed its integrity check"; stop there,
+restore the newest backup into a new folder (section 7) and point the server at it.
+
+### Why SQLite, and when that changes
+
+The platform keeps its records in one SQLite file next to the project files: no database server to install, patch or back up separately, and a
+consistent online backup. It is opened with a 5 second wait for locks, foreign keys enforced, write-ahead logging, a `quick_check` at start and a
+checkpoint at a clean stop. Moving to PostgreSQL is worth its cost only when one of these is measured, not assumed: write latency (p95) above 200 ms
+or event-loop delay above 100 ms at normal load; a requirement for two application servers or a hot standby; a recovery point under one minute;
+or a company rule that application data must live in the managed database platform. The storage layer is already separated for that step.
 
 ## 9. Silent installation
 
@@ -172,6 +256,11 @@ The exit code is the standard Inno Setup one (0 = success; anything else is a fa
 | A project shows **Folder missing** | its folder under `projects\` was not there when the server started (a drive not mounted yet, antivirus quarantine, a moved folder, a partial restore). Nothing was deleted: the project keeps its members. Put the folder back and restart the server, or delete the project (type its name to confirm). |
 | A project from an import disappeared after a restart | the server was stopped while that import was still running; the half-made project is removed at the next start and the audit log says so (`project.import_discarded`). Import it again. |
 | "The server is busy for a moment" (503) | another program held the database longer than 5 seconds (a backup tool copying `publisher.db`, an antivirus scan, `--reset-admin`). Try again; configure backup tools to copy a stopped server's data folder, or the backup the platform makes. |
+| The server log says "This database was written by a newer version of Agastya Platform" and the server stops | an older version was installed over a newer one. Nothing was changed. Install the newer version again, or restore a backup taken with this version (section 8). |
+| "... differs from the one this database applied (checksum)" | the program files were altered (a migration step was edited). Reinstall the version you run. |
+| "The database failed its integrity check" | the database file is damaged (disk fault, a copy taken while the server ran). Restore the newest platform backup into a new folder and point the server at it (section 7). |
+| "The safety copy of the database before migration ... could not be made" | the first start of a newer version could not write `backups\publisher-before-...db` (disk full, the folder not writable). The database is unchanged; free space or fix the permission and start again. |
+| *Platform backup* shows "The last backup failed" or a failed restore test | the message names the cause (disk full, a damaged file). Make a backup by hand once it is fixed and *Verify* it. |
 
 A clean stop (the tray's Stop, `net stop`, closing the console) lets requests that are running finish for up to 15 seconds, then writes
 the database's journal back into `publisher.db` and gives the data folder back. A copy of the data folder taken after a clean stop is complete.

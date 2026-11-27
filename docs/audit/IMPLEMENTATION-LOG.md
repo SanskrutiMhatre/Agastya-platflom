@@ -908,6 +908,89 @@ order of 08 section 7:
 * Limits: the installer is **not** rebuilt with Node 24 (release work: `npm run package:win -- --node C:\Users\Admin\Desktop\_tools\node-v24.22.3-win-x64\node.exe`,
   then `verify-installer`); the full backend suite, the gate and Playwright were not run on Node 24 (or on this branch); the performance
   baseline (B1-B13) is not re-taken on Node 24, so the phase-2 exit criterion "baseline re-measured" is open.
+
+### WP-12 Data protection: complete backup, tested restore, safe migrations, retention (PLT-001, PLT-005, PERF-006, PLT-006, PLT-007, PLT-011, PLT-013, DEP-001 part, DEP-002, DEP-008, ENT-006, ENT-013, ENT-015, ARC-005, DEP-025, PLT-029, RES-002, DEP-013, ARC-003) - done, with the limits listed
+
+Decisions taken from the audit (no owner question): the platform backup is a ZIP (the existing ZIP64 streaming writer) of a SQLite
+online-backup image + every data-folder file + a SHA-256 manifest; restore goes only into a NEW or empty folder and the switch-over is an
+operator step (point `AGASTYA_WORKSPACE_DIR` at it), so the owner's live data folder is never overwritten; migrations stay additive and
+forward-only ("down" = the pre-migration copy); the historical migration order (014, 015 first) is kept and only new steps must be appended
+in number order; schedule 24 h, retention 7/4/12 for scheduled backups only (manual / pre-update archives are kept until an administrator
+deletes them); pre-migration copies keep the newest 5; housekeeping retention 30 d sessions / 90 d read notifications / 90 d decided reset
+requests / 730 d audit (archived to a gzip file first); all are settings, 0 = off / keep for ever. RPO = backup interval, RTO = measured by Verify.
+
+* **Migration framework (PLT-011, PLT-006, ARC-003, DEP-002, ENT-013, PLT-013).** `storage/schema.ts`, called by `AppContext.start()` in this
+  order before anything is written: `checkOrder` (unique names and NNN numbers, no gap, new steps appended), `quickCheck` (a damaged file stops
+  the start: "failed its integrity check ... restore the latest backup"), `inspectSchema` (a migration unknown to this build or a
+  `user_version` above its highest number = a database from a NEWER build: refused, file untouched; a recorded checksum that differs from the
+  step = an edited shipped migration: refused naming it), `snapshotBeforePendingMigrations` (ONE `VACUUM INTO` copy before the first pending
+  step of ANY number, `publisher-before-<step>.db`, never overwriting, checked with quick_check; failure = `SNAPSHOT_FAILED`, nothing migrated;
+  newest 5 kept), then `AuthStore.migrate` unchanged, then `recordApplied` (SHA-256 checksum + program version per step, backfilled for
+  existing rows, and `PRAGMA user_version`). `schema_migrations` gets two columns by `ALTER TABLE ADD COLUMN` (additive). `context.ts` prints
+  the refusal on top before the process stops. The old 016-only `snapshotBeforeMigration` is kept unchanged for its test, no longer called.
+* **Migration 022-audit-project-index** (PLT-007): `ix_audit_project ON audit_log(project_id, id)`; the activity query plan uses it (tested).
+  NOTE for the merge: if another package also added a `022-...`, renumber one of them (`checkOrder` refuses two 022s).
+* **Platform backup (PLT-001, PLT-005, PERF-006, DEP-008, DEP-025, ENT-006, ARC-005).** `storage/dbImage.ts` (node:sqlite `backup()` in page
+  steps, VACUUM INTO fallback, image switched to rollback journal = one self-contained file; `inspectDatabaseFile` = integrity_check,
+  foreign_key_check, applied migrations, user_version, per table rows + SHA-256 over every row; run in a worker thread so the server keeps
+  answering), `services/platformBackup.ts` (`createPlatformBackup`: image checked before use, every file streamed from disk into the ZIP with
+  its SHA-256 (`ZipStreamWriter.addFile` now returns size/CRC/SHA-256), `.partial` + fsync + rename, one at a time (`BUSY`); excludes the live
+  db/wal/shm, the server lock and `backups/`), `restorePlatformBackup` (refuses a non-empty target, a non-ZIP, a foreign/newer manifest format,
+  a backup whose manifest OR database carries migrations this build does not know, a missing or an unlisted entry, any size/SHA-256
+  mismatch, a database whose integrity, foreign keys or any table's rows/digest differ; extracts into a sibling staging folder and renames
+  only when everything matched; leaves nothing on failure), `verifyPlatformBackup` (= restore into a scratch folder, then removed),
+  `retainedBackups`/`pruneScheduledBackups` (grandfather-father-son), `copyBackupTo` (copy + SHA-256 comparison, never overwrites).
+* **Jobs (ENT-006, RES-002 9.7, PLT-007, ENT-015).** `services/dataProtection.ts`: `backupNow` (audited `backup.created`/`backup.failed`),
+  `restoreTest` (newest backup; failure audited and sent to every administrator's notifications), `runRetention` (repository
+  `repositories/retentionRepository.ts`; audit rows paged by id, written to `<workspace>/audit-archive/audit-<ids>-<date>.jsonl.gz`, read back,
+  then removed up to the archived id - so the archive travels with the next backup), `tick` (scheduled backup when due + pruning, restore test
+  weekly, retention daily; each independent), `startScheduler` (from `index.ts` only, first run 10 min after start, hourly, unref'd; stopped on
+  shutdown), `status`. State in `<backup dir>/backup-state.json` (atomic write). Config (`config.ts`): `AGASTYA_BACKUP_DIR`,
+  `AGASTYA_BACKUP_INTERVAL_HOURS`, `AGASTYA_BACKUP_KEEP`, `AGASTYA_KEEP_MIGRATION_SNAPSHOTS`, `AGASTYA_RESTORE_TEST_DAYS`,
+  `AGASTYA_RETENTION_{SESSIONS,NOTIFICATIONS,RESET_REQUESTS}_DAYS`, `AGASTYA_AUDIT_RETENTION_DAYS` (invalid values stop the start, named).
+* **Routes (administrators only, authz snapshot updated: 8 new rows, all `requireAdmin`).** `routes/backups.ts`: `GET/POST /api/admin/backups`,
+  `GET .../:name/download` (streamed), `POST .../:name/verify|copy|restore`, `DELETE .../:name`; names must match the archive pattern (no path
+  parts); copy/restore targets must be absolute and outside the running data folder and the backups folder; restore answers the switch-over steps.
+* **Project files export (PERF-006, PLT-005, DEP-025, PLT-029).** `GET /api/backup` keeps its scope and content (authors: their projects) but is
+  now streamed from disk with the ZIP64 writer through a pipeline (a client that disconnects stops it), one at a time per server (409 `BUSY`);
+  its manifest says `restorable: false`. The in-memory `services/zip.ts` is deleted.
+* **CLI and doctor (DEP-013, PLT-013, DEP-001 part).** `backend/scripts/agastya-backup.js backup|verify|restore|check` (works with the server
+  running; `--kind pre-update` for the installer of WP-25). `npm run doctor`: database quick_check, schema not newer than this version, newest
+  platform backup under 7 days (read-only open).
+* **UI.** Administrator > Maintenance: new *Platform backup* panel (`pages/PlatformBackups.tsx`: back up now, stale/failed warnings, schedule
+  and last restore test, per archive Download / Verify / Copy to... / Restore... / delete, the switch-over steps after a restore); the old card
+  renamed *Project files export* with "not a backup" wording; the Backup page's administrator note points to the platform backup; activity labels.
+* **Docs.** `docs/OPERATIONS.md` sections 7-8 rewritten: what the backup holds, schedule, restore test, copy elsewhere, CLI, restore runbook
+  (never overwrite; switch-over), RPO/RTO, pre-migration copies, retention, forward-only upgrades and the downgrade refusal, the SQLite
+  switch criteria (RES-002); five new rows in "When something is wrong".
+* Verified (backend `tsc` 0 errors; each file alone, `--test-concurrency=1`, `AGASTYA_CLIENT_DIST` = the main checkout's `frontend/dist`):
+  new `wp12-migrations` 10/10 (order rules; checksums/version/user_version recorded; newer database refused and the file byte-identical;
+  edited migration refused; a scribbled database refused at start; the copy before a pending 022 predates it, holds the data and, put in place
+  of the database in a new folder, starts with the data; synthetic future step gets its own copy beside an existing file; copy failure =
+  nothing migrated; snapshot pruning; the G-REL-3 matrix: databases stopped after steps 1, 3, 13, 15, 16, 18, 20, 21 upgrade to the same
+  schema as a new one with their rows, a named copy, foreign_key_check and quick_check clean); new `wp12-backup-restore` 7/7 (G-REL-1: every
+  table incl. audit_log row-for-row and every file byte-for-byte equal after a restore, a server started from `dist/index.js` on the restored
+  folder signs `meera` in with her old password and serves the module, its history and `/api/version` compatible; a backup during concurrent
+  saves verifies; a second concurrent backup BUSY; refusals: non-empty target, truncated, changed file, added entry, newer manifest, a database
+  carrying an unknown migration behind a clean manifest, a foreign format - nothing left behind; admin routes incl. 403 for a project manager,
+  download = file, path-traversal name 404, verify, copy + no overwrite, restore refused inside the data folder / relative, restore, refused
+  twice, delete; GFS keeps 7 days / one per month for 12 months / manual and foreign files; retention with archive file and the query plan;
+  the schedule due/not due); `wp10-storage-contract` 11/11 (new retention case); `wp10-seams` 11/11 (ORDER with 022 appended); `db-snapshot`
+  4/4; `s1000d-migration` 2/2 (the generic copy keeps the 016 name); `wp06-lifecycle` 5/5; `project-archive` 5/5; `notifications` 6/6
+  (the streamed export); `phase13` 12/12; `wp13-version` 4/4; `api` 17/17; `admin-ops` 8/8; `packages` 10/10; `authz-matrix` 6/6 (after the
+  reviewed snapshot update); `routes-guarded` 1/1. CLI tried by hand on a scratch workspace: backup, verify, restore, restore into a non-empty
+  folder refused, check; `npm run doctor` with `AGASTYA_WORKSPACE_DIR` = that workspace shows the three new rows ok. Frontend: `tsc --noEmit`
+  clean; vitest `src/pages/PlatformBackups.test.tsx` 2/2. `node scripts/ci/lint.mjs` green (no new `any` / `require(`).
+* Limits / not done: (1) DEP-001 installer side - `packaging/host/AgastyaHost.cs` still makes its fixed-wait `pre-upgrade-*` copy; making the
+  installer call `agastya-backup.js backup --kind pre-update` and refuse to continue on failure belongs to WP-25 (release engineering runs in
+  parallel; the packaging code was not touched). The server-side generic pre-migration copy now covers every start, installer or not.
+  (2) "Restore ... runs migrations": the restore does not migrate; the first start on the restored folder does, after its own verified copy
+  (proven in `wp12-migrations`). (3) The weekly restore test checks files, tables, integrity and foreign keys; it does not boot a second server
+  (the round-trip test does that). (4) ZIP64 is exercised by the writer's forced-ZIP64 case in `zipio.test.js`, not by a real 4 GiB backup;
+  no 1 GB event-loop measurement was taken on this machine (shared host). (5) The archive is not encrypted (it holds password hashes); the
+  docs say to keep it administrator-only; encryption at rest is left to the OS / WP-28 (central backup). (6) Revisions and blobs are not
+  purged by retention (the audit: explicit action only). (7) The node:sqlite `backup()` call exists in Node 22.23.2 (used here) and is part of
+  Node 24 (WP-13 pin); it was not run on 24.22.3 in this package. (8) Playwright, the full backend suite and the gate were not run.
 ## Phase 3
 
 ### WP-33 S1000D FO-stage scaling, the vendored stylesheet (PERF-003, P0) - done

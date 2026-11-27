@@ -20,6 +20,7 @@ import { DEFAULT_ACCENT, deriveAccent } from '../lib/accent';
 import { useUi } from '../store/ui';
 import { Audit, Users } from './Settings';
 import { CatalogueSection, SnsPresetsSection, ExtensionsSection, CoverageSection } from './AdminS1000d';
+import { PlatformBackups } from './PlatformBackups';
 
 const REFERENCE: Array<[string, string]> = [
   ['country-codes', 'Country codes'], ['language-codes', 'Language codes'], ['dm-types', 'DM types'],
@@ -271,12 +272,13 @@ function MaintenanceSection() {
             {result[c.id] ? <p className="v2-hint" style={{ marginBottom: 0 }} data-testid={`maint-${c.id}-result`}>{result[c.id]}</p> : null}
           </div>
         ))}
+        {/* WP-12 (PLT-001, ENT-006, ARC-005): the restorable platform backup; the project files export below is a convenience copy */}
+        <PlatformBackups />
         <div className="v2-card v2-card-pad">
-          {/* WP-07 (FE-013): named for what it holds; a database backup with restore is WP-12 */}
-          <h4 style={{ marginTop: 0 }}>Project data export</h4>
-          <p className="v2-sub">A ZIP of every project, the people and their memberships, and the last 5,000 events of the activity log.</p>
-          <p className="v2-hint">It is not a database backup: it holds no passwords, settings or release records, and it cannot be restored from here. For a complete backup, copy the data folder of the stopped server (administrator guide, section 7).</p>
-          <a className="btn btn-primary" href="/api/backup" download>Export project data</a>
+          <h4 style={{ marginTop: 0 }}>Project files export</h4>
+          <p className="v2-sub">A ZIP of every project's files, the people and their memberships, and the last 5,000 events of the activity log, to read or hand on.</p>
+          <p className="v2-hint">It is not a backup: it holds no passwords, settings, history or release records and cannot be restored. Use Platform backup above for that.</p>
+          <a className="btn" href="/api/backup" download>Export project files</a>
         </div>
         <div className="v2-card v2-card-pad">
           <h4 style={{ marginTop: 0 }}>Download logs</h4>
