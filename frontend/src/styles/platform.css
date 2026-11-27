@@ -336,15 +336,7 @@ a:hover { text-decoration: underline; }
 .v2-bell-count { position: absolute; top: -3px; right: -3px; margin: 0; padding: 0 4px; min-width: 16px; font-size: 10px; line-height: 16px; background: var(--accent); color: var(--accent-text); border-radius: 8px; text-align: center; }
 /* compact layout (administrator setting): html.v2-compact switches the density tokens in tokens.css (DS-006); the table header follows here */
 html.v2-compact .v2-table th { padding-top: 5px; padding-bottom: 5px; }
-
-/* ---------------------------------------------------------- graphics, administrator, review */
-.v2-gfx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
-.v2-gfx { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-elev); display: flex; flex-direction: column; }
-.v2-gfx-thumb { height: 120px; display: grid; place-items: center; background: repeating-conic-gradient(var(--bg-hover) 0 25%, transparent 0 50%) 0 0 / 16px 16px; }
-.v2-gfx-thumb img { max-width: 100%; max-height: 100%; object-fit: contain; }
-.v2-gfx-meta { padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; }
-.v2-drop { border-style: dashed; }
-.v2-drop.over { border-color: var(--accent); background: var(--accent-soft); }
+/* ---------------------------------------------------------- administrator, review (graphics: styles/pages/graphics.css) */
 .v2-pre { font-family: var(--font-mono); font-size: 12px; white-space: pre; background: var(--bg-hover); border-radius: 6px; padding: 10px; }
 .v2-admin { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 18px; align-items: start; }
 .v2-admin-nav { display: flex; flex-direction: column; gap: 10px; position: sticky; top: 8px; }
