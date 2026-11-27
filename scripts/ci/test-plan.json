@@ -13,7 +13,7 @@
   "pdfSmoke": [
     "pdf-furniture.test.js", "jss-change-notice.test.js", "jss-cover-foot.test.js", "jss-cover-isolation.test.js", "jsg-engine.test.js",
     "pdf-multi-ipd.test.js", "pdf-long-doctype.test.js", "object-docs.test.js", "applic-publish.test.js",
-    "wp33-fo-equivalence.test.js", "wp15-jsg-release.test.js"
+    "wp33-fo-equivalence.test.js", "wp15-jsg-release.test.js", "wp30-pdf-regression.test.js"
   ],
   "heavy": [
     "pdf21.test.js", "brex-gate.test.js", "publish-gate.test.js", "dmtypes.test.js", "golden-xignal.test.js", "jss-naval.test.js",
