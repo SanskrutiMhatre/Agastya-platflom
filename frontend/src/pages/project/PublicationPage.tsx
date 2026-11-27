@@ -48,12 +48,12 @@ function describe(e: PmEntry, byFile: Map<string, DmSummary>, byCode: Map<string
 interface DragState { from: string | null; pool: DmSummary | null; over: string | null; where: DropWhere | null }
 
 export function PublicationPage() {
-  const { id, role, summary, reload } = useProject();
+  const { id, role, can, summary, reload } = useProject();
   const nav = useNavigate();
   const toast = useUi((s) => s.toast);
   const progress = useProgress(id);
   const data = useAsync(async () => ({ pm: await contentApi.pmc(id), dms: await contentApi.dms(id) }), [id]);
-  const writable = canWrite(role);
+  const writable = canWrite(can);
 
   const [entries, setEntries] = useState<PmEntry[]>([]);
   const [dirty, setDirty] = useState(false);
@@ -236,7 +236,7 @@ export function PublicationPage() {
         </div>
       ) : null}
       {error ? <div style={{ marginBottom: 12 }}><Alert tone="bad">{error}</Alert>{rulesOnly ? <p className="v2-hint" style={{ margin: '6px 0 0' }}>Only business rules (BREX) are broken. You can still generate the PDF to look at it; it stays stamped NOT RELEASED and cannot be approved until the rules are met. <button className="btn btn-sm btn-primary" disabled={busy !== null} onClick={() => void build(true)} data-testid="generate-anyway">Generate anyway</button></p> : null}</div> : null}
-      {refusal ? <div style={{ marginBottom: 12 }}><PublishRefusal refusal={refusal} projectId={id} role={role} mode="draft" onDismiss={() => setRefusal(null)} onRecorded={() => { setWaiverTick((t) => t + 1); void build(); }} /></div> : null}
+      {refusal ? <div style={{ marginBottom: 12 }}><PublishRefusal refusal={refusal} projectId={id} can={can} mode="draft" onDismiss={() => setRefusal(null)} onRecorded={() => { setWaiverTick((t) => t + 1); void build(); }} /></div> : null}
       {missing > 0 ? <div style={{ marginBottom: 12 }}><Alert tone="warn"><strong>{missing} entr{missing === 1 ? 'y points' : 'ies point'} at data modules this project does not have</strong> — nothing is published for {missing === 1 ? 'it' : 'them'} until you import the module or remove the entry.</Alert></div> : null}
       {!writable ? <div style={{ marginBottom: 12 }}><Alert tone="warn">You have {role} access: you can look at the publication, but only editors, managers and owners can change or build it.</Alert></div> : null}
 
@@ -279,7 +279,7 @@ export function PublicationPage() {
         </aside>
       </div>
 
-      <PublishWaivers projectId={id} role={role} refreshKey={waiverTick} />
+      <PublishWaivers projectId={id} can={can} refreshKey={waiverTick} />
       {guard}
 
       {naming ? <PromptModal title="New chapter" label="Chapter title" confirmLabel="Add chapter" onClose={() => setNaming(false)} onSubmit={async (t) => { addChapter(t); }} /> : null}

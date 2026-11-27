@@ -29,7 +29,7 @@ import { refusalOf, type Refusal } from '../../../lib/waivers';
 interface Problem { message: string; hint?: string; file?: string; line?: number; onlyRules?: boolean; refusal?: Refusal; mode?: Mode }
 
 export function PdfPane({ ctx, savedTick, onOpenAt, onPopped }: { ctx: ProjectCtx; savedTick: number; onOpenAt: (file: string, line?: number) => void; onPopped?: (both: boolean) => void }) {
-  const { id, role, summary } = ctx;
+  const { id, role, can, summary } = ctx;
   const active = useStudio((s) => s.docs.find((d) => d.active));
   const progress = useProgress(id);
   const [auto, setAuto] = useState(() => localStorage.getItem('agastya.pdf.auto') !== '0');
@@ -40,7 +40,7 @@ export function PdfPane({ ctx, savedTick, onOpenAt, onPopped }: { ctx: ProjectCt
   const [note, setNote] = useState('');
   const blobUrl = useRef<string | null>(null);
   const run = useRef(0);
-  const mayBuild = canBuild(role);
+  const mayBuild = canBuild(can);
 
   // Pop-out windows: while one is open for a mode, that mode's results go to it instead of this pane.
   const [popped, setPopped] = useState<Record<Mode, boolean>>({ quick: false, build: false });
@@ -151,7 +151,7 @@ export function PdfPane({ ctx, savedTick, onOpenAt, onPopped }: { ctx: ProjectCt
         {summary.build && summary.project.type !== 'CIR' ? <a className="btn btn-sm" href={contentApi.pdfUrl(id, true)} title="Download the last built publication"><Icon name="download" size={12} />PDF</a> : null}
       </div>
       {problem?.refusal ? (
-        <div style={{ margin: 8 }}><PublishRefusal refusal={problem.refusal} projectId={id} role={role} mode="draft" onDismiss={() => setProblem(null)}
+        <div style={{ margin: 8 }}><PublishRefusal refusal={problem.refusal} projectId={id} can={can} mode="draft" onDismiss={() => setProblem(null)}
           onRecorded={() => { const again = problem.mode ?? 'build'; setProblem(null); handlers.current[again](); }} /></div>
       ) : problem ? (
         <div className="v2-alert bad" style={{ margin: 8 }}>

@@ -31,7 +31,7 @@ test('every /api route is guarded or explicitly public', async () => {
 
     // The public surface is exactly the intended set.
     assert.deepEqual(publicRoutes.sort(), [
-      'GET /api/auth/setup', 'GET /api/health', 'GET /api/ready', 'POST /api/auth/forgot', 'POST /api/auth/login', 'POST /api/auth/setup',
+      'GET /api/auth/setup', 'GET /api/health', 'GET /api/ready', 'GET /api/version', 'POST /api/auth/forgot', 'POST /api/auth/login', 'POST /api/auth/setup',
     ].sort());
   } finally { await h.close(); }
 });

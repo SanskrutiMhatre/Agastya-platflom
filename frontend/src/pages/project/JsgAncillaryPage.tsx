@@ -66,9 +66,9 @@ const fromText = (s: string, original?: Inline[]): Inline[] => {
 };
 
 export function JsgAncillaryPage() {
-  const { id, role } = useProject();
+  const { id, role, can } = useProject();
   const toast = useUi((s) => s.toast);
-  const writable = canWrite(role);
+  const writable = canWrite(can);
   const [doc, setDoc] = useState<JsgDoc | null>(null);
   const [docType, setDocType] = useState<'uhb' | 'ispl'>('uhb');
   const list = pagesFor(docType);
@@ -158,7 +158,7 @@ export function JsgAncillaryPage() {
       <PageHeader icon="file" title="Ancillary pages"
         sub={`The pages before the ${docType === 'ispl' ? 'plates' : 'chapters'}, in the order of the filled ${docType === 'ispl' ? 'list' : 'handbook'}: tick the ones to print, and edit what each says. Save, then build the PDF to see them.`}
         actions={writable ? <>
-          <button className="btn" disabled={building || saving || !canBuild(role)} onClick={() => void preview()} data-testid="jsg-anc-preview" title="Save, build the PDF and open it in a new tab">{building ? <Spinner /> : <Icon name="pdf" size={14} />}Save and preview PDF</button>
+          <button className="btn" disabled={building || saving || !canBuild(can)} onClick={() => void preview()} data-testid="jsg-anc-preview" title="Save, build the PDF and open it in a new tab">{building ? <Spinner /> : <Icon name="pdf" size={14} />}Save and preview PDF</button>
           <button className="btn btn-primary" disabled={!dirty || saving} onClick={() => void save()} data-testid="jsg-anc-save">{saving ? <Spinner /> : <Icon name="check" size={14} />}Save{dirty ? ' changes' : ''}</button>
         </> : undefined}
         stats={[{ label: 'Printed', value: `${counts.on} of ${list.length}` }, { label: 'Left out', value: counts.off, tone: counts.off ? 'warn' : undefined }]} />

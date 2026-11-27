@@ -9,17 +9,21 @@ import { Icon } from '../components/Icon';
 import { projectRailItems } from './projectRail';
 import { Alert, Loading, errText } from '../components/ui';
 import { MissingBrex } from '../components/MissingBrex';
+import { may, type Can } from '../lib/roles';
 
 export interface ProjectCtx {
   id: string;
   summary: Summary;
   role: ProjectRole;
+  /** What the signed-in person may do here, as the server computed it (WP-13, FE-019; lib/roles.ts). */
+  can: Can;
   reload: () => void;
 }
 export const useProject = (): ProjectCtx => useOutletContext<ProjectCtx>();
 
-export const canWrite = (role: ProjectRole): boolean => role === 'editor' || role === 'manager' || role === 'owner';
-export const canBuild = (role: ProjectRole): boolean => role !== 'viewer';
+/** Writing data modules and documents (the routes' dm.write capability), and building a PDF (publish.build): asked of the server's map. */
+export const canWrite = (can: Can | null | undefined): boolean => may(can, 'dm.write');
+export const canBuild = (can: Can | null | undefined): boolean => may(can, 'publish.build');
 
 /**
  * FE-005: one shell per project. Keyed by the id, a move from one project to another (a link, Back, Forward) starts a fresh shell with no
@@ -53,7 +57,7 @@ function ProjectShellFor({ id }: { id: string }) {
   const s1000d = (summary.project.format ?? 's1000d') === 's1000d';           // validation (schemas, BREX) belongs to S1000D only
   const items = projectRailItems(id, summary);                                // WP-34: the rail per project kind lives in projectRail.ts
 
-  const ctx: ProjectCtx = { id, summary, role: summary.role, reload: load };
+  const ctx: ProjectCtx = { id, summary, role: summary.role, can: (summary.project.can ?? {}) as Can, reload: load };
   return (
     <div className="v2-pshell">
       <aside className="v2-rail" aria-label="Project navigation">
@@ -71,7 +75,7 @@ function ProjectShellFor({ id }: { id: string }) {
         </nav>
       </aside>
       <div className="v2-main" style={{ minWidth: 0 }}>
-        {s1000d ? <MissingBrex projectId={id} canCreate={canWrite(summary.role)} /> : null}
+        {s1000d ? <MissingBrex projectId={id} canCreate={canWrite(ctx.can)} /> : null}
         <Outlet context={ctx} />
       </div>
     </div>

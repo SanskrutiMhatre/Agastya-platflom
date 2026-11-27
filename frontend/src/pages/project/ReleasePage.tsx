@@ -26,7 +26,7 @@ const STATE: Record<ReviewState, { label: string; tone?: 'ok' | 'warn' | 'bad' |
 };
 
 export function ReleasePage() {
-  const { id, role, reload } = useProject();
+  const { id, role, can, reload } = useProject();
   const toast = useUi((s) => s.toast);
   const rel = useAsync(() => contentApi.release(id), [id]);
   const dms = useAsync(() => contentApi.dms(id), [id]);
@@ -54,7 +54,7 @@ export function ReleasePage() {
   if (rel.error || !rel.data) return <div className="v2-page"><Alert tone="bad">{rel.error}</Alert></div>;
   const r = rel.data;
   const rv = r.review;
-  const writable = canWrite(role);
+  const writable = canWrite(can);
   const st = STATE[rv.state];
   const open = rv.comments.filter((c) => !c.resolved);
   const submitLabel = rv.state === 'changes_requested' ? 'Resubmit for review' : 'Submit for review';
@@ -95,7 +95,7 @@ export function ReleasePage() {
 
       <div className="v2-grid cols-2" style={{ alignItems: 'start' }}>
         <div className="v2-stack">
-          {refusal ? <PublishRefusal refusal={refusal} projectId={id} role={role} mode="release" onDismiss={() => setRefusal(null)} /> : null}
+          {refusal ? <PublishRefusal refusal={refusal} projectId={id} can={can} mode="release" onDismiss={() => setRefusal(null)} /> : null}
           <div className="v2-card v2-card-pad" data-testid="review-status" data-state={rv.state}>
             <div className="v2-row v2-spread"><h3 style={{ margin: 0 }}>Status</h3>
               <Badge tone={st.tone}>{rv.state === 'approved' && r.release ? <><Icon name="ok" size={12} />Approved — Release {r.release.number}</> : st.label}</Badge>

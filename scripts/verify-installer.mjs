@@ -23,6 +23,8 @@ const port = Number(arg('--port', '4072'));
 if (port < 4070 || port > 4079) { console.error('Use a port from 4070 to 4079 (the range this check is allowed to use).'); process.exit(2); }
 
 const product = JSON.parse(fs.readFileSync(path.join(root, 'packaging', 'product.json'), 'utf8'));
+// WP-13 (DEP-004): the expected version is the package's, never a literal.
+const expectedVersion = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
 let setup = arg('--setup');
 if (!setup) {
   const rel = path.join(root, 'release');
@@ -93,7 +95,9 @@ try {
   const before = manifest(inst);
   host = spawn(ctl, ['--console'], { stdio: 'ignore', windowsHide: true });
   const h = await health();
-  check('the installed server answers on the chosen port', h && h.status === 'ok' && h.version === '2.0.0', JSON.stringify(h));
+  check('the installed server answers on the chosen port', h && h.status === 'ok' && h.version === expectedVersion, JSON.stringify(h));
+  const v = await fetch(`http://127.0.0.1:${port}/api/version`).then((r) => r.json()).catch(() => null);
+  check('/api/version agrees with the package and the stamped build (WP-13)', v && v.version === expectedVersion && v.build?.packaged === true && v.schema?.compatible === true, JSON.stringify(v));
   const ui = await fetch(`http://127.0.0.1:${port}/`).then((r) => r.text()).catch(() => '');
   check('and serves the web client', /id=["']root["']/.test(ui));
   await sleep(1500);

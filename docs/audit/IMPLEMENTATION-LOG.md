@@ -840,3 +840,71 @@ order of 08 section 7:
   pictures show hover/focus samples in their resting look (the computed test drives the real states); the gate itself was not run here (lead's
   instruction); the perf history needs three runner runs before it judges; the main e2e suite (`zz-theme-states.spec.ts` touches the toast) and
   the full vitest are for the lead's run.
+## Phase 2
+
+### WP-13 Runtime baseline, version identity and dead-code removal (ENT-008, DEP-018, DEP-005, ARC-009, DEP-004, ARC-013, FE-018, DEP-021, FE-019, ARC-004, ARC-011, ARC-015, PLT-025, ARC-019, PERF-017) - done in part (see limits)
+
+* Runtime decision (D1, ENT-008, DEP-018): **Node 24 LTS**, pinned to **24.22.3** (EOL 2028-04-30) in `packaging/product.json` `runtime`
+  (version, end of life, SHA-256 of the official win-x64 zip, source URL, `minSupportMonths` 12). The zip was downloaded and its SHA-256
+  checked (`e612af99f626ab415ea225af6bce5c971feb448cb5cae250bb1c3fa50c5f7d9f`); a copy is at `C:\Users\Admin\Desktop\_tools\node-v24.22.3-win-x64`.
+  `scripts/package-windows.mjs` now refuses a runtime of another major, older than the pin, or with fewer than 12 months of support left, and
+  refuses to package when `backend/package.json`'s version differs from the root one. `backend/package.json` engines `^24.11.0 || ^22.13.0`
+  (development still runs on 22). Readiness G-SEC-11b checks the shipped runtime (BUILD-INFO, else the pin): PASS, 17.1 months left.
+  `npm run doctor` says "Node.js 24 LTS (or 22.13+ for development)". The stale "built into Node 24" comment of `vendor/engine/db.js` fixed.
+* `node:sqlite` re-checked (DEP-018): `backend/test/wp13-sqlite-contract.test.js` (pragmas incl. WAL, prepared statements, foreign keys and
+  cascade, commit/rollback, large BLOBs, `VACUUM INTO`, a second connection under WAL) passes 8/8 on Node 24.22.3 and on Node 22.23.2.
+* Patch cadence (DEP-005, ARC-009): `docs/BUNDLED-COMPONENTS.md` - versions read from the shipped files (Node 24.22.3, Temurin 21.0.13.1+2,
+  FOP 2.10 / Batik 1.18, libxslt 1.1.28 / libxml2 2.9.3 32-bit), support dates, the open FOP/Batik advisories, a quarterly window per
+  component, and the recorded libxslt decision (keep until an in-house 64-bit build or in-JVM XSLT is proven equal on the golden set).
+* Version identity (DEP-004): `backend/src/services/version.ts` is the one source - the root `package.json` version (a packaged install
+  reads the `version.json` the packager writes), `API_VERSION` 1 and `MIN_CLIENT_VERSION` 2.0.0, and the schema level (the migrations the
+  code knows against those the database applied; migrations the code does not know = a newer database, `compatible: false`). Public route
+  `GET /api/version` returns `{product, version, apiVersion, minClientVersion, schema:{level,latest,applied,compatible}, build:{commit,builtAt,packaged}}`;
+  `/api/health` reports the same version. `scripts/verify-installer.mjs` reads the expected version from the root `package.json` (was the
+  literal "2.0.0") and checks `/api/version` agrees (version, packaged, schema compatible). Test `wp13-version.test.js` (4).
+* Argon2 hard requirement (ARC-019, PERF-017): `argon2` moved from optional to required dependencies (lockfile flags updated);
+  `crypto.js` `assertPasswordHashing()` is the first call of `start()` - without the module the server exits 1 with a message naming the
+  module and how to repair the install; `npm run doctor` has a row for it. New hashes are always Argon2id; scrypt is only used to verify
+  legacy `$scrypt$` hashes, asynchronously (`crypto.scrypt`, off the event loop), and a legacy hash is re-hashed with Argon2id at the next
+  successful sign-in (not via the master path). Test `wp13-password-hashing.test.js` (3: the event loop keeps ticking during a legacy verify;
+  a preload hiding argon2 gives the clear error and `dist/index.js` exits 1; the rehash on login).
+* Server-computed `can` map (FE-019, ARC-004): `requireProject` guards now carry `minRole` and `cap`; `services/permissions.ts` builds the
+  capability table from the registered routes once at start (`capabilityTableFrom(app)`: the highest minimum role per capability), and
+  every project card carries `can` (`canFor(role, status)`; a project that is not active gives only `project.read`, to its owner). The client
+  (`lib/roles.ts` `may(can, cap)`, `ProjectShell` `ctx.can`, `canWrite(can)` / `canBuild(can)`) asks the map instead of repeating role
+  ranks: Ancillary, DocPublication, EditorSide, PdfPane, Editor, Graphics, JSG/JSS editors and ancillary, Publication, Release, Explore
+  (lock = `doc.lock`), Validation (`validate.run`), Project settings (rename, members, delete, publishing), CIR target list, PublishRefusal,
+  PublishWaivers, ImportPackageDialog. Kept as UI policy (not an authorisation rule): JSG "Save mine over theirs" for manager/owner. Removed
+  the dead role helpers `canWriteRole`, `canManageRole`, `canChooseBrandPack`, `canEditSns`, `canEditSnsDefaults`. Test `wp13-permissions.test.js` (3).
+* Dead code (ARC-011, DEP-021, FE-018): removed 40 client wrappers nothing called and `frontend/src/api/publish.ts` (`publishApi`, never
+  imported): `csdbApi.{objects, deleteObject, newObject, generateDml, objectHtmlUrl, assets, findings, exportProjectUrl, importPackage,
+  delivery, html, buildHtml, lifecycle, workingRevision, suggestions, applyMarks, issue, obsolete, reinstate, supersede, cirLinks,
+  approveCir, detachCir, extensions, setExtension}` with their now-unused types; `workspaceApi.{documentTypes, importProject, invite}`;
+  `contentApi.revision`; `configApi.collections`; `jssApi.types`; `packageApi.importReport`; `pmcApi.get`;
+  `s1000dApi.{importPreset, configurations, planConfigured, buildConfigured, configuredUrl, applicability, saveApplicability}` with the
+  applicability and configuration types. Removed `backend/vendor/engine/lemminx.js` and `comments.js` (nothing requires them).
+  `vendor/engine/license.js` stays in the source (pinned by a hash in `pm-multiref.test.js`, decision D12 open) but is excluded from the
+  package, as is `vendor/tools-linux` (the product is Windows-only).
+* Dead routes (ARC-013, D8) - **none removed**, by decision: the owner's lists of 2026-11-26 removed the screens of SNS System 2, the brand
+  packs, the CSDB page and all applicability screens and said "backend, data and API stay"; D19 also puts the route list with the WP-36
+  cleanup after the regression sign-off. A first pass that removed 26 routes (SNS rows and defaults, brand packs, applicability,
+  configured publication) and adapted their tests was reverted before commit for that reason. The routes without a client caller are listed,
+  per group with the reason they are kept, in `docs/API-ONLY-ROUTES.md` (ARC-013 acceptance). Services orphaned only if those routes go
+  later (for WP-36): `services/sns/{service,derive,learn,pmxml}`, `applicability.writeModel`, `publisher.buildConfiguredPublication`, `listConfiguredPdfs`.
+* Documentation (ARC-015, PLT-025): README prerequisites say Node 24 LTS and point to `BUNDLED-COMPONENTS.md`; the README's "JSG is not
+  built" is corrected; `PROJECT_ARCHITECTURE_AND_TECH_STACK.md` (a 2026-11-23 snapshot) has a corrections block (JSG built, all 28 JSS types
+  ready, Node 24, Argon2 required, temporary password format, `/api/version`, API-only list) and its password line fixed; the stale
+  "Surname@Year" comments in `core/auth/routes.js` and `policy.js` now describe the random temporary password.
+* Not done here: `codemirror` (no import, ARC-011) stays in `frontend/package.json` - removing it changes the lockfile, which was not done
+  offline; `studio/export/pdf.ts` `buildPdfDocDefinition` and the pdfmake generator (ARC-012) and duplicate chunks in `frontend/dist`
+  (ARC-021) are left for WP-36/WP-18; the two copies of the S1000D schemas (ARC-010) are left; `FE-022` (typed API) is not started.
+* Verification (run 2026-11-27, one file at a time): on Node 22.23.2 - `wp13-version` 4/4, `wp13-password-hashing` 3/3,
+  `wp13-permissions` 3/3, `wp13-sqlite-contract` 8/8, `routes-guarded` 1/1, `rbac` 7/7, `api` 17/17, `wp04-reset-admin` 1/1,
+  `phase17-security` 5/5, `sns-separation` 6/6, `applicability` 4/4, `brand-packs-route` 2/2, `pm-multiref` 3/3, `applic-publish` 12/12,
+  `package-settings` 5/5, `xengine-identity` 11/11, `sns-http` 10/10, `sns-polish` 4/4, `applic-external` 7/7. On Node 24.22.3 -
+  `wp13-sqlite-contract` 8/8, `wp13-version` 4/4, `wp13-password-hashing` 3/3, `wp13-permissions` 3/3, `routes-guarded` 1/1. `wp03-auth`
+  10/11: "security headers on the API and on the application" fails because this worktree has no `frontend/dist` (the page it checks is not
+  served) - environmental, not this package. Frontend: `tsc --noEmit` clean; vitest `src/api/query.test.ts` + `src/lib/importPackage.test.ts` 31/31.
+* Limits: the installer is **not** rebuilt with Node 24 (release work: `npm run package:win -- --node C:\Users\Admin\Desktop\_tools\node-v24.22.3-win-x64\node.exe`,
+  then `verify-installer`); the full backend suite, the gate and Playwright were not run on Node 24 (or on this branch); the performance
+  baseline (B1-B13) is not re-taken on Node 24, so the phase-2 exit criterion "baseline re-measured" is open.

@@ -6,7 +6,8 @@
 //   npm run package:win -- --build      build the backend and the frontend first
 //   options: --no-installer   skip Setup.exe          --no-zip   skip the portable ZIP
 //            --out <dir>      output folder (default: release)
-//            --node <node.exe>   the Node.js runtime to ship (default: the one running this script; must be 64-bit Windows, Node 22)
+//            --node <node.exe>   the Node.js runtime to ship (default: the one running this script; must be 64-bit Windows and the Node line
+//                                pinned in packaging/product.json runtime.node, Node 24 LTS since WP-13)
 //            --no-arial       leave the four proprietary Arial font files out (Liberation Sans, metric-compatible, is used instead). Use it when
 //                             the party distributing the product does not hold a licence that lets it redistribute Arial.
 //
@@ -90,7 +91,18 @@ if (newest(path.join(root, 'frontend', 'src')) > fs.statSync(feDist).mtimeMs) fa
 // ---- 2. the Node.js runtime ----------------------------------------------------------------------------------------------------------------
 if (!fs.existsSync(nodeExe)) fail(`node.exe not found: ${nodeExe}`);
 const nodeVer = capture(nodeExe, ['--version']).stdout.trim();
-if (!/^v22\./.test(nodeVer)) fail(`The shipped Node.js must be 22.x (the server uses node:sqlite); ${nodeExe} is ${nodeVer}`);
+// WP-13 (ENT-008): the runtime is pinned in packaging/product.json (runtime.node). Same major, not older than the pin, and enough support left.
+const pin = product.runtime || {};
+const pinParts = String(pin.node || '').split('.').map(Number);
+const verParts = nodeVer.replace(/^v/, '').split('.').map(Number);
+if (pinParts.length !== 3 || pinParts.some((n) => !Number.isInteger(n))) fail('packaging/product.json runtime.node must be the pinned x.y.z Node.js version.');
+if (verParts[0] !== pinParts[0]) fail(`The shipped Node.js must be ${pinParts[0]}.x (pinned ${pin.node} in packaging/product.json); ${nodeExe} is ${nodeVer}. Pass --node <path to the pinned node.exe>.`);
+if (verParts[1] < pinParts[1] || (verParts[1] === pinParts[1] && verParts[2] < pinParts[2])) fail(`${nodeExe} is ${nodeVer}, older than the pinned ${pin.node} (packaging/product.json): it lacks security fixes the pin has.`);
+if (verParts.join('.') !== pin.node) log(`NOTE: shipping Node.js ${nodeVer}, newer than the pin ${pin.node}; update runtime.node in packaging/product.json to record it.`);
+const supportMonths = (new Date(pin.nodeEndOfLife) - new Date()) / (30.44 * 864e5);
+if (!(supportMonths >= (pin.minSupportMonths ?? 12))) fail(`Node.js ${pinParts[0]} reaches end of life on ${pin.nodeEndOfLife} (${supportMonths.toFixed(1)} months): move the pin to a supported LTS line (docs/BUNDLED-COMPONENTS.md).`);
+const bePkgVersion = JSON.parse(fs.readFileSync(path.join(root, 'backend', 'package.json'), 'utf8')).version;
+if (bePkgVersion !== version) fail(`backend/package.json version ${bePkgVersion} differs from package.json ${version}: the server reports the backend's (WP-13, one version).`);
 const nodeArch = capture(nodeExe, ['-p', 'process.arch']).stdout.trim();
 if (nodeArch !== 'x64') fail(`The shipped node.exe must be 64-bit (it is ${nodeArch}).`);
 const nodeLicence = path.join(path.dirname(nodeExe), 'LICENSE');
@@ -132,7 +144,10 @@ for (const s of ['doctor.js', 'reset-admin.js', 'recover-structure.js']) fs.copy
 copyFiltered(path.join(be, 'vendor'), path.join(appBe, 'vendor'), (src) => {
   const r = path.relative(path.join(be, 'vendor'), src).split(path.sep).join('/');
   return /^tools\/fop-2\.10\/javadocs(\/|$)/.test(r) || /^tools\/fop-2\.10\/fop\/(examples(\/|$)|example\.fo$|output\.pdf$)/.test(r)
-    || /^tools\/libxslt-[^/]+\/share\/doc(\/|$)/.test(r) || /\.(map|log)$/.test(r) || (noArial && /^tools\/fonts\/arial[a-z]*\.ttf$/i.test(r));
+    || /^tools\/libxslt-[^/]+\/share\/doc(\/|$)/.test(r) || /\.(map|log)$/.test(r) || (noArial && /^tools\/fonts\/arial[a-z]*\.ttf$/i.test(r))
+    // WP-13 (DEP-021): code nothing in the product calls stays out of the install - the dormant licence check of the older product (kept in the
+    // source, pinned by a test, until decision D12) and the Linux tool stubs (the product is Windows-only)
+    || r === 'engine/license.js' || /^tools-linux(\/|$)/.test(r);
 });
 
 log('copying the web client');

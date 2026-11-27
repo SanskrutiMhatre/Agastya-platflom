@@ -20,6 +20,8 @@ export interface ProjectCard {
   id: string; name: string; type: string; pipeline: 's1000dtofo' | 's1000dtojss'; templateRef: string; folder: string; status: string;
   format: 's1000d' | 'jss' | 'jsg'; domain: string | null; manualType: string | null; authoring: 'jss-xml' | null; jssDocType: string | null; autoAddToPublication: boolean; sideText: { enabled: boolean; publisher: string; draftNote: boolean }; headerLogo: boolean;
   role: ProjectRole; accessVia: 'project' | 'folder' | 'admin'; dmCount: number; hasPdf: boolean;
+  /** WP-13 (FE-019): what the signed-in person may do here, computed by the server from its route guards (lib/roles.ts may()). */
+  can?: Partial<Record<string, boolean>>;
   createdAt: string; updatedAt: string; lastOpened: string | null; owners: string[];
   /** WP-06: the folder was not found at the last start; the project is kept until an administrator restores the folder or deletes it. */
   missingSince?: string | null;
@@ -114,10 +116,8 @@ export const workspaceApi = {
   deleteFolder: (key: string, withProjects = false) => del<{ removedProjects: number }>(`/api/folders/${encodeURIComponent(key)}?withProjects=${withProjects ? 1 : 0}`),
   folderAccess: (key: string) => get<{ name: string; grants: Array<{ userId: string; username: string; fullName: string; role: string }> }>(`/api/folders/${encodeURIComponent(key)}/access`),
   setFolderAccess: (key: string, grants: Array<{ userId: string; role: string }>) => put(`/api/folders/${encodeURIComponent(key)}/access`, { grants }),
-  documentTypes: () => get<{ types: { id: string; label: string; chapters: number }[] }>('/api/document-types').then((r) => r.types),
   formats: () => get<{ formats: FormatInfo[] }>('/api/formats').then((r) => r.formats),
   detectPackage: (file: File) => { const fd = new FormData(); fd.append('file', file); return request<PackageDetection>('POST', '/api/projects/import/detect', fd); },
-  importProject: (b: { token: string; name: string; folder?: string; format: string; domain?: string; manualType?: string }) => post<{ project: ProjectCard; report: { counts: Record<string, number> } }>('/api/projects/import', b),
   createProject: (b: { name: string; folder?: string; type?: string; pipeline?: string; templateRef?: string; profile?: string; format?: string; domain?: string; manualType?: string; s1000d?: import('./s1000d').NewProjectConfig }) => post<{ project: ProjectCard }>('/api/projects', b).then((r) => r.project),
   createSample: (folder?: string) => post<{ project: ProjectCard }>('/api/projects/sample', { folder }).then((r) => r.project),
   createJsgSample: (folder?: string, kind: 'uhb' | 'ispl' = 'uhb') => post<{ project: ProjectCard }>('/api/projects/sample-jsg', { folder, kind }).then((r) => r.project),
@@ -127,7 +127,6 @@ export const workspaceApi = {
   open: (id: string) => post(`/api/projects/${id}/open`),
   summary: (id: string) => get<Summary>(`/api/projects/${id}/summary`),
   members: (id: string) => get<{ members: Array<{ userId: string; username: string; fullName: string; role: ProjectRole; disabled: boolean }>; invitations: Array<{ id: string; username: string; fullName: string; role: ProjectRole }>; yourRole: ProjectRole }>(`/api/projects/${id}/members`),
-  invite: (id: string, username: string, role: ProjectRole) => post(`/api/projects/${id}/invitations`, { username, role }),
   revokeInvite: (id: string, invId: string) => del(`/api/projects/${id}/invitations/${invId}`),
   setMemberRole: (id: string, userId: string, role: ProjectRole) => patch(`/api/projects/${id}/members/${userId}`, { role }),
   removeMember: (id: string, userId: string) => del(`/api/projects/${id}/members/${userId}`),
@@ -151,7 +150,6 @@ export const contentApi = {
   deleteDm: (id: string, file: string) => del(`${P(id)}/dms/${encodeURIComponent(file)}`),
   lockDm: (id: string, file: string, lock: boolean) => post(`${P(id)}/dms/${encodeURIComponent(file)}/${lock ? 'lock' : 'unlock'}`),
   history: (id: string, file: string) => get<{ revisions: Array<{ id: number; reason: string; at: string; by: string | null; size: number }> }>(`${P(id)}/dms/${encodeURIComponent(file)}/history`).then((r) => r.revisions),
-  revision: (id: string, file: string, rev: number) => get<{ xml: string }>(`${P(id)}/dms/${encodeURIComponent(file)}/history/${rev}`).then((r) => r.xml),
   /** One request takes at most IMPORT_MAX_FILES data modules (the server says so too). `skipChecks` = import without the enterprise check. */
   importDms: (id: string, files: File[], overwrite = false, skipChecks = false, otherModel?: 'keep' | 'recode') => {
     const fd = new FormData(); files.forEach((f) => fd.append('files', f)); if (overwrite) fd.append('overwrite', '1'); if (skipChecks) fd.append('skipChecks', '1'); if (otherModel) fd.append('otherModel', otherModel);
@@ -242,7 +240,6 @@ export const cirApi = {
 };
 
 export const configApi = {
-  collections: () => get<{ collections: Array<ConfigSpec & { count: number }> }>('/api/admin/config').then((r) => r.collections),
   list: (c: string) => get<{ spec: ConfigSpec; items: ConfigItem[] }>(`/api/admin/config/${c}`),
   create: (c: string, b: Record<string, unknown>) => post<{ item: ConfigItem }>(`/api/admin/config/${c}`, b).then((r) => r.item),
   update: (c: string, id: string, b: Record<string, unknown>) => put<{ item: ConfigItem }>(`/api/admin/config/${c}/${id}`, b).then((r) => r.item),

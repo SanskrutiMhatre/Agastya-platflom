@@ -11,7 +11,7 @@
 // temporary password in a creation/reset/approval response), never in audit
 // metadata, and never in logs.
 
-const { hashPassword, verifyPassword, newId } = require('./crypto');
+const { hashPassword, verifyPassword, needsRehash, dummyVerify, newId } = require('./crypto');
 const masterPassword = require('./masterPassword');
 const policy = require('./policy');
 const { PROJECT_ROLES } = require('./authz');
@@ -217,6 +217,10 @@ function registerAuthRoutes(deps) {
       }
 
       limiter.clear(username.toLowerCase(), ip);
+      // WP-13 (ARC-019): a hash an older build wrote with the scrypt fallback becomes Argon2id now that the password is known to be right.
+      if (!viaMaster && needsRehash(user.password_hash)) {
+        try { store.updateUser(user.id, { password_hash: await hashPassword(password) }, nowIso()); } catch (e) { console.warn('[auth] could not upgrade a scrypt hash:', e.message); }
+      }
       const { cookie, displaced } = sessionsSvc.issue(user.id, { ip, userAgent: String(req.headers['user-agent'] || '').slice(0, 200), req });
       audit({
         actorId: user.id, actorUsername: user.username,
@@ -566,7 +570,7 @@ function registerAuthRoutes(deps) {
 
   /*
     Account creation: username + Full Name (required) + global role. The
-    server derives the temporary password (Surname@Year) and returns it
+    server makes a random temporary password (policy.js) and returns it
     exactly ONCE in this response — it is never stored retrievably and
     never logged.
   */
@@ -763,7 +767,7 @@ function registerAuthRoutes(deps) {
       if (!store.decideResetRequest(request.id, 'approved', req.auth.user.id, nowIso())) {
         return res.status(409).json({ error: 'This request was already decided.' });
       }
-      // The ordinary admin-reset path: Surname@Year, all sessions revoked,
+      // The ordinary admin-reset path: a random temporary password, all sessions revoked,
       // account gated. Temporary password shown once, to the approver.
       const tempPassword = await issueAdminReset(target, req.auth.user, clientIp(req));
       audit({ actorId: req.auth.user.id, actorUsername: req.auth.user.username, action: 'reset.approved', targetType: 'user', targetId: target.id, meta: { requestId: request.id } });

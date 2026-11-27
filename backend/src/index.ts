@@ -14,10 +14,15 @@ import { startRenderer, stopRenderer, rendererStatus } from './services/publishe
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { ensureBootstrapAdmin } = require('./core/auth/bootstrap');
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { assertPasswordHashing } = require('./core/auth/crypto');
 
 let server: http.Server | null = null;
 
 export async function start(port: number = config.port): Promise<number> {
+  // WP-13 (ARC-019): Argon2 is required. Without it no stored password can be checked, so the server stops here with the cause instead of
+  // starting and refusing every sign-in.
+  assertPasswordHashing();
   // WP-06 (DEP-017): one server per data folder; a second one stops here naming the owner's process. Test harnesses that start several
   // in-process apps on one workspace on purpose opt out with AGASTYA_NO_WORKSPACE_LOCK=1.
   if (config.workspaceLock) acquireWorkspaceLock(workspaceDir);

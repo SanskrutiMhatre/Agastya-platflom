@@ -18,7 +18,7 @@ frontend/   React 18 + Vite + Tailwind + Zustand
 
 ## Run it
 
-Prerequisites: **Node.js 22.5+** (uses the built-in `node:sqlite`) and a **Java 11+** runtime (Apache FOP renders the PDF; `npm run doctor` checks this).
+Prerequisites: **Node.js 24 LTS** (the installer ships 24.22.3, pinned in `packaging/product.json`; 22.13+ still runs a development checkout; uses the built-in `node:sqlite`; see `docs/BUNDLED-COMPONENTS.md`) and a **Java 11+** runtime (Apache FOP renders the PDF; `npm run doctor` checks this).
 xsltproc, FOP and a Java runtime are bundled for Windows; elsewhere Java must be on PATH.
 
 ```bash
@@ -201,7 +201,7 @@ rows already present, the rows that differ, and marks the ones that differ only 
 presets replaced it); rows an upgraded database may still hold in it are merged into the defaults once at the first read, and again on request
 (`POST /api/sns/defaults/merge-legacy`, administrator, `{apply:false}` previews). Every derive keeps the publication
 module it replaces as `<name>.bak` and as a timestamped copy (`<name>.<yyyymmdd-hhmmss>.bak`, the newest 20 are kept). Xignal front-matter modules and the settings that
-feed them convert both ways through `/api/projects/:id/jssdm/{import-frontmatter,generate,status}`. JSG is not built (on hold).
+feed them convert both ways through `/api/projects/:id/jssdm/{import-frontmatter,generate,status}`. JSG is built (`docs/JSG_ENGINE.md`). Routes that no screen calls any more are listed in `docs/API-ONLY-ROUTES.md`.
 
 ### Offline runtime and licences
 

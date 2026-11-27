@@ -25,10 +25,6 @@ const toPool = (d: DmSummary): PoolModule => ({
 });
 
 export const pmcApi = {
-  get: async (projectId: string): Promise<PmcModel> => {
-    const r = await contentApi.pmc(projectId);
-    return { file: 'publication.xml', meta: r.meta, entries: r.entries as PmEntry[], warnings: r.warnings, counts: r.counts, pool: r.pool.map(toPool) };
-  },
   save: async (projectId: string, model: { meta?: any; entries: PmEntry[] }, allowEmpty = false) => {
     const r = await contentApi.savePmc(projectId, { meta: model.meta, entries: model.entries }, allowEmpty);
     return { success: true, ...r };

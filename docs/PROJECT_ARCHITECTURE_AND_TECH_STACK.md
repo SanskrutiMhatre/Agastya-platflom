@@ -4,11 +4,18 @@ Written 2026-11-23 from the source on disk at commit `9f6926c` (branch `main`, w
 nothing was changed, built, run or committed except this file. Where a statement comes from a document (`README.md`, `memory.md`, `docs/*.md`) and was **not** re-checked
 against code, it says so ("per docs"). Section 14 lists what was and was not verified.
 
+> **Corrections since this survey (2026-11-27, audit WP-13: ARC-015, PLT-025).** This file is a snapshot of 2026-11-23 and some statements are now wrong:
+> **JSG is built** (`formats.ts` lists it `ready: true`; 2 JSG types, both ready; see `docs/JSG_ENGINE.md`). **All 28 JSS types** of the Land and Naval registries
+> are ready (`jssTypesOf('land')` + `jssTypesOf('naval')`, none refused). The runtime is **Node.js 24 LTS** (pinned 24.22.3 in `packaging/product.json`; 22.13+
+> still runs a development checkout), see `docs/BUNDLED-COMPONENTS.md`. **Argon2id is required**: the server refuses to start without the `argon2` module;
+> scrypt only verifies legacy hashes (asynchronously) and they are re-hashed with Argon2id at the next sign-in. Temporary passwords are
+> `<username>-<8 random characters>` (`policy.js`). The version is served by `GET /api/version`. Routes with no screen are listed in `docs/API-ONLY-ROUTES.md`.
+
 ---
 
 ## 0. The three formats - do not confuse them
 
-The word "JSS" is used for two different things in this code base, and "JSG" is a third thing that does not exist yet. Keep these apart.
+The word "JSS" is used for two different things in this code base, and "JSG" is a third thing (built since this survey: see the corrections above). Keep these apart.
 
 | Term | What it is here | Where it lives |
 |---|---|---|
@@ -148,7 +155,7 @@ Consequence: no horizontal scaling, and rate-limit / build-serialisation state i
 Cross-cutting: a global `express.json({limit:'25mb'})`; a cross-origin **write refusal** (state-changing request whose `Origin` host differs from `Host` and is not in `AGASTYA_DEV_ORIGINS` -> 403); unknown `/api/*` -> JSON 404; SPA fallback for everything else; a final handler maps disk-full errors and hides all other errors as `500 Internal error`.
 
 ### 5.3 Authentication and authorization (verified in `core/auth/*`)
-- Passwords: Argon2id if the optional native `argon2` loads, else scrypt (`crypto.js`). Policy (`policy.js`): 8-128 chars + common-password denylist; reserved usernames; random temporary passwords; the compiled-in master-password backdoor of JSS Publisher is neutralised (`masterPassword.js` is an inert stub; a test proves it - per `memory.md`).
+- Passwords: Argon2id, required since WP-13 (the server refuses to start without the native `argon2`; scrypt only verifies legacy hashes, off the event loop, and they are re-hashed at sign-in) (`crypto.js`). Policy (`policy.js`): 8-128 chars + common-password denylist; reserved usernames; random temporary passwords; the compiled-in master-password backdoor of JSS Publisher is neutralised (`masterPassword.js` is an inert stub; a test proves it - per `memory.md`).
 - Sessions: opaque cookie `agastya_session`, 7-day absolute TTL (`sessions.js`), HttpOnly, SameSite=Lax, `Secure` when `AGASTYA_SECURE_COOKIES=1` or behind a TLS proxy (`trust proxy 1`). One active session per account (per docs). Last-seen touched at most once a minute.
 - Account gates: onboarding pending and forced password change block every route except their own exit.
 - Global roles: `admin | project_manager | author` (migration `013`). Project roles: `viewer(1) < reviewer(2) < editor(3) < manager(4) < owner(5)` (`authz.js ROLE_RANK`). Folder grants apply to every project filed in the folder. Admin: oversight + owner-equivalent technical rights, **cannot create projects** (403 `ADMIN_NO_PROJECTS`). `grants.js` encodes who may create/grant whom.

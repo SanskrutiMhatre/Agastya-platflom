@@ -12,7 +12,7 @@ import { Icon } from '../../components/Icon';
 import { PageHeader } from '../../components/PageHeader';
 import { Alert, Badge, ConfirmModal, Field, Loading, errText, useAsync } from '../../components/ui';
 import { canWrite, useProject } from '../../layouts/ProjectShell';
-import { PROJECT_LABEL } from '../../lib/roles';
+import { PROJECT_LABEL, may } from '../../lib/roles';
 import { useSession } from '../../store/session';
 import { useUi } from '../../store/ui';
 import { PublishSettings } from './reused/PublishSettings';
@@ -28,7 +28,7 @@ const ROLE_HELP: Record<ProjectRole, string> = {
 };
 
 function General() {
-  const { id, role, summary, reload } = useProject();
+  const { id, can, summary, reload } = useProject();
   const toast = useUi((s) => s.toast);
   const ws = useAsync(() => workspaceApi.workspace(), []);
   const p = summary.project;
@@ -39,7 +39,7 @@ function General() {
   const [logo, setLogo] = useState(p.headerLogo !== false);
   const [style, setStyle] = useState(p.templateRef);
   const [busy, setBusy] = useState(false);
-  const owner = role === 'owner';
+  const owner = may(can, 'project.rename');   // the PATCH route's capability (owner)
   const dirty = name !== p.name || folder !== p.folder || auto !== (p.autoAddToPublication !== false) || JSON.stringify(side) !== JSON.stringify(p.sideText ?? { enabled: true, publisher: '', draftNote: true }) || logo !== (p.headerLogo !== false) || style !== p.templateRef;
 
   const save = async () => {
@@ -106,7 +106,7 @@ function PersonPicker({ role, value, onChange, placeholder }: { role: GlobalRole
 }
 
 function Team() {
-  const { id, role } = useProject();
+  const { id, role, can } = useProject();
   const me = useSession((s) => s.user);
   const toast = useUi((s) => s.toast);
   const m = useAsync(() => workspaceApi.members(id), [id]);
@@ -117,7 +117,7 @@ function Team() {
   // FE-012: changing someone's access is confirmed first
   const [access, setAccess] = useState<{ userId: string; name: string; role: ProjectRole } | null>(null);
   const isOwner = role === 'owner' || me?.role === 'admin';
-  const canManage = isOwner || role === 'manager';
+  const canManage = may(can, 'members.manage');
 
   const act = async (fn: () => Promise<unknown>, ok: string) => { try { await fn(); toast(ok, 'success'); m.reload(); } catch (e) { toast(errText(e), 'error'); } };
 
@@ -194,12 +194,12 @@ function ProjectActivity() {
 }
 
 function Danger() {
-  const { id, role, summary } = useProject();
+  const { id, can, summary } = useProject();
   const nav = useNavigate();
   const toast = useUi((s) => s.toast);
   const [typed, setTyped] = useState('');
   const [busy, setBusy] = useState(false);
-  if (role !== 'owner') return <Alert>Only an owner can delete the project.</Alert>;
+  if (!may(can, 'project.delete')) return <Alert>Only an owner can delete the project.</Alert>;
   const del = async () => {
     setBusy(true);
     try { await workspaceApi.deleteProject(id, summary.project.name); toast('Project deleted', 'success'); nav('/workspace'); }
@@ -216,9 +216,9 @@ function Danger() {
 }
 
 export function ProjectSettingsPage() {
-  const { role, summary } = useProject();
+  const { role, can, summary } = useProject();
   const me = useSession((s) => s.user);
-  const manages = role === 'owner' || role === 'manager' || me?.role === 'admin';
+  const manages = may(can, 'members.manage');
   const tabs = [
     { to: 'general', label: 'General' }, ...(summary.project.format === 's1000d' ? [{ to: 's1000d', label: 'S1000D' }] : []), { to: 'publishing', label: 'Publishing' }, { to: 'team', label: 'Team' },
     ...(manages ? [{ to: 'activity', label: 'Activity' }] : []), { to: 'danger', label: 'Danger zone' },
@@ -232,7 +232,7 @@ export function ProjectSettingsPage() {
         <Route index element={<Navigate to="general" replace />} />
         <Route path="general" element={<General />} />
         <Route path="s1000d" element={<S1000dConfig />} />
-        <Route path="publishing" element={<>{!canWrite(role) ? <div style={{ marginBottom: 12 }}><Alert tone="warn">You have {role} access: settings are read-only.</Alert></div> : null}<PublishSettings /></>} />
+        <Route path="publishing" element={<>{!may(can, 'settings.write') ? <div style={{ marginBottom: 12 }}><Alert tone="warn">You have {role} access: settings are read-only.</Alert></div> : null}<PublishSettings /></>} />
         {/* the Brand pack tab and the second SNS tab were removed (2026-11-26): the reference logos are the default, and the project's SNS lives under S1000D > SNS; old links land there */}
         <Route path="brand" element={<Navigate to="../publishing" replace />} />
         <Route path="sns/*" element={<Navigate to="../s1000d" replace />} />

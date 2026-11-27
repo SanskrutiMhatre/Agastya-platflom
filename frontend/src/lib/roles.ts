@@ -8,28 +8,25 @@ export const PROJECT_LABEL: Record<ProjectRole, string> = { owner: 'Owner', mana
 /** Who gets the Activity dashboard: administrators (everything) and Project Managers (their projects). */
 export const canMonitor = (u: User | null | undefined): boolean => !!u && (u.role === 'admin' || u.role === 'project_manager');
 
-/** What each person may do inside a project, by project role. */
-export const canWriteRole = (r: ProjectRole): boolean => r === 'editor' || r === 'manager' || r === 'owner';
-export const canManageRole = (r: ProjectRole): boolean => r === 'manager' || r === 'owner';
+/*
+  What the signed-in person may do inside a project (WP-13, FE-019). The SERVER computes it: every project card carries `can`, a map from the
+  capability names its routes declare to true/false for this person's role, read from the route guards themselves (backend
+  services/permissions.ts). The client no longer repeats the role ladder; it only asks the map. A missing map (an old server) allows nothing.
+*/
+export type Capability =
+  | 'project.read' | 'project.clone' | 'project.rename' | 'project.delete'
+  | 'dm.write' | 'dm.delete' | 'doc.lock' | 'pm.write' | 'graphics.write' | 'settings.write' | 'config.write'
+  | 'publish.build' | 'publish.preview' | 'validate.run' | 'watermark.read' | 'watermark.write'
+  | 'release.read' | 'release.submit' | 'release.decide' | 'review.comment'
+  | 'members.read' | 'members.invite' | 'members.manage' | 'activity.read';
+export type Can = Partial<Record<Capability, boolean>>;
+export const may = (can: Can | null | undefined, cap: Capability): boolean => !!can?.[cap];
 
 /*
-  Who may use the newer project functions. They mirror the server (the server decides; this only decides what is shown):
-    package import - scan and apply need what a data module write needs ("Author or above": an editor, manager or owner of the project);
-                     assigning the modules no publication claimed needs what writing the publication needs, which is the same level
-    publish waivers - an editor or above records and withdraws them; anyone who can see the project may read them
-    brand pack      - part of the project's settings, which an editor or above may change
-  A reviewer can build and comment but not write, and a viewer only looks, so neither sees these actions.
+  The newer project functions, by the capability their routes declare:
+    package import  - scan and apply: dm.write; placing the modules no publication claimed: pm.write
+    publish waivers - recording and withdrawing one: pm.write; anyone who can see the project may read them
 */
-export const canImportPackage = (r: ProjectRole): boolean => canWriteRole(r);
-export const canAssignModules = (r: ProjectRole): boolean => canWriteRole(r);
-export const canRecordWaiver = (r: ProjectRole): boolean => canWriteRole(r);
-export const canChooseBrandPack = (r: ProjectRole): boolean => canWriteRole(r);
-
-/*
-  Standard Numbering System (SNS). They mirror the server, which decides; this only decides what is shown:
-    a project's SNS   - anyone who can see the project reads it; changing rows, importing, learning, ordering and deriving the publication structure
-                        need what writing the publication needs: an editor, manager or owner (the server also asks for the project-write capability)
-    organisation defaults - everyone signed in reads them; only a software administrator changes them
-*/
-export const canEditSns = (r: ProjectRole): boolean => canWriteRole(r);
-export const canEditSnsDefaults = (u: User | null | undefined): boolean => !!u && u.role === 'admin';
+export const canImportPackage = (can: Can | null | undefined): boolean => may(can, 'dm.write');
+export const canAssignModules = (can: Can | null | undefined): boolean => may(can, 'pm.write');
+export const canRecordWaiver = (can: Can | null | undefined): boolean => may(can, 'pm.write');

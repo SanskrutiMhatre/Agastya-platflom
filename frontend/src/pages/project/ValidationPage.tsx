@@ -11,7 +11,8 @@ import { contentApi, type ValidationIssue, type ValidationRun } from '../../api'
 import { Icon } from '../../components/Icon';
 import { PageHeader } from '../../components/PageHeader';
 import { Alert, Badge, Empty, Loading, Spinner, ago, errText, fmtDate, useAsync } from '../../components/ui';
-import { canBuild, useProject } from '../../layouts/ProjectShell';
+import { useProject } from '../../layouts/ProjectShell';
+import { may } from '../../lib/roles';
 import { useUi } from '../../store/ui';
 import { csvRow } from '../../lib/csv';
 import { MoreRows, useProgressive } from '../../components/windowing';
@@ -35,7 +36,7 @@ function toCsv(issues: ValidationIssue[]): string {
 }
 
 export function ValidationPage() {
-  const { id, role, reload } = useProject();
+  const { id, role, can, reload } = useProject();
   const nav = useNavigate();
   const toast = useUi((s) => s.toast);
   const last = useAsync(() => contentApi.validation(id), [id]);
@@ -56,7 +57,7 @@ export function ValidationPage() {
   const chooseIssue = async (v: string) => {
     const before = issue;
     setIssue(v);
-    if (!canBuild(role)) return;
+    if (!may(can, 'validate.run')) return;
     try { await contentApi.setValidationIssue(id, v); toast(v === 'auto' ? 'Checks use each module\'s own S1000D issue' : `Checks now use S1000D issue ${v}, also when building and releasing`, 'success'); }
     catch (e) { setIssue(before); toast(errText(e), 'error'); }
   };
@@ -99,11 +100,11 @@ export function ValidationPage() {
             {(last.data?.schemaIssues ?? []).map((i) => <option key={i} value={i}>S1000D issue {i}</option>)}
           </select>
           <label className="v2-row" style={{ gap: 6 }}><input type="checkbox" checked={brex} onChange={(e) => setBrex(e.target.checked)} />Include BREX</label>
-          <button className="btn btn-primary" onClick={start} disabled={busy || !canBuild(role)} data-testid="run-validation">{busy ? <Spinner /> : <Icon name="play" />}Run validation</button>
+          <button className="btn btn-primary" onClick={start} disabled={busy || !may(can, 'validate.run')} data-testid="run-validation">{busy ? <Spinner /> : <Icon name="play" />}Run validation</button>
         </div>} />
-      {!canBuild(role) ? <div style={{ marginBottom: 12 }}><Alert tone="warn">Viewers can review the last run but cannot start a new one.</Alert></div> : null}
+      {!may(can, 'validate.run') ? <div style={{ marginBottom: 12 }}><Alert tone="warn">Viewers can review the last run but cannot start a new one.</Alert></div> : null}
 
-      {!run ? <div className="v2-card"><Empty title="Not validated yet">{canBuild(role) ? 'Press “Run validation” to check every data module and the publication.' : 'Nobody has run validation on this project yet.'}</Empty></div> : (
+      {!run ? <div className="v2-card"><Empty title="Not validated yet">{may(can, 'validate.run') ? 'Press “Run validation” to check every data module and the publication.' : 'Nobody has run validation on this project yet.'}</Empty></div> : (
         <>
           {run.notes.length ? <div style={{ marginBottom: 12 }}><Alert>{run.notes.slice(0, 3).join(' · ')}</Alert></div> : null}
 
