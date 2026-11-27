@@ -1,0 +1,8 @@
+/* =========================================================================
+   WP-35 second pass: page-only rules moved out of platform.css unchanged (the entry stylesheet's 30 KB advisory budget, FE-033).
+   Loaded with this page's chunk only. Colours are tokens only.
+   ========================================================================= */
+
+/* ------------------------------------------------ WP-35 second pass: moved from platform.css unchanged (used only in this chunk) */
+.v2-popout { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--bg); }
+.v2-popout-bar { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--bg-elev); border-bottom: 1px solid var(--border); }

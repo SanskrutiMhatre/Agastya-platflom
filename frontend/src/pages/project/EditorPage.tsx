@@ -8,6 +8,7 @@
 // starts in Write (no PDF pane, the ribbon folded to its tabs): Quick preview and Generate then sit in the header and open the PDF pane.
 
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import '../../styles/pages/editor-host.css';   // WP-35 second pass: the editor page's columns, panel and import dialog styles
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon } from '../../components/Icon';
 import { Alert, errText } from '../../components/ui';

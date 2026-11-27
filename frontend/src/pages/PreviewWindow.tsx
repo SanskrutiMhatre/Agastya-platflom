@@ -10,6 +10,7 @@ import { LazyPdfViewer } from '../components/pdf/LazyPdfViewer';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { Spinner, errText } from '../components/ui';
 import { channelFor, type Mode, type ToEditor, type ToPopout } from '../lib/previewBus';
+import '../styles/pages/preview.css';   // WP-35 second pass: the pop-out window's styles load with its chunk
 
 export function PreviewWindow() {
   const { id = '', mode: raw = 'quick' } = useParams();

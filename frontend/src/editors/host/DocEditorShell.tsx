@@ -15,6 +15,7 @@ import { CommentsButton, CommentsPanel, useEditorComments } from './EditorCommen
 import type { Can } from '../../lib/roles';
 import { TeamChip } from './TeamChip';
 import { useSession } from '../../store/session';
+import '../../styles/pages/editor-host.css';   // WP-35 second pass: the split, divider and PDF placeholder styles
 
 export interface DocEditorShellProps {
   kind: 'jss' | 'jsg';

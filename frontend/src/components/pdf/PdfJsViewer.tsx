@@ -22,6 +22,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 import type { PDFDocumentProxy } from 'pdfjs-dist';
+import '../../styles/pdf.css';   // WP-35 second pass: the pdf.js text layer styles load with the viewer chunk, not the entry
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
