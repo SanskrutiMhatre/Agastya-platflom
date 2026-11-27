@@ -4,9 +4,11 @@
 import { Suspense, lazy } from 'react';
 import { Loading } from '../../components/ui';
 import { useProject } from '../../layouts/ProjectShell';
+import { loadStudioStyles } from '../../studio/styles/load';
 
-// Both are large and only this route needs them.
-const StudioEditor = lazy(() => import('./EditorPage').then((m) => ({ default: m.EditorPage })));
+// Both are large and only this route needs them. The Studio's own stylesheets come with it (WP-18, FE-020): the editor
+// renders once they are in, so it never shows unstyled.
+const StudioEditor = lazy(() => Promise.all([import('./EditorPage'), loadStudioStyles()]).then(([m]) => ({ default: m.EditorPage })));
 const JssEditor = lazy(() => import('./JssEditorPage').then((m) => ({ default: m.JssEditorPage })));
 const JsgEditor = lazy(() => import('./JsgEditorPage').then((m) => ({ default: m.JsgEditorPage })));
 

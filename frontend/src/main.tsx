@@ -2,8 +2,9 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 import './styles/tokens/tokens.css';
-import './studio/styles/app.css';
-import './studio/styles/document.css';
+// The Studio shell and document sheets (studio/styles/app.css, document.css) load with the Studio editor chunk, linked
+// ahead of these (studio/styles/load.ts); base.css is the app-wide part they used to carry.
+import './styles/base.css';
 import './styles/platform.css';
 import './styles/pdf.css';
 import './styles/states.css';

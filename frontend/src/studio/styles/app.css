@@ -2,21 +2,8 @@
    S1000D Studio — application shell
    =================================================================== */
 /* Design tokens (colours, fonts, radii, density) come from src/styles/tokens/tokens.css, generated from tokens.json (WP-19). */
-
-* { box-sizing: border-box; }
-html, body { height: 100%; margin: 0; }
-body {
-  font-family: var(--font-ui);
-  font-size: 13px;
-  color: var(--text);
-  background: var(--bg);
-  -webkit-font-smoothing: antialiased;
-  overflow: hidden;
-}
-button, input, select, textarea { font: inherit; color: inherit; }
-[hidden] { display: none !important; }
-.spacer { flex: 1; }
-.muted { color: var(--text-muted); }
+/* The app-wide base (resets, buttons, fields, modal dialogs, spinner, reduced motion) is src/styles/base.css, loaded with the
+   entry. This sheet and document.css load with the Studio editor chunk (studio/styles/load.ts), ahead of the entry sheets. */
 
 .app {
   display: grid;
@@ -53,14 +40,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .doc-tab-new { align-self: center; }
 .quick { display: flex; align-items: center; gap: 2px; }
 .quick-sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; }
-
-.icon-btn {
-  display: inline-grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: var(--radius-sm);
-  background: transparent; color: var(--text-muted); cursor: pointer;
-}
-.icon-btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
-.icon-btn.pressed { background: var(--bg-active); color: var(--accent); }
-.icon { flex: none; }
 
 /* ---------------------------------------------------------------- ribbon */
 .ribbon { background: var(--bg-elev); border-bottom: 1px solid var(--border); box-shadow: var(--shadow-1); position: relative; z-index: 3; }
@@ -312,42 +291,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .status-badge.warn { color: var(--warning); }
 .status-badge.unknown, .status-badge.busy { color: var(--text-faint); }
 
-/* ---------------------------------------------------------------- buttons, forms */
-.btn { display: inline-flex; align-items: center; gap: 6px; height: var(--btn-h); padding: 0 var(--btn-pad-x); border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--bg-elev); cursor: pointer; font-weight: 500; white-space: nowrap; }
-.btn:hover { background: var(--bg-hover); }
-:where(button, [tabindex], select, input, textarea, a, summary):focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.btn:focus-visible, .rb:focus-visible, .icon-btn:focus-visible, .vs-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.btn-sm { height: var(--btn-h-sm); padding: 0 9px; font-size: 12px; }
-.btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
-.btn-primary:hover { background: var(--accent-strong); }
-.btn-danger { color: var(--danger); }
-.btn-danger:hover { background: var(--danger-soft); }
-.input { width: 100%; height: var(--studio-input-h); padding: 0 8px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--bg-elev); outline: none; }
-.input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-input[type='file'].input { padding: 4px; height: auto; }
-.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.field label { font-size: 12px; font-weight: 500; color: var(--text-muted); }
-.field-hint { font-size: 11.5px; color: var(--text-faint); }
-.field.span2 { grid-column: span 2; }
-.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; margin-bottom: 10px; }
-.form-grid.two { grid-template-columns: 1fr 220px; align-items: start; }
-.form-section { font-size: 11px; font-weight: 650; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-faint); margin: 14px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
-.form-section:first-child { margin-top: 0; }
-.form-errors { color: var(--danger); font-size: 12px; }
-.form-errors ul { margin: 6px 0 0; padding-left: 18px; }
-.check { display: flex; align-items: center; gap: 6px; padding: 4px 0; cursor: pointer; }
-
-/* ---------------------------------------------------------------- modal */
-.modal-backdrop { position: fixed; inset: 0; background: var(--scrim); display: grid; place-items: center; z-index: 100; animation: fade 0.12s ease-out; }
-.modal { background: var(--bg-elev); border-radius: 10px; box-shadow: var(--shadow-2); max-width: calc(100vw - 32px); max-height: calc(100vh - 48px); width: 560px; display: flex; flex-direction: column; border: 1px solid var(--border); animation: pop 0.14s ease-out; }
-.modal-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 10px 18px; border-bottom: 1px solid var(--border); }
-.modal-title { font-size: 15px; font-weight: 600; margin: 0; }
-.modal-body { padding: 16px 18px; overflow: auto; }
-.modal-buttons { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--border); background: var(--bg-sunken); border-radius: 0 0 10px 10px; }
-.confirm-text { margin: 0; line-height: 1.55; }
-@keyframes fade { from { opacity: 0; } }
-@keyframes pop { from { transform: translateY(6px) scale(0.99); opacity: 0; } }
-
 .picker-modal .modal-body { padding: 10px; }
 .picker-input { margin-bottom: 8px; }
 .picker-list { max-height: 52vh; overflow: auto; }
@@ -423,12 +366,9 @@ kbd { font-family: var(--font-mono); font-size: 11px; padding: 1px 6px; border: 
 .toast-warning { background: var(--toast-warning); color: var(--text-on-solid); }
 .toast-error { background: var(--toast-error); color: var(--text-on-solid); }
 .toast.out { opacity: 0; transform: translateY(6px); }
-.spinner { display: inline-block; width: 11px; height: 11px; border: 2px solid var(--border-strong); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: -1px; }
-@keyframes spin { to { transform: rotate(360deg); } }
 
 /* ---------------------------------------------------------------- printing */
 @media print {
-  body { overflow: visible; background: var(--paper); }
   .app { display: block; height: auto; }
   .app-header, .ribbon, .pane, .status-bar, .toasts, .find-bar, .doc-banner, .xml-view, .split-handle { display: none !important; }
   .workspace, .center, .editor-host, .doc-editor, .doc-views { display: block !important; overflow: visible !important; }
@@ -439,12 +379,6 @@ kbd { font-family: var(--font-mono); font-size: 11px; padding: 1px 6px; border: 
 button.fm-recent-item { width: 100%; border: 0; background: none; text-align: left; cursor: pointer; }
 button.fm-recent-item:hover { background: var(--bg-hover); }
 
-/* Motion is decoration here: people who ask their system for less of it get none. */
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
-  .spinner { animation: none; border-top-color: var(--border-strong); border-right-color: var(--accent); }
-}
-
 /* New data module: project applicability picker and SNS-driven fields */
 .dmc-row .field.w-m { width: 190px; }
 .dmc-row select.input { text-transform: none; }
@@ -453,3 +387,8 @@ button.fm-recent-item:hover { background: var(--bg-hover); }
 .applic-row .input { width: auto; min-width: 160px; }
 .applic-vals { display: inline-flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .applic-tools { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+
+/* Cascade order (WP-18): base.css loads with the entry, so it now comes AFTER this sheet. These rules overrode a base rule
+   of the same specificity only by coming later; they are restated one step more specific so they still win. */
+.panel-filter:focus-visible, .attr-input:focus-visible, .find-input:focus-visible { outline: none; }
+.input.deflist-def { padding: 6px 8px; }
