@@ -2,20 +2,24 @@
 // left, the Studio editor and the generated PDF in the middle. Nothing about
 // release, watermark or publication settings appears here - those are the
 // project dashboard's job - which is what keeps this surface to authoring.
+//
+// WP-21: the page is the S1000D adapter of the editor host (src/editors/host): the same header, save-state words, layout switch, palette and
+// shortcut keys (the Studio's own, reached from the header too), focus mode and conflict comparison as the JSS and JSG pages. A new session
+// starts in Write (no PDF pane, the ribbon folded to its tabs): Quick preview and Generate then sit in the header and open the PDF pane.
 
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon } from '../../components/Icon';
-import { ThemeToggle } from '../../components/ThemeToggle';
 import { Alert, errText } from '../../components/ui';
 import { canWrite, useProject } from '../../layouts/ProjectShell';
-import { studio, useStudio } from '../../lib/studioSession';
+import { studio, useStudio, type StudioConflict } from '../../lib/studioSession';
 import { useUi } from '../../store/ui';
+import { ConflictDialog } from '../../editors/host/ConflictDialog';
+import { EditorHeader, SaveStateChip } from '../../editors/host/EditorHeader';
+import { useEditorLayout } from '../../editors/host/useEditorLayout';
+import { useHostKeys } from '../../editors/host/useHostKeys';
 import { EditorSide } from './editor/EditorSide';
 import { PdfPane } from './editor/PdfPane';
-
-type View = 'edit' | 'split' | 'pdf';
-const VIEW_KEY = 'agastya.editor.view';
 
 export function EditorPage() {
   const ctx = useProject();
@@ -23,30 +27,26 @@ export function EditorPage() {
   const toast = useUi((s) => s.toast);
   const [params, setParams] = useSearchParams();
   const hostRef = useRef<HTMLDivElement>(null);
-  const [view, setView] = useState<View>(() => { const v = localStorage.getItem(VIEW_KEY); return v === 'edit' || v === 'pdf' ? v : 'split'; });
+  const layout = useEditorLayout({ format: 'editor', split: [25, 80, 56], onResize: () => studio.relayout() });
+  const { view, pct, dragging, startDrag, dividerKey, splitRef, narrow, focus, setFocus, toggleFocus } = layout;
   const [savedTick, setSavedTick] = useState(0);
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [error, setError] = useState('');
   const [sideKey, setSideKey] = useState(0);
   const [treeKey, setTreeKey] = useState(0);
   const [ready, setReady] = useState(false);
-  const [pct, setPct] = useState(() => Math.min(80, Math.max(25, Number(localStorage.getItem('agastya.editor.split')) || 56)));
-  const [dragging, setDragging] = useState(false);
   const [sideOpen, setSideOpen] = useState(() => localStorage.getItem('agastya.editor.side') !== '0');
   const [bothPopped, setBothPopped] = useState(false);
   const [listW, setListW] = useState(() => Math.min(480, Math.max(180, Number(localStorage.getItem('agastya.editor.listw')) || 248)));
   const [listDrag, setListDrag] = useState(false);
-  const splitRef = useRef<HTMLDivElement>(null);
+  const [conflict, setConflict] = useState<(StudioConflict & { theirs: string; hash: string }) | null>(null);
+  // the header slot that holds Quick preview and Generate while the PDF pane is closed
+  const [slot, setSlot] = useState<HTMLSpanElement | null>(null);
   const reload = ctx.reload;
   // With both previews in their own windows the editor takes the whole width.
   // On a narrow window two panes side by side are unusable: show one at a time.
-  const [narrow, setNarrow] = useState(() => window.matchMedia('(max-width: 900px)').matches);
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 900px)');
-    const on = () => { setNarrow(mq.matches); studio.relayout(); };
-    mq.addEventListener('change', on);
-    return () => mq.removeEventListener('change', on);
-  }, []);
-  const shown: View = (bothPopped || narrow) && view === 'split' ? 'edit' : view;
+  const shown = focus ? 'edit' : (bothPopped || narrow) && view === 'split' ? 'edit' : view;
+  const side = sideOpen && !focus;
   const docs = useStudio((s) => s.docs);
   const dirtyCount = docs.filter((d) => d.dirty).length;
   const activeDoc = docs.find((d) => d.active);
@@ -54,9 +54,23 @@ export function EditorPage() {
   const saveNow = async () => { setSaving(true); try { await studio.saveActive(); } catch (e) { toast(errText(e), 'error'); } finally { setSaving(false); } };
   const setSide = (open: boolean) => { setSideOpen(open); localStorage.setItem('agastya.editor.side', open ? '1' : '0'); studio.relayout(); };
 
-  useEffect(() => { localStorage.setItem(VIEW_KEY, view); studio.relayout(); }, [view, bothPopped]);
+  useEffect(() => { studio.relayout(); }, [bothPopped, side]);
   // Alongside the PDF the editor gets all the room it can: its own side panes open only when it has the page to itself.
   useEffect(() => { if (ready) studio.relayout(); }, [shown, ready]);
+
+  // the platform's focus mode is the Studio's too (Ctrl+. inside the Studio, the header button, the palette)
+  const focusRef = useRef(focus); focusRef.current = focus;
+  useEffect(() => {
+    studio.focus = { toggle: toggleFocus, isOn: () => focusRef.current };
+    return () => { studio.focus = null; };
+  }, [toggleFocus]);
+  useHostKeys({
+    palette: () => studio.run('tools.palette'),
+    shortcuts: () => studio.run('tools.shortcuts'),
+    focus: toggleFocus,
+    find: (replace) => studio.run(replace ? 'edit.replace' : 'edit.find'),
+    escape: () => { if (focus) { setFocus(false); return true; } return false; },
+  });
 
   /** Drag the edge of the data-module list; the width is remembered. */
   const startListDrag = (e: ReactPointerEvent) => {
@@ -72,23 +86,12 @@ export function EditorPage() {
     window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
   };
 
-  const startDrag = (e: ReactPointerEvent) => {
-    e.preventDefault();
-    const rect = splitRef.current!.getBoundingClientRect();
-    let last = pct;
-    setDragging(true);
-    const move = (ev: PointerEvent) => { last = Math.min(80, Math.max(25, ((ev.clientX - rect.left) / rect.width) * 100)); setPct(last); };
-    const up = () => {
-      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);
-      setDragging(false); localStorage.setItem('agastya.editor.split', String(Math.round(last))); studio.relayout();
-    };
-    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
-  };
-
   useEffect(() => {
     studio.notify = (m, kind) => toast(m, kind === 'error' ? 'error' : kind === 'success' ? 'success' : 'info');
     // WP-18 (FE-029): after a save the list and the project summary are asked for again; the publication tree only when a new module was created
-    studio.onSaved = (created) => { setSavedTick((t) => t + 1); setSideKey((k) => k + 1); if (created) setTreeKey((k) => k + 1); reload(); };
+    studio.onSaved = (created) => { setSavedTick((t) => t + 1); setSavedAt(new Date()); setSideKey((k) => k + 1); if (created) setTreeKey((k) => k + 1); reload(); };
+    // WP-21 (PRD-004): a refused save the author wants to compare
+    studio.onConflict = (c) => { void studio.serverVersion(c.file).then((t) => setConflict({ ...c, theirs: t.xml, hash: t.hash }), (e) => toast(errText(e), 'error')); };
     let alive = true;
     (async () => {
       try {
@@ -112,43 +115,43 @@ export function EditorPage() {
         }
       } catch (e) { if (alive) setError(errText(e)); }
     })();
-    return () => { alive = false; studio.unmount(); };
+    return () => { alive = false; studio.onConflict = null; studio.unmount(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctx.id]);
 
   const openAt = useCallback((file: string, line?: number) => { studio.openDm(file, line).catch((e) => toast(errText(e), 'error')); }, [toast]);
+  const writable = canWrite(ctx.can);
 
   return (
     <>
-      <header className="v2-top v2-edhead">
-        <button className="icon-btn" onClick={() => setSide(!sideOpen)} title={sideOpen ? 'Hide the data module panel' : 'Show the data module panel'} aria-label={sideOpen ? 'Hide the data module panel' : 'Show the data module panel'} aria-pressed={sideOpen} data-testid="toggle-side"><Icon name="panel" size={17} /></button>
-        <h1 style={{ fontSize: 14 }} className="v2-trunc">{ctx.summary.project.name}</h1>
-        {activeDoc ? <span className="v2-hint v2-trunc v2-crumb" title={activeDoc.file ?? activeDoc.title}>/ {activeDoc.title || activeDoc.file}</span> : null}
-        <span className="spacer" />
-        {ready && canWrite(ctx.can) ? (
-          dirtyCount > 0
+      <EditorHeader layout={layout} title={ctx.summary.project.name}
+        lead={<button className="icon-btn" onClick={() => setSide(!sideOpen)} title={sideOpen ? 'Hide the data module panel' : 'Show the data module panel'} aria-label={sideOpen ? 'Hide the data module panel' : 'Show the data module panel'} aria-pressed={sideOpen} data-testid="toggle-side"><Icon name="panel" size={17} /></button>}
+        crumb={activeDoc ? <span className="v2-hint v2-trunc v2-crumb" title={activeDoc.file ?? activeDoc.title}>/ {activeDoc.title || activeDoc.file}</span> : null}
+        state={ready && writable ? <SaveStateChip state={{ saving, dirty: dirtyCount > 0, savedAt, dirtyCount }} testId="save-state" /> : null}
+        actions={<span className="v2-edactions">
+          {ready && writable && dirtyCount > 0
             ? <button className="btn btn-sm btn-primary" onClick={() => void saveNow()} disabled={saving || !activeDoc} title="Save the open data module (Ctrl+S)" data-testid="save-now"><Icon name="check" size={12} />{saving ? 'Saving…' : `Save${dirtyCount > 1 ? ` (${dirtyCount} unsaved)` : ''}`}</button>
-            : <span className="v2-hint v2-saved" aria-live="polite" data-testid="save-state"><Icon name="check" size={12} /> All changes saved</span>
-        ) : null}
-        <div className="v2-seg" role="group" aria-label="Editor layout">
-          <button className={view === 'edit' ? 'on' : ''} onClick={() => setView('edit')} aria-pressed={view === 'edit'} title="Write only">Editor</button>
-          {narrow ? null : <button className={view === 'split' ? 'on' : ''} onClick={() => setView('split')} aria-pressed={view === 'split'} title="Write and see the PDF side by side">Split</button>}
-          <button className={view === 'pdf' ? 'on' : ''} onClick={() => setView('pdf')} aria-pressed={view === 'pdf'} title="PDF only">PDF</button>
-        </div>
-        <ThemeToggle />
-      </header>
-      {!canWrite(ctx.can) ? <Alert tone="warn">You have {ctx.role} access to this project: you can read and proof data modules, but changes cannot be saved.</Alert> : null}
+            : null}
+          <span className="v2-edactions" ref={setSlot} data-testid="chrome-preview-slot" />
+        </span>}
+        onPalette={() => studio.run('tools.palette')} onShortcuts={() => studio.run('tools.shortcuts')} />
+      {!writable ? <Alert tone="warn">You have {ctx.role} access to this project: you can read and proof data modules, but changes cannot be saved.</Alert> : null}
       {error ? <Alert tone="bad">{error}</Alert> : null}
-      <div className="v2-split" data-testid="editor-split" ref={splitRef} style={dragging || listDrag ? { userSelect: 'none' } : undefined}>
-        {sideOpen ? <EditorSide ctx={ctx} refreshKey={sideKey} treeKey={treeKey} width={listW} onCollapse={() => setSide(false)} /> : null}
-        {sideOpen ? <div className={`v2-divider ${listDrag ? 'drag' : ''}`} role="separator" aria-orientation="vertical" aria-label="Resize data module list" tabIndex={0}
+      <div className={`v2-split${focus ? ' is-focus' : ''}`} data-testid="editor-split" ref={splitRef} style={dragging || listDrag ? { userSelect: 'none' } : undefined}>
+        {side ? <EditorSide ctx={ctx} refreshKey={sideKey} treeKey={treeKey} width={listW} onCollapse={() => setSide(false)} /> : null}
+        {side ? <div className={`v2-divider ${listDrag ? 'drag' : ''}`} role="separator" aria-orientation="vertical" aria-label="Resize data module list" tabIndex={0}
           onPointerDown={startListDrag} onKeyDown={(e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { const w = Math.min(480, Math.max(180, listW + (e.key === 'ArrowRight' ? 16 : -16))); setListW(w); localStorage.setItem('agastya.editor.listw', String(w)); studio.relayout(); } }} /> : null}
-        <div className="a" style={{ display: shown === 'pdf' ? 'none' : 'flex', flex: shown === 'edit' ? '1 1 0' : `0 0 calc((100% - ${sideOpen ? listW + 5 : 0}px) * ${pct / 100})` }}>
+        <div className="a" style={{ display: shown === 'pdf' ? 'none' : 'flex', flex: shown === 'edit' ? '1 1 0' : `0 0 calc((100% - ${side ? listW + 5 : 0}px) * ${pct / 100})` }}>
           <div ref={hostRef} className="v2-studio-host" data-testid="studio-host" />
         </div>
-        {shown === 'split' ? <div className={`v2-divider ${dragging ? 'drag' : ''}`} role="separator" aria-orientation="vertical" aria-label="Resize editor and PDF" onPointerDown={startDrag} /> : null}
-        <div className="b" style={{ flex: '1 1 0', borderLeft: shown === 'pdf' ? 0 : undefined, display: shown === 'edit' ? 'none' : undefined }}><PdfPane ctx={ctx} savedTick={savedTick} onOpenAt={openAt} onPopped={setBothPopped} /></div>
+        {shown === 'split' ? <div className={`v2-divider ${dragging ? 'drag' : ''}`} role="separator" aria-orientation="vertical" aria-label="Resize editor and PDF" aria-valuenow={Math.round(pct)} aria-valuemin={layout.splitRange[0]} aria-valuemax={layout.splitRange[1]} tabIndex={0} onPointerDown={startDrag} onKeyDown={dividerKey} /> : null}
+        <div className="b" style={{ flex: '1 1 0', borderLeft: shown === 'pdf' ? 0 : undefined, display: shown === 'edit' ? 'none' : undefined }}>
+          <PdfPane ctx={ctx} savedTick={savedTick} onOpenAt={openAt} onPopped={setBothPopped} slot={shown === 'edit' && !focus ? slot : null} onReveal={layout.reveal} />
+        </div>
       </div>
+      {conflict ? <ConflictDialog base={conflict.base} mine={conflict.mine} theirs={conflict.theirs} onClose={() => setConflict(null)}
+        check={(xml) => studio.checkText(xml, conflict.file)}
+        save={async (xml) => { const ok = await studio.saveMerged(conflict.file, xml, conflict.hash); if (ok) toast('Saved: the merged data module replaced both versions.', 'success'); return ok; }} /> : null}
     </>
   );
 }

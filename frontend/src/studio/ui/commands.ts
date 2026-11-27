@@ -154,6 +154,9 @@ export function buildCommands(): Command[] {
   add({ id: 'view.zoomIn', label: 'Zoom in', icon: 'zoomIn', keys: ['Mod+Alt+='], group: 'View', global: true, run: (a) => a.zoom(0.1) });
   add({ id: 'view.zoomOut', label: 'Zoom out', icon: 'zoomOut', keys: ['Mod+Alt+-'], group: 'View', global: true, run: (a) => a.zoom(-0.1) });
   add({ id: 'view.zoomReset', label: 'Zoom 100%', group: 'View', keys: ['Mod+Alt+0'], global: true, run: (a) => a.zoom(0) });
+  // WP-21 (UX-002, UX-012): fold the ribbon to its tabs; the platform's focus mode (only offered inside the platform, which owns it)
+  add({ id: 'view.ribbon', label: 'Collapse the ribbon', icon: 'collapse', keys: ['Mod+F1'], group: 'View', global: true, run: (a) => a.toggleRibbon(), checked: (a) => a.ribbonCollapsed });
+  add({ id: 'view.focus', label: 'Focus mode', icon: 'design', keys: ['Mod+.'], group: 'View', global: true, run: (a) => a.host?.toggleFocus?.(), checked: (a) => !!a.host?.isFocus?.(), enabled: (a) => !!a.host?.toggleFocus });
   add({ id: 'view.theme', label: 'Dark theme', icon: 'theme', group: 'View', global: true, run: (a) => a.toggleTheme(), checked: (a) => a.isDark() });
   add({ id: 'view.sync', label: 'Synchronise selection (Split)', icon: 'sync', group: 'View', global: true, run: (a) => a.toggleSetting('syncSelection'), checked: (a) => a.settings.syncSelection });
   add({ id: 'view.splitTags', label: 'Show tags in Split view', icon: 'tags', group: 'View', global: true, run: (a) => { a.toggleSetting('splitTags'); a.editors.forEach((e) => { if (e.mode === 'split') { e.mode = 'design'; e.setMode('split'); } }); }, checked: (a) => a.settings.splitTags });
@@ -166,7 +169,7 @@ export function buildCommands(): Command[] {
   add({ id: 'tools.ids', label: 'Generate missing IDs', icon: 'id', group: 'Tools', run: (a, ed) => { const n = ed!.generateIds(); a.toast(n ? `Generated ${n} ID${n === 1 ? '' : 's'}` : 'All referenceable elements already have IDs', 'info'); }, enabled: editable });
   add({ id: 'tools.settings', label: 'Settings…', icon: 'settings', keys: ['Mod+,'], group: 'Tools', global: true, run: (a) => a.dialogs.settings() });
   add({ id: 'tools.shortcuts', label: 'Keyboard shortcuts', icon: 'keyboard', keys: ['F1'], group: 'Tools', global: true, run: (a) => a.dialogs.shortcuts() });
-  add({ id: 'tools.palette', label: 'Command palette…', icon: 'palette', keys: ['Mod+Shift+P'], group: 'Tools', global: true, run: (a) => a.dialogs.palette() });
+  add({ id: 'tools.palette', label: 'Command palette…', icon: 'palette', keys: ['Mod+Shift+P', 'Mod+K'], group: 'Tools', global: true, run: (a) => a.dialogs.palette() });
   add({ id: 'tools.about', label: 'About S1000D Studio', icon: 'info', group: 'Tools', global: true, run: (a) => a.dialogs.about() });
   return c;
 }

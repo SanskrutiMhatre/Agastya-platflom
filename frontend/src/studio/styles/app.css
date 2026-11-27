@@ -62,6 +62,11 @@
 .vs-btn:hover:not(:disabled) { color: var(--text); background: var(--bg-hover); }
 .vs-btn.pressed { background: var(--bg-elev); color: var(--accent); box-shadow: var(--shadow-1); font-weight: 600; }
 .ribbon-body { padding: 4px 8px 2px; min-height: 86px; overflow-x: auto; }
+/* WP-21 (UX-002, UX-012): the folded ribbon is its 32 px tab strip; a tab click shows that tab's commands until one is used */
+.ribbon.is-collapsed .ribbon-body { display: none; }
+.ribbon.is-collapsed .ribbon-tab.active:not(.file-tab)::after { opacity: 0; }
+.ribbon.is-peek .ribbon-body { box-shadow: var(--shadow-2); }
+.ribbon-pin { width: 28px; height: 28px; margin-left: 4px; flex: none; }
 .ribbon-panel { display: flex; align-items: stretch; gap: 0; }
 .ribbon-group { display: flex; flex-direction: column; padding: 0 8px; border-right: 1px solid var(--border); }
 .ribbon-group:last-child { border-right: 0; }

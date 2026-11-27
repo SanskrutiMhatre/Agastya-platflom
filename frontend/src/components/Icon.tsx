@@ -4,6 +4,7 @@ import {
   Eye, FileCode2, FileText, Folder, FolderKanban, FolderOpen, FolderPlus, History, House, Info, KeyRound, LayoutDashboard, ListTree, Lock, LogOut, Moon,
   PanelLeft, Pencil, Play, Plus, RefreshCw, Rocket, Search, Settings, ShieldCheck, Stamp, Sun, Trash2, TriangleAlert, Unlock, Upload, UserPlus, Users, X, FileDown,
   PenLine, Network, Monitor, Server, Layers, CircleUser, Image, Library, Wrench, SlidersHorizontal, MessageSquare, Send, Undo2, Package,
+  Keyboard, Maximize2, Minimize2, GitCompare, Command,
 } from 'lucide';
 
 const ICONS: Record<string, IconNode> = {
@@ -14,6 +15,8 @@ const ICONS: Record<string, IconNode> = {
   shield: ShieldCheck, stamp: Stamp, sun: Sun, trash: Trash2, warn: TriangleAlert, unlock: Unlock, upload: Upload, invite: UserPlus, users: Users, close: X,
   pdf: FileDown, editor: PenLine, explore: Network, monitor: Monitor, server: Server, layers: Layers,
   user: CircleUser, image: Image, library: Library, wrench: Wrench, sliders: SlidersHorizontal, comment: MessageSquare, send: Send, undo: Undo2, package: Package,
+  // WP-21: the editor host chrome (shortcuts, focus mode, conflict comparison, command palette)
+  keyboard: Keyboard, focus: Maximize2, unfocus: Minimize2, compare: GitCompare, command: Command,
 };
 
 export type IconName = keyof typeof ICONS;

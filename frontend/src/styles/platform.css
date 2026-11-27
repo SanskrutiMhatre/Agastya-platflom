@@ -438,3 +438,51 @@ html.v2-compact .v2-table th { padding-top: 5px; padding-bottom: 5px; }
 /* FE-004: the server is not answering; the page stays usable. */
 .v2-offline-banner { position: fixed; left: 50%; top: 8px; transform: translateX(-50%); z-index: 1000; padding: 6px 14px; border-radius: 6px;
   background: var(--warning-soft); color: var(--warning); border: 1px solid currentColor; font-size: 13px; box-shadow: var(--shadow-banner); }
+
+/* ------------------------------------------------ WP-21: the editor host chrome (editors/host) */
+.v2-edactions { display: contents; }
+.v2-edstate { flex: none; }
+.v2-edcmd { gap: 6px; color: var(--text-muted); }
+.v2-kbd { display: inline-flex; align-items: center; height: 18px; padding: 0 5px; border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 4px; background: var(--bg-sunken); color: var(--text-muted); font: 600 10.5px/1 var(--font-mono); white-space: nowrap; }
+.v2-kbd + .v2-kbd { margin-left: 3px; }
+.icon-btn.is-on { background: var(--accent-soft); color: var(--accent); }
+/* focus mode: the page and a slim header (06 section 7.2); the project rail steps aside */
+.v2-edhead.is-focus { min-height: 34px; padding-top: 2px; padding-bottom: 2px; }
+html[data-editor-focus] .v2-pshell { grid-template-columns: 0 1fr !important; }
+html[data-editor-focus] .v2-pshell > .v2-rail { visibility: hidden; overflow: hidden; width: 0; padding: 0; border: 0; }
+@media (max-width: 1100px) { .v2-edcmd-label { display: none; } }
+@media (max-width: 760px) { .v2-edcmd .v2-kbd { display: none; } }
+
+/* the command palette */
+.v2-palette { list-style: none; margin: 8px 0 0; padding: 0; max-height: min(52vh, 420px); overflow: auto; border: 1px solid var(--border); border-radius: 6px; }
+.v2-palette li { display: flex; align-items: center; gap: 10px; padding: 6px 10px; cursor: pointer; border-bottom: 1px solid var(--border); }
+.v2-palette li:last-child { border-bottom: 0; }
+.v2-palette li.on { background: var(--accent-soft); }
+.v2-palette li.off { color: var(--text-disabled); cursor: not-allowed; }
+.v2-palette-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2-palette-group { font-size: 11px; color: var(--text-faint); }
+.v2-palette-none { padding: 10px; color: var(--text-muted); }
+
+/* the shortcuts dialog */
+.v2-shortcuts-h { margin: 6px 0; font-size: 13px; }
+.v2-shortcuts-t td { vertical-align: top; }
+.v2-shortcuts-t td:first-child { white-space: nowrap; }
+
+/* the JSS find bar */
+.v2-findbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 6px 12px; border-bottom: 1px solid var(--border); background: var(--bg-elev); color: var(--text-muted); }
+.v2-findbar .v2-input { width: 200px; height: 28px; }
+.v2-findbar-case { gap: 4px; font-size: 12px; }
+::highlight(host-find) { background: var(--paper-find); color: var(--paper-ink); }
+::highlight(host-find-cur) { background: var(--paper-find-current); color: var(--paper-ink); }
+
+/* compare and merge */
+.v2-merge-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; max-height: 58vh; overflow: auto; }
+.v2-merge-item { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; background: var(--bg-elev); }
+.v2-merge-item.conflict { border-color: var(--warning); }
+.v2-merge-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; margin-top: 6px; }
+.v2-merge-lines { margin: 2px 0 0; padding: 6px 8px; max-height: 180px; overflow: auto; border-radius: 4px; font: 12px/1.45 var(--font-mono); white-space: pre-wrap; word-break: break-word; background: var(--bg-sunken); color: var(--text); }
+.v2-merge-lines.del { background: var(--danger-soft); }
+.v2-merge-lines.add { background: var(--success-soft); }
+.v2-merge-pick { display: block; padding: 6px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+.v2-merge-pick.on { border-color: var(--accent); background: var(--accent-soft); }
+@media (max-width: 760px) { .v2-merge-cols { grid-template-columns: minmax(0, 1fr); } }
