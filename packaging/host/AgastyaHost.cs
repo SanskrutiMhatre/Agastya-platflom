@@ -6,7 +6,8 @@
 //   AgastyaPlatform.exe --service  entry point the Windows Service Control Manager uses
 //   AgastyaCtl.exe <command>       the same code built as a console program, for administrators and scripts
 //
-// Commands (AgastyaCtl.exe):  --console  --doctor  --status  --start  --stop  --install-service  --uninstall-service  --version  --help
+// Commands (AgastyaCtl.exe):  --console  --doctor [--deep]  --verify  --support-bundle [file]  --status  --start  --stop  --install-service
+//                             --uninstall-service  --version  --help   (--verify / --support-bundle / the start-up file check: Integrity.cs, SupportBundle.cs)
 // Options:                    --home <dir>   keep config, data and logs under <dir> (tests and portable use)
 //                             --port <n>     --lan   (with --install-service: written to the configuration)
 //
@@ -359,6 +360,7 @@ namespace Agastya
         public void Start()
         {
             stopping = false; GaveUp = false;
+            Integrity.CheckAtStartInBackground();   // WP-24 (DEP-013): once per process, logged only, never blocks the start
             loop = new Thread(Run); loop.IsBackground = true; loop.Name = "server-supervisor"; loop.Start();
         }
 
@@ -632,8 +634,9 @@ namespace Agastya
             catch { return null; }
         }
 
-        public static int Run(Settings cfg)
+        public static int Run(Settings cfg, bool deep)
         {
+            fails = 0; warns = 0;
             Console.WriteLine("Agastya Platform " + Layout.Version + " - self-check");
             Console.WriteLine("  mode      " + (Layout.Portable ? "portable" : "installed"));
             Console.WriteLine("  program   " + Layout.ExeDir);
@@ -643,7 +646,8 @@ namespace Agastya
             Console.WriteLine();
 
             if (Environment.Is64BitOperatingSystem) Pass("64-bit Windows"); else Fail("this product needs 64-bit Windows");
-            foreach (string p in cfg.Problems) Warn("agastya.ini " + p);
+            // WP-24 (G-DEP-4): a value the program cannot use (it falls back to the default) is a problem; a key it does not know stays a warning
+            foreach (string p in cfg.Problems) { if (p.IndexOf("unknown setting", StringComparison.Ordinal) >= 0) Warn("agastya.ini " + p); else Fail("agastya.ini " + p + " (the default is used instead)"); }
             if (cfg.Problems.Count == 0) Pass("agastya.ini is valid");
 
             string[] must = new string[] {
@@ -658,6 +662,16 @@ namespace Agastya
             bool all = true;
             foreach (string f in must) { if (!(File.Exists(f) || Directory.Exists(f))) { Fail("missing: " + f); all = false; } }
             if (all) Pass("program files are complete");
+
+            // WP-24 (DEP-013): the program files against the signed manifest (quick: sizes + hashes of the executables and server code; --deep: all)
+            IntegrityResult ir = Integrity.Check(Layout.ExeDir, deep);
+            if (!ir.ManifestPresent) Warn(ir.FilesLine());
+            else if (ir.FilesOk) Pass(ir.FilesLine()); else Fail(ir.FilesLine());
+            if (ir.ManifestPresent)
+            {
+                if (!ir.SignaturePresent) Warn(ir.SignatureLine());
+                else if (ir.SignatureValid && ir.SignerMatchesExe) Pass(ir.SignatureLine()); else Fail(ir.SignatureLine());
+            }
 
             string nv = File.Exists(Layout.NodeExe) ? RunCapture(Layout.NodeExe, "--version", 10000) : null;
             if (nv != null && nv.StartsWith("v")) Pass("Node.js runtime " + nv); else Fail("the bundled Node.js does not run");
@@ -800,7 +814,9 @@ namespace Agastya
         private const string Usage =
             "Agastya Platform {0}\r\n\r\n" +
             "  AgastyaCtl.exe --console              run the server in this window (Ctrl+C stops it)\r\n" +
-            "  AgastyaCtl.exe --doctor               check the installation and this machine\r\n" +
+            "  AgastyaCtl.exe --doctor [--deep]      check the installation and this machine (--deep: hash every program file)\r\n" +
+            "  AgastyaCtl.exe --verify [--require-signed]  check every program file against the signed manifest (exit 0 = intact)\r\n" +
+            "  AgastyaCtl.exe --support-bundle [<file.zip>]  write a ZIP for support: reports and redacted logs, never the database\r\n" +
             "  AgastyaCtl.exe --status               show whether the service / server is running\r\n" +
             "  AgastyaCtl.exe --install-service      register the Windows service (Administrator)\r\n" +
             "  AgastyaCtl.exe --uninstall-service    remove it (your data is kept)\r\n" +
@@ -815,11 +831,14 @@ namespace Agastya
         [STAThread]
         private static int Main(string[] args)
         {
-            string home = null, mode = null, port = null, label = null; bool lan = false;
+            string home = null, mode = null, port = null, label = null; bool lan = false, deep = false, requireSigned = false;
             for (int i = 0; i < args.Length; i++)
             {
                 string a = args[i];
                 if (a == "--home" && i + 1 < args.Length) home = args[++i];
+                else if (a == "--deep") deep = true;
+                else if (a == "--require-signed") requireSigned = true;
+                else if (a == "--support-bundle") { mode = a; if (i + 1 < args.Length && !args[i + 1].StartsWith("--")) label = args[++i]; }
                 else if (a == "--port" && i + 1 < args.Length) port = args[++i];
                 else if (a == "--lan") lan = true;
                 else if (a == "--backup-db" && i + 1 < args.Length) { mode = a; label = args[++i]; }
@@ -847,7 +866,9 @@ namespace Agastya
                 {
                     case "--version": Console.WriteLine("Agastya Platform " + Layout.Version + " (win-x64)"); return 0;
                     case "--help": Console.WriteLine(string.Format(Usage, Layout.Version)); return 0;
-                    case "--doctor": return Doctor.Run(cfg);
+                    case "--doctor": return Doctor.Run(cfg, deep);
+                    case "--verify": return Integrity.VerifyCommand(requireSigned);
+                    case "--support-bundle": return SupportBundle.Create(cfg, label);
                     case "--status":
                         Console.WriteLine("service '" + cfg.ServiceName + "': " + ServiceTools.StateOf(cfg.ServiceName));
                         Console.WriteLine("server on port " + cfg.Port + ": " + (Probe.Alive(cfg.Port) ? "answering" : "not answering"));

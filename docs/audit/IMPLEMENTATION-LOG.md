@@ -1194,3 +1194,52 @@ internal CA is the recommended path, and the generator is a separate tool, not a
   The editors' own toolbars, menus and tablists (Studio ribbon, JSS/JSG tabs) were left to WP-21 except the targeted fixes named above.
   Not run here: the main e2e suite (00-platform's wizard Cancel and account-menu tests should be unaffected: Cancel still closes at once,
   menu items are still `menuitem` buttons), the full vitest, the backend suite, the gate.
+### WP-24 Release engineering: signing, SBOM, integrity, offline verification (DEP-003, ENT-014, RES-005, DEP-020, DEP-006, DEP-014, DEP-019, DEP-026, ENT-007, DEP-024, RES-006, DEP-013)
+
+* **Signing as one configured step** (`scripts/release/signing.mjs`): `AGASTYA_SIGN_THUMBPRINT` (+ `AGASTYA_SIGN_STORE`; certificate store or
+  hardware token, the only route for a public certificate after the CA/B Forum rules of 1 March 2026) or `AGASTYA_SIGN_PFX` + `AGASTYA_SIGN_PASSWORD`;
+  `AGASTYA_SIGN_TIMESTAMP_URL`; `AGASTYA_SIGNTOOL` (default: newest x64 signtool of an installed Windows SDK, fallback `Set-AuthenticodeSignature`);
+  legacy `AGASTYA_SIGN_CMD` kept. The packager signs every PE file of the stage that carries no signature (vendor-signed `node.exe` / JRE keep
+  theirs), Inno signs Setup and the uninstaller through `signing.mjs --sign` (password never on the ISCC command line), `--show` prints the set-up.
+* **Integrity**: `MANIFEST.sha256` (format `agastya-manifest/1`, SHA-256 + size of every shipped file, runtime-owned paths excluded) inside the
+  product, `SHA256SUMS.txt` over all release outputs; both get a detached signature (`agastya-detached-signature/1`, RSA-PKCS1/ECDSA-P1363 SHA-256,
+  certificate embedded) by `scripts/signing/Sign-Manifest.ps1` with the Authenticode certificate. Verifiers: `scripts/release/verify-release.mjs`
+  (build side, run by the packager as its last step), `scripts/signing/Verify-Release.ps1` (customer side, PS 5.1, shipped beside Setup), and the host
+  (`packaging/host/Integrity.cs`): `AgastyaCtl --verify [--require-signed]`, `--doctor` quick / `--doctor --deep`, and a quick check in the background
+  at every server start (log line + Application-log warning). The manifest signer must equal the Authenticode signer of `AgastyaCtl.exe`
+  (WinVerifyTrust, cache only, no revocation fetch).
+* **SBOM** (`scripts/release/sbom.mjs`): CycloneDX 1.5, no network, content-derived serial number; npm packages from what the stage really ships
+  (lockfile integrity as hash; a package not in the lockfile at that place/version is marked and refuses a `--release`), web-client npm from the
+  frontend lockfile, non-npm components from `packaging/bundled-components.json` with file hashes. Written into the product and the release folder;
+  `--check` validates it (against the stage when given).
+* **Release mode** (`--release`): refuses unsigned, untimestamped (unless `AGASTYA_SIGN_ALLOW_NO_TIMESTAMP=1`, recorded), dirty tree, lockfile drift,
+  empty `copyright`/`url` in `packaging/product.json`, missing `docs/EULA.txt`; the final verification then requires signed + time-stamped.
+* **Support and deployment**: `AgastyaCtl --support-bundle [file]` (`packaging/host/SupportBundle.cs`, allow-list ZIP, line redaction of
+  passwords/Bearer/Basic/session cookies/argon2+scrypt hashes, no database or project data); `--doctor` now FAILs on an unusable ini value (WARN for
+  an unknown key) and reports integrity. `packaging/deploy/Detect-AgastyaPlatform.ps1` (uninstall key `{AppId}_is1` + file version);
+  `docs/DEPLOYMENT-KIT.md` (silent commands, Inno exit codes, detection rule, Intune/ConfigMgr/GPO recipes, Windows support matrix with NOT VERIFIED rows).
+* **Gates**: `scripts/ci/readiness.mjs` G-SEC-11a (Setup + both host exes Valid and time-stamped), G-SEC-11c (verify-release signed+timestamped),
+  RES-005 (SBOM checks and is covered by the sums), G-DEP-4 (host.test.mjs), G-DEP-3 (detection, with `--install`), DEP-013 (installed `--verify
+  --require-signed`); G-DEP-6 fixed (`--doctor`, was `doctor`). `scripts/ci/gate.mjs`: new `release-tools` stage from `test-plan.json`
+  `scriptTests`, package stage = release-tools, package (`--release` in the release profile), verify-package, verify-release.
+  `scripts/vm-acceptance/Test-InstallerInVm.ps1` gained `-RequireSigned` and a WP-24 block (signatures, `--verify`, seeded fault, start-up log line,
+  support bundle without db/admin password) - parse-checked only, **not run** in a guest.
+* Docs: `docs/SIGNING.md` (rewritten), `docs/DEPLOYMENT-KIT.md` (new), `docs/OPERATIONS.md`, `docs/PACKAGING.md`, `docs/BUNDLED-COMPONENTS.md`.
+* Recorded decisions: the start-up integrity check is log-only (never blocks an air-gapped site); a detached-signature format of our own instead of
+  CMS/catalog files (verifiable by Node, PS 5.1 and .NET 4 without extra tools); unsigned third-party PE files are signed by us, vendor signatures
+  are never replaced; a release ships exactly the lockfile.
+* Verified (2026-11-27): `scripts/release/release.test.mjs` 8/8 and `scripts/release/host.test.mjs` 6/6 (throwaway certificates in temp folders;
+  tampering: changed byte, same-size change, missing file, planted DLL, foreign signer, edited manifest; doctor seeded faults; support-bundle canaries;
+  detection against a throwaway HKCU uninstall key, removed afterwards); `node scripts/ci/lint.mjs` exit 0; `node --check` on the changed scripts.
+  A **complete package** was built with signing on, into a scratch folder (Node 24.22.3, installer included, a throwaway self-signed `.pfx`
+  `CN=Agastya WP-24 Package Test Only`, no time stamp): 12 of 84 PE files signed by us, 72 vendor-signed, SBOM 261 components (148 backend npm),
+  manifest 2,437 files, signed manifest and sums, packager self-verification OK (2 warnings: no time stamp). Independently re-checked with
+  `Verify-Release.ps1 -Thumbprint ... -RequireSigned` (OK), `AgastyaCtl.exe --verify --require-signed` on the stage (intact) and
+  `verify-release.mjs --release` (OK). The certificate-store mode was exercised once: the same throwaway certificate imported into
+  **CurrentUser\My only**, signtool + `Sign-Manifest.ps1` by thumbprint, verified, and the certificate and its key deleted straight after. No other
+  store was touched; the scratch folder (pfx, password, package) was deleted. That first package run had found a real bug (SBOM compared the shipped
+  `node_modules` with the lockfile and failed on a nested `ms`); fixed by listing what ships and marking drift.
+* Not done / blocked: **real certificate** (owner, decision D4) and therefore a time-stamped signature (no TSA reachable here); the VM matrix and
+  no-NIC runs (G-OFF-1/3/4, Windows 10/11/Server 2019/2022, ARM64) need guest images; the new VM-harness block was not executed; Intune/ConfigMgr
+  run of the detection rule (no tenant); MSI (WP-31/D6); unattended first administrator from the installer (WP-25); structured JSON logs and
+  Event-Log security events (WP-29); low-disk / stopped-service / TLS-certificate doctor faults; the release installer in `release/` was not rebuilt.

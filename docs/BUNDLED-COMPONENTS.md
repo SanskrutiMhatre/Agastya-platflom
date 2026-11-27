@@ -44,5 +44,7 @@ baseline (B1-B13) on Node 24 on the reference machine.
   has parsed and guarded (WP-02 XML guard), which limits exposure.
 * **Out-of-band**: an advisory that is reachable from an author's upload or over the network is patched in the next Offline Update, not at the
   next window.
-* **Every release**: an SBOM (WP-24) and the versions above in `release/BUILD-INFO.json`; `GET /api/version` reports the product version,
+* **Every release**: an SBOM (WP-24: `scripts/release/sbom.mjs`, CycloneDX 1.5, written by the packager from the shipped bytes into
+  `release/Agastya-Platform-<v>-win-x64-SBOM.cdx.json` and into the product as `SBOM.cdx.json`; the components npm does not describe come from
+  `packaging/bundled-components.json`, which must change with this table) and the versions above in `release/BUILD-INFO.json`; `GET /api/version` reports the product version,
   API level and database schema level of the running server.
