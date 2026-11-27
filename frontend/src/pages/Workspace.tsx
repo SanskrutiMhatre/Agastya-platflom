@@ -7,7 +7,8 @@ import { workspaceApi, adminApi, type FolderView, type ProjectRole } from '../ap
 import { Icon } from '../components/Icon';
 import { CreateProjectModal, ProjectCardView } from '../components/project';
 import { Alert, ConfirmModal, Empty, Loading, Modal, PromptModal, errText, useAsync } from '../components/ui';
-import { SampleButton } from '../components/SampleButton';
+import { SampleMenu } from '../components/SampleButton';
+import { useContextMenu } from '../components/ContextMenu';
 import { useSession } from '../store/session';
 import { useUi } from '../store/ui';
 
@@ -68,6 +69,7 @@ export function Workspace() {
   const [access, setAccess] = useState<FolderView | null>(null);
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
+  const ctx = useContextMenu();             // WP-35 (UID-005): right-click, the Menu key or Shift+F10 on a folder heading: its own buttons as a menu
 
   if (ws.loading && !ws.data) return <Loading />;
   if (ws.error || !ws.data) return <div className="v2-page"><Alert tone="bad">{ws.error}</Alert></div>;
@@ -82,7 +84,7 @@ export function Workspace() {
         <div><h2>Workspace</h2><p className="v2-sub">{total} project{total === 1 ? '' : 's'} in {folders.length} folder{folders.length === 1 ? '' : 's'}.</p></div>
         <div className="v2-row">
           <input className="v2-input" style={{ width: 220 }} placeholder="Filter projects…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Filter projects" />
-          {isAdmin ? null : <><SampleButton onCreated={() => ws.reload()} /><SampleButton kind="jsg" onCreated={() => ws.reload()} /><SampleButton kind="jsg-ispl" onCreated={() => ws.reload()} /></>}
+          {isAdmin ? null : <SampleMenu onCreated={() => ws.reload()} />}
           <button className="btn" onClick={() => setNewFolder(true)}><Icon name="folderPlus" />New folder</button>
           {isAdmin ? null : <button className="btn btn-primary" onClick={() => setCreating('')}><Icon name="plus" />New project</button>}
         </div>
@@ -93,7 +95,14 @@ export function Workspace() {
         if (q && projects.length === 0) return null;
         return (
           <section key={f.key} className="v2-folder" aria-label={`Folder ${f.name}`}>
-            <div className="v2-folder-head">
+            <div className="v2-folder-head" {...ctx.bind(`Folder ${f.name}`, [
+              ...(isAdmin ? [] : [{ label: 'New project here', icon: 'plus' as const, onSelect: () => setCreating(f.name) }]),
+              ...(f.canManage ? [
+                { label: 'Folder access…', icon: 'users' as const, onSelect: () => setAccess(f) },
+                { label: 'Rename folder…', icon: 'edit' as const, onSelect: () => setRename(f) },
+                { label: 'Delete folder…', icon: 'trash' as const, danger: true, onSelect: () => setDel(f) },
+              ] : []),
+            ])}>
               <Icon name="folderOpen" /><h3>{f.name}</h3>
               <span className="v2-hint">{f.projects.length} project{f.projects.length === 1 ? '' : 's'}{f.owner ? ` · owned by ${f.owner.fullName}` : ''}</span>
               <span className="spacer" />
@@ -119,6 +128,7 @@ export function Workspace() {
         </section>
       ) : null}
 
+      {ctx.menu}
       {creating !== null ? <CreateProjectModal folders={folderNames} defaultFolder={creating} onClose={() => setCreating(null)} onCreated={() => ws.reload()} /> : null}
       {newFolder ? <PromptModal title="New folder" label="Folder name" confirmLabel="Create folder" onClose={() => setNewFolder(false)} onSubmit={async (n) => { await workspaceApi.createFolder(n); toast(`Folder "${n}" created`, 'success'); ws.reload(); }} /> : null}
       {rename ? <PromptModal title="Rename folder" label="Folder name" initial={rename.name} onClose={() => setRename(null)} onSubmit={async (n) => { await workspaceApi.renameFolder(rename.key, n); ws.reload(); }} /> : null}

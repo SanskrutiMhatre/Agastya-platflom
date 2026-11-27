@@ -1,0 +1,29 @@
+/* =========================================================================
+   WP-35: the editor host's dialogs and bars (WP-21: shortcuts dialog, JSS find bar, compare and merge), moved out of platform.css
+   unchanged so they load with the editor chunks, not with every page (FE-033). Imported by editors/host/ShortcutsDialog.tsx,
+   FindBar.tsx and ConflictDialog.tsx.
+   ========================================================================= */
+
+/* the shortcuts dialog */
+.v2-shortcuts-h { margin: 6px 0; font-size: 13px; }
+.v2-shortcuts-t td { vertical-align: top; }
+.v2-shortcuts-t td:first-child { white-space: nowrap; }
+
+/* the JSS find bar */
+.v2-findbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; padding: 6px 12px; border-bottom: 1px solid var(--border); background: var(--bg-elev); color: var(--text-muted); }
+.v2-findbar .v2-input { width: 200px; height: 28px; }
+.v2-findbar-case { gap: 4px; font-size: 12px; }
+::highlight(host-find) { background: var(--paper-find); color: var(--paper-ink); }
+::highlight(host-find-cur) { background: var(--paper-find-current); color: var(--paper-ink); }
+
+/* compare and merge */
+.v2-merge-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; max-height: 58vh; overflow: auto; }
+.v2-merge-item { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; background: var(--bg-elev); }
+.v2-merge-item.conflict { border-color: var(--warning); }
+.v2-merge-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; margin-top: 6px; }
+.v2-merge-lines { margin: 2px 0 0; padding: 6px 8px; max-height: 180px; overflow: auto; border-radius: 4px; font: 12px/1.45 var(--font-mono); white-space: pre-wrap; word-break: break-word; background: var(--bg-sunken); color: var(--text); }
+.v2-merge-lines.del { background: var(--danger-soft); }
+.v2-merge-lines.add { background: var(--success-soft); }
+.v2-merge-pick { display: block; padding: 6px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; }
+.v2-merge-pick.on { border-color: var(--accent); background: var(--accent-soft); }
+@media (max-width: 760px) { .v2-merge-cols { grid-template-columns: minmax(0, 1fr); } }

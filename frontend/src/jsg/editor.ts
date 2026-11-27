@@ -9,6 +9,7 @@
 import { isClause, newClause, newFigure, newList, newNotice, newPara, newTable, META_FIELDS, plain, text,
   type Align, type Appendix, type Block, type Cell, type Chapter, type Clause, type Figure, type Graphic, type Inline, type JsgDoc, type List, type ListType, type Mark, type Notice, type Orientation, type Para, type Part, type Section, type Table } from './model';
 import { parseJsg, serializeJsg } from './xml';
+import { confirmDialog } from '../lib/dialogs';
 import { BASE_CSS, escH, injectCss, mk, openMenu, pickGraphic, tabbedBar, type BarTab, type GraphicInfo, type JsgEditorLike, type JsgEditorOptions, type JsgFinding, type JsgHost, type MenuItem, type SectionBadge } from './shared';
 
 export type { GraphicInfo, JsgFinding, JsgHost, JsgEditorOptions } from './shared';
@@ -679,7 +680,12 @@ export class JsgEditor implements JsgEditorLike {
       mk('+ Chapter', () => { this.doc.chapters.push({ k: 'chapter', title: 'NEW CHAPTER', sections: [{ k: 'section', title: 'New section', orientation: 'portrait', children: [newPara('')] }] }); this.afterEdit(null); });
       mk('+ Section', () => { const c = this.doc.chapters[this.doc.chapters.length - 1]; if (c) { c.sections.push({ k: 'section', title: 'New section', orientation: 'portrait', children: [newPara('')] }); this.afterEdit(null); } });
       mk('+ Appendix', () => { this.doc.appendices.push({ k: 'appendix', label: 'X', title: 'New appendix', orientation: 'portrait', children: [newPara('')] }); this.afterEdit(null); });
-      mk('− Last chapter', () => { if (this.doc.chapters.length && window.confirm('Remove the last chapter and everything in it?')) { this.doc.chapters.pop(); this.afterEdit(null); } });
+      mk('− Last chapter', () => {
+        const last = this.doc.chapters[this.doc.chapters.length - 1]; if (!last) return;
+        // WP-35 (GAP-002): the application's dialog, naming what goes
+        void confirmDialog({ title: 'Remove the last chapter?', message: `This removes the last chapter "${last.title}" and everything in it.`, confirmLabel: 'Remove', danger: true })
+          .then((ok) => { const i = this.doc.chapters.indexOf(last); if (ok && i >= 0) { this.doc.chapters.splice(i, 1); this.afterEdit(null); } });
+      });
     }
     if (this.findings.length) {
       this.nav.append(this.el('h4', '', `Problems (${this.findings.length})`));

@@ -33,8 +33,8 @@ export function ActivityView({ report, single = false }: { report: ActivityRepor
             {report.projects.map((p) => (
               <div key={p.id} className="v2-card v2-card-pad v2-stack" data-testid="activity-project">
                 <div className="v2-row v2-spread">
-                  <div style={{ minWidth: 0 }}><strong className="v2-trunc" style={{ fontSize: 14.5 }}>{p.name}</strong><div className="v2-hint">{p.folder ? `${p.folder} · ` : ''}{p.dataModules} data modules</div></div>
-                  <div className="v2-row">{p.pendingRelease ? <Badge tone="warn">release awaiting approval</Badge> : null}<button className="btn btn-sm" onClick={() => nav(`/projects/${p.id}`)}>Open</button></div>
+                  <div className="v2-grow-min"><strong className="v2-trunc v2-acard-title" title={p.name}>{p.name}</strong><div className="v2-hint">{p.folder ? `${p.folder} · ` : ''}{p.dataModules} data modules</div></div>
+                  <div className="v2-row v2-no-shrink">{p.pendingRelease ? <Badge tone="warn">release awaiting approval</Badge> : null}<button className="btn btn-sm" onClick={() => nav(`/projects/${p.id}`)}>Open</button></div>
                 </div>
                 <div className="v2-row wrap" style={{ gap: 18 }}>
                   <span><strong>{p.edits}</strong> <span className="v2-hint">edits</span></span>

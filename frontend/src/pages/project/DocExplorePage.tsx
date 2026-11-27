@@ -3,6 +3,7 @@
 // all, a detail panel for what is selected, Refresh. Read-only by design - arranging is the Publication page's job; this is for finding things and seeing the shape.
 
 import { useMemo, useState } from 'react';
+import '../../styles/pages/structure.css';   // WP-35: this page's styles load with its chunk
 import { useNavigate } from 'react-router-dom';
 import { graphicsApi } from '../../api';
 import { xengineApi } from '../../api/xengine';

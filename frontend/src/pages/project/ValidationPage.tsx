@@ -6,6 +6,7 @@
 // the editor, or export the list.
 
 import { useEffect, useMemo, useState } from 'react';
+import '../../styles/pages/structure.css';   // WP-35: this page's styles load with its chunk
 import { useNavigate } from 'react-router-dom';
 import { contentApi, problemsApi, type ReviewMark, type ValidationIssue, type ValidationRun } from '../../api';
 import { forgetLegacyReviewed, issueKey, legacyReviewedKeys, severityLabel } from '../../lib/problems';

@@ -122,6 +122,7 @@ test('FE-005: Back from a JSS project to the S1000D project never asks about ano
   await page.goForward(); await expect(page.getByTestId('jss-editor')).toBeVisible({ timeout: 30_000 });
   page.off('dialog', onDialog);
   expect(dialogs).toEqual([]);
+  await expect(page.getByTestId('app-dialog')).toHaveCount(0);       // WP-35 (GAP-002): the question is the application's own dialog now; it must not appear either
 });
 
 test('FE-006 / PUB-023: unsaved JSS text survives a reload and is offered back; a save removes the draft', async () => {

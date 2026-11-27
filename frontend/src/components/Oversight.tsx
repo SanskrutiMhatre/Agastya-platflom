@@ -82,8 +82,8 @@ export function FeedList({ feed }: { feed: Oversight['feed'] }) {
   return (
     <div className="v2-card">
       {feed.length === 0 ? <Empty title="Nothing yet" /> : feed.map((a) => (
-        <div key={a.id} style={{ padding: '9px 14px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ fontSize: 13 }}><strong>{a.actor ?? 'system'}</strong> {actionLabel(a.action)}{a.projectName ? <> <a href={`/projects/${a.projectId}`} onClick={(e) => { e.preventDefault(); nav(`/projects/${a.projectId}`); }}>{a.projectName}</a></> : null}</div>
+        <div key={a.id} className="v2-feed-item">
+          <div className="v2-feed-line"><strong>{a.actor ?? 'system'}</strong> {actionLabel(a.action)}{a.projectName ? <> <a href={`/projects/${a.projectId}`} onClick={(e) => { e.preventDefault(); nav(`/projects/${a.projectId}`); }}>{a.projectName}</a></> : null}</div>
           <div className="v2-hint">{ago(a.at)}</div>
         </div>
       ))}

@@ -8,6 +8,7 @@
 // keeps the codes of the sections that moved. Where the stencil fixes the chapters or the sections of a document type, they are shown and cannot be moved.
 
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import '../../styles/pages/structure.css';   // WP-35: this page's styles load with its chunk
 import { useNavigate } from 'react-router-dom';
 import { contentApi } from '../../api';
 import { ApiError } from '../../api/client';

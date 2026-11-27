@@ -22,6 +22,7 @@ import { S1000D_STATE } from '../../editors/host/testIds';
 import { EditorSide } from './editor/EditorSide';
 import { PdfPane } from './editor/PdfPane';
 import { rememberDoc } from '../../lib/continueDoc';
+import { confirmDialog } from '../../lib/dialogs';
 import { CommentsButton, CommentsPanel, useEditorComments } from '../../editors/host/EditorComments';
 
 export function EditorPage() {
@@ -105,7 +106,9 @@ export function EditorPage() {
       try {
         // Another project's documents are still open: do not silently throw away unsaved work.
         if (studio.currentProject && studio.currentProject !== ctx.id && studio.hasUnsaved()) {
-          if (!window.confirm('You have unsaved changes in another project’s editor. Discard them and open this project?')) { nav(`/projects/${studio.currentProject}/editor`, { replace: true }); return; }
+          const discard = await confirmDialog({ title: 'Discard unsaved changes?', message: 'You have unsaved changes in another project’s editor. Discard them and open this project?', confirmLabel: 'Discard and open', danger: true });
+          if (!alive) return;
+          if (!discard) { nav(`/projects/${studio.currentProject}/editor`, { replace: true }); return; }
         }
         await studio.setProject(ctx.id);
         if (!alive || !hostRef.current) return;

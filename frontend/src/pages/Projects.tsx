@@ -5,11 +5,12 @@ import { StatusBadge, BackupButton } from '../components/Oversight';
 import { useSession } from '../store/session';
 import { Icon } from '../components/Icon';
 import { RowLink } from '../components/a11y';
-import { SampleButton } from '../components/SampleButton';
+import { SampleMenu } from '../components/SampleButton';
 import { CreateProjectModal, RoleBadge, formatLabel } from '../components/project';
 import { Alert, Badge, Empty, Loading, PromptModal, ago, useAsync } from '../components/ui';
 import { useUi } from '../store/ui';
 import { MoreRows, useProgressive } from '../components/windowing';
+import { useContextMenu, type MenuAction } from '../components/ContextMenu';
 
 type Sort = 'recent' | 'name' | 'dms';
 
@@ -25,6 +26,7 @@ export function Projects() {
   const [creating, setCreating] = useState(false);
   const [importing, setImporting] = useState(false);
   const [copying, setCopying] = useState<string | null>(null);
+  const ctx = useContextMenu();             // WP-35 (UID-005): right-click, the Menu key or Shift+F10 on a row: the row's own actions
 
   const rows = useMemo(() => {
     const all = (list.data ?? []).filter((p) => !q || `${p.name} ${p.folder}`.toLowerCase().includes(q.toLowerCase()));
@@ -38,6 +40,11 @@ export function Projects() {
   if (list.error) return <div className="v2-page"><Alert tone="bad">{list.error}</Alert></div>;
   const folders = [...new Set((list.data ?? []).map((p) => p.folder).filter(Boolean))];
   const open = (id: string) => { void workspaceApi.open(id).catch(() => undefined); nav(`/projects/${id}`); };
+  // the same actions as the row's visible controls (the name link opens, the copy button copies): nothing is only in the menu
+  const rowActions = (id: string): MenuAction[] => [
+    { label: 'Open', icon: 'folderOpen', onSelect: () => open(id) },
+    ...(role === 'admin' ? [] : [{ label: 'Copy project…', icon: 'copy' as const, onSelect: () => setCopying(id) }]),
+  ];
 
   return (
     <div className="v2-page">
@@ -50,7 +57,7 @@ export function Projects() {
             <option value="recent">Recently opened</option><option value="name">Name</option><option value="dms">Most data modules</option>
           </select>
           <BackupButton />
-          {role === 'admin' ? null : <><button className="btn" onClick={() => setImporting(true)} data-testid="import-as-open" title="Import a package of S1000D documents (or the older publishing tool's export), or a JSS / JSG document, as a new S1000D, JSS or JSG project"><Icon name="upload" />Import package</button><SampleButton onCreated={() => list.reload()} /><SampleButton kind="jsg" onCreated={() => list.reload()} /><SampleButton kind="jsg-ispl" onCreated={() => list.reload()} /><button className="btn btn-primary" onClick={() => setCreating(true)}><Icon name="plus" />New project</button></>}
+          {role === 'admin' ? null : <><button className="btn" onClick={() => setImporting(true)} data-testid="import-as-open" title="Import a package of S1000D documents (or the older publishing tool's export), or a JSS / JSG document, as a new S1000D, JSS or JSG project"><Icon name="upload" />Import package</button><SampleMenu onCreated={() => list.reload()} /><button className="btn btn-primary" onClick={() => setCreating(true)}><Icon name="plus" />New project</button></>}
         </div>
       </div>
 
@@ -60,7 +67,7 @@ export function Projects() {
             <thead><tr><th>Name</th>{overseer ? <th>Status</th> : null}<th>Folder</th>{role === 'admin' ? <th>Owner</th> : <th>Your role</th>}<th>Data modules</th><th>Engine</th><th>Last opened</th><th /></tr></thead>
             <tbody>
               {rows.slice(0, shown.limit).map((p) => (
-                <tr key={p.id} className="clickable" onClick={() => open(p.id)} data-testid="project-row">
+                <tr key={p.id} className="clickable" onClick={() => open(p.id)} data-testid="project-row" {...ctx.bind(`Project ${p.name}`, rowActions(p.id))}>
                   <td><strong><RowLink href={`/projects/${p.id}`} onOpen={() => open(p.id)}>{p.name}</RowLink></strong>{p.hasPdf ? <> <Badge tone="ok">PDF built</Badge></> : null}{p.missingSince ? <> <Badge tone="bad">Folder missing</Badge></> : null}</td>
                   {overseer ? <td>{status.data?.get(p.id) ? <StatusBadge status={status.data.get(p.id)!.status} stale={status.data.get(p.id)!.changedSinceRelease} /> : null}</td> : null}
                   <td>{p.folder || <span className="v2-hint">—</span>}</td>
@@ -79,6 +86,7 @@ export function Projects() {
         )}
       </div>
 
+      {ctx.menu}
       {creating ? <CreateProjectModal folders={folders} onClose={() => setCreating(false)} onCreated={() => list.reload()} /> : null}
       {importing ? <CreateProjectModal folders={folders} startWith="import" onClose={() => setImporting(false)} onCreated={() => list.reload()} /> : null}
       {copying ? (

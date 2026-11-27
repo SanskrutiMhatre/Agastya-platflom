@@ -121,8 +121,13 @@ test('ISPL: add a plate with a picture and parts, paste rows; Ctrl+S saves valid
   await expect(plate.locator('.jsg-view .pic img')).toHaveCount(1, { timeout: 20_000 });
   await plate.getByRole('button', { name: '+ part' }).click();
   await plate.locator('.jsg-grid tbody tr, .jsg-grid tr').nth(1).locator('input').nth(4).fill('PONTOON ASSY');
-  page.once('dialog', (d) => void d.accept('02\tI-A/2\tP\t14/5420-72-058-7194\tDECK ASSY\t25\t28\tAIF4200000000\t\t205,920\t'));
+  // WP-35 (GAP-002): the paste box is the application's own dialog, not the browser's prompt
   await plate.getByRole('button', { name: 'Paste rows' }).click();
+  const paste = page.getByRole('dialog', { name: 'Paste parts' });
+  await expect(paste).toContainText('Paste rows copied from a spreadsheet (tab-separated, one part per line).');
+  await paste.getByTestId('app-dialog-input').fill('02\tI-A/2\tP\t14/5420-72-058-7194\tDECK ASSY\t25\t28\tAIF4200000000\t\t205,920\t');
+  await paste.getByTestId('app-dialog-confirm').click();
+  await expect(paste).toHaveCount(0);
   await expect(plate.locator('.jsg-grid tr')).toHaveCount(3);                                // header + 2 parts
   await page.keyboard.press('Control+s');
   await expect(state()).toContainText('Saved', { timeout: 15_000 });
@@ -173,6 +178,7 @@ test('JSG sample and ancillary pages: create the sample from the button, tick pa
   test.setTimeout(120_000);                                                           // the sample is a 47,000-word handbook with 244 figures: opening it takes a while
   const t0 = Date.now(); const lap = (what: string) => console.log(`[sample] ${what}: ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   await page.goto('/projects');
+  await page.getByTestId('samples-menu').click();                                       // WP-35 (UX-014): the samples sit behind one button
   await page.getByTestId('create-jsg-sample').first().click();
   await expect(page).toHaveURL(/\/projects\/[^/]+(\/editor)?$/, { timeout: 60_000 });
   const pid = page.url().split('/projects/')[1].split('/')[0]; const U = `/api/projects/${pid}`;
@@ -223,6 +229,7 @@ test('JSG sample and ancillary pages: create the sample from the button, tick pa
 test('ISPL sample and ancillary pages: create the sample, tick pages off, edit the preface and the amendments, save; the editor shows plates and appendices without the front pages', async () => {
   test.setTimeout(120_000);
   await page.goto('/projects');
+  await page.getByTestId('samples-menu').click();
   await page.getByTestId('create-jsg-ispl-sample').click();
   await expect(page).toHaveURL(/\/projects\/sample-jsg-illustrated/, { timeout: 60_000 });
   const pid = new URL(page.url()).pathname.split('/')[2];

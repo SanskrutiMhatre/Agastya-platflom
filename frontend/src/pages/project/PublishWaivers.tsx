@@ -28,13 +28,18 @@ export function PublishWaivers({ projectId, can, refreshKey }: { projectId: stri
   const history = list.data?.history ?? [];
   const inForce = waivers.filter((w) => !w.expired).length;
   return (
-    <section className="v2-card" style={{ marginTop: 16 }} aria-label="Publish waivers" data-testid="publish-waivers">
+    <section className="v2-card v2-mt16" aria-label="Publish waivers" data-testid="publish-waivers">
       <div className="v2-card-head"><span>Publish waivers <Badge tone={inForce ? 'warn' : undefined}>{inForce}</Badge></span></div>
-      <div className="v2-card-pad v2-stack" style={{ gap: 8 }}>
-        <p className="v2-hint" style={{ margin: 0 }}>
-          The build is strict: a data module that names a BREX this project does not have is not built. When that is the only problem, an editor can record a waiver here to
-          allow <strong>draft</strong> builds without it. Every build that relies on one says so in its log. <strong>A waiver never covers a release request or approval.</strong>
-        </p>
+      <div className="v2-card-pad v2-stack v2-gap8">
+        {/* WP-35 (group 6, audit 5.4 Publication): the long explanation folds away so it no longer competes with the structure above; the
+            rule that matters most stays in the visible line */}
+        <details className="v2-disclose">
+          <summary>Draft builds only: <strong>a waiver never covers a release request or approval.</strong> How waivers work</summary>
+          <p className="v2-hint">
+            The build is strict: a data module that names a BREX this project does not have is not built. When that is the only problem, an editor can record a waiver here to
+            allow <strong>draft</strong> builds without it. Every build that relies on one says so in its log. <strong>A waiver never covers a release request or approval.</strong>
+          </p>
+        </details>
         {list.loading && !list.data ? <Loading /> : list.error ? <Alert tone="bad">{list.error}</Alert> : waivers.length === 0 ? (
           <Empty title="No waivers">Nothing is being waived. A build that names a missing BREX is refused and offers to record one.</Empty>
         ) : (

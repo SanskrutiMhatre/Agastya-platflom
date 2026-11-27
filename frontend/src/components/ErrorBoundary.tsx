@@ -3,6 +3,7 @@
 // of the editors is kept by their own drafts (WP-05), so a reload offers it back.
 
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { promptDialog } from '../lib/dialogs';
 
 interface Props { children: ReactNode; /** a new value (the address) clears the error: moving to another page tries again */ resetKey?: string; where?: string }
 interface State { error: Error | null; stack: string; copied: boolean }
@@ -30,7 +31,8 @@ export class ErrorBoundary extends Component<Props, State> {
 
   private copy = async (): Promise<void> => {
     try { await navigator.clipboard.writeText(this.details()); this.setState({ copied: true }); }
-    catch { this.setState({ copied: false }); window.prompt('Copy the details:', this.details()); }
+    // WP-35 (GAP-002): the details in the application's own dialog (selectable text), not the browser's prompt
+    catch { this.setState({ copied: false }); void promptDialog({ title: 'Copy the details', label: 'Details', message: 'Select the text and copy it (Ctrl+C).', initial: this.details(), multiline: true, confirmLabel: 'Close' }); }
   };
 
   render(): ReactNode {

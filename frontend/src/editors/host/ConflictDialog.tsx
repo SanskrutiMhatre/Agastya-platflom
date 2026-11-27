@@ -7,6 +7,7 @@
 // other save as its base, so it is an ordinary save that a third person's later save would refuse in turn.
 
 import { useMemo, useState } from 'react';
+import '../../styles/pages/editor-host.css';   // WP-35: loads with the editor chunks
 import { Icon } from '../../components/Icon';
 import { Alert, Modal, Spinner, errText } from '../../components/ui';
 import { buildMerged, defaultChoices, merge3, type MergeChoice, type MergeChunk } from './merge';

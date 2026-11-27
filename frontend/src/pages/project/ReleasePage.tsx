@@ -93,7 +93,8 @@ export function ReleasePage() {
           { label: 'Releases', value: r.history.filter((h) => h.status === 'approved').length },
         ]} />
 
-      <div className="v2-grid cols-2" style={{ alignItems: 'start' }}>
+      {/* WP-35 (group 9): the review task takes the wide column; the watermark, a setting changed once, the narrow one (audit 5.4 Release) */}
+      <div className="v2-grid v2-cols-main">
         <div className="v2-stack">
           {refusal ? <PublishRefusal refusal={refusal} projectId={id} can={can} mode="release" onDismiss={() => setRefusal(null)} /> : null}
           <div className="v2-card v2-card-pad" data-testid="review-status" data-state={rv.state}>
@@ -116,7 +117,7 @@ export function ReleasePage() {
 
           {rv.state === 'in_review' && r.pending ? (
             <div className="v2-card v2-card-pad" data-testid="pending-request">
-              <h3 style={{ marginTop: 0 }}>Waiting for review</h3>
+              <h3 className="v2-mt0">Waiting for review</h3>
               <p>Submitted {fmtDate(r.pending.requestedAt)}{r.pending.requestedBy ? ` by ${r.pending.requestedBy}` : ''}.{r.pending.note ? <> Note: “{r.pending.note}”.</> : null}</p>
               {r.canApprove ? (
                 <div className="v2-stack">
@@ -132,7 +133,7 @@ export function ReleasePage() {
             </div>
           ) : writable ? (
             <div className="v2-card v2-card-pad" data-testid="submit-card">
-              <h3 style={{ marginTop: 0 }}>{submitLabel}</h3>
+              <h3 className="v2-mt0">{submitLabel}</h3>
               {rv.state === 'changes_requested' && open.length ? <Alert tone="warn">{open.length} comment{open.length === 1 ? ' is' : 's are'} still open. Mark each one done when you have dealt with it.</Alert> : null}
               <form className="v2-stack" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
                 <Field label="Note for the Project Manager"><textarea className="v2-textarea" rows={2} maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} placeholder={rv.state === 'changes_requested' ? 'What did you change?' : 'Anything the reviewer should know?'} /></Field>
@@ -144,7 +145,7 @@ export function ReleasePage() {
           ) : <Alert>Editors and owners can submit a manual for review.</Alert>}
 
           <div className="v2-card v2-card-pad" data-testid="review-thread">
-            <h3 style={{ marginTop: 0 }}>Review comments</h3>
+            <h3 className="v2-mt0">Review comments</h3>
             {rv.comments.length === 0 ? <Empty title="No comments yet" /> : <div className="v2-stack">{rv.comments.map(commentRow)}</div>}
             {rv.canComment ? (
               <form className="v2-stack" style={{ marginTop: 12 }} onSubmit={(e) => { e.preventDefault(); if (text.trim()) void addComment(); }}>
@@ -161,8 +162,8 @@ export function ReleasePage() {
           </div>
 
           <div className="v2-card v2-card-pad" data-testid="review-reader-card">
-            <h3 style={{ marginTop: 0 }}>Read and comment</h3>
-            <p className="v2-sub" style={{ marginTop: 0 }}>{rv.canComment ? 'Open a data module and click the place you want to comment on.' : 'Open a data module to see the comments where they were made.'}</p>
+            <h3 className="v2-mt0">Read and comment</h3>
+            <p className="v2-sub v2-mt0">{rv.canComment ? 'Open a data module and click the place you want to comment on.' : 'Open a data module to see the comments where they were made.'}</p>
             <select className="v2-select" style={{ height: 30, maxWidth: 360, marginBottom: 10 }} value={reading} onChange={(e) => setReading(e.target.value)} aria-label="Data module to read">
               <option value="">Choose a data module…</option>
               {(dms.data ?? []).map((d) => <option key={d.file} value={d.file}>{d.techName || d.file}{rv.comments.some((c) => c.dmFile === d.file && !c.resolved) ? '  •' : ''}</option>)}
@@ -181,8 +182,8 @@ export function ReleasePage() {
         </div>
 
         <div className="v2-card v2-card-pad">
-          <h3 style={{ marginTop: 0 }}>Watermark</h3>
-          <p className="v2-sub" style={{ marginTop: 0 }}>Printed across every page of an <strong>approved</strong> manual when enabled. An unapproved manual is always stamped “NOT RELEASED” in orange, and this setting cannot turn that off.</p>
+          <h3 className="v2-mt0">Watermark</h3>
+          <p className="v2-sub v2-mt0">Printed across every page of an <strong>approved</strong> manual when enabled. An unapproved manual is always stamped “NOT RELEASED” in orange, and this setting cannot turn that off.</p>
           <div className="v2-stack">
             <label className="v2-row"><input type="checkbox" checked={wm.enabled} disabled={!writable} onChange={(e) => { setWm({ ...wm, enabled: e.target.checked }); setWmDirty(true); }} />Print a watermark on released copies</label>
             <Field label="Text"><input className="v2-input" value={wm.text} maxLength={120} disabled={!writable} onChange={(e) => { setWm({ ...wm, text: e.target.value }); setWmDirty(true); }} placeholder="e.g. CONTROLLED COPY" /></Field>
@@ -191,11 +192,11 @@ export function ReleasePage() {
                 {r.watermarkStyles.map((s) => <option key={s} value={s}>{s === 'diagonal' ? 'Diagonal across the page' : s === 'horizontal' ? 'Horizontal, centred' : 'Tiled, repeated over the page'}</option>)}
               </select>
             </Field>
-            <div aria-label="Watermark preview" style={{ height: 150, border: '1px solid var(--border)', borderRadius: 8, background: 'var(--paper)', position: 'relative', overflow: 'hidden', display: 'grid', placeItems: 'center' }}>
+            <div aria-label="Watermark preview" className="v2-wm-preview">
               {wm.enabled && wm.text ? (wm.style === 'tiled'
-                ? <div style={{ position: 'absolute', inset: -20, display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, transform: 'rotate(-30deg)', color: 'var(--paper-watermark-preview)', fontWeight: 700, fontSize: 13, placeItems: 'center' }}>{Array.from({ length: 15 }, (_, i) => <span key={i}>{wm.text}</span>)}</div>
-                : <span style={{ color: 'var(--paper-watermark-preview-strong)', fontWeight: 800, fontSize: 20, transform: wm.style === 'diagonal' ? 'rotate(-35deg)' : 'none', whiteSpace: 'nowrap' }}>{wm.text}</span>)
-                : <span className="v2-hint" style={{ color: 'var(--paper-muted)' }}>{wm.enabled ? 'Enter the watermark text' : 'No watermark on released copies'}</span>}
+                ? <div className="v2-wm-tiles">{Array.from({ length: 15 }, (_, i) => <span key={i}>{wm.text}</span>)}</div>
+                : <span className={`v2-wm-one${wm.style === 'diagonal' ? ' diagonal' : ''}`}>{wm.text}</span>)
+                : <span className="v2-hint v2-wm-empty">{wm.enabled ? 'Enter the watermark text' : 'No watermark on released copies'}</span>}
             </div>
             {writable ? <div><button className="btn btn-primary" disabled={!wmDirty || busy} onClick={() => act(async () => { await contentApi.saveWatermark(id, wm); setWmDirty(false); }, 'Watermark saved')}>Save watermark</button></div> : null}
           </div>

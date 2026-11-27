@@ -713,6 +713,7 @@ test.describe('sample project and unique data modules', () => {
 
   test('one click creates a sample project with data modules, a figure and a publication; it builds', async () => {
     await page.goto('/workspace');
+    await page.getByTestId('samples-menu').click();                                      // WP-35 (UX-014): the samples sit behind one button
     await page.getByTestId('create-sample').click();
     await expect(page).toHaveURL(/\/editor$/);
     sampleUrl = page.url().replace(/\/editor$/, '');

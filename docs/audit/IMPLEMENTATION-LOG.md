@@ -1795,3 +1795,55 @@ recommendation.
     a Server SKU was not tried.
   - No full `npm run package:win` with the update package; it needs `frontend/dist` and the bundled runtimes.
   - G-REL-3 was not run against a real previous release; only the synthetic 1.0.0/1.1.0 stages.
+## Phase 6
+
+### WP-35 Screen-by-screen redesign of the remaining screens on the design system (GAP-002, UX-025, UID-*, 08 section 8.2) - done in part (see limits); branch `wp35-redesign`
+
+Rule followed: no feature lost. Parity (`node scripts/parity/check.mjs`) PASS with nothing removed, so no explanation row was needed;
+the baseline was re-captured with `npm run parity:update` at the end. Owner-removed screens stay removed (CSDB page, System 2 SNS,
+Brand pack, applicability UI, Codes strip and button, PMC/ICN/contents switches). Opening a project still lands in the Editor.
+D20 (take the audit's recommendations and mockups) applied where the change is safe; what was not taken is listed below.
+
+* Batch 1 (158416f), groups 1, 2, 3, 14, 16:
+  - Dialog service (GAP-002): `lib/dialogs.ts` (`confirmDialog`, `promptDialog`, `alertDialog`; promise API that the framework-free
+    JSG editors can call) and `components/DialogHost.tsx` (each request a `Modal`; testids `app-dialog`, `app-dialog-confirm`,
+    `app-dialog-cancel`, `app-dialog-input`; a dangerous action focuses Cancel). Every native `confirm`/`prompt`/`alert` replaced:
+    ErrorBoundary (copy details), CIR (replace in repository), EditorPage (discard unsaved), PublicationPage (empty save, replace by
+    import), JsgAncillaryPage (reload saved handbook), JSG editor (last chapter names the chapter), ISPL editor (delete plate names the
+    plate with its view and part counts, delete appendix, remove the only view, two Paste rows now a multi-line prompt).
+    `lib/dialogs.test.tsx` is an architecture test: no native dialog call in any non-test source file.
+  - Password field: `components/PasswordInput.tsx` (Show/Hide toggle with `aria-pressed`, Caps Lock notice in a status region tied
+    with `aria-describedby`, re-hidden 60 s after blur) on all 12 password inputs. The repeat-password check (Setup, Onboarding,
+    forced change, Settings) marks the repeat field and focuses it; nothing is sent while they differ.
+  - Context menu: `components/ContextMenu.tsx` (right click, Shift+F10 or the ContextMenu key; arrows, Home/End, Escape) on the
+    Projects rows (Open, Copy project...) and on Workspace folder headings (New project here, Folder access, Rename, Delete). Each
+    entry repeats an action that is still on the page.
+  - Samples: the three sample buttons sit behind one `samples-menu` disclosure (ids of the three buttons kept) on Overview,
+    Projects and Workspace.
+  - Auth screens: link-styled buttons instead of `href="#"`, inline styles moved to classes, footnote "Offline · on-premises".
+* Batch 2 (6636f1b), groups 2, 6, 9, 11, 12: sidebar grouped (work / Library / Manage headings, active page bar), CIR hint, account
+  menu on classes; Overview and Oversight sections on the design-system classes and a main/side grid; ActivityView titles truncate
+  with a full title (UX-025); Release: task column wide, watermark in a narrow column (kept visible: the platform e2e fills it);
+  Publish waivers explanation in a disclosure whose summary states the rule (draft builds only).
+* Batch 3 (6b9863c): Structure (Explore, Validation, Publication, ancillary) and editor-host CSS moved out of the entry stylesheet
+  into `styles/pages/structure.css` and `styles/pages/editor-host.css`, loaded with their lazy chunks (entry 68.1 -> 63.1 KB).
+  A clash fixed before commit: the new grid class first reused `.v2-split`, the editor/PDF splitter (keyboard divider test caught
+  it); it is `.v2-cols-main`. New `e2e/wp35-redesign.spec.ts`.
+* Specs adjusted for moved selectors (no assertion weakened): `jsg-editor` (paste in the app dialog; samples menu first),
+  `00-platform` (samples menu before `create-sample`; NOT run here, the main suite is reserved), `zz-core-routes` (Forgot / Back to
+  sign in are buttons), `wp05-dataloss` FE-005 (also asserts no app dialog), `AuthScreens.test` (submit is the non-toggle button).
+* Tests run (all on this branch): `tsc --noEmit` clean; vitest `src/editors src/parity src/components src/styles src/lib src/pages`
+  28 files, 343 tests passed; `lint:theme` 0 colour literals; `scripts/ci/lint.mjs` ratchets ok; `vite build` ok; `check:bundle`
+  PASS (entry stylesheet 63.1 KB, still over the 30 KB advisory); visual/a11y/keyboard (port 4096, msedge) 67 passed, 7 skipped
+  (the keyboard spec skips its dark-theme copy by design); e2e alone on port 4095: `wp35-redesign` 4/4, `jsg-editor` 11/11,
+  `wp05-dataloss` 10/10, `zz-core-routes` 5/5. Not run (by the brief): full vitest, backend suite, gate, main e2e suite.
+* Visual baselines updated after looking at each diff (15): light+dark administrator, overview, projects, publication, release,
+  sign-in, workspace; light settings. Changes: nav groups and active bar, Samples button, Show toggle, auth footnote, Release grid,
+  waiver disclosure; administrator/settings/overview also gain the WP-22 "Jump to" button that was never re-baselined there.
+* Decisions (recorded for the owner): Overview, Workspace and Projects not merged into one page, Explore and Publication not merged
+  into one Structure page, rail labels not renamed - each is guarded by owner layout e2e and touches pages that parallel WPs edit;
+  the Release watermark stays visible; no backup-restore hint (it would describe behaviour not verified here); Settings keeps Sign out.
+* Not done, and why: the Structure and Overview/Workspace/Projects merges (above); the tooltip codemod (UID-003) across all icon
+  buttons; new designs for the remaining 08 section 8.2 screens (Graphics, Validation, JSS editor chrome, Administrator - the last
+  left to WP-27); entry stylesheet still 63.1 KB against the 30 KB advisory (the remaining bulk is shared shell/component CSS);
+  Caps Lock e2e uses events carrying the modifier state (headless browsers do not toggle Caps Lock); owner sign-off pending.
