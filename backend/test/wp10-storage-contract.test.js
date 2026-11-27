@@ -17,7 +17,7 @@ function makeSqlite() {
   const { createAppContext } = require('../dist/appContext');
   const ctx = createAppContext(buildConfig({ AGASTYA_WORKSPACE_DIR: fs.mkdtempSync(path.join(os.tmpdir(), 'agastya-contract-')) }));
   ctx.start();
-  return { repos: ctx.repos, limiterStores: { authStore: ctx.limiterStore, memory: new (require('../dist/storage/authStores').MemoryLimiterStore)() }, audit: ctx.audit, close: () => ctx.close() };
+  return { repos: ctx.repos, store: ctx.store, limiterStores: { authStore: ctx.limiterStore, memory: new (require('../dist/storage/authStores').MemoryLimiterStore)() }, audit: ctx.audit, close: () => ctx.close() };
 }
 
 function contract(engine, make) {
@@ -206,6 +206,33 @@ function contract(engine, make) {
     assert.deepEqual(R.activity.lastActive(['p']).map((r) => r.actor_id).sort(), ['u1', 'u2']);
     const feed = R.activity.feed(['p']);
     assert.equal(feed.length, 4); assert.equal(feed[0].actor_username, 'bob', 'newest first');
+  });
+
+  withRepos('retention (WP-12): only ended sessions, read notifications and decided reset requests before the cut; audit rows paged, then removed up to an id', (R, e) => {
+    const S = e.store; const old = '2026-01-01T00:00:00.000Z'; const cut = '2026-06-01T00:00:00.000Z'; const fresh = '2026-11-01T00:00:00.000Z';
+    S.createUser({ id: 'u1', username: 'alice', fullName: 'Alice', role: 'author', passwordHash: 'x', now: old });
+    S.insertSessionDisplacing({ id: 's-exp', userId: 'u1', tokenHash: 'a', now: old, expiresAt: old, displace: false });
+    S.insertSessionDisplacing({ id: 's-rev', userId: 'u1', tokenHash: 'b', now: old, expiresAt: '2027-01-01T00:00:00.000Z', displace: false });
+    S.revokeSessionById('s-rev', 'test', old);
+    S.insertSessionDisplacing({ id: 's-live', userId: 'u1', tokenHash: 'c', now: old, expiresAt: '2027-01-01T00:00:00.000Z', displace: false });
+    S.insertSessionDisplacing({ id: 's-new', userId: 'u1', tokenHash: 'd', now: fresh, expiresAt: fresh, displace: false });
+    assert.equal(R.retention.purgeEndedSessions(cut), 2, 'the expired and the revoked one; never a live session, never a recent one');
+    assert.ok(S.listActiveSessions('2026-12-01T00:00:00.000Z').some((s) => s.id === 's-live'), 'the live session is still there');
+    S.insertNotification({ userId: 'u1', kind: 'k', title: 'read long ago', now: old }); S.insertNotification({ userId: 'u1', kind: 'k', title: 'unread', now: old });
+    const ids = S.listNotifications('u1').filter((n) => n.title === 'read long ago').map((n) => n.id);
+    S.markNotificationsRead('u1', ids, old);
+    assert.equal(R.retention.purgeReadNotifications(cut), 1);
+    assert.deepEqual(S.listNotifications('u1').map((n) => n.title), ['unread']);
+    S.createResetRequest({ id: 'r1', userId: 'u1', now: old }); S.decideResetRequest('r1', 'rejected', 'admin', old);
+    S.createResetRequest({ id: 'r2', userId: 'u1', now: old });
+    assert.equal(R.retention.purgeDecidedResetRequests(cut), 1, 'a pending request is never removed');
+    assert.ok(S.getResetRequest('r2'));
+    for (let i = 0; i < 5; i++) e.audit({ actorId: 'u1', actorUsername: 'alice', action: `old.${i}`, at: old });
+    e.audit({ actorId: 'u1', actorUsername: 'alice', action: 'new.one', at: fresh });
+    const page1 = R.retention.auditRowsBefore(cut, 0, 3); const page2 = R.retention.auditRowsBefore(cut, page1[2].id, 3);
+    assert.deepEqual([...page1, ...page2].map((r) => r.action), ['old.0', 'old.1', 'old.2', 'old.3', 'old.4'], 'oldest first, paged by id');
+    assert.equal(R.retention.deleteAuditUpTo(cut, page1[2].id), 3, 'only up to the id the caller archived');
+    assert.deepEqual(R.retention.auditRowsBefore(cut, 0, 10).map((r) => r.action), ['old.3', 'old.4']);
   });
 
   test(`[${engine}] sign-in throttle stores: the same answers from the database table and from memory`, () => {

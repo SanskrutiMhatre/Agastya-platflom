@@ -70,7 +70,7 @@ export function inspectDatabaseFile(file: string): DatabaseFacts {
 /** inspectDatabaseFile in a worker thread. */
 export function inspectDatabaseFileAsync(file: string): Promise<DatabaseFacts> {
   return new Promise((resolve, reject) => {
-    const w = new Worker(path.join(__dirname, 'dbInspectWorker.js'), { workerData: { file } });
+    const w = new Worker(path.join(__dirname, 'dbInspectWorker.js'), { workerData: { file }, execArgv: ['--no-warnings'] });   // node:sqlite's "experimental" notice once per server is enough
     let settled = false;
     w.once('message', (m: { ok: boolean; facts?: DatabaseFacts; error?: string }) => { settled = true; if (m.ok && m.facts) resolve(m.facts); else reject(new Error(m.error || 'database check failed')); });
     w.once('error', (e) => { if (!settled) { settled = true; reject(e); } });

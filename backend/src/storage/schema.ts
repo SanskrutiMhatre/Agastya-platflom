@@ -116,8 +116,8 @@ export function inspectSchema(db: SqlDatabase, steps: MigrationStep[], opts: { p
 
 /** PRAGMA quick_check; throws SchemaError DAMAGED naming the first problems. */
 export function quickCheck(db: SqlDatabase, label = 'The database'): void {
-  const rows = db.prepare('PRAGMA quick_check').all() as Array<Record<string, unknown>>;
-  const msgs = rows.map((r) => String(Object.values(r)[0]));
+  let msgs: string[];
+  try { msgs = (db.prepare('PRAGMA quick_check').all() as Array<Record<string, unknown>>).map((r) => String(Object.values(r)[0])); } catch (e) { msgs = [(e as Error).message]; }
   if (msgs.length !== 1 || msgs[0] !== 'ok') {
     throw new SchemaError('DAMAGED', `${label} failed its integrity check (${msgs.slice(0, 3).join('; ')}${msgs.length > 3 ? '; ...' : ''}). ` +
       'Stop here and restore the latest backup (docs/OPERATIONS.md, "Restore"); do not keep writing to this file.');
