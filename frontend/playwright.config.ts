@@ -33,7 +33,8 @@ export default defineConfig({
   testDir: './e2e',
   testMatch: /.*\.spec\.ts/,
   // the 21-type x 4-issue verification is heavy (about 5 minutes): `npm run test:verify:e2e` sets VERIFY_E2E
-  testIgnore: process.env.VERIFY_E2E ? [] : [/zz-verify-.*\.spec\.ts/],
+  // e2e/visual/ is the theme and accessibility suite (WP-20): its own config, port and baselines (playwright.visual.config.ts)
+  testIgnore: [/[\\/]visual[\\/]/, ...(process.env.VERIFY_E2E ? [] : [/zz-verify-.*\.spec\.ts/])],
   timeout: 120_000,
   expect: { timeout: 15_000 },
   workers: 1,
