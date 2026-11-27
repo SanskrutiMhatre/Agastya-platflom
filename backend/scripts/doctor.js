@@ -61,6 +61,15 @@ if (fs.existsSync(dbFile)) {
   try { newest = fs.readdirSync(backupDir).filter((f) => /^agastya-backup-\d{8}-\d{6}Z-[a-z-]+(-\d+)?\.zip$/.test(f)).sort((a, b) => (a.slice(15, 31) < b.slice(15, 31) ? 1 : -1))[0] || null; } catch { /* no folder yet */ }
   const ageDays = newest ? (Date.now() - Date.parse(newest.replace(/^agastya-backup-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})Z.*$/, '$1-$2-$3T$4:$5:$6Z'))) / 86400000 : Infinity;
   row('Platform backup in the last 7 days (optional)', ageDays < 7, newest ? `${newest} (${ageDays.toFixed(1)} days old) in ${backupDir}` : `none in ${backupDir} - Administrator > Maintenance > Back up now`);
+  // WP-29 (ENT-003, G-SEC-4): the audit chain, read-only, against the checkpoints in the database and the backup folder
+  try {
+    const off = path.join(root, 'dist', 'storage', 'auditOffline.js');
+    if (!fs.existsSync(off)) row('Audit chain intact', false, 'backend/dist is missing: build first');
+    else {
+      const rep = require(off).verifyWorkspaceAudit({ workspaceDir: workspace, env: process.env });
+      row('Audit chain intact', rep.ok, rep.ok ? rep.summary : `${rep.summary} - see docs/OPERATIONS.md section 9`);
+    }
+  } catch (e) { row('Audit chain intact', /no audit chain yet/.test(e.message), e.message); }
 }
 
 row('Client build (optional)', fs.existsSync(path.resolve(root, '..', 'frontend', 'dist', 'index.html')), 'run "npm run build" in frontend/ to serve the UI from this process');

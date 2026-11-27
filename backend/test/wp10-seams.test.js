@@ -205,7 +205,8 @@ test('PRD-002: the migration files are complete for the SQLite engine, unique, a
   assert.deepEqual(ORDER, ['014-notifications', '015-review-config-cir', '001-users-sessions-audit', '002-reset-queue', '003-membership-invitations',
     '004-project-governance', '005-documents-revisions', '007-releases', '008-release-scope-and-content', '009-document-comments', '006-document-locks',
     '010-folder-permissions', '011-folder-access-and-changes', '012-change-seen', '013-manager-and-author-roles', '016-s1000d-reference',
-    '017-s1000d-completion', '018-sns-preset-model', '019-review-comment-anchor', '020-login-throttle', '021-project-lifecycle', '022-audit-project-index'],
+    '017-s1000d-completion', '018-sns-preset-model', '019-review-comment-anchor', '020-login-throttle', '021-project-lifecycle', '022-audit-project-index',
+    '023-audit-chain'],
   'a shipped migration is never renamed or reordered; a new one is appended');
   assert.equal(new Set(ORDER).size, ORDER.length);
   for (const m of MIGRATIONS) { assert.ok(m.sqlite && (m.sqlite.sql || m.sqlite.columns), `${m.name} has a sqlite body`); assert.equal(path.basename(m.name), m.name); }

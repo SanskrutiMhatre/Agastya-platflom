@@ -16,7 +16,7 @@ import fs from 'fs';
 import path from 'path';
 import multer from 'multer';
 import { nowIso, vendor } from '../config';
-import { requireProject, requireAdmin, store, audit, projectDirFor, workspaceDir, docIndex, authz, securityPolicy } from '../context';
+import { requireProject, requireAdmin, store, audit, auditedTx, projectDirFor, workspaceDir, docIndex, authz, securityPolicy } from '../context';
 import { headOf, rootStart } from '../services/xmlHead';
 import { wrap, param, bad, notFound, forbidden, conflict, HttpError } from '../services/http';
 import { pageRequest, searchText, windowOf } from '../services/paging';
@@ -307,7 +307,7 @@ export function registerProjectContentRoutes(app: Express): void {
     const again = review.reviewState(req.project.id).state === 'changes_requested';
     publisher.syncFrontMatter(req.project.id);                       // the fingerprint that is approved must be the one every build reproduces
     const out = release.requestRelease(req.project.id, req.auth.user.id, req.body ?? {});
-    log(req, again ? 'review.resubmitted' : 'release.requested', out);
+    log(req, again ? 'review.resubmitted' : 'release.requested', { ...out, fingerprint: out.contentHash });   // WP-29 (ENT-020): the fingerprint the approver signs off
     const who = req.auth.user.fullName ?? req.auth.user.full_name;
     notify(approversOf(req.project.id), again
       ? { kind: 'review.resubmitted', title: 'Manual resubmitted for review', body: `${who} made the requested changes to ${pname(req.project.id)} and resubmitted it.`, projectId: req.project.id, actorId: req.auth.user.id }
@@ -331,10 +331,15 @@ export function registerProjectContentRoutes(app: Express): void {
     // approval can simply be repeated - already-issued modules are not issued twice.
     let issued: Array<{ from: string; file: string }> = [];
     if (approve && store.getRelease(param(req, 'relId'))?.status === 'pending') issued = await lifecycle.issueForRelease(req.project.id, publicationSources(req.project.id), actor(req));
-    release.decideRelease(req.project.id, param(req, 'relId'), approve, req.auth.user.id);
-    if (issued.length) { store.setReleaseContentHash(param(req, 'relId'), release.publicationFingerprint(req.project.id)); log(req, 'release.issued', { issued }); }
+    // WP-29 (ENT-003, ENT-020): the decision, the fingerprint it covers and its audit row are one transaction; the row names the fingerprint.
+    const relId = param(req, 'relId');
+    auditedTx(() => ({ actorId: req.auth.user.id, actorUsername: req.auth.user.username, action: approve ? 'release.approved' : 'release.rejected', projectId: req.project.id,
+      targetType: 'project', targetId: req.project.id, meta: { id: relId, fingerprint: store.getRelease(relId)?.content_hash ?? null } }), () => {
+      release.decideRelease(req.project.id, relId, approve, req.auth.user.id);
+      if (issued.length) store.setReleaseContentHash(relId, release.publicationFingerprint(req.project.id));
+    });
+    if (issued.length) log(req, 'release.issued', { issued });
     notify([requester], { kind: approve ? 'approval.approved' : 'approval.rejected', title: approve ? 'Release approved' : 'Release rejected', body: `${pname(req.project.id)}: ${approve ? 'approved' : 'rejected'} by ${req.auth.user.fullName ?? req.auth.user.full_name}.`, projectId: req.project.id, actorId: req.auth.user.id });
-    log(req, approve ? 'release.approved' : 'release.rejected', { id: param(req, 'relId') });
     res.json({ ok: true });
   })];
   app.post(`${base}/release/:relId/approve`, ...decide(true));

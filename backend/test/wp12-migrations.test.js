@@ -28,6 +28,10 @@ const schema = require('../dist/storage/schema');
 const { ORDER, forDialect } = require('../dist/storage/migrations');
 const STEPS = forDialect('sqlite');
 const LAST = ORDER[ORDER.length - 1];
+// An index the last step creates, which the "pending migration" test drops and expects back (022 was the last step when it was written;
+// a package that appends a step adds its index here).
+const LAST_INDEX = { '022-audit-project-index': 'ix_audit_project', '023-audit-chain': 'ix_audit_seq' }[LAST];
+assert.ok(LAST_INDEX, `name an index that ${LAST} creates in LAST_INDEX`);
 
 /** A started context on `ws` (a new folder by default), with an administrator and one registered project so the database is "in use". */
 function populated(ws = tmp()) {
@@ -46,8 +50,9 @@ test('PLT-011: the migration list is well formed; duplicates, gaps and steps not
   schema.checkOrder(ORDER);
   assert.throws(() => schema.checkOrder([...ORDER, ORDER[3]]), /listed twice/);
   assert.throws(() => schema.checkOrder([...ORDER, '022-another-022']), /Two migrations carry the number 022/);
-  assert.throws(() => schema.checkOrder([...ORDER, '024-skips-023']), /023 is missing/);
   const n = ORDER.length; const next = String(n + 1).padStart(3, '0'); const after = String(n + 2).padStart(3, '0');
+  // (was the literal '024-skips-023' while 022 was the last step; WP-29 appended 023, so the gap is computed from the list)
+  assert.throws(() => schema.checkOrder([...ORDER, `${after}-skips-${next}`]), new RegExp(`${next} is missing`));
   assert.throws(() => schema.checkOrder([...ORDER, `${after}-b`, `${next}-a`]), new RegExp(`${next}-a must be appended after ${after}`));
   assert.doesNotThrow(() => schema.checkOrder([...ORDER, `${next}-a`, `${after}-b`]));
   assert.throws(() => schema.checkOrder([...ORDER, 'not-numbered']), /is not NNN-name/);
@@ -101,19 +106,19 @@ test('PLT-013 / G-REL-9: a damaged database file is refused at start with a clea
 test('PLT-006 / ARC-003: before a pending migration of ANY number a verified copy is taken; it predates the migration and is restorable', () => {
   const ws = populated();
   // make it a database from before the last migration
-  const db = open(ws); db.exec('DROP INDEX IF EXISTS ix_audit_project'); db.prepare('DELETE FROM schema_migrations WHERE name = ?').run(LAST); db.exec('PRAGMA user_version = 21'); db.close();
+  const db = open(ws); db.exec(`DROP INDEX IF EXISTS ${LAST_INDEX}`); db.prepare('DELETE FROM schema_migrations WHERE name = ?').run(LAST); db.exec('PRAGMA user_version = 21'); db.close();
 
   const { snapshot } = startOn(ws);
   assert.equal(path.basename(snapshot), `publisher-before-${LAST}.db`);
   const copy = new DatabaseSync(snapshot, { readOnly: true });
   assert.equal(copy.prepare('PRAGMA quick_check').get().quick_check, 'ok');
   assert.equal(copy.prepare('SELECT COUNT(*) AS n FROM schema_migrations WHERE name = ?').get(LAST).n, 0, 'the copy predates the migration');
-  assert.equal(copy.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name = 'ix_audit_project'").get().n, 0);
+  assert.equal(copy.prepare('SELECT COUNT(*) AS n FROM sqlite_master WHERE name = ?').get(LAST_INDEX).n, 0);
   assert.equal(copy.prepare("SELECT username FROM users WHERE id = 'u1'").get().username, 'admin', 'and holds the data');
   copy.close();
   const live = open(ws, { readOnly: true });
   assert.equal(live.prepare('SELECT COUNT(*) AS n FROM schema_migrations WHERE name = ?').get(LAST).n, 1, 'the migration ran after the copy');
-  assert.equal(live.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name = 'ix_audit_project'").get().n, 1);
+  assert.equal(live.prepare('SELECT COUNT(*) AS n FROM sqlite_master WHERE name = ?').get(LAST_INDEX).n, 1);
   live.close();
 
   // the copy is the way back: put it in place of the database in a new folder and start - the data is there and the migration runs again

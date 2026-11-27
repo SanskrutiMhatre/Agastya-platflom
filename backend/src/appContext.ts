@@ -28,6 +28,9 @@ import { LocalFolderStore, type ContentStore } from './storage/contentStore';
 import type { LimiterStore, SessionStore } from './storage/authStores';
 import { createSqliteRepositories, type Repositories } from './repositories';
 import { currentRequest } from './services/requestContext';
+import { HttpError } from './services/http';
+import { raiseSecurityEvent, securityEventForAudit } from './services/securityEvents';
+import { loadOrCreateKey } from './core/auth/auditChain';
 
 /* eslint-disable @typescript-eslint/no-var-requires, @typescript-eslint/no-explicit-any */
 const { AuthStore } = require('./core/auth/store');
@@ -80,7 +83,14 @@ export interface AppContext {
   docIndex: any;
   revisions: any;
   audit(fields: Record<string, any>): void;
-  auditHealth(): { failures: number; last: null | { at: string; action: string; error: string } };
+  /** WP-29: write the row or throw AuditUnavailableError (503) - for an action that must not happen unrecorded, audited before it acts. */
+  auditStrict(fields: Record<string, any>): void;
+  /** WP-29: run `fn` and write its audit row in ONE transaction; if the row cannot be written, the change is rolled back (503). */
+  auditedTx<T>(fields: Record<string, any> | ((out: T) => Record<string, any> | null), fn: () => T): T;
+  auditHealth(): AuditHealth;
+  recordAuditVerification(r: { at: string; ok: boolean; summary: string }): void;
+  /** WP-29: the audit chain key (read from config.audit.keyFile, made on first start). */
+  auditKey(): { key: Buffer; id: string; file: string };
   /** Take the pre-migration snapshot and run the additive migrations. Idempotent. */
   start(): { snapshot: string | null };
   /** Checkpoint and close the database. */
@@ -154,25 +164,68 @@ export function redactAuditMeta(meta: unknown): unknown {
   }));
 }
 
-function createAudit(store: { appendAudit(row: Record<string, unknown>): unknown }, workspaceDir: string): Pick<AppContext, 'audit' | 'auditHealth'> {
+/**
+ * WP-29 (ENT-003, G-REL-8, AU-5): the failure classes. An ordinary action whose audit row cannot be written still goes ahead (its own write
+ * has usually happened already), but the failure is counted, logged, written to audit-failures.log, raised as Application-log event 4100
+ * and shown to administrators. A CRITICAL action (sign-in, role and membership changes, release decisions, restore) uses auditedTx /
+ * auditStrict instead: the change and its audit row are one transaction, so the change does not happen without its row (503 AUDIT_UNAVAILABLE).
+ */
+export class AuditUnavailableError extends HttpError {
+  constructor(action: string) {
+    super(503, 'The action was not carried out because the audit log could not record it. Try again; if it keeps happening, tell the administrator (Security page).', 'AUDIT_UNAVAILABLE', { action });
+  }
+}
+
+type AuditApi = Pick<AppContext, 'audit' | 'auditHealth' | 'auditStrict' | 'auditedTx' | 'recordAuditVerification'>;
+function createAudit(store: { appendAudit(row: Record<string, unknown>): unknown; tx<T>(fn: () => T): T }, workspaceDir: string): AuditApi {
   const failures = { count: 0, last: null as null | { at: string; action: string; error: string } };
+  let lastVerify: AuditHealth['lastVerification'] = null;
+  const rowOf = (fields: Record<string, unknown>): Record<string, unknown> =>
+    ({ at: nowIso(), ...fields, ip: fields.ip || currentRequest()?.ip || null, meta: redactAuditMeta(fields.meta) });
+  const failed = (fields: Record<string, unknown>, e: unknown, critical: boolean): void => {
+    failures.count++;
+    failures.last = { at: nowIso(), action: String(fields.action ?? ''), error: (e as Error).message };
+    console.error(`[audit] write failed (${critical ? 'the action was refused' : 'operation unaffected'}):`, (e as Error).message);
+    try {
+      const dir = path.join(workspaceDir, 'logs'); fs.mkdirSync(dir, { recursive: true });
+      fs.appendFileSync(path.join(dir, 'audit-failures.log'), `${JSON.stringify({ ...failures.last, critical, actor: fields.actorUsername ?? null, ip: currentRequest()?.ip ?? null })}\n`);
+    } catch { /* the counter still shows it */ }
+    raiseSecurityEvent('AUDIT_WRITE_FAILED', `The audit log could not record "${String(fields.action ?? '')}" by ${String(fields.actorUsername ?? 'unknown')}: ${(e as Error).message}. ${critical ? 'The action was refused.' : 'The action went ahead without its audit row.'}`);
+  };
+  const written = (row: Record<string, unknown>): void => { try { securityEventForAudit(row); } catch { /* events never break an action */ } };
+  const strict = (fields: Record<string, unknown>): Record<string, unknown> => {
+    const row = rowOf(fields);
+    try { store.appendAudit(row); } catch (e) { failed(fields, e, true); throw new AuditUnavailableError(String(fields.action ?? '')); }
+    return row;
+  };
   return {
-    auditHealth: () => ({ failures: failures.count, last: failures.last }),
+    auditHealth: () => ({ failures: failures.count, last: failures.last, lastVerification: lastVerify }),
+    recordAuditVerification: (r) => { lastVerify = { at: r.at, ok: r.ok, summary: r.summary }; },
     audit(fields: Record<string, any>): void {
-      try {
-        const meta = redactAuditMeta(fields.meta);
-        store.appendAudit({ at: nowIso(), ...fields, ip: fields.ip || currentRequest()?.ip || null, meta });
-      } catch (e) {
-        failures.count++;
-        failures.last = { at: nowIso(), action: String(fields.action ?? ''), error: (e as Error).message };
-        console.error('[audit] write failed (operation unaffected):', (e as Error).message);
-        try {
-          const dir = path.join(workspaceDir, 'logs'); fs.mkdirSync(dir, { recursive: true });
-          fs.appendFileSync(path.join(dir, 'audit-failures.log'), `${JSON.stringify({ ...failures.last, actor: fields.actorUsername ?? null, ip: currentRequest()?.ip ?? null })}\n`);
-        } catch { /* the counter still shows it */ }
-      }
+      let row: Record<string, unknown>;
+      try { row = rowOf(fields); store.appendAudit(row); } catch (e) { failed(fields, e, false); return; }
+      written(row);
+    },
+    auditStrict(fields: Record<string, any>): void { written(strict(fields)); },
+    auditedTx<T>(fields: Record<string, any> | ((out: T) => Record<string, any> | null), fn: () => T): T {
+      let row: Record<string, unknown> | null = null;
+      const out = store.tx(() => {
+        const r = fn();
+        const f = typeof fields === 'function' ? fields(r) : fields;
+        if (f) row = strict(f);
+        return r;
+      });
+      if (row) written(row);
+      return out;
     },
   };
+}
+
+export interface AuditHealth {
+  failures: number;
+  last: null | { at: string; action: string; error: string };
+  /** The last chain verification this process ran (WP-29), or null. */
+  lastVerification: null | { at: string; ok: boolean; summary: string };
 }
 
 export function createAppContext(config: Config, o: AppContextOverrides = {}): AppContext {
@@ -187,6 +240,10 @@ export function createAppContext(config: Config, o: AppContextOverrides = {}): A
 
   const db = o.db ?? openSqlite(workspaceDir);
   const store = new AuthStore(db);
+  // WP-29: the chain key, outside the database. Made on the first start; an unreadable or damaged key file stops the start (a silent new key
+  // would make every earlier row unverifiable).
+  const chainKey = loadOrCreateKey(config.audit.keyFile) as { key: Buffer; id: string; file: string };
+  store.setAuditKey(chainKey);
   const repos = o.repos ?? createSqliteRepositories(db);
   const sessionStore: SessionStore = o.sessionStore ?? store;
   const limiterStore: LimiterStore = o.limiterStore ?? store;
@@ -205,6 +262,7 @@ export function createAppContext(config: Config, o: AppContextOverrides = {}): A
     docIndex: new DocIndex(store),
     revisions: new Revisions(store),
     ...createAudit(store, workspaceDir),
+    auditKey: () => chainKey,
     start() {
       if (started) return { snapshot };
       /**

@@ -55,6 +55,13 @@ function registerAuthRoutes(deps) {
     onProjectDecided = () => {},
     securityPolicy = null,
   } = deps;
+  /*
+    WP-29 (ENT-003, G-REL-8): critical actions - sign-in, platform role and account state, project membership, release decisions - write
+    their audit row in the same transaction as the change (context auditedTx): if the row cannot be written the change is rolled back and
+    the caller gets 503 AUDIT_UNAVAILABLE. A host without the context's helper (an embedding test) gets "change, then audit" as before.
+  */
+  const auditedTx = deps.auditedTx || ((fields, fn) => { const out = fn(); const f = typeof fields === 'function' ? fields(out) : fields; if (f) audit(f); return out; });
+  const auditRefused = (res, e) => (e && e.code === 'AUDIT_UNAVAILABLE' ? (res.status(503).json({ error: e.message, code: e.code }), true) : false);
   // WP-10 (PLT-027): who a person is comes from the AuthProvider; local accounts by default.
   const authProvider = deps.authProvider || createLocalAuthProvider({ store, sessions: sessionsSvc });
   const { requireAuth, requireAdmin, requireProject, publicRoute } = authz;
@@ -197,6 +204,7 @@ function registerAuthRoutes(deps) {
 
       const rl = limiter.attempt(username.toLowerCase(), ip);
       if (!rl.allowed) {
+        if (deps.onSignInThrottled) { try { deps.onSignInThrottled(username, ip); } catch { /* an event never blocks the answer */ } }   // WP-29: event 4111
         res.set('Retry-After', String(rl.retryAfterSeconds));
         return res.status(429).json({ error: 'Too many attempts. Try again later.', retryAfterSeconds: rl.retryAfterSeconds });
       }
@@ -221,14 +229,14 @@ function registerAuthRoutes(deps) {
       if (!viaMaster && needsRehash(user.password_hash)) {
         try { store.updateUser(user.id, { password_hash: await hashPassword(password) }, nowIso()); } catch (e) { console.warn('[auth] could not upgrade a scrypt hash:', e.message); }
       }
-      const { cookie, displaced } = sessionsSvc.issue(user.id, { ip, userAgent: String(req.headers['user-agent'] || '').slice(0, 200), req });
-      audit({
+      // WP-29: the session and its audit row are one transaction - no sign-in without its record.
+      const { cookie, displaced } = auditedTx({
         actorId: user.id, actorUsername: user.username,
         // Its own action name, not a flag on the ordinary one: anyone reading
         // the trail later should not have to know to look for a field.
         action: viaMaster ? 'auth.login.master' : 'auth.login',
         ip,
-      });
+      }, () => sessionsSvc.issue(user.id, { ip, userAgent: String(req.headers['user-agent'] || '').slice(0, 200), req }));
       if (viaMaster) {
         console.warn('[auth] MASTER PASSWORD sign-in as ' + user.username + ' from ' + ip);
       }
@@ -238,6 +246,7 @@ function registerAuthRoutes(deps) {
       res.set('Set-Cookie', cookie);
       res.json({ ok: true, user: publicUser(user), gates: gatesOf(user) });
     } catch (e) {
+      if (auditRefused(res, e)) return undefined;
       // WP-06 (PLT-002): a database held by another process past the busy timeout is a moment's wait, not a failed sign-in
       if (e && (e.errcode === 5 || e.errcode === 6 || /database is locked/i.test(String(e.message)))) {
         res.set('Retry-After', '3');
@@ -522,8 +531,8 @@ function registerAuthRoutes(deps) {
     if (target.role === 'owner' && role !== 'owner' && store.countOwners(req.project.id) <= 1) {
       return res.status(409).json({ error: 'This is the project\'s last owner. Make someone else an owner first.' });
     }
-    store.upsertMember(req.project.id, target.user_id, role, req.auth.user.id, nowIso());
-    audit({ actorId: req.auth.user.id, actorUsername: req.auth.user.username, action: 'member.role_changed', projectId: req.project.id, targetType: 'user', targetId: target.user_id, meta: { from: target.role, to: role } });
+    auditedTx({ actorId: req.auth.user.id, actorUsername: req.auth.user.username, action: 'member.role_changed', projectId: req.project.id, targetType: 'user', targetId: target.user_id, meta: { from: target.role, to: role } },
+      () => store.upsertMember(req.project.id, target.user_id, role, req.auth.user.id, nowIso()));
     if (onAccess) onAccess('changed', { actor: req.auth.user, projectId: req.project.id, userId: target.user_id, role });
     res.json({ ok: true });
   });
@@ -536,8 +545,8 @@ function registerAuthRoutes(deps) {
     if (target.role === 'owner' && store.countOwners(req.project.id) <= 1) {
       return res.status(409).json({ error: 'This is the project\'s last owner. Make someone else an owner first.' });
     }
-    store.removeMember(req.project.id, target.user_id);
-    audit({ actorId: req.auth.user.id, actorUsername: req.auth.user.username, action: 'member.removed', projectId: req.project.id, targetType: 'user', targetId: target.user_id, meta: { role: target.role } });
+    auditedTx({ actorId: req.auth.user.id, actorUsername: req.auth.user.username, action: 'member.removed', projectId: req.project.id, targetType: 'user', targetId: target.user_id, meta: { role: target.role } },
+      () => store.removeMember(req.project.id, target.user_id));
     if (onAccess) onAccess('removed', { actor: req.auth.user, projectId: req.project.id, userId: target.user_id, role: target.role });
     res.json({ ok: true });
   });
@@ -608,18 +617,19 @@ function registerAuthRoutes(deps) {
       const admins = store.listUsers().filter((u) => u.role === 'admin' && !u.disabled_at);
       if (admins.length <= 1) return res.status(409).json({ error: 'This is the last active administrator and cannot be disabled.' });
     }
-    store.updateUser(target.id, { disabled_at: nowIso() }, nowIso());
-    // Disabling kills live sessions immediately.
-    const revoked = store.revokeAllSessionsForUser(target.id, 'account-disabled', nowIso());
-    audit({ actorId: req.auth.user.id, actorUsername: req.auth.user.username, action: 'user.disabled', targetType: 'user', targetId: target.id, meta: { sessionsRevoked: revoked } });
+    // Disabling kills live sessions immediately; the change, the revocation and the audit row are one transaction (WP-29).
+    auditedTx((revoked) => ({ actorId: req.auth.user.id, actorUsername: req.auth.user.username, action: 'user.disabled', targetType: 'user', targetId: target.id, meta: { sessionsRevoked: revoked } }), () => {
+      store.updateUser(target.id, { disabled_at: nowIso() }, nowIso());
+      return store.revokeAllSessionsForUser(target.id, 'account-disabled', nowIso());
+    });
     res.json({ ok: true, user: publicUser(store.getUser(target.id)) });
   });
 
   app.post('/api/admin/users/:id/enable', requireAdmin(), (req, res) => {
     const target = store.getUser(String(req.params.id));
     if (!target) return res.status(404).json({ error: 'Not found' });
-    store.updateUser(target.id, { disabled_at: null }, nowIso());
-    audit({ actorId: req.auth.user.id, actorUsername: req.auth.user.username, action: 'user.enabled', targetType: 'user', targetId: target.id });
+    auditedTx({ actorId: req.auth.user.id, actorUsername: req.auth.user.username, action: 'user.enabled', targetType: 'user', targetId: target.id },
+      () => store.updateUser(target.id, { disabled_at: null }, nowIso()));
     res.json({ ok: true, user: publicUser(store.getUser(target.id)) });
   });
 
@@ -643,8 +653,8 @@ function registerAuthRoutes(deps) {
       fields.full_name = nCheck.fullName;
     }
     if (!Object.keys(fields).length) return res.status(400).json({ error: 'Nothing to change.' });
-    store.updateUser(target.id, fields, nowIso());
-    audit({ actorId: req.auth.user.id, actorUsername: req.auth.user.username, action: 'user.updated', targetType: 'user', targetId: target.id, meta: fields });
+    auditedTx({ actorId: req.auth.user.id, actorUsername: req.auth.user.username, action: 'user.updated', targetType: 'user', targetId: target.id, meta: { ...fields, ...(fields.role ? { fromRole: target.role } : {}) } },
+      () => store.updateUser(target.id, fields, nowIso()));
     res.json({ ok: true, user: publicUser(store.getUser(target.id)) });
   });
 
@@ -815,24 +825,25 @@ function registerAuthRoutes(deps) {
     const pending = store.getRelease(String(req.params.id));
     const sod = pending && securityPolicy ? securityPolicy.approverConflict(pending.requested_by, req.auth.user.id) : null;
     if (sod) return res.status(403).json({ error: sod, code: 'SEPARATION_OF_DUTIES' });   // D7, PLT-015
-    const approved = store.approveRelease(String(req.params.id), req.auth.user.id, nowIso());
-    if (!approved) return res.status(404).json({ error: 'Not found' });
-    audit({
+    // WP-29 (ENT-020): the approval row names the fingerprint that was approved; the decision and its row are one transaction.
+    const approved = auditedTx((a) => (a ? {
       actorId: req.auth.user.id, actorUsername: req.auth.user.username, action: 'release.approved',
-      projectId: approved.project_id, targetType: 'project', targetId: approved.project_id,
-      meta: { releaseNumber: approved.release_number, scheduledAt: approved.scheduled_at },
-    });
+      projectId: a.project_id, targetType: 'project', targetId: a.project_id,
+      meta: { releaseId: a.id, releaseNumber: a.release_number, scheduledAt: a.scheduled_at, fingerprint: a.content_hash || (pending && pending.content_hash) || null },
+    } : null), () => store.approveRelease(String(req.params.id), req.auth.user.id, nowIso()));
+    if (!approved) return res.status(404).json({ error: 'Not found' });
     res.json({ ok: true, releaseNumber: approved.release_number });
   });
 
   app.post('/api/admin/releases/:id/reject', requireAdmin(), (req, res) => {
     const r = store.getRelease(String(req.params.id));
     if (!r || r.status !== 'pending') return res.status(404).json({ error: 'Not found' });
-    if (!store.rejectRelease(r.id, req.auth.user.id, nowIso())) {
+    const rejected = auditedTx((ok) => (ok ? { actorId: req.auth.user.id, actorUsername: req.auth.user.username, action: 'release.rejected',
+      projectId: r.project_id, targetType: 'project', targetId: r.project_id, meta: { releaseId: r.id, fingerprint: r.content_hash || null } } : null),
+    () => store.rejectRelease(r.id, req.auth.user.id, nowIso()));
+    if (!rejected) {
       return res.status(409).json({ error: 'This request was already decided.' });
     }
-    audit({ actorId: req.auth.user.id, actorUsername: req.auth.user.username, action: 'release.rejected',
-      projectId: r.project_id, targetType: 'project', targetId: r.project_id });
     res.json({ ok: true });
   });
 
@@ -992,8 +1003,8 @@ function registerAuthRoutes(deps) {
     if (existing && existing.role === 'owner' && role !== 'owner' && store.countOwners(row.id) <= 1) {
       return res.status(409).json({ error: 'This is the project\'s last owner. Make someone else an owner first.' });
     }
-    store.upsertMember(row.id, target.id, role, req.auth.user.id, nowIso());
-    audit({ actorId: req.auth.user.id, actorUsername: req.auth.user.username, action: 'member.added', projectId: row.id, targetType: 'user', targetId: target.id, meta: { role, direct: true } });
+    auditedTx({ actorId: req.auth.user.id, actorUsername: req.auth.user.username, action: 'member.added', projectId: row.id, targetType: 'user', targetId: target.id, meta: { role, direct: true, from: existing ? existing.role : null } },
+      () => store.upsertMember(row.id, target.id, role, req.auth.user.id, nowIso()));
     res.json({ ok: true });
   });
 
@@ -1039,10 +1050,13 @@ function registerAuthRoutes(deps) {
     const limit = Math.min(500, Math.max(1, parseInt(req.query.limit, 10) || 200));
     const before = req.query.before ? parseInt(req.query.before, 10) : null;
     const action = req.query.action ? String(req.query.action).slice(0, 60) : null;
-    const rows = store.listAudit({ limit, before, action }).map((r) => ({
+    // WP-29: filters by who, project and time as well (from inclusive, to exclusive; a date alone means that day's start)
+    const text = (k, n) => (req.query[k] ? String(req.query[k]).trim().slice(0, n) || null : null);
+    const time = (k) => { const v = text(k, 40); if (!v) return null; const t = Date.parse(v); return Number.isFinite(t) ? new Date(t).toISOString() : null; };
+    const rows = store.listAudit({ limit, before, action, actor: text('actor', 64), project: text('project', 120), from: time('from'), to: time('to') }).map((r) => ({
       id: r.id, at: r.at, actor: r.actor_username, action: r.action,
       targetType: r.target_type, targetId: r.target_id, projectId: r.project_id,
-      ip: r.ip, meta: r.meta ? JSON.parse(r.meta) : null,
+      ip: r.ip, meta: r.meta ? JSON.parse(r.meta) : null, seq: r.seq ?? null,
     }));
     res.json({ entries: rows });
   });

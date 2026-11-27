@@ -46,6 +46,9 @@ export const { requireAuth, requireAdmin, requireRoles, requireProject, publicRo
 export { redactAuditMeta };
 export const auditHealth = ctx.auditHealth;
 export const audit = ctx.audit;
+/** WP-29: the critical-action forms of audit() (appContext.ts). */
+export const auditStrict = ctx.auditStrict;
+export const auditedTx = ctx.auditedTx;
 
 /** The client's address: Express's req.ip, which honours the trust-proxy setting (config.trustProxy, SEC-008); the socket peer otherwise. */
 export const clientIp = (req: { ip?: string; socket?: { remoteAddress?: string } }): string =>

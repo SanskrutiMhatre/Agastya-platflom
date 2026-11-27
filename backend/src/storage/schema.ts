@@ -26,7 +26,8 @@ import path from 'path';
 import { DatabaseSync } from 'node:sqlite';
 import type { SqlDatabase } from './sqlite';
 
-export interface MigrationStep { name: string; sql?: string; columns?: unknown; fkOff?: boolean }
+/** `postSql` (WP-29) runs after `columns`, so a step can index a column it adds; every part of a step is re-runnable (IF NOT EXISTS). */
+export interface MigrationStep { name: string; sql?: string; columns?: unknown; fkOff?: boolean; postSql?: string }
 
 /** A database this build must not open (newer schema, edited migration, damaged file, failed safety copy). The message is for an operator. */
 export class SchemaError extends Error {
@@ -62,7 +63,8 @@ export function checkOrder(order: string[]): void {
 
 /** SHA-256 of what a step does (its SQL, its added columns, its foreign-key mode), so an edited shipped step is detected. */
 export function migrationChecksum(m: MigrationStep): string {
-  return crypto.createHash('sha256').update(JSON.stringify({ sql: m.sql ?? null, columns: m.columns ?? null, fkOff: !!m.fkOff })).digest('hex');
+  // postSql joins the digest only when a step has one, so the recorded checksums of every earlier step stay what they were
+  return crypto.createHash('sha256').update(JSON.stringify({ sql: m.sql ?? null, columns: m.columns ?? null, fkOff: !!m.fkOff, ...(m.postSql ? { postSql: m.postSql } : {}) })).digest('hex');
 }
 
 export interface SchemaState {

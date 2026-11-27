@@ -13,6 +13,8 @@ import * as broadcast from './services/broadcast';
 import { reconcileRegistry, sweepPendingImports } from './services/projects';
 import { startRenderer, stopRenderer, rendererStatus } from './services/publisher';
 import { loadTls, listen, hostCheckFor, setHostCheck, describeNetwork } from './services/network';
+import { installLogging } from './services/log';
+import { enableHostEventSink } from './services/securityEvents';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { ensureBootstrapAdmin } = require('./core/auth/bootstrap');
@@ -22,6 +24,10 @@ import { assertPasswordHashing } from './core/auth/crypto';
 let servers: http.Server[] = [];
 
 export async function start(port: number = config.port): Promise<number> {
+  // WP-29 (ENT-007, RES-004): every console line becomes a structured log record (JSON on standard output in production, and always JSON
+  // in <log dir>/agastya-server.jsonl, rotated); security events also go to the Windows host when it asked for them.
+  installLogging(config);
+  enableHostEventSink(config.log.eventSink === 'host');
   // WP-13 (ARC-019): Argon2 is required. Without it no stored password can be checked, so the server stops here with the cause instead of
   // starting and refusing every sign-in.
   assertPasswordHashing();

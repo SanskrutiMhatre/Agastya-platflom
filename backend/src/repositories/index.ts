@@ -18,8 +18,9 @@ import {
   type ActivityRepository, type CirLinkRepository, type ExtensionRepository, type LifecycleRepository,
 } from './s1000dRecords';
 import { SqliteRetentionRepository, type RetentionRepository } from './retentionRepository';
+import { SqliteAuditRepository, type AuditRepository } from './auditRepository';
 
-export type { ProjectRegistry, SnsRepository, ProjectConfigRepository, ReferenceRepository, ActivityRepository, CirLinkRepository, ExtensionRepository, LifecycleRepository, RetentionRepository, UnitOfWork };
+export type { ProjectRegistry, SnsRepository, ProjectConfigRepository, ReferenceRepository, ActivityRepository, CirLinkRepository, ExtensionRepository, LifecycleRepository, RetentionRepository, AuditRepository, UnitOfWork };
 
 export interface Repositories extends UnitOfWork {
   /** The engine behind these repositories ('sqlite'); a contract test and the migration runner use it to pick a dialect. */
@@ -38,6 +39,8 @@ export interface Repositories extends UnitOfWork {
   activity: ActivityRepository;
   /** WP-12 (PLT-007, ENT-015): housekeeping rows past their retention. */
   retention: RetentionRepository;
+  /** WP-29 (ENT-003, ENT-017): the audit chain's reading side, checkpoints, anchor, export pages; waiver history. */
+  audit: AuditRepository;
 }
 
 export function createSqliteRepositories(db: SqlDatabase): Repositories {
@@ -57,5 +60,6 @@ export function createSqliteRepositories(db: SqlDatabase): Repositories {
     extensions: new SqliteExtensionRepository(db),
     activity: new SqliteActivityRepository(db),
     retention: new SqliteRetentionRepository(db),
+    audit: new SqliteAuditRepository(db),
   };
 }
