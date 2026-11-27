@@ -11,8 +11,9 @@ import { PageHeader } from '../components/PageHeader';
 import { Alert, Badge, ConfirmModal, Empty, Loading, Modal, ago, errText, fmtDate, useAsync } from '../components/ui';
 import { useSession } from '../store/session';
 import { useUi } from '../store/ui';
+import { may } from '../lib/roles';
 
-const WRITE_ROLES = new Set(['editor', 'manager', 'owner']);
+// The copy route checks dm.write on the target project; the server's `can` map on each card says where that holds (WP-13, FE-019).
 
 export function CirPage() {
   const toast = useUi((s) => s.toast);
@@ -64,7 +65,7 @@ export function CirPage() {
 
       {adding ? <AddModal onClose={() => setAdding(false)} onDone={() => { setAdding(false); list.reload(); }} /> : null}
       {use ? (
-        <UseModal module={use} projects={(projects.data ?? []).filter((p) => WRITE_ROLES.has(p.role))} onClose={() => setUse(null)} />
+        <UseModal module={use} projects={(projects.data ?? []).filter((p) => may(p.can, 'dm.write'))} onClose={() => setUse(null)} />
       ) : null}
       {look ? <Modal title={look.file} width={760} onClose={() => setLook(null)} buttons={<button className="btn" onClick={() => setLook(null)}>Close</button>}><pre className="v2-pre" style={{ maxHeight: '60vh', overflow: 'auto', margin: 0 }}>{look.xml}</pre></Modal> : null}
       {del ? (

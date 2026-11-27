@@ -17,7 +17,7 @@ import { Icon } from '../../../components/Icon';
 import {
   buildPackageForm, defaultRepairs, describeSelection, importOptions, makeSelection, plural, selectionProblem, type PickSource, type Selection,
 } from '../../../lib/importPackage';
-import { canAssignModules, canImportPackage } from '../../../lib/roles';
+import { canAssignModules, canImportPackage, type Can } from '../../../lib/roles';
 import { ImportAssignPanel } from './ImportAssignPanel';
 import { ImportReportView } from './ImportReportView';
 import { ImportResultView } from './ImportResultView';
@@ -30,11 +30,11 @@ interface Failure { message: string; problems?: string[] }
 // webkitdirectory is not in React's typings, but every current browser honours it.
 const FOLDER_ATTRS = { webkitdirectory: '', directory: '' } as Record<string, string>;
 
-export function ImportPackageDialog({ projectId, role, onClose, onChanged }: {
-  projectId: string; role: ProjectRole; onClose: () => void; onChanged: (what: { media: boolean }) => void;
+export function ImportPackageDialog({ projectId, can, onClose, onChanged }: {
+  projectId: string; can: Can; onClose: () => void; onChanged: (what: { media: boolean }) => void;
 }) {
-  const mayImport = canImportPackage(role);
-  const mayAssign = canAssignModules(role);
+  const mayImport = canImportPackage(can);
+  const mayAssign = canAssignModules(can);
   const [tab, setTab] = useState<Tab>('import');
   const [stage, setStage] = useState<Stage>('choose');
   const [sel, setSel] = useState<Selection | null>(null);

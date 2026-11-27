@@ -36,6 +36,7 @@ import { registerWaiverRoutes } from './routes/waivers';
 import { registerBrandRoutes } from './routes/brand';
 import { notifyAccess } from './services/access-notify';
 import { API_VERSION, MIN_CLIENT_VERSION, buildInfo, schemaLevel } from './services/version';
+import { capabilityTableFrom, setCapabilityTable } from './services/permissions';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { registerAuthRoutes } = require('./core/auth/routes');
@@ -109,6 +110,8 @@ export function createApp(): express.Express {
   registerXengineRoutes(app);
   registerWaiverRoutes(app);
   registerBrandRoutes(app);
+  // The client's `can` map is read from the guards just registered (WP-13, FE-019): one rule, stated once, on the server.
+  setCapabilityTable(capabilityTableFrom(app));
 
   // Unknown API paths are JSON 404s, never the SPA shell.
   app.use('/api', (_req, res) => { res.status(404).json({ error: 'Not found' }); });

@@ -8,17 +8,21 @@ import { workspaceApi, type ProjectRole, type Summary } from '../api';
 import { Icon, type IconName } from '../components/Icon';
 import { Alert, Loading, errText } from '../components/ui';
 import { MissingBrex } from '../components/MissingBrex';
+import { may, type Can } from '../lib/roles';
 
 export interface ProjectCtx {
   id: string;
   summary: Summary;
   role: ProjectRole;
+  /** What the signed-in person may do here, as the server computed it (WP-13, FE-019; lib/roles.ts). */
+  can: Can;
   reload: () => void;
 }
 export const useProject = (): ProjectCtx => useOutletContext<ProjectCtx>();
 
-export const canWrite = (role: ProjectRole): boolean => role === 'editor' || role === 'manager' || role === 'owner';
-export const canBuild = (role: ProjectRole): boolean => role !== 'viewer';
+/** Writing data modules and documents (the routes' dm.write capability), and building a PDF (publish.build): asked of the server's map. */
+export const canWrite = (can: Can | null | undefined): boolean => may(can, 'dm.write');
+export const canBuild = (can: Can | null | undefined): boolean => may(can, 'publish.build');
 
 interface Item { to: string; label: string; icon: IconName; badge?: { text: string; tone: 'bad' | 'warn' | 'ok' } | null }
 
@@ -73,7 +77,7 @@ function ProjectShellFor({ id }: { id: string }) {
     { to: `/projects/${id}/settings`, label: 'Settings', icon: 'settings' },
   ];
 
-  const ctx: ProjectCtx = { id, summary, role: summary.role, reload: load };
+  const ctx: ProjectCtx = { id, summary, role: summary.role, can: (summary.project.can ?? {}) as Can, reload: load };
   return (
     <div className="v2-pshell">
       <aside className="v2-rail" aria-label="Project navigation">
@@ -91,7 +95,7 @@ function ProjectShellFor({ id }: { id: string }) {
         </nav>
       </aside>
       <div className="v2-main" style={{ minWidth: 0 }}>
-        {s1000d ? <MissingBrex projectId={id} canCreate={canWrite(summary.role)} /> : null}
+        {s1000d ? <MissingBrex projectId={id} canCreate={canWrite(ctx.can)} /> : null}
         <Outlet context={ctx} />
       </div>
     </div>

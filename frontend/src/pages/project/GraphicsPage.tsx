@@ -12,7 +12,7 @@ import { canWrite, useProject } from '../../layouts/ProjectShell';
 import { useUi } from '../../store/ui';
 
 export function ProjectGraphicsPage() {
-  const { id, role, summary } = useProject();
+  const { id, role, can, summary } = useProject();
   const toast = useUi((s) => s.toast);
   const list = useAsync(() => graphicsApi.list(id), [id]);
   const [kind, setKind] = useState<'auto' | 'icn' | 'symbol'>('auto');
@@ -21,7 +21,7 @@ export function ProjectGraphicsPage() {
   const [problems, setProblems] = useState<string[]>([]);
   const [del, setDel] = useState<Graphic | null>(null);
   const input = useRef<HTMLInputElement>(null);
-  const writable = canWrite(role);
+  const writable = canWrite(can);
 
   const upload = async (files: FileList | File[] | null) => {
     const f = files ? [...files] : [];

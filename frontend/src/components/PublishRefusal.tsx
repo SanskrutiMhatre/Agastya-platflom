@@ -6,7 +6,7 @@
 import { useState } from 'react';
 import type { ProjectRole } from '../api';
 import { waiverApi } from '../api/waivers';
-import { canRecordWaiver } from '../lib/roles';
+import { canRecordWaiver, type Can } from '../lib/roles';
 import { REASON_MAX, reasonProblem, summariseFindings, waiverOffer, type GateFinding, type Refusal } from '../lib/waivers';
 import { Alert, Badge, Field, Modal, Spinner, errText } from './ui';
 import { CappedList } from './lists';
@@ -57,12 +57,12 @@ function WaiverDialog({ projectId, subjects, others, onClose, onRecorded }: { pr
  * `mode`: 'draft' for a build (offers the waiver where one applies), 'release' for a release request or approval (never offers it, and says
  * why). `onRecorded` runs after a waiver is recorded: the caller repeats the build.
  */
-export function PublishRefusal({ refusal, projectId, role, mode, onRecorded, onDismiss }: {
-  refusal: Refusal; projectId: string; role: ProjectRole; mode: 'draft' | 'release'; onRecorded?: () => void; onDismiss?: () => void;
+export function PublishRefusal({ refusal, projectId, can, mode, onRecorded, onDismiss }: {
+  refusal: Refusal; projectId: string; can: Can; mode: 'draft' | 'release'; onRecorded?: () => void; onDismiss?: () => void;
 }) {
   const [asking, setAsking] = useState(false);
   const offer = waiverOffer(refusal);
-  const may = canRecordWaiver(role);
+  const may = canRecordWaiver(can);
   const summary = summariseFindings(refusal.findings);
 
   return (

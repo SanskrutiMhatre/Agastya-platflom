@@ -6,15 +6,15 @@ import type { ProjectRole } from '../../api';
 import { waiverApi, type Waiver } from '../../api/waivers';
 import { Alert, Badge, Empty, Loading, errText, fmtDate, useAsync } from '../../components/ui';
 import { Icon } from '../../components/Icon';
-import { canRecordWaiver } from '../../lib/roles';
+import { canRecordWaiver, type Can } from '../../lib/roles';
 import { waiverKindLabel } from '../../lib/waivers';
 import { useUi } from '../../store/ui';
 
-export function PublishWaivers({ projectId, role, refreshKey }: { projectId: string; role: ProjectRole; refreshKey: number }) {
+export function PublishWaivers({ projectId, can, refreshKey }: { projectId: string; can: Can; refreshKey: number }) {
   const toast = useUi((s) => s.toast);
   const list = useAsync(() => waiverApi.list(projectId), [projectId, refreshKey]);
   const [busy, setBusy] = useState('');
-  const may = canRecordWaiver(role);
+  const may = canRecordWaiver(can);
 
   const remove = async (w: Waiver) => {
     setBusy(w.id);

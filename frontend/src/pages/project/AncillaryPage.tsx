@@ -17,9 +17,9 @@ import { useLeaveGuard } from '../../lib/leaveGuard';
 type Mode = 'text' | 'xml';
 
 export function AncillaryPage() {
-  const { id, role } = useProject();
+  const { id, role, can } = useProject();
   const toast = useUi((s) => s.toast);
-  const writable = canWrite(role);
+  const writable = canWrite(can);
   const list = useAsync(() => ancillaryApi.list(id), [id]);
   const [pages, setPages] = useState<AncillaryPage[]>([]);
   const [sel, setSel] = useState('');

@@ -22,6 +22,7 @@ import { removeReleasingRenderer } from './renderer';
 import { chapterEntries, profileById } from './profiles';
 import * as PC from './projectConfig';
 import * as SNS from './sns';
+import { canFor } from './permissions';
 
 const { newId } = require('../core/auth/crypto');
 const { safeRelPath, safeArtworkRef } = require('../core/auth/xmlGuard');
@@ -131,6 +132,8 @@ export interface ProjectCard {
   /** Page furniture of S1000D publications: rotated side text in the left margin, and the default header logo. On by default. */
   sideText: { enabled: boolean; publisher: string; draftNote: boolean }; headerLogo: boolean; publisherLogo: boolean;
   folder: string; status: string; role: string; accessVia: 'project' | 'folder' | 'admin';
+  /** WP-13 (FE-019): what the caller may do here, computed from the route guards (services/permissions.ts). */
+  can: Record<string, boolean>;
   dmCount: number; hasPdf: boolean; createdAt: string; updatedAt: string; lastOpened: string | null;
   owners: string[];
   /** WP-06 (PLT-003): the project folder was not found at the last start (the row and memberships are kept); null when it is there. */
@@ -162,7 +165,7 @@ export function projectCard(row: any, role: string, via: ProjectCard['accessVia'
     jssDocType: pj.authoring === 'jss-xml' ? (pj.jssDocType ?? null) : null,
     folder: String(pj.group || '').trim(),
     status: row.status || 'active',
-    role, accessVia: via,
+    role, accessVia: via, can: canFor(role, row.status || 'active'),
     dmCount: countDms(row.id, pj),
     hasPdf: fs.existsSync(path.join(projectDirFor(row.id), 'jss-output.pdf')),
     createdAt: row.created_at, updatedAt: row.updated_at, lastOpened: row.last_opened || null,

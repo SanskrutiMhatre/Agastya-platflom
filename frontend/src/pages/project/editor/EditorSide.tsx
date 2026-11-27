@@ -40,7 +40,7 @@ export function EditorSide({ ctx, refreshKey, treeKey, width, onCollapse }: { ct
   const [closed, setClosed] = useState<Set<string>>(() => { try { return new Set(JSON.parse(localStorage.getItem(`agastya.editor.closed.${ctx.id}`) ?? '[]')); } catch { return new Set(); } });
   const fileInput = useRef<HTMLInputElement>(null);
   const rawInput = useRef<HTMLInputElement>(null);       // the same picker, for "Import without validation"
-  const writable = canWrite(ctx.role);
+  const writable = canWrite(ctx.can);
 
   const hasChapters = !isCir && (explore.data?.counts.folders ?? 0) > 0;
   const view: View = isCir ? 'all' : viewPref ?? (hasChapters ? 'tree' : 'all');
@@ -155,7 +155,7 @@ export function EditorSide({ ctx, refreshKey, treeKey, width, onCollapse }: { ct
             <span className="v2-vsep" aria-hidden="true" />
             <button className="icon-btn" title="Import data modules (.xml) and graphics" aria-label="Import data modules and graphics" onClick={() => fileInput.current?.click()}><Icon name="upload" size={14} /></button>
             <button className="icon-btn" title="Import without validation: brings in every file as it is (enterprise and content checks skipped)" aria-label="Import without validation" data-testid="import-raw" onClick={() => rawInput.current?.click()}><Icon name="warn" size={14} /></button>
-            {canImportPackage(ctx.role) && !isCir ? <button className="icon-btn" title="Import a package: a folder, a .zip or files from another S1000D tool, scanned and repaired first" aria-label="Import package" data-testid="import-package" onClick={() => setPackageOpen(true)}><Icon name="package" size={14} /></button> : null}
+            {canImportPackage(ctx.can) && !isCir ? <button className="icon-btn" title="Import a package: a folder, a .zip or files from another S1000D tool, scanned and repaired first" aria-label="Import package" data-testid="import-package" onClick={() => setPackageOpen(true)}><Icon name="package" size={14} /></button> : null}
             {isCir ? null : <button className="icon-btn" title="Add a data module from the common repository" aria-label="Add from the common repository" onClick={() => setPicking(true)} data-testid="cir-pick"><Icon name="library" size={14} /></button>}
             <input ref={fileInput} type="file" accept=".xml,.XML,.png,.jpg,.jpeg,.gif,.svg,.bmp,.webp" multiple hidden onChange={(e) => void doImport(e.target.files)} />
             <input ref={rawInput} data-testid="import-raw-input" type="file" accept=".xml,.XML,.png,.jpg,.jpeg,.gif,.svg,.bmp,.webp" multiple hidden onChange={(e) => void doImport(e.target.files, true)} />
@@ -201,7 +201,7 @@ export function EditorSide({ ctx, refreshKey, treeKey, width, onCollapse }: { ct
         </div>
       </section>
       {picking ? <CirPicker projectId={ctx.id} existing={new Set((list.data ?? []).map((d) => d.file))} onClose={() => setPicking(false)} onAdded={() => { list.reload(); explore.reload(); void studio.refreshProjectData(); ctx.reload(); }} /> : null}
-      {packageOpen ? <ImportPackageDialog projectId={ctx.id} role={ctx.role} onClose={() => setPackageOpen(false)} onChanged={onPackageChanged} /> : null}
+      {packageOpen ? <ImportPackageDialog projectId={ctx.id} can={ctx.can} onClose={() => setPackageOpen(false)} onChanged={onPackageChanged} /> : null}
       {refused ? (
         <Modal title="Import refused" width={620} onClose={() => setRefused(null)} buttons={<>
           <button className="btn" onClick={() => setRefused(null)}>Cancel</button>

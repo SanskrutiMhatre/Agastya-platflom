@@ -28,7 +28,7 @@ const VIEW_KEY = 'agastya.jsg.view';
 const SPLIT_KEY = 'agastya.jsg.split';
 
 export function JsgEditorPage() {
-  const ctx = useProject(); const { id, role, summary } = ctx;
+  const ctx = useProject(); const { id, role, can, summary } = ctx;
   const toast = useUi((s) => s.toast);
   const progress = useProgress(id);
   const hostRef = useRef<HTMLDivElement>(null);
@@ -62,7 +62,7 @@ export function JsgEditorPage() {
   const [view, setView] = useState<View>(() => { const v = localStorage.getItem(VIEW_KEY); return v === 'edit' || v === 'pdf' ? v : 'split'; });
   const [pct, setPct] = useState(() => Math.min(80, Math.max(30, Number(localStorage.getItem(SPLIT_KEY)) || 58)));
   const [dragging, setDragging] = useState(false);
-  const writable = canWrite(role);
+  const writable = canWrite(can);
 
   useEffect(() => { localStorage.setItem(VIEW_KEY, view); }, [view]);
   const [narrow, setNarrow] = useState(() => window.matchMedia('(max-width: 900px)').matches);
@@ -171,7 +171,7 @@ export function JsgEditorPage() {
   };
 
   const generate = useCallback(async () => {
-    if (!canBuild(role)) return;
+    if (!canBuild(can)) return;
     setBuilding(true); setNote(''); progress.clear();
     try {
       if (!(await save())) return;
@@ -225,7 +225,7 @@ export function JsgEditorPage() {
         <button className="btn btn-sm" onClick={() => void save()} disabled={!writable || !dirty || saving} data-testid="jsg-save" title={!writable ? 'You have read-only access' : !dirty ? 'Nothing to save' : 'Save the document (Ctrl+S)'}>{saving ? <Spinner /> : <Icon name="check" size={12} />}Save</button>
         {loaded?.docType === 'uhb' ? <ConvertButton id={id} from="jsg" name={summary.project.name} dirty={dirty} saveFirst={save} /> : null}
         <ExportProjectButton id={id} dirty={dirty} saveFirst={save} />
-        <button className="btn btn-sm btn-primary" onClick={() => void generate()} disabled={!canBuild(role) || building || !loaded} data-testid="jsg-generate" title={!canBuild(role) ? 'Reviewers, editors and owners can build the PDF' : 'Save, then build the document as a PDF'}>{building ? <Spinner /> : <Icon name="play" size={12} />}{building ? 'Building…' : 'Generate PDF'}</button>
+        <button className="btn btn-sm btn-primary" onClick={() => void generate()} disabled={!canBuild(can) || building || !loaded} data-testid="jsg-generate" title={!canBuild(can) ? 'Reviewers, editors and owners can build the PDF' : 'Save, then build the document as a PDF'}>{building ? <Spinner /> : <Icon name="play" size={12} />}{building ? 'Building…' : 'Generate PDF'}</button>
         <div className="v2-seg" role="group" aria-label="Editor layout">
           <button className={view === 'edit' ? 'on' : ''} onClick={() => setView('edit')} aria-pressed={view === 'edit'} title="Write only">Editor</button>
           {narrow ? null : <button className={view === 'split' ? 'on' : ''} onClick={() => setView('split')} aria-pressed={view === 'split'} title="Write and see the PDF side by side">Split</button>}

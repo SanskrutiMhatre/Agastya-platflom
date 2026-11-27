@@ -27,7 +27,7 @@ const VIEW_KEY = 'agastya.jss.view';
 const SPLIT_KEY = 'agastya.jss.split';
 
 export function JssEditorPage() {
-  const ctx = useProject(); const { id, role, summary } = ctx;
+  const ctx = useProject(); const { id, role, can, summary } = ctx;
   const toast = useUi((s) => s.toast);
   const progress = useProgress(id);
   const hostRef = useRef<HTMLDivElement>(null);
@@ -46,7 +46,7 @@ export function JssEditorPage() {
   const [view, setView] = useState<View>(() => { const v = localStorage.getItem(VIEW_KEY); return v === 'edit' || v === 'pdf' ? v : 'split'; });
   const [pct, setPct] = useState(() => Math.min(80, Math.max(30, Number(localStorage.getItem(SPLIT_KEY)) || 58)));
   const [dragging, setDragging] = useState(false);
-  const writable = canWrite(role);
+  const writable = canWrite(can);
 
   useEffect(() => { localStorage.setItem(VIEW_KEY, view); }, [view]);
 
@@ -158,7 +158,7 @@ export function JssEditorPage() {
   }, [id]);
 
   const generate = useCallback(async () => {
-    if (!canBuild(role)) return;
+    if (!canBuild(can)) return;
     setBuilding(true); setNote(''); progress.clear();
     try {
       if (!(await save())) return;
@@ -207,7 +207,7 @@ export function JssEditorPage() {
         <ConvertButton id={id} from="jss" name={summary.project.name} dirty={dirty} saveFirst={save} />
         {/* WP-07 (UX-019): two different exports, so two names; WP-22 folds them into the Document menu */}
         <ExportProjectButton id={id} dirty={dirty} saveFirst={save} label="Export project" />
-        <button className="btn btn-sm btn-primary" onClick={() => void generate()} disabled={!canBuild(role) || building || !loaded} data-testid="jss-generate" title={!canBuild(role) ? 'Reviewers, editors and owners can build the PDF' : 'Save, then build the whole publication as a PDF'}>{building ? <Spinner /> : <Icon name="play" size={12} />}{building ? 'Building…' : 'Generate PDF'}</button>
+        <button className="btn btn-sm btn-primary" onClick={() => void generate()} disabled={!canBuild(can) || building || !loaded} data-testid="jss-generate" title={!canBuild(can) ? 'Reviewers, editors and owners can build the PDF' : 'Save, then build the whole publication as a PDF'}>{building ? <Spinner /> : <Icon name="play" size={12} />}{building ? 'Building…' : 'Generate PDF'}</button>
         <div className="v2-seg" role="group" aria-label="Editor layout">
           <button className={view === 'edit' ? 'on' : ''} onClick={() => setView('edit')} aria-pressed={view === 'edit'} title="Write only">Editor</button>
           {narrow ? null : <button className={view === 'split' ? 'on' : ''} onClick={() => setView('split')} aria-pressed={view === 'split'} title="Write and see the PDF side by side">Split</button>}

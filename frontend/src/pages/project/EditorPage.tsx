@@ -125,7 +125,7 @@ export function EditorPage() {
         <h1 style={{ fontSize: 14 }} className="v2-trunc">{ctx.summary.project.name}</h1>
         {activeDoc ? <span className="v2-hint v2-trunc v2-crumb" title={activeDoc.file ?? activeDoc.title}>/ {activeDoc.title || activeDoc.file}</span> : null}
         <span className="spacer" />
-        {ready && canWrite(ctx.role) ? (
+        {ready && canWrite(ctx.can) ? (
           dirtyCount > 0
             ? <button className="btn btn-sm btn-primary" onClick={() => void saveNow()} disabled={saving || !activeDoc} title="Save the open data module (Ctrl+S)" data-testid="save-now"><Icon name="check" size={12} />{saving ? 'Saving…' : `Save${dirtyCount > 1 ? ` (${dirtyCount} unsaved)` : ''}`}</button>
             : <span className="v2-hint v2-saved" aria-live="polite" data-testid="save-state"><Icon name="check" size={12} /> All changes saved</span>
@@ -137,7 +137,7 @@ export function EditorPage() {
         </div>
         <ThemeToggle />
       </header>
-      {!canWrite(ctx.role) ? <Alert tone="warn">You have {ctx.role} access to this project: you can read and proof data modules, but changes cannot be saved.</Alert> : null}
+      {!canWrite(ctx.can) ? <Alert tone="warn">You have {ctx.role} access to this project: you can read and proof data modules, but changes cannot be saved.</Alert> : null}
       {error ? <Alert tone="bad">{error}</Alert> : null}
       <div className="v2-split" data-testid="editor-split" ref={splitRef} style={dragging || listDrag ? { userSelect: 'none' } : undefined}>
         {sideOpen ? <EditorSide ctx={ctx} refreshKey={sideKey} treeKey={treeKey} width={listW} onCollapse={() => setSide(false)} /> : null}

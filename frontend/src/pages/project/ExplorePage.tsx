@@ -10,6 +10,7 @@ import { Icon } from '../../components/Icon';
 import { PageHeader } from '../../components/PageHeader';
 import { Alert, Badge, Empty, Loading, Modal, fmtDate, fmtSize, useAsync, ago, errText } from '../../components/ui';
 import { canWrite, useProject } from '../../layouts/ProjectShell';
+import { may } from '../../lib/roles';
 import { useUi } from '../../store/ui';
 
 type Sel = { file: string } | { missing: string } | null;
@@ -69,7 +70,7 @@ function History({ id, file, onClose }: { id: string; file: string; onClose: () 
 }
 
 export function ExplorePage() {
-  const { id, role } = useProject();
+  const { id, role, can } = useProject();
   const nav = useNavigate();
   const toast = useUi((s) => s.toast);
   const ex = useAsync(() => contentApi.explore(id), [id]);
@@ -136,7 +137,7 @@ export function ExplorePage() {
 
           {unplaced.length > 0 && mode === 'tree' ? (
             <div className="v2-card">
-              <div className="v2-card-head"><span>Not in the publication <Badge tone="warn">{unplaced.length}</Badge></span>{canWrite(role) ? <button className="btn btn-sm" onClick={() => nav('../publication')}>Place in chapters…</button> : null}</div>
+              <div className="v2-card-head"><span>Not in the publication <Badge tone="warn">{unplaced.length}</Badge></span>{canWrite(can) ? <button className="btn btn-sm" onClick={() => nav('../publication')}>Place in chapters…</button> : null}</div>
               <ul className="v2-tree" style={{ padding: 6 }}>{unplaced.map((d) => (
                 <li key={d.file}><div className={`v2-tnode ${sel && 'file' in sel && sel.file === d.file ? 'sel' : ''}`} onClick={() => setSel({ file: d.file })}>
                   <span className="v2-twist" /><Icon name="xml" size={15} /><span className="lbl">{d.techName || d.file}</span><span className="meta v2-mono">{d.dmc}</span></div></li>))}</ul>
@@ -162,7 +163,7 @@ export function ExplorePage() {
               <div className="v2-row wrap">
                 <button className="btn btn-primary" onClick={() => nav(`../editor?file=${encodeURIComponent(selected.file)}`)}><Icon name="editor" />Open in editor</button>
                 <button className="btn" onClick={() => setHist(selected.file)}><Icon name="history" />History</button>
-                {role === 'owner' ? <button className="btn" onClick={async () => { try { await contentApi.lockDm(id, selected.file, !selected.locked); toast(selected.locked ? 'Unlocked' : 'Locked — only owners can edit it now', 'success'); dms.reload(); } catch (x) { toast(errText(x), 'error'); } }}><Icon name={selected.locked ? 'unlock' : 'lock'} />{selected.locked ? 'Unlock' : 'Lock'}</button> : null}
+                {may(can, 'doc.lock') ? <button className="btn" onClick={async () => { try { await contentApi.lockDm(id, selected.file, !selected.locked); toast(selected.locked ? 'Unlocked' : 'Locked — only owners can edit it now', 'success'); dms.reload(); } catch (x) { toast(errText(x), 'error'); } }}><Icon name={selected.locked ? 'unlock' : 'lock'} />{selected.locked ? 'Unlock' : 'Lock'}</button> : null}
               </div>
             </div>
           ) : sel && 'missing' in sel ? (

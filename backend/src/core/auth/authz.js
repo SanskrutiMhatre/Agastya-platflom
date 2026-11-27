@@ -233,6 +233,8 @@ function createAuthz({ store, sessions, workspaceDir, projectDirFor }) {
       next();
     };
     mw.isAuthGuard = `requireProject(${minRole},${from === 'active' ? 'active' : from === 'param' ? 'param' : 'custom'})`;
+    // WP-13 (FE-019, ARC-004): read back from the route table to compute the client's `can` map (services/permissions.ts)
+    mw.minRole = minRole; mw.cap = cap;
     return mw;
   }
 

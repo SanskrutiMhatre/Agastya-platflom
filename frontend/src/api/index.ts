@@ -20,6 +20,8 @@ export interface ProjectCard {
   id: string; name: string; type: string; pipeline: 's1000dtofo' | 's1000dtojss'; templateRef: string; folder: string; status: string;
   format: 's1000d' | 'jss' | 'jsg'; domain: string | null; manualType: string | null; authoring: 'jss-xml' | null; jssDocType: string | null; autoAddToPublication: boolean; sideText: { enabled: boolean; publisher: string; draftNote: boolean }; headerLogo: boolean;
   role: ProjectRole; accessVia: 'project' | 'folder' | 'admin'; dmCount: number; hasPdf: boolean;
+  /** WP-13 (FE-019): what the signed-in person may do here, computed by the server from its route guards (lib/roles.ts may()). */
+  can?: Partial<Record<string, boolean>>;
   createdAt: string; updatedAt: string; lastOpened: string | null; owners: string[];
   /** WP-06: the folder was not found at the last start; the project is kept until an administrator restores the folder or deletes it. */
   missingSince?: string | null;

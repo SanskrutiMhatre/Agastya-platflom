@@ -37,10 +37,10 @@ const kindText = (m: PubModule): string => (m.kind === 'chapter-intro' ? 'Introd
 const detail = (m: PubModule): string => [kindText(m), m.subs.length ? `${m.subs.length} sub-heading${m.subs.length === 1 ? '' : 's'}` : '', m.pictures.length ? `${m.pictures.length} picture${m.pictures.length === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · ');
 
 export function DocPublicationPage() {
-  const { id, role, summary, reload } = useProject();
+  const { id, role, can, summary, reload } = useProject();
   const nav = useNavigate(); const toast = useUi((s) => s.toast); const progress = useProgress(id);
   const jss = summary.project.authoring === 'jss-xml';
-  const writable = canWrite(role);
+  const writable = canWrite(can);
   const codes = useAsync(() => xengineApi.codes(id), [id]);
   const rules = useAsync(async () => (jss ? await jssApi.read(id) : null), [id, jss]);     // the stencil's rules (are the chapters and sections the author's?) and its first chapter
   const base = useMemo(() => (codes.data ? buildPublication(codes.data) : null), [codes.data]);
@@ -248,7 +248,7 @@ export function DocPublicationPage() {
         actions={<>
           {chaptersFree ? <button className="btn" onClick={() => setNaming(true)} data-testid="add-chapter"><Icon name="plus" />Add chapter</button> : null}
           {writable ? <button className="btn" onClick={() => setEdits((l) => l.slice(0, -1))} disabled={!dirty} data-testid="undo-arrangement">Undo</button> : null}
-          <button className="btn btn-primary" onClick={() => void build()} disabled={busy !== null || !canBuild(role)} data-testid="build-publication" title={canBuild(role) ? 'Save the arrangement, then build the PDF' : 'Reviewers, editors and owners can build the PDF'}>{busy === 'build' ? <Spinner /> : <Icon name="rocket" />}Build publication</button>
+          <button className="btn btn-primary" onClick={() => void build()} disabled={busy !== null || !canBuild(can)} data-testid="build-publication" title={canBuild(can) ? 'Save the arrangement, then build the PDF' : 'Reviewers, editors and owners can build the PDF'}>{busy === 'build' ? <Spinner /> : <Icon name="rocket" />}Build publication</button>
         </>}
         stats={[
           { label: 'Chapters', value: view.chapters.length },
