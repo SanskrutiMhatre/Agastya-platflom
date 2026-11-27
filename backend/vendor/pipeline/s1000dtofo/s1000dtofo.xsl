@@ -1170,9 +1170,32 @@
             <xsl:when test="generate-id(.) = generate-id(key('by-id', @id)[1])">
                 <xsl:value-of select="@id"/>
             </xsl:when>
+            <!--
+              A repeated id: the id plus how many elements before this one (preceding::, so not counting ancestors) carry it.
+              WP-33 / PERF-003 (vendor exception "FO-stage scaling"): that count used to be count(preceding::*[@id = current()/@id]),
+              a scan of the whole book per element, i.e. O(figures x book) and the main cost of the FO stage. It is now read from
+              this element's position in key('by-id', @id), which holds every element with this id in document order: the ones
+              before it are its preceding:: matches plus its ancestors with the same id, so the ancestors are subtracted. Same
+              number, by construction; the old expression is kept as the fallback for a node the key does not hold (a node of a
+              result tree fragment), so nothing can change there either.
+            -->
             <xsl:otherwise>
-                <xsl:value-of select="concat(@id,
-                    format-number(count(preceding::*[@id = current()/@id]), '00'))"/>
+                <xsl:variable name="me" select="generate-id(.)"/>
+                <xsl:variable name="pos">
+                    <xsl:for-each select="key('by-id', @id)">
+                        <xsl:if test="generate-id(.) = $me"><xsl:value-of select="position()"/></xsl:if>
+                    </xsl:for-each>
+                </xsl:variable>
+                <xsl:choose>
+                    <xsl:when test="string($pos) != ''">
+                        <xsl:value-of select="concat(@id,
+                            format-number($pos - 1 - count(ancestor::*[@id = current()/@id]), '00'))"/>
+                    </xsl:when>
+                    <xsl:otherwise>
+                        <xsl:value-of select="concat(@id,
+                            format-number(count(preceding::*[@id = current()/@id]), '00'))"/>
+                    </xsl:otherwise>
+                </xsl:choose>
             </xsl:otherwise>
         </xsl:choose>
     </xsl:template>
@@ -1201,9 +1224,26 @@
             </xsl:variable>
             <xsl:variable name="same" select="key('dm-by-code', string($key))"/>
             <xsl:if test="generate-id($same[1]) != generate-id($dm)">
-                <xsl:variable name="before" select="$dm/preceding::dmodule"/>
+                <!--
+                  WP-33 / PERF-003: the print number is this module's position among the modules with its code ($same is in
+                  document order and modules do not nest, so the ones before it are exactly its preceding:: ones). It was
+                  counted by intersecting $same with $dm/preceding::dmodule, a scan of the book for EVERY id of a reprinted
+                  module. The old expression stays as the fallback for a module the key does not hold.
+                -->
+                <xsl:variable name="me" select="generate-id($dm)"/>
+                <xsl:variable name="pos">
+                    <xsl:for-each select="$same">
+                        <xsl:if test="generate-id(.) = $me"><xsl:value-of select="position()"/></xsl:if>
+                    </xsl:for-each>
+                </xsl:variable>
                 <xsl:text>_x</xsl:text>
-                <xsl:value-of select="count($same[count(. | $before) = count($before)]) + 1"/>
+                <xsl:choose>
+                    <xsl:when test="string($pos) != ''"><xsl:value-of select="number($pos)"/></xsl:when>
+                    <xsl:otherwise>
+                        <xsl:variable name="before" select="$dm/preceding::dmodule"/>
+                        <xsl:value-of select="count($same[count(. | $before) = count($before)]) + 1"/>
+                    </xsl:otherwise>
+                </xsl:choose>
             </xsl:if>
         </xsl:if>
     </xsl:template>

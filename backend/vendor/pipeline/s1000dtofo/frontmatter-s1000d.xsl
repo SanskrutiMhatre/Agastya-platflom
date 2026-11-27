@@ -32,6 +32,9 @@
   -->
   <xsl:param name="frontmatter.style">jss</xsl:param>
 
+  <!-- WP-33 / PERF-003: every acronym by its normalised term, for the one-row-per-term test of the list of abbreviations. -->
+  <xsl:key name="acronym-by-term" match="acronym" use="normalize-space(acronymTerm)"/>
+
   <!--
     1 under the Xignal profile: each prelim section (contents, illustrations, abbreviations) is numbered from page 1 of its own, as the
     reference does. 0 keeps the running number the engine has always used. Only takes effect where $page.numbering restarts per module.
@@ -705,7 +708,18 @@
                 nothing about the book they wrote. The list of abbreviations
                 below already carried its "None" row; this one did not.
               -->
-              <xsl:if test="not(//dmodule//figure[title]) and $cover.pic.id = ''">
+              <!--
+                WP-33 / PERF-003 (vendor exception "FO-stage scaling"): the first titled figure of the book, worked out ONCE.
+                It was (//dmodule//figure[title])[1] inside the row loop below, i.e. one walk of the whole book (and a
+                merge of every module's figures) per figure: O(figures x book), the top template of the FO-stage profile.
+                Written with the descendant axis: libxml2 rewrites "//figure" to descendant::figure only when the step has no
+                predicate, so "//dmodule//figure[title]" collected every node of every module through descendant-or-self and
+                merged the per-module sets with a duplicate check, quadratic in the book's size (about 25 s at 500 modules
+                even when evaluated once). Same node-set: a figure with a title that lies inside a data module.
+              -->
+              <xsl:variable name="loi.figures.first" select="(//dmodule/descendant::figure[title])[1]"/>
+              <xsl:variable name="loi.figures.first.id" select="generate-id($loi.figures.first)"/>
+              <xsl:if test="not($loi.figures.first) and $cover.pic.id = ''">
                 <fo:table-row>
                   <xsl:call-template name="s1000d-td">
                     <xsl:with-param name="t" select="$fm.label.s1000d.none"/>
@@ -729,7 +743,7 @@
                   <fo:table-row>
                     <xsl:call-template name="s1000d-td">
                       <xsl:with-param name="cap" select="$xs.fm.cap.loi"/>
-                      <xsl:with-param name="cap.first" select="number($cover.pic.id = '' and generate-id(.) = generate-id((//dmodule//figure[title])[1]))"/>
+                      <xsl:with-param name="cap.first" select="number($cover.pic.id = '' and generate-id(.) = $loi.figures.first.id)"/>
                       <!-- Xignal: the code on a module's first figure is a link to the module, as it is in the contents list -->
                       <xsl:with-param name="link"><xsl:if test="$xs.fm.on and position() = 1"><xsl:value-of select="concat('content-start-', generate-id($dm))"/></xsl:if></xsl:with-param>
                       <xsl:with-param name="t">
@@ -830,7 +844,13 @@
                          sort above — it keeps the first occurrence in the
                          source, wherever that lands on the page. -->
                     <xsl:variable name="t" select="normalize-space(acronymTerm)"/>
-                    <xsl:if test="not(preceding::acronym[normalize-space(acronymTerm) = $t])">
+                    <!-- WP-33 / PERF-003: "no earlier acronym with this term" read from a key (the first of the term's
+                         acronyms in document order) instead of a walk of the book per acronym. "Earlier in document
+                         order" is preceding:: plus ancestors, so an acronym inside another acronym (or a node the key
+                         does not hold) still takes the old walk; every other one answers from the key. -->
+                    <xsl:variable name="first.of.term" select="key('acronym-by-term', $t)[1]"/>
+                    <xsl:if test="($first.of.term and not(ancestor::acronym) and generate-id($first.of.term) = generate-id(.))
+                                  or ((not($first.of.term) or ancestor::acronym) and not(preceding::acronym[normalize-space(acronymTerm) = $t]))">
                       <fo:table-row>
                         <xsl:call-template name="s1000d-td">
                           <xsl:with-param name="cap" select="$xs.fm.cap.loa"/>

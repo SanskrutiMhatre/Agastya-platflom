@@ -194,6 +194,13 @@ cross-module `dmRef`, ICN references, asset integrity).
   validator cannot run is retried module by module, a module it cannot hold is reported as too large with the limit, and only a module that was judged counts in `checked`. Results for projects that validated before
   are the same findings (`test/wp32-validation-scale.test.js`).
   (6) `vendor/pipeline/jss/frontmatter/13-description-of-symbols.xml` (generated, shipped): the six symbol pictures that were never shipped are left out (WP-07, PUB-012).
+  (7) `vendor/pipeline/s1000dtofo/frontmatter-s1000d.xsl`, `s1000dtofo.xsl`, `refs.xsl`, `warnings.xsl` (WP-33, PERF-003, exception "FO-stage scaling" in
+  `docs/JSS_VENDOR_EXCEPTIONS.md`): whole-book XPath scans evaluated per figure, per repeated id, per reference and per abbreviation are replaced by `xsl:key` lookups and
+  values computed once (the list of illustrations' first titled figure, on the descendant axis because libxml2 merges `//dmodule//figure[title]` quadratically; `unique-id`
+  and `dm-occurrence-suffix` read a position in a key instead of counting `preceding::`; the old expressions remain as fallbacks). The FO is the same up to a renaming of
+  `generate-id()` values, which libxslt changes from run to run anyway (`test/wp33-fo-equivalence.test.js`; 104 product builds of the PDF suites re-run with the old
+  stylesheets, all equivalent). FO stage, 200 figure-bearing modules: 535 s before, 2.8 s after; 500 modules 9.3 s (`test/wp33-fo-scaling.test.js`). The pre-change files are
+  in `backend/test/fixtures/wp33-old/`.
 
 ## 11. Migration
 

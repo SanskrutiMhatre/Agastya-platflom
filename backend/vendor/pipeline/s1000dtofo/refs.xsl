@@ -379,8 +379,14 @@
           any data module, where there is no module to scope to.
         -->
         <xsl:variable name="dm" select="ancestor::dmodule"/>
+        <!--
+          WP-33 / PERF-003: the fallback half was //*[@id = $target][not($dm)], which walks the whole book for every
+          reference even when $dm is there and the predicate then throws every node away. The test now comes first, on the
+          root ((/)[not($dm)] is empty when there is a module), so the walk happens only when its result is used. Same
+          node-set in every case.
+        -->
         <xsl:variable name="target-element"
-            select="($dm//*[@id = $target] | //*[@id = $target][not($dm)])[1]"/>
+            select="($dm//*[@id = $target] | (/)[not($dm)]//*[@id = $target])[1]"/>
         <!--
           What KIND of thing is being referenced.
 
@@ -540,7 +546,9 @@
     -->
     <xsl:template match="footnoteRef">
         <xsl:variable name="fnref" select="@internalRefId"/>
-        <xsl:variable name="fn" select="//footnote[@id = $fnref]"/>
+        <!-- WP-33 / PERF-003: key('by-id') filtered to footnotes, the same node-set as //footnote[@id = $fnref] without a walk
+             of the whole book per reference. -->
+        <xsl:variable name="fn" select="key('by-id', $fnref)[self::footnote]"/>
         <fo:footnote>
             <fo:inline baseline-shift="0.3em" font-size="70%">
                 <xsl:for-each select="$fn">
