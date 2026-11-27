@@ -354,6 +354,11 @@ test('release: the Author requests, cannot approve; the administrator approves; 
 
   await adminPage.goto(projectUrl + '/release');
   await adminPage.getByRole('button', { name: 'Approve' }).click();
+  // WP-05: approval is confirmed in the platform dialog (it was the browser's confirm box, which Playwright accepted on its own)
+  const approve = adminPage.getByRole('dialog', { name: 'Approve and release this manual?' });
+  await expect(approve).toContainText('The approval is recorded under your name');
+  await approve.getByRole('button', { name: 'Approve' }).click();
+  await expect(approve).toHaveCount(0);
   await expect(adminPage.getByTestId('review-status')).toContainText('Approved — Release 1', { timeout: 15_000 });
   await shot(adminPage, '13-release-approved');
   await page.reload();
@@ -488,10 +493,12 @@ test('administrator: every V1 section is there; reference data is edited, mainte
   await a.goto('/administrator');
   const nav = a.getByRole('navigation', { name: 'Administrator sections' });
   // the Administrator is grouped by manual type now (shared / S1000D / JSS / JSG / system) and the sections have plain names
-  for (const n of ['Roles', 'Users', 'Information codes', 'Numbering (SNS)', 'SNS defaults', 'Country codes', 'Language codes', 'Data module types', 'Publication templates', 'Responsible partner companies', 'Originator companies', 'Security classifications',
+  for (const n of ['Roles', 'Users', 'Information codes', 'Numbering (SNS)', 'Country codes', 'Language codes', 'Data module types', 'Publication templates', 'Responsible partner companies', 'Originator companies', 'Security classifications',
     'PDF customisations', 'Interface languages', 'Audit logs', 'Maintenance', 'Visual settings', 'Settings', 'Licence']) {
     await expect(nav.getByRole('link', { name: n, exact: true })).toBeVisible();
   }
+  // the owner removed the second SNS screen on 2026-11-26 (one numbering system per project kind): it must not come back
+  await expect(nav.getByRole('link', { name: 'SNS defaults', exact: true })).toHaveCount(0);
   await shot(a, '39-administrator');
 
   await nav.getByRole('link', { name: 'Data module types', exact: true }).click();

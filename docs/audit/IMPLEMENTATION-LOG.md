@@ -117,6 +117,15 @@ verified, and what is left or blocked.
   and the platform dialog. (3) The first-run test needs an empty workspace but seven specs sorted before it and created the administrator,
   so it failed and its serial file skipped 44 tests; the file is now `00-platform.spec.ts` and runs first (every other spec already copes
   with an existing administrator).
+* Found by the full e2e run on the Phase 1A commit (f16f2ea; 122 passed, 1 failed, 25 not run): (4) the release test clicked Approve and
+  waited for "Approved", but WP-05 had replaced the browser confirm box (accepted by Playwright on its own) with the platform dialog
+  "Approve and release this manual?"; the test now confirms in that dialog and checks it closes. (5) Behind it, the administrator test
+  still listed the "SNS defaults" section the owner removed on 2026-11-26; it now asserts the section is absent. After both:
+  `00-platform.spec.ts` 41/41 and the whole Edge suite **148/148** (9.4 min).
+* Frontend unit tests on f16f2ea: type check clean. A full `vitest run` alongside three agents gave 5 s default-timeout failures
+  (`naval.test.ts`, `verify/objects.test.ts`: 34/34 when run alone) and a worker crash in the heavy `verify/` schema files
+  (`controls`, `brex-xpath`, `editor-controls`, 20 min). Both are QA-scope findings of WP-08 (timeouts, the native crash); the three
+  heavy files are re-run on an idle machine after WP-08.
 
 ### WP-06 Project lifecycle integrity (PLT-003, PLT-004, PLT-002, PLT-010, REL-003, REL-004, DEP-017) - done
 
