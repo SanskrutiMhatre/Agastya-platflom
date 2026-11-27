@@ -105,6 +105,21 @@ $p = G {
 Check 'publish returns 200 and a real PDF' (($p.pubStatus -eq 200) -and ($p.magic -eq '%PDF-') -and ($p.pdfLen -gt 5000)) ($p | Out-String)
 Check 'database written by the LocalService account' ($p.db) 'publisher.db missing'
 
+# Gate G-SEC-6 (WP-04): the data and state folders are readable only by SYSTEM, the Administrators and the service identity.
+$acl = G {
+  $rows = foreach ($d in @('C:\ProgramData\Agastya Platform', 'C:\ProgramData\Agastya Platform\workspace')) {
+    $a = Get-Acl $d
+    [pscustomobject]@{ dir = $d; inherited = -not $a.AreAccessRulesProtected; who = (($a.Access | ForEach-Object { $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value }) | Sort-Object -Unique) -join ',' ; text = (& icacls.exe $d | Out-String) }
+  }
+  $rows
+}
+$allowed = @('S-1-5-18', 'S-1-5-32-544', 'S-1-5-19', 'S-1-3-0')   # SYSTEM, Administrators, LOCAL SERVICE, CREATOR OWNER
+foreach ($r in $acl) {
+  $extra = @($r.who -split ',' | Where-Object { $_ -and ($allowed -notcontains $_) })
+  Check "no ACE for Users or anyone else on $($r.dir)" (($extra.Count -eq 0) -and ($r.text -notmatch 'BUILTIN\\Users|Authenticated Users|Everyone')) ($r.text)
+  Check "inheritance from ProgramData cut on $($r.dir)" (-not $r.inherited) ($r.text)
+}
+
 # ------------------------------------------------------------------ phase 2: reboot
 Say '--- phase 2: reboot the guest, the service must come back by itself'
 G { Add-Content 'C:\ProgramData\Agastya Platform\agastya.ini' "`r`n; kept-across-upgrade-marker`r`n" }

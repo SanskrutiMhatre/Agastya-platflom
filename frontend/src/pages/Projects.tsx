@@ -40,8 +40,9 @@ export function Projects() {
     <div className="v2-page">
       <div className="v2-page-head">
         <div><h2>Projects</h2><p className="v2-sub">{rows.length} of {list.data?.length ?? 0} projects.</p></div>
-        <div className="v2-row">
-          <input className="v2-input" style={{ width: 240 }} placeholder="Search by name or folder…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search projects" />
+        {/* WP-07 (UX-006): the toolbar wraps, so New project never lies beyond the right edge at 1280 or 1366 px */}
+        <div className="v2-row wrap" style={{ justifyContent: 'flex-end' }}>
+          <input className="v2-input" style={{ width: 240, maxWidth: '100%' }} placeholder="Search by name or folder…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search projects" />
           <select className="v2-select" style={{ width: 150 }} value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label="Sort projects">
             <option value="recent">Recently opened</option><option value="name">Name</option><option value="dms">Most data modules</option>
           </select>
@@ -57,7 +58,7 @@ export function Projects() {
             <tbody>
               {rows.map((p) => (
                 <tr key={p.id} className="clickable" onClick={() => open(p.id)} data-testid="project-row">
-                  <td><strong>{p.name}</strong>{p.hasPdf ? <> <Badge tone="ok">PDF built</Badge></> : null}</td>
+                  <td><strong>{p.name}</strong>{p.hasPdf ? <> <Badge tone="ok">PDF built</Badge></> : null}{p.missingSince ? <> <Badge tone="bad">Folder missing</Badge></> : null}</td>
                   {overseer ? <td>{status.data?.get(p.id) ? <StatusBadge status={status.data.get(p.id)!.status} stale={status.data.get(p.id)!.changedSinceRelease} /> : null}</td> : null}
                   <td>{p.folder || <span className="v2-hint">—</span>}</td>
                   {role === 'admin' ? <td>{p.owners[0] ?? '-'}</td> : <td><RoleBadge role={p.role} /></td>}

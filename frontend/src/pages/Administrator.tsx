@@ -11,7 +11,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
-import { configApi, platformApi, workspaceApi, type AppSettings, type ConfigItem, type ConfigSpec } from '../api';
+import { configApi, platformApi, workspaceApi, type AppSettings, type ConfigItem, type ConfigSpec, type SecurityPolicy } from '../api';
 import { Icon } from '../components/Icon';
 import { PageHeader } from '../components/PageHeader';
 import { Alert, Badge, ConfirmModal, Empty, Field, Loading, Modal, errText, useAsync } from '../components/ui';
@@ -37,7 +37,7 @@ const GROUPS: Array<{ title: string; items: Array<[string, string]>; advanced?: 
   { title: 'S1000D', items: S1000D_ITEMS, advanced: S1000D_ADVANCED },
   { title: 'JSS', items: [['format-jss', 'Manual types and stencils']] },
   { title: 'JSG', items: [['format-jsg', 'Manual types and stencils']] },
-  { title: 'System', items: [['audit-logs', 'Audit logs'], ['maintenance', 'Maintenance'], ['visual-settings', 'Visual settings'], ['settings', 'Settings'], ['licence', 'Licence']] },
+  { title: 'System', items: [['audit-logs', 'Audit logs'], ['security', 'Security'], ['maintenance', 'Maintenance'], ['visual-settings', 'Visual settings'], ['settings', 'Settings'], ['licence', 'Licence']] },
 ];
 const ENTERPRISE = new Set(['rpc-cages', 'originator-cages']);
 
@@ -88,6 +88,7 @@ export function AdministratorPage() {
             {REFERENCE.map(([id]) => <Route key={id} path={id} element={<ConfigTable key={id} collection={id} />} />)}
             <Route path="sns-defaults" element={<Navigate to="../sns-presets" replace />} />   {/* the second SNS screen was removed (2026-11-26): Numbering (SNS) is the one */}
             <Route path="audit-logs" element={<AuditSection />} />
+            <Route path="security" element={<SecuritySection />} />
             <Route path="maintenance" element={<MaintenanceSection />} />
             <Route path="visual-settings" element={<VisualSection />} />
             <Route path="settings" element={<SettingsSection />} />
@@ -202,6 +203,39 @@ function AuditSection() {
 
 // ── System ───────────────────────────────────────────────────────────────────
 
+/** Account and session rules (WP-03). The separation-of-duties switch is the documented override for a one-person installation (D7). */
+function SecuritySection() {
+  const toast = useUi((s) => s.toast);
+  const data = useAsync(() => Promise.all([platformApi.securityPolicy(), platformApi.health()]), []);
+  const [form, setForm] = useState<SecurityPolicy | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  useEffect(() => { if (data.data) setForm(data.data[0].policy); }, [data.data]);
+  if (data.loading && !data.data) return <Loading />;
+  if (data.error) return <Alert tone="bad">{data.error}</Alert>;
+  if (!form) return null;
+  const audit = data.data?.[1].audit;
+  const num = (k: 'idleMinutes' | 'absoluteHours' | 'passwordMinLength') => (e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, [k]: Number(e.target.value) });
+  const save = async () => {
+    setBusy(true); setErr('');
+    try { setForm(await platformApi.saveSecurityPolicy(form)); toast('Saved', 'success'); } catch (e) { setErr(errText(e)); } finally { setBusy(false); }
+  };
+  return (
+    <div className="v2-stack" style={{ maxWidth: 560 }} data-testid="security-policy">
+      <div><h3 style={{ margin: 0 }}>Security</h3><p className="v2-sub" style={{ margin: '2px 0 0' }}>How long people stay signed in, and who may approve a release.</p></div>
+      {audit && audit.failures > 0 ? <Alert tone="bad">The audit log could not record {audit.failures} action{audit.failures === 1 ? '' : 's'} since the server started (last: {audit.last?.action} at {audit.last?.at}: {audit.last?.error}). The details are in workspace\logs\audit-failures.log.</Alert> : null}
+      <Field label="Sign out after this many minutes without activity" hint="0 means no idle limit. Typing in an editor counts as activity."><input className="v2-input" type="number" min={0} max={1440} value={form.idleMinutes} onChange={num('idleMinutes')} data-testid="sec-idle" /></Field>
+      <Field label="Sign out this many hours after signing in" hint="Whatever happens; one working day is usual."><input className="v2-input" type="number" min={1} max={720} value={form.absoluteHours} onChange={num('absoluteHours')} data-testid="sec-absolute" /></Field>
+      <Field label="Shortest password a person may choose" hint="15 or more when there is no second sign-in factor. Existing passwords keep working."><input className="v2-input" type="number" min={8} max={64} value={form.passwordMinLength} onChange={num('passwordMinLength')} data-testid="sec-pwmin" /></Field>
+      <label className="v2-row" style={{ gap: 8 }}><input type="checkbox" checked={form.singleSession} onChange={(e) => setForm({ ...form, singleSession: e.target.checked })} data-testid="sec-single" />One session per person: signing in on another computer signs the first one out (it is told why).</label>
+      <label className="v2-row" style={{ gap: 8 }}><input type="checkbox" checked={form.separationOfDuties} onChange={(e) => setForm({ ...form, separationOfDuties: e.target.checked })} data-testid="sec-sod" />Separation of duties: the person who requests a release cannot approve it.</label>
+      {!form.separationOfDuties ? <Alert tone="warn">Self-approval is allowed. Use this only on a one-person installation; the change is recorded in the audit log.</Alert> : null}
+      {err ? <Alert tone="bad">{err}</Alert> : null}
+      <div><button className="btn btn-primary" disabled={busy} onClick={() => void save()} data-testid="sec-save">Save</button></div>
+    </div>
+  );
+}
+
 function MaintenanceSection() {
   const toast = useUi((s) => s.toast);
   const [busy, setBusy] = useState('');
@@ -209,6 +243,13 @@ function MaintenanceSection() {
   const run = async (id: string, fn: () => Promise<string>) => {
     setBusy(id);
     try { const msg = await fn(); setResult((r) => ({ ...r, [id]: msg })); toast(msg, 'success'); } catch (e) { toast(errText(e), 'error'); } finally { setBusy(''); }
+  };
+  // FE-012: what changes data or starts a long job asks first; a read-only check runs at once
+  const [asking, setAsking] = useState<{ id: string; title: string; ask: string; go: () => Promise<string> } | null>(null);
+  const ASK: Record<string, string> = {
+    reindex: "Every project's document index is rebuilt from its files. People can keep working; lists may be incomplete for a moment.",
+    previews: 'The temporary single-module preview files of every project are deleted. They are made again when someone previews.',
+    rebuild: "Every project's PDF is generated again in the background. This can take a long time and keeps the server busy.",
   };
   const cards: Array<{ id: string; title: string; desc: string; btn: string; go: () => Promise<string> }> = [
     { id: 'reindex', title: 'Re-index documents', desc: 'Rebuild the document index of every project, after files were copied in by hand.', btn: 'Re-index', go: async () => { const r = await platformApi.reindex(); return `Re-indexed ${r.projects} project${r.projects === 1 ? '' : 's'}`; } },
@@ -218,20 +259,23 @@ function MaintenanceSection() {
   ];
   return (
     <div className="v2-stack" data-testid="maintenance">
+      {asking ? <ConfirmModal title={`${asking.title}?`} body={<p>{asking.ask}</p>} confirmLabel="Go ahead" onClose={() => setAsking(null)} onConfirm={() => { const a = asking; setAsking(null); void run(a.id, a.go); }} /> : null}
       <div><h3 style={{ margin: 0 }}>Maintenance</h3><p className="v2-sub" style={{ margin: '2px 0 0' }}>System maintenance tools.</p></div>
       <div className="v2-grid cols-2">
         {cards.map((c) => (
           <div key={c.id} className="v2-card v2-card-pad">
             <h4 style={{ marginTop: 0 }}>{c.title}</h4>
             <p className="v2-sub">{c.desc}</p>
-            <button className="btn btn-primary" disabled={!!busy} onClick={() => run(c.id, c.go)} data-testid={`maint-${c.id}`}>{busy === c.id ? 'Working…' : c.btn}</button>
+            <button className="btn btn-primary" disabled={!!busy} onClick={() => { if (ASK[c.id]) setAsking({ id: c.id, title: c.title, ask: ASK[c.id], go: c.go }); else void run(c.id, c.go); }} data-testid={`maint-${c.id}`}>{busy === c.id ? 'Working…' : c.btn}</button>
             {result[c.id] ? <p className="v2-hint" style={{ marginBottom: 0 }} data-testid={`maint-${c.id}-result`}>{result[c.id]}</p> : null}
           </div>
         ))}
         <div className="v2-card v2-card-pad">
-          <h4 style={{ marginTop: 0 }}>Database backup</h4>
-          <p className="v2-sub">A ZIP of every project, the people and the activity log.</p>
-          <a className="btn btn-primary" href="/api/backup" download>Back up the platform</a>
+          {/* WP-07 (FE-013): named for what it holds; a database backup with restore is WP-12 */}
+          <h4 style={{ marginTop: 0 }}>Project data export</h4>
+          <p className="v2-sub">A ZIP of every project, the people and their memberships, and the last 5,000 events of the activity log.</p>
+          <p className="v2-hint">It is not a database backup: it holds no passwords, settings or release records, and it cannot be restored from here. For a complete backup, copy the data folder of the stopped server (administrator guide, section 7).</p>
+          <a className="btn btn-primary" href="/api/backup" download>Export project data</a>
         </div>
         <div className="v2-card v2-card-pad">
           <h4 style={{ marginTop: 0 }}>Download logs</h4>

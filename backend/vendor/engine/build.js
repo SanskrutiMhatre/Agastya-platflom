@@ -17,6 +17,7 @@ const { publishersXml } = require('./frontmatterInject');
 const { enabledPages, CATALOGUE } = require('./frontMatterPages');
 const { writeImageDimIndex } = require('./imageDims');
 const fopd = require('./fopd');
+const foGuard = require('./foGuard');   // vendor exception "foGuard" (WP-02)
 const { checkImages, formatImageCheck } = require('./foChecks');
 const { buildImageCache, rewriteFoImagePaths } = require('./imageOptim');
 const toolPaths = require('./paths');
@@ -57,6 +58,7 @@ function run(cmd, opts) {
   permitted is the bundled java binary.
 */
 function runFile(file, args, opts) {
+    if (file === toolPaths.XSLTPROC) args = toolPaths.quoteSafeXsltArgs(args);   // vendor exception "quote-safe params" (PUB-025)
     return new Promise((resolve, reject) => {
         execFile(file, args, opts, (err, stdout, stderr) => {
             if (err) {
@@ -500,6 +502,9 @@ async function buildJss(o) {
 
     await applyImageCompression(o, log, timed);
 
+    // Vendor exception "foGuard" (WP-02 / SEC-003): no picture outside the allowed folders, no URL, reaches FOP.
+    { const m = foGuard.formatConfine(foGuard.confineFo(path.join(o.workDir, o.foOut), { baseDir: o.workDir, roots: o.resourceRoots })); if (m) log(`Security: ${m}`); }
+
     // FOP renders a missing image as a silent blank, so check before it runs.
     const images = checkImages(path.join(o.workDir, o.foOut), o.workDir);
     { const m = formatImageCheck(images); if (m) log(`Image references: ${m}`); }
@@ -670,6 +675,9 @@ async function buildS1000dToFo(o) {
     if (unmapped.size) log(`Unmapped elements (content dropped): ${formatUnmapped(unmapped)}`);
 
     await applyImageCompression(o, log, timed);
+
+    // Vendor exception "foGuard" (WP-02 / SEC-003), as in the JSS-path build above.
+    { const m = foGuard.formatConfine(foGuard.confineFo(path.join(o.workDir, o.foOut), { baseDir: o.workDir, roots: o.resourceRoots })); if (m) log(`Security: ${m}`); }
 
     const images = checkImages(path.join(o.workDir, o.foOut), o.workDir);
     { const m = formatImageCheck(images); if (m) log(`Image references: ${m}`); }

@@ -16,7 +16,7 @@ import fs from 'fs';
 import path from 'path';
 import multer from 'multer';
 import { nowIso, vendor } from '../config';
-import { requireProject, requireAdmin, store, audit, projectDirFor, workspaceDir, docIndex, authz } from '../context';
+import { requireProject, requireAdmin, store, audit, projectDirFor, workspaceDir, docIndex, authz, securityPolicy } from '../context';
 import { headOf, rootStart } from '../services/xmlHead';
 import { wrap, param, bad, notFound, forbidden, conflict, HttpError } from '../services/http';
 import { getConfig, getConfigRow, newDmProblems } from '../services/projectConfig';
@@ -33,7 +33,7 @@ import { checkDmEnterprises } from '../services/enterprises';
 import * as validation from '../services/validation';
 import * as publisher from '../services/publisher';
 import { assertPublishable } from '../services/publishGate';
-import { readProjectJson, updateProjectJson, csdbRel, mediaRel, isCirProject, assertNotCir } from '../services/projects';
+import { readProjectJson, updateProjectJson, csdbRel, mediaRel, isCirProject, assertNotCir, PROTECTED_PROJECT_KEYS, unsafeInputFields, sameSetting, unsafeArtwork } from '../services/projects';
 import * as cir from '../services/cir';
 import { notify, approversOf, adminIds } from '../services/notifications';
 
@@ -280,7 +280,8 @@ export function registerProjectContentRoutes(app: Express): void {
     const rs = review.reviewState(req.project.id);
     res.json({
       ...release.releaseOverview(req.project.id, canSubmit(req.project.role) || req.auth.user.role === 'admin'),
-      canApprove: canApprove(req.auth.user, req.project.role),
+      canApprove: canApprove(req.auth.user, req.project.role) && !securityPolicy.approverConflict(store.pendingRelease(req.project.id)?.requested_by, req.auth.user.id),
+      approveBlocked: canApprove(req.auth.user, req.project.role) ? securityPolicy.approverConflict(store.pendingRelease(req.project.id)?.requested_by, req.auth.user.id) : null,
       review: { ...rs, comments: review.listComments(req.project.id), open: review.openComments(req.project.id), canComment: canComment(req.project.role) || req.auth.user.role === 'admin' },
     });
   }));
@@ -306,8 +307,9 @@ export function registerProjectContentRoutes(app: Express): void {
   // A release only becomes real when the project's Project Manager (or an administrator) approves it.
   const decide = (approve: boolean): RequestHandler[] => [view('manager', 'release.decide'), wrap(async (req, res) => {
     if (!canApprove(req.auth.user, req.project.role)) throw forbidden('Only the Project Manager of this project, or an administrator, can decide a release.', 'APPROVER_ONLY');
-    if (approve) await assertPublishable(req.project.id, 'publication');   // never approve a release whose content is not valid now
     const requester = store.getRelease(param(req, 'relId'))?.requested_by;
+    if (approve) { const sod = securityPolicy.approverConflict(requester, req.auth.user.id); if (sod) throw forbidden(sod, 'SEPARATION_OF_DUTIES'); }   // before any side effect (D7)
+    if (approve) await assertPublishable(req.project.id, 'publication');   // never approve a release whose content is not valid now
     // Approval turns every in-work revision of the publication into the next ISSUE (in-work 00, issueType "changed"); the release then covers that content.
     // The issuing happens BEFORE the decision is recorded (and only for a request that is still pending), so a failure leaves the release undecided and the
     // approval can simply be repeated - already-issued modules are not issued twice.
@@ -442,12 +444,25 @@ export function registerProjectContentRoutes(app: Express): void {
       fs.writeFileSync(path.join(tdir, `${ref}.house.json`), JSON.stringify(house, null, 2) + '\n', 'utf8');
     }
     if (project) {
-      // Keep what the settings screen does not own: where the project is filed, its name and its input layout.
+      if (typeof project !== 'object' || Array.isArray(project)) throw bad('The project settings must be an object.');
+      // WP-01 (SEC-002, S1K-001, PUB-001): the settings screen never owns what makes the project this project or where its
+      // files are. Those keys always keep the value on disk, whatever the body says; a body that tries to change one is refused
+      // so that a forged request is visible rather than silently half-applied.
+      // Hostile path values and a change of the project's kind are refused outright; a stale name or folder (renamed in another
+      // tab while this screen was open) is not an attack, so those keys simply keep the value on disk.
+      if (unsafeInputFields(project).length) throw new HttpError(400, `Unsafe file location in the project settings (${unsafeInputFields(project).join(', ')}): only a relative path inside the project is allowed.`, 'UNSAFE_PATH');
+      { const art = unsafeArtwork(project); if (art.length) throw new HttpError(400, `Unsafe picture reference in the project settings (${art.slice(0, 3).join(', ')}): use a picture uploaded to the project (a path such as Media/logo.png), not a web address or a file elsewhere on the computer.`, 'UNSAFE_ARTWORK'); }
+      for (const k of ['id', 'format', 'authoring', 'type'] as const) {
+        if (k in project && !sameSetting(project[k], current[k])) throw new HttpError(400, `"${k}" cannot be changed from the project settings.`, 'PROTECTED_SETTING');
+      }
       updateProjectJson(req.project.id, (pj) => {
-        const keep = { group: pj.group, name: pj.name, input: pj.input, watermark: pj.watermark, validation: pj.validation };   // validation: the issue chosen on the Validation page
+        const keep: Record<string, unknown> = { watermark: pj.watermark, validation: pj.validation };   // validation: the issue chosen on the Validation page
+        const fixed: Record<string, unknown> = {};
+        for (const k of PROTECTED_PROJECT_KEYS) fixed[k] = pj[k];
         for (const k of Object.keys(pj)) delete pj[k];
         Object.assign(pj, project);
         for (const [k, v] of Object.entries(keep)) if (v !== undefined && pj[k] === undefined) pj[k] = v;
+        for (const [k, v] of Object.entries(fixed)) { if (v === undefined) delete pj[k]; else pj[k] = v; }
       });
     }
     log(req, 'settings.saved', { house: !!house, project: !!project });

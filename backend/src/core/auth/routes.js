@@ -52,10 +52,14 @@ function registerAuthRoutes(deps) {
     // named comes into being with the approval, and goes away with the
     // rejection — the workspace knows how to do that, this module does not.
     onProjectDecided = () => {},
+    securityPolicy = null,
   } = deps;
   const { requireAuth, requireAdmin, requireProject, publicRoute } = authz;
 
-  const clientIp = (req) => (req.socket && req.socket.remoteAddress) || '';
+  // Express's req.ip honours the configured trust-proxy setting (SEC-008); the socket peer is the fallback.
+  const clientIp = (req) => String(req.ip || (req.socket && req.socket.remoteAddress) || '').replace(/^::ffff:/, '');
+  // The password rule with the policy's minimum length (RES-009); without a policy the built-in minimum.
+  const checkPassword = (pw, context = []) => policy.validatePassword(pw, { min: securityPolicy ? securityPolicy.read().passwordMinLength : policy.PASSWORD_MIN, context });
   const publicUser = (u) => ({
     id: u.id, username: u.username, fullName: u.full_name, role: u.role,
     disabled: !!u.disabled_at, onboardingPending: !!u.onboarding_pending,
@@ -123,7 +127,7 @@ function registerAuthRoutes(deps) {
       // and the first administrator is the same narrow exception here.
       const u = policy.validateUsername(rawUsername, { allowReserved: true });
       if (!u.ok) return res.status(400).json({ error: u.error });
-      const pw = policy.validatePassword(password);
+      const pw = checkPassword(password, [u.username, fullName]);
       if (!pw.ok) return res.status(400).json({ error: pw.error });
 
       const passwordHash = await hashPassword(password);
@@ -246,6 +250,11 @@ function registerAuthRoutes(deps) {
       res.set('Set-Cookie', cookie);
       res.json({ ok: true, user: publicUser(user), gates: gatesOf(user) });
     } catch (e) {
+      // WP-06 (PLT-002): a database held by another process past the busy timeout is a moment's wait, not a failed sign-in
+      if (e && (e.errcode === 5 || e.errcode === 6 || /database is locked/i.test(String(e.message)))) {
+        res.set('Retry-After', '3');
+        return res.status(503).json({ error: 'The server is busy for a moment. Try signing in again in a few seconds.', code: 'BUSY' });
+      }
       console.error('[auth] login error:', e.message);
       res.status(500).json({ error: 'Sign-in failed.' });
     }
@@ -257,6 +266,14 @@ function registerAuthRoutes(deps) {
     audit({ actorId: user.id, actorUsername: user.username, action: 'auth.logout', ip: clientIp(req) });
     res.set('Set-Cookie', sessionsSvc.clearCookieValue(req));
     res.json({ ok: true });
+  });
+
+  // The client reports that the person is working (typing or clicking in a page that has not called the server for a
+  // while), so the idle limit does not end the session of someone writing (WP-03). The touch itself is in resolveAuth.
+  app.post('/api/auth/activity', requireAuth({ allowPendingOnboarding: true, allowForcedChange: true }), (req, res) => {
+    try { store.touchSession(req.auth.session.id, nowIso()); } catch { /* the next request tries again */ }
+    const p = securityPolicy ? securityPolicy.read() : null;
+    res.json({ ok: true, idleMinutes: p ? p.idleMinutes : null });
   });
 
   app.get('/api/auth/me', requireAuth({ allowPendingOnboarding: true, allowForcedChange: true }), (req, res) => {
@@ -320,7 +337,7 @@ function registerAuthRoutes(deps) {
       }
       if (!ok) return res.status(400).json({ error: 'Current password is incorrect.' });
 
-      const p = policy.validatePassword(next);
+      const p = checkPassword(next, [fresh.username, fresh.full_name]);
       if (!p.ok) return res.status(400).json({ error: p.error });
 
       const hash = await hashPassword(next);
@@ -349,7 +366,7 @@ function registerAuthRoutes(deps) {
       const body = req.body || {};
       const uCheck = policy.validateUsername(body.username);
       if (!uCheck.ok) return res.status(400).json({ error: uCheck.error });
-      const pCheck = policy.validatePassword(String(body.password || ''));
+      const pCheck = checkPassword(String(body.password || ''), [body.username, req.auth && req.auth.user && req.auth.user.fullName]);
       if (!pCheck.ok) return res.status(400).json({ error: pCheck.error });
 
       const taken = store.findUserByUsername(uCheck.username);
@@ -417,6 +434,12 @@ function registerAuthRoutes(deps) {
     disabled accounts are excluded.
   */
   app.get('/api/users/search', requireAuth(), (req, res) => {
+    // Only someone who can add people to a project needs to look them up (SEC-004): an administrator, a Project Manager,
+    // or the owner or manager of at least one project. Anyone else gets 403, so the directory cannot be walked by prefix.
+    const me = req.auth.user;
+    if (me.role !== 'admin' && me.role !== 'project_manager' && !store.managesAnyProject(me.id)) {
+      return res.status(403).json({ error: 'Only people who manage a project can look up other accounts.', code: 'FORBIDDEN' });
+    }
     const q = String(req.query.q || '').slice(0, 64);
     if (q.trim().length < 1) return res.json({ users: [] });
     const only = String(req.query.role || '');
@@ -795,6 +818,9 @@ function registerAuthRoutes(deps) {
   });
 
   app.post('/api/admin/releases/:id/approve', requireAdmin(), (req, res) => {
+    const pending = store.getRelease(String(req.params.id));
+    const sod = pending && securityPolicy ? securityPolicy.approverConflict(pending.requested_by, req.auth.user.id) : null;
+    if (sod) return res.status(403).json({ error: sod, code: 'SEPARATION_OF_DUTIES' });   // D7, PLT-015
     const approved = store.approveRelease(String(req.params.id), req.auth.user.id, nowIso());
     if (!approved) return res.status(404).json({ error: 'Not found' });
     audit({
@@ -989,6 +1015,23 @@ function registerAuthRoutes(deps) {
         ip: s.ip, userAgent: s.user_agent,
       })),
     });
+  });
+
+  // ---- security policy and health (WP-03) ------------------------------------
+  app.get('/api/admin/security-policy', requireAdmin(), (req, res) => {
+    res.json({ policy: securityPolicy ? securityPolicy.read() : null, defaults: securityPolicy ? securityPolicy.DEFAULTS : null });
+  });
+  app.put('/api/admin/security-policy', requireAdmin(), (req, res) => {
+    if (!securityPolicy) return res.status(501).json({ error: 'No security policy on this server.' });
+    const before = securityPolicy.read();
+    const out = securityPolicy.write(req.body || {});
+    if (out.error) return res.status(400).json({ error: out.error, code: 'BAD_POLICY' });
+    // Switching separation of duties off is the documented override for one-person installations (D7): it is in the trail.
+    audit({ actorId: req.auth.user.id, actorUsername: req.auth.user.username, action: 'settings.security_policy', targetType: 'admin', meta: { before, after: out.policy } });
+    res.json({ policy: out.policy });
+  });
+  app.get('/api/admin/health', requireAdmin(), (req, res) => {
+    res.json({ audit: deps.auditHealth ? deps.auditHealth() : null });
   });
 
   app.post('/api/admin/sessions/:id/revoke', requireAdmin(), (req, res) => {

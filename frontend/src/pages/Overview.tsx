@@ -12,7 +12,7 @@ import { SampleButton } from '../components/SampleButton';
 import { BackupButton, FeedList, ProjectStatusTable, TeamTable } from '../components/Oversight';
 import { CreateProjectModal, ProjectCardView } from '../components/project';
 import { Alert, Empty, Loading, ago, useAsync } from '../components/ui';
-import { actionLabel } from '../lib/activity';
+import { actionLabel, isFeedNoise } from '../lib/activity';
 import { useSession } from '../store/session';
 
 const Section = ({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) => (
@@ -92,7 +92,8 @@ function AuthorOverview() {
 
   if (ov.loading && !ov.data) return <Loading />;
   if (ov.error || !ov.data) return <div className="v2-page"><Alert tone="bad">{ov.error || 'Could not load the overview.'}</Alert></div>;
-  const { counts, recent, activity } = ov.data;
+  const { counts, recent } = ov.data;
+  const activity = ov.data.activity.filter((a) => !isFeedNoise(a.action));        // WP-07 (UX-015): the author's own sign-ins are not news
   const answer = async (id: string, accept: boolean) => {
     if (accept) await workspaceApi.acceptInvitation(id); else await workspaceApi.declineInvitation(id);
     inv.reload(); ov.reload();

@@ -18,6 +18,11 @@ function open(workspaceDir) {
   if (db) return db;
   const file = path.join(workspaceDir, 'publisher.db');
   db = new DatabaseSync(file);
+  // A second process (the break-glass reset-admin script, a backup) waits up to 5 s for a write lock instead of failing at once with
+  // "database is locked" while the server runs (audit PLT-012).
+  db.exec('PRAGMA busy_timeout = 5000;');
+  // WP-06 (PLT-010): enforced references, stated rather than left to the library default.
+  db.exec('PRAGMA foreign_keys = ON;');
   db.exec(`
     PRAGMA journal_mode = WAL;
     CREATE TABLE IF NOT EXISTS projects (
@@ -95,6 +100,15 @@ function listFiles(projectId) {
   return db.prepare('SELECT * FROM files WHERE project_id=? ORDER BY rel_path').all(projectId);
 }
 
+// WP-06 (REL-003): a clean stop writes the write-ahead log back into the database file and closes it, so the next start (or a copy of
+// the data folder taken after the stop) finds one complete file.
+function close() {
+  if (!db) return;
+  try { db.exec('PRAGMA wal_checkpoint(TRUNCATE);'); } catch (e) { console.warn('[db] checkpoint at stop failed:', e.message); }
+  try { db.close(); } catch { /* already closed */ }
+  db = null;
+}
+
 // Guard so a missing open() fails loudly instead of on a null deref.
 open.assert = function () {
   if (!db) throw new Error('db.open(workspaceDir) must be called first');
@@ -102,6 +116,7 @@ open.assert = function () {
 
 module.exports = {
   open,
+  close,
   upsertProject,
   touchOpened,
   getProject,

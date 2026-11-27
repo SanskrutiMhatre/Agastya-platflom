@@ -25,7 +25,7 @@ import type { Writable } from 'stream';
 import { nowIso } from '../config';
 import { docIndex, projectDirFor, registryDb, workspace, workspaceDir } from '../context';
 import { bad } from './http';
-import { createProject, readProjectJson, type User } from './projects';
+import { createProject, fillImported, readProjectJson, unsafeInputFields, cleanInput, type User } from './projects';
 import { restoreSettings, settingsOf } from './packageSettings';
 import { adoptFromContents, dmCount, updateConfig } from './projectConfig';
 import * as review from './review';
@@ -131,9 +131,9 @@ export async function readManifestOf(zipPath: string): Promise<ArchiveManifest |
 
 /**
  * Bring an archive back as a new project. Throws a plain refusal (nothing is created) when the file is not an archive, is newer than this version, holds an unsafe path or
- * unsafe XML; once the checks pass the project is created and filled, and if filling fails the half-made project is removed again by the caller's `discard`.
+ * unsafe XML; once the checks pass the project is created and filled, and if filling fails (or the server stops during it) the half-made project is removed (projects.fillImported).
  */
-export async function restoreProjectArchive(user: User, zipPath: string, opts: { name?: string; folder?: string; discard?: (id: string) => void } = {}): Promise<RestoreResult> {
+export async function restoreProjectArchive(user: User, zipPath: string, opts: { name?: string; folder?: string } = {}): Promise<RestoreResult> {
   const man = await readManifestOf(zipPath);
   if (!man) throw bad('This ZIP is not a project archive made by this platform.', 'NOT_AN_ARCHIVE');
   if ((man.manifestVersion || 0) > ARCHIVE_VERSION) throw bad('This archive was made by a newer version of the platform.', 'ARCHIVE_TOO_NEW');
@@ -160,7 +160,8 @@ export async function restoreProjectArchive(user: User, zipPath: string, opts: {
     // 2. a new project of the same kind (the engine makes its starting files; the archive's own replace them)
     const card = await createProject(user, { name: opts.name || man.name || 'Imported project', folder: opts.folder, format, domain: man.domain ?? undefined, manualType: man.manualType ?? undefined });
     const id = card.id; const dir = projectDirFor(id);
-    try {
+    // WP-06 (REL-004): marked pending until the end; a failure discards it at once, a crash leaves the mark for the next start
+    return await fillImported(id, 'project archive import', async () => {
       let files = 0;
       for (const e of entries) {
         const name = e.name.replace(/\\/g, '/');
@@ -172,7 +173,16 @@ export async function restoreProjectArchive(user: User, zipPath: string, opts: {
       // 3. the project.json: the archive's, apart from what makes this project this one (its name and folder)
       const now = nowIso();
       const mine = readProjectJson(id);
-      const merged = { ...src, name: mine.name, group: mine.group, schemaVersion: mine.schemaVersion ?? src.schemaVersion };
+      const merged: any = { ...src, name: mine.name, group: mine.group, schemaVersion: mine.schemaVersion ?? src.schemaVersion };
+      // WP-01 (SEC-002): an archive is untrusted input. What kind of project this is comes from the project the import just
+      // made, never from the archive, and a file location that is not a relative path inside the project is dropped.
+      for (const k of ['id', 'format', 'authoring', 'type'] as const) { if (mine[k] !== undefined) merged[k] = mine[k]; else delete merged[k]; }
+      const dropped = unsafeInputFields(src);
+      if (dropped.length) {
+        const input = cleanInput(src.input);
+        if (input && Object.keys(input).length) merged.input = input; else delete merged.input;
+        findings.push({ severity: 'warning', message: `The archive's project file pointed outside the project (${dropped.join(', ')}); those locations were ignored and the standard folders are used.` });
+      }
       fs.writeFileSync(path.join(dir, 'project.json'), JSON.stringify(merged, null, 2), 'utf8');
       registryDb.upsertProject({ id, name: merged.name, type: merged.type, template: merged.templateRef, now });
 
@@ -226,6 +236,6 @@ export async function restoreProjectArchive(user: User, zipPath: string, opts: {
         } catch { findings.push({ severity: 'warning', message: 'The comments file could not be read.' }); }
       }
       return { project: { ...card, name: merged.name }, findings, counts: { files, comments } };
-    } catch (err) { try { opts.discard?.(id); } catch { /* best effort */ } throw err; }
+    });
   } finally { try { r.close(); } catch { /* closed */ } }
 }

@@ -35,6 +35,12 @@ export const config = {
   clientDist: process.env.AGASTYA_CLIENT_DIST ?? path.resolve(ROOT, '..', 'frontend', 'dist'),
 
   secureCookies: process.env.AGASTYA_SECURE_COOKIES === '1',
+  /**
+   * Which peers may set X-Forwarded-For / X-Forwarded-Proto (Express "trust proxy"; audit SEC-008). Default "loopback": a reverse proxy on the
+   * same machine is believed, a client that writes the header itself is not (with the former fixed 1 any client could choose its own address
+   * for the login throttle and the audit log). Behind a proxy on another machine set its address ("10.0.0.5") or a hop count ("1").
+   */
+  trustProxy: (() => { const v = (process.env.AGASTYA_TRUST_PROXY ?? 'loopback').trim(); if (/^\d+$/.test(v)) return Number(v); if (/^(false|off|none|0)$/i.test(v)) return false; return v; })() as string | number | boolean,
 };
 
 /** Load a CommonJS module from vendor/ (engine code that is deliberately not type-checked). */

@@ -29,7 +29,7 @@ npm start               # http://localhost:4040  - one process serves the UI and
 ```
 
 First visit: the app asks you to create the software administrator. Nothing ships with a default account or password.
-Forgot it later? On the server machine: `npm run reset-admin -- <username> <new-password>`.
+Forgot it later? On the server machine: `npm run reset-admin -- <username>` (it asks for the new password).
 
 Development: `npm run dev:backend` (port 4040) and `npm run dev:frontend` (port 5174, proxies `/api` and `/ws`).
 

@@ -11,6 +11,7 @@ import path from 'path';
 import { vendor } from '../../config';
 import { projectDirFor } from '../../context';
 import { bad, notFound } from '../http';
+import { checkXmlSafetyOf } from '../csdbGuard';
 import { readProjectJson, updateProjectJson } from '../projects';
 import { wellFormedError } from '../wellFormed';
 import { jssTypeOfProject, prepareFrontMatterFiles } from './service';
@@ -87,6 +88,7 @@ export function writeAncillary(projectId: string, effective: any, pageId: string
   if (typeof xml !== 'string' || !xml.trim()) throw bad('Send the page as { "xml": "..." }.', 'BAD_BODY');
   if (Buffer.byteLength(xml) > MAX_BYTES) throw bad('A page may be at most 1 MB.', 'TOO_BIG');
   if (/<!DOCTYPE|<!ENTITY/i.test(xml)) throw bad('A page may not declare a DOCTYPE or entities.', 'BAD_XML');
+  checkXmlSafetyOf(xml);                         // WP-02 (PUB-002): an xi:include of a local file needs no DOCTYPE
   const problem = wellFormedError(xml);
   if (problem) throw bad(`The page is not well-formed XML: ${problem}`, 'MALFORMED_XML');
   const was = rootName(fs.readFileSync(abs, 'utf8')); const now = rootName(xml);

@@ -3,6 +3,9 @@
 // (Studio, saving to the server, quick preview, PDF) -> explore -> publication ->
 // validation review -> release & watermark -> settings.
 //
+// The file name sorts first on purpose: the first-run test needs an empty workspace, and Playwright runs files in name order with one
+// worker. Every other spec signs in as the administrator this one creates, or creates it when run alone.
+//
 // Screenshots of each screen are written to test-results/shots for review.
 
 import { test, expect, type Page } from '@playwright/test';
@@ -71,7 +74,7 @@ test('the administrator oversees but does not create projects: its navigation ha
   await expect(adminPage.getByTestId('backup')).toBeVisible();
 });
 
-test('the administrator creates an Author: the username is suggested from the name, the temporary password is username@year', async () => {
+test('the administrator creates an Author: the username is suggested from the name, the temporary password is username-<random>', async () => {
   const page = adminPage;
   await page.goto('/settings/users');
   await page.getByRole('button', { name: 'New user' }).click();
@@ -80,7 +83,7 @@ test('the administrator creates an Author: the username is suggested from the na
   await page.getByLabel('Role', { exact: true }).selectOption('author');
   await page.getByRole('button', { name: 'Create account' }).click();
   asha = await page.getByLabel('Temporary password').inputValue();
-  expect(asha).toBe(`asha@${new Date().getFullYear()}`);
+  expect(asha).toMatch(/^asha-[a-hjkmnp-z2-9]{8}$/);
   await page.getByRole('button', { name: 'Done' }).click();
   // the next person with the same first name gets firstname.lastinitial
   await page.getByRole('button', { name: 'New user' }).click();
@@ -645,7 +648,7 @@ test.describe('a second person: account creation, onboarding, sharing and read-o
     const box = page.getByLabel('Temporary password');
     await expect(box).toBeVisible();
     temp = await box.inputValue();
-    expect(temp).toBe(`priya@${new Date().getFullYear()}`);
+    expect(temp).toMatch(/^priya-[a-hjkmnp-z2-9]{8}$/);
     await page.getByRole('button', { name: 'Done' }).click();
     await shot(page, '17-users');
   });
@@ -965,6 +968,7 @@ test.describe('roles: administrator -> Project Manager -> Author', () => {
 
     await mgr.goto(`/projects/${id}/release`);
     await mgr.getByTestId('approve').click();
+    await mgr.getByRole('dialog').getByRole('button', { name: 'Approve' }).click();   // FE-012: approval asks first
     await expect(mgr.getByTestId('review-status')).toHaveAttribute('data-state', 'approved', { timeout: 15_000 });
 
     await auth.goto(`/projects/${id}/release`);

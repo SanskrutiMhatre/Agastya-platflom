@@ -10,6 +10,7 @@
 import type { Express } from 'express';
 import { audit, requireAdmin, requireAuth, requireProject } from '../context';
 import { wrap, param, bad, conflict, notFound } from '../services/http';
+import { csvRow } from '../services/csv';
 import * as REF from '../services/s1000dRef';
 import * as SNS from '../services/sns';
 import * as PC from '../services/projectConfig';
@@ -152,8 +153,7 @@ export function registerS1000dRoutes(app: Express): void {
     const fmt = req.query.format === 'csv' ? 'csv' : 'json';
     const flat = nodes.filter((n) => !n.note?.category);
     if (fmt === 'csv') {
-      const q = (s: string) => `"${s.replace(/"/g, '""')}"`;
-      const rows = ['system,subsystem,assembly,title', ...flat.map((n) => { const c = n.path.split('/'); return [c[0].replace(/#.*/, ''), c[1] ?? '', c[2] ?? '', q(n.title)].join(','); })];
+      const rows = ['system,subsystem,assembly,title', ...flat.map((n) => { const c = n.path.split('/'); return csvRow([c[0].replace(/#.*/, ''), c[1] ?? '', c[2] ?? '', n.title]); })];      // WP-07 (SEC-015)
       return res.type('text/csv').attachment(`${preset.id}.csv`).send(rows.join('\r\n') + '\r\n');
     }
     res.type('application/json').attachment(`${preset.id}.json`).send(JSON.stringify({ format: 'agastya-sns-preset', version: 1, preset: { id: preset.id, name: preset.name, source: preset.source, limitation: preset.limitation }, nodes: flat }, null, 2));
@@ -241,9 +241,9 @@ export function registerS1000dRoutes(app: Express): void {
   }));
 
   // ── Applicability (ACT / CCT / PCT) ─────────────────────────────────────
-  app.get(`${base}/applicability`, projView('viewer', 'project.read'), wrap((req, res) => {
+  app.get(`${base}/applicability`, projView('viewer', 'project.read'), wrap(async (req, res) => {
     const { model, files } = APP.readModel(req.project.id);
-    res.json({ model, files, problems: APP.validateProject(req.project.id), filtering: false,
+    res.json({ model, files, problems: await APP.validateProject(req.project.id), filtering: false,
       note: 'Applicability is authored and validated. Publication filtering by product configuration is not implemented: a publication contains every data module.' });
   }));
   app.put(`${base}/applicability`, projView('manager', 'config.write'), wrap(async (req, res) => {
@@ -252,9 +252,9 @@ export function registerS1000dRoutes(app: Express): void {
     const model: APP.ApplicModel = { attributes: m.attributes ?? [], conditionTypes: m.conditionTypes ?? [], conditions: m.conditions ?? [], products: m.products ?? [] };
     const out = await APP.writeModel(req.project.id, model, { id: req.auth.user.id, username: req.auth.user.username, role: req.auth.user.role }, req.project.role);
     pLog(req, 'project.applicability.written', { files: out.written.map((w) => w.file) });
-    res.json({ ...out, problems: APP.validateProject(req.project.id) });
+    res.json({ ...out, problems: await APP.validateProject(req.project.id) });
   }));
-  app.get(`${base}/applicability/validate`, projView('viewer', 'project.read'), wrap((req, res) => { res.json({ problems: APP.validateProject(req.project.id) }); }));
+  app.get(`${base}/applicability/validate`, projView('viewer', 'project.read'), wrap(async (req, res) => { res.json({ problems: await APP.validateProject(req.project.id) }); }));
 
   // ── Configuration-specific publication ──────────────────────────────────
   // What a configuration can be made of, and the configuration PDFs already built.

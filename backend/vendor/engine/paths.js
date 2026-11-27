@@ -181,8 +181,53 @@ function gsCmd() {
 */
 const LINKER_VARS = ['LD_LIBRARY_PATH', 'LD_PRELOAD'];
 
+/*
+  Vendor exception "childEnv allow-list" (2026-11-27, audit WP-02): a tool gets only the variables it needs to start
+  and find fonts, temp folders and libraries, not the whole environment of whoever started the server. In particular
+  JAVA_TOOL_OPTIONS, _JAVA_OPTIONS, JDK_JAVA_OPTIONS and CLASSPATH (each can load code into the JVM that renders every
+  PDF), NODE_OPTIONS and any token or password of the session never reach a child. The variables a build sets itself
+  (`extra`: JAVA_HOME, XML_CATALOG_FILES, ...) are always passed.
+*/
+const CHILD_ENV_ALLOW = new Set([
+    // Windows
+    'systemroot', 'windir', 'systemdrive', 'temp', 'tmp', 'path', 'pathext', 'comspec', 'userprofile', 'homedrive', 'homepath',
+    'appdata', 'localappdata', 'programdata', 'programfiles', 'programfiles(x86)', 'programw6432', 'commonprogramfiles',
+    'commonprogramfiles(x86)', 'commonprogramw6432', 'number_of_processors', 'processor_architecture', 'processor_identifier',
+    'os', 'username', 'userdomain', 'computername', 'public', 'allusersprofile',
+    // POSIX
+    'home', 'user', 'logname', 'shell', 'lang', 'language', 'tz', 'tmpdir', 'xdg_data_dirs', 'xdg_config_dirs', 'xdg_cache_home',
+    'xdg_config_home', 'xdg_data_home', 'xdg_runtime_dir', 'fontconfig_file', 'fontconfig_path', 'appdir', 'appimage',
+    'ld_library_path', 'ld_library_path_original', 'ld_preload_original',
+    // the tools' own settings
+    'java_home', 'xml_catalog_files', 'jss_java', 'jss_gs',
+]);
+const allowedChildVar = (k) => { const l = k.toLowerCase(); return CHILD_ENV_ALLOW.has(l) || l.startsWith('lc_'); };
+
+/*
+  Vendor exception "quote-safe params" (2026-11-27, audit PUB-025): xsltproc refuses a --stringparam value holding both
+  ' and " ("stringparam contains both quote and double-quotes !", exit 8), so a book or publisher name such as
+  O'Brien "Mk 2" stopped the build. Such a value is passed instead as --param with an XPath concat() of literals that
+  each contain one quote kind only; the stylesheet receives exactly the same string. Every other argument is unchanged.
+*/
+function xpathString(v) {
+    if (!v.includes("'")) return `'${v}'`;
+    if (!v.includes('"')) return `"${v}"`;
+    return `concat(${v.split("'").map((p) => `'${p}'`).join(`, "'", `)})`;
+}
+function quoteSafeXsltArgs(args) {
+    const out = [];
+    for (let i = 0; i < args.length; i++) {
+        const v = args[i + 2];
+        if (args[i] === '--stringparam' && typeof v === 'string' && v.includes("'") && v.includes('"')) { out.push('--param', args[i + 1], xpathString(v)); i += 2; }
+        else out.push(args[i]);
+    }
+    return out;
+}
+
 function childEnv(extra) {
-    const env = { ...process.env, ...(extra || {}) };
+    const env = {};
+    for (const [k, v] of Object.entries(process.env)) if (v !== undefined && allowedChildVar(k)) env[k] = v;
+    Object.assign(env, extra || {});
     if (process.env.APPDIR || process.env.APPIMAGE) {
         for (const v of LINKER_VARS) {
             const original = process.env[`${v}_ORIGINAL`];
@@ -194,6 +239,7 @@ function childEnv(extra) {
 }
 
 module.exports = {
+    quoteSafeXsltArgs,
     TOOLS,
     SCHEMAS,
     childEnv,

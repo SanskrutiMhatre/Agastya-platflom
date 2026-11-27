@@ -252,3 +252,29 @@ its sample address block (the Foreword prints the project's own); the NOT RELEAS
 
 **To undo.** Remove the `lref`-guarded branches and the three parameters from `frontmatter.xsl`, the two from `jsstofo.xsl`, the `ref.layout` / `restricted.scope` / `chapter.title.align` / `heading.underline` /
 `red.color` entry from `layoutParamsFor`, and restore revision 2 of `jss-stencil.house.json` (the previous copy is kept as `jss-stencil.house.json.rev2.bak` in a workspace that has been upgraded).
+
+## Exception: `foGuard` (2026-11-27, audit work package WP-02, findings SEC-003 and SEC-011; made under the owner's approval of the audit roadmap)
+
+**Reason.** Apache FOP fetches whatever an `fo:external-graphic`, a `background-image` or an SVG `<image>` names. The audit reproduced a build in which the bundled Java
+requested `http://127.0.0.1:<port>/pixel.png` because a publisher logo in `project.json` named it (server-side request forgery), and showed that a picture reference can
+also name any file of the machine. The settings route now refuses such values, but the XSL-FO is assembled from several places (project settings, brand packs, stylesheet
+parameters, generated front matter, older projects and imported archives), so the check has to sit where every build passes.
+
+**Affected files.** One new file, `backend/vendor/engine/foGuard.js`, and two call sites in `backend/vendor/engine/build.js` (the JSS-path build and the S1000D direct build),
+each one line before the existing `checkImages` step. Outside the vendor folder the same function is called by `services/jsg/engine.ts` (JSG) and `services/objectRender.ts`
+(single-object PDF), and `services/publisher.ts` passes the allowed folders (`resourceRootsFor`: the project, the shared templates and brand packs, `backend/assets`,
+`backend/schemas`, `backend/vendor/pipeline`; the build folder and the vendored engine are always allowed).
+
+**Behaviour.** A reference that is a `data:image/...` value or a local file inside an allowed folder is kept; an SVG is kept only when its own references obey the same rule.
+Anything else (http, https, jar, ftp, UNC, a drive path or `..` outside the allowed folders) is replaced by a 1x1 transparent PNG, the build log says which reference was
+refused, and the build goes on. `fo:basic-link` destinations are links in the PDF, never fetched, and are not touched.
+
+**Isolation measures.** When no reference is refused the FO file is not rewritten at all (byte-identical; the unit test checks the content and the modification time), so the
+output of every legitimate build is unchanged. No stylesheet, configuration or generated structure was changed.
+
+**Regression tests** (`backend/test/fo-guard.test.js`, 4 tests): allowed references are untouched; nine kinds of hostile reference plus a background image and an inline SVG
+image are blanked; the reference forms FOP understands; and end to end, a logo URL planted in `project.json` pointing at a loopback listener is refused by the settings route
+and, written to disk directly, is never requested by a build (the listener records nothing). The guard was checked to be able to fail: with `confineFo` disabled the end-to-end
+test fails with `GET /pixel.png Java/21.0.13.1` on the listener.
+
+**To undo.** Delete `foGuard.js` and the `foGuard` lines in `build.js`, `jsg/engine.ts` and `objectRender.ts`.

@@ -360,15 +360,8 @@ export const PublishSettings: React.FC = () => {
                   hint="Stamped verbatim on every page."
                 />
               </Group>
-
-              <Group title="Output">
-                <Field
-                  label="Image compression"
-                  value={getPath(project, 'output.compression') ?? 0}
-                  onChange={v => setP('output.compression', Number(v) || 0)}
-                  hint="0-100. 0 leaves artwork untouched."
-                />
-              </Group>
+              {/* WP-07 (DEP-027, PERF-019): "Image compression" is not offered. It needs Ghostscript, which is not shipped, so the setting
+                  did nothing; the build still honours output.compression where an administrator provides Ghostscript (JSS_GS). */}
             </>
           )}
 

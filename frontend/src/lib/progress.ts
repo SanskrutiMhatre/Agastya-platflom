@@ -3,6 +3,11 @@
 // messages to people who can read that project.
 
 import { useEffect, useState } from 'react';
+import { signalUnauthorized } from '../api/client';
+import { useSession } from '../store/session';
+
+/** The server closes a socket whose session ended (sign-out, a newer sign-in, idle or time limit, account disabled) with this code. */
+const SESSION_ENDED = 4401;
 
 export interface ProgressMsg { type: 'progress' | 'reload'; projectId: string; message?: string; done?: boolean; error?: boolean; file?: string; line?: number; hint?: string; preview?: boolean; kind?: string }
 
@@ -19,8 +24,12 @@ function connect() {
   socket = ws;
   ws.onopen = () => { retry = 0; };
   ws.onmessage = (ev) => { try { const m = JSON.parse(ev.data) as ProgressMsg; listeners.forEach((l) => l(m)); } catch { /* ignore malformed */ } };
-  ws.onclose = () => {
+  ws.onclose = (ev) => {
     socket = null;
+    // FE-011: a socket whose session ended is not retried blindly. The session store learns why and shows the sign-in page;
+    // signing in again (a new subscribe) reconnects. Nor is a socket retried while nobody is signed in.
+    if (ev.code === SESSION_ENDED) { signalUnauthorized(); return; }
+    if (useSession.getState().status !== 'authed') return;
     if (wanted > 0) setTimeout(connect, Math.min(10000, 500 * 2 ** retry++));
   };
   ws.onerror = () => ws.close();

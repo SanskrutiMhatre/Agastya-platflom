@@ -70,7 +70,7 @@ export function ImportAssignPanel({ projectId, data, error, loading, mayAssign, 
 
       {!data.hasPublication ? <Alert tone="warn">This project has no publication to place modules in. Import with a publication, or create one on the Publication page.</Alert> : null}
       {pool.length === 0 ? (
-        <div className="v2-empty" data-testid="pool-empty"><strong>Every data module is in the publication.</strong>Modules an import leaves out of the publication are listed here until you place them.</div>
+        <div className="v2-empty" data-testid="pool-empty"><strong className="v2-empty-title">Every data module is in the publication.</strong>Modules an import leaves out of the publication are listed here until you place them.</div>
       ) : (
         <>
           <p style={{ margin: 0 }}><strong>{plural(pool.length, 'module')}</strong> {pool.length === 1 ? 'is' : 'are'} not in the publication. {pool.length === 1 ? 'It is' : 'They are'} kept in the project and never published until you place {pool.length === 1 ? 'it' : 'them'}.</p>

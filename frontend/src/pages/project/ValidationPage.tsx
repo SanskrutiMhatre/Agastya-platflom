@@ -13,6 +13,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { Alert, Badge, Empty, Loading, Spinner, ago, errText, fmtDate, useAsync } from '../../components/ui';
 import { canBuild, useProject } from '../../layouts/ProjectShell';
 import { useUi } from '../../store/ui';
+import { csvRow } from '../../lib/csv';
 
 const SOURCE_LABEL: Record<ValidationIssue['source'], string> = {
   xml: 'Well-formedness', xsd: 'S1000D schema', brex: 'Business rules (BREX)', graphics: 'Graphics', ids: 'Identifiers', icn: 'ICN entities', pm: 'Publication',
@@ -28,8 +29,8 @@ function useReviewed(projectId: string) {
 }
 
 function toCsv(issues: ValidationIssue[]): string {
-  const q = (s: string | number) => `"${String(s).replace(/"/g, '""')}"`;
-  return ['severity,check,file,line,title,detail', ...issues.map((i) => [i.sev, SOURCE_LABEL[i.source], i.rel, i.line, i.title, i.detail].map(q).join(','))].join('\r\n');
+  // WP-07 (ARC-020): one cell writer; a title or detail beginning with = is written as text
+  return ['severity,check,file,line,title,detail', ...issues.map((i) => csvRow([i.sev, SOURCE_LABEL[i.source], i.rel, i.line, i.title, i.detail]))].join('\r\n');
 }
 
 export function ValidationPage() {

@@ -12,6 +12,7 @@ import path from 'path';
 import { config } from '../../config';
 import { projectDirFor } from '../../context';
 import { bad, conflict, HttpError } from '../http';
+import { checkXmlSafetyOf } from '../csdbGuard';
 import { syncIdentity } from '../xengine/project';
 import { parseTree, walk, type MNode } from '../miniXml';
 import { wellFormedError } from '../wellFormed';
@@ -186,6 +187,8 @@ export function readSource(projectId: string): { xml: string; hash: string } {
 export async function writeSource(projectId: string, xml: string, baseHash?: string): Promise<{ hash: string; report: JsgReport }> {
   if (typeof xml !== 'string' || !xml.trim()) throw bad('There is no document to save.', 'EMPTY');
   if (Buffer.byteLength(xml) > 50 * 1024 * 1024) throw bad('The document is larger than 50 MB.', 'TOO_LARGE');
+  checkXmlSafetyOf(xml);                         // WP-02: the same guard as every S1000D write (XXE, xi:include, entity bombs)
+  if (/<!DOCTYPE/i.test(xml.replace(/<!--[\s\S]*?-->/g, '').replace(/<!\[CDATA\[[\s\S]*?\]\]>/g, ''))) throw bad('A JSG document may not declare a DOCTYPE: the engine needs none, and entities are not supported in it.', 'DOCTYPE_REFUSED');   // PUB-014
   const wf = wellFormedError(xml);
   if (wf) throw new HttpError(400, `The document is not well-formed XML: ${wf}`, 'MALFORMED_XML');
   const abs = sourcePath(projectId);

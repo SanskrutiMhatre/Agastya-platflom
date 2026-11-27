@@ -618,6 +618,38 @@ const MIGRATIONS = [
     name: '019-review-comment-anchor',
     sql: `ALTER TABLE review_comments ADD COLUMN anchor TEXT;`,
   },
+  {
+    /*
+      020 - the per-account sign-in throttle lives in the database (audit WP-03: SEC-007, REL-006): a restart no longer
+      resets it, and it counts every address together, so rotating addresses does not help. One row per throttled name:
+      the attempt times of the current window as a JSON array. Additive: a new table.
+    */
+    name: '020-login-throttle',
+    sql: `CREATE TABLE IF NOT EXISTS login_throttle (
+            key        TEXT PRIMARY KEY,
+            attempts   TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+          );`,
+  },
+  {
+    /*
+      021 - project lifecycle (audit WP-06: PLT-003, PLT-004). project_missing: a project whose folder was not there at a start is
+      marked, never deleted; its row and memberships stay until an administrator decides. project_tombstones: the id of a deleted
+      project is never given to a new one, so nothing of the old project (documents, releases, locks) can reappear under it.
+      Additive: two new tables.
+    */
+    name: '021-project-lifecycle',
+    sql: `CREATE TABLE IF NOT EXISTS project_missing (
+            project_id TEXT PRIMARY KEY,
+            since      TEXT NOT NULL
+          );
+          CREATE TABLE IF NOT EXISTS project_tombstones (
+            id         TEXT PRIMARY KEY,
+            name       TEXT,
+            deleted_at TEXT NOT NULL,
+            deleted_by TEXT
+          );`,
+  },
 ];
 
 /*
@@ -740,7 +772,18 @@ class AuthStore {
     const sets = keys.map((k) => `${k} = ?`).join(', ');
     this.stmt(`UPDATE users SET ${sets}, updated_at = ? WHERE id = ?`)
       .run(...keys.map((k) => fields[k]), now, id);
+    if (keys.includes('disabled_at') || keys.includes('role')) this.emitAccessChanged(id);
     return this.getUser(id);
+  }
+
+  /*
+    Access-change notices (WP-03, SEC-010 / PLT-017): a session ended, an account was disabled or changed role, a
+    membership changed. The WebSocket broadcaster listens and closes or re-authorises the affected connections at once,
+    instead of letting a revoked browser keep receiving project messages. `userId` null means "anyone may be affected".
+  */
+  onAccessChanged(fn) { (this._accessListeners || (this._accessListeners = new Set())).add(fn); return () => this._accessListeners.delete(fn); }
+  emitAccessChanged(userId) {
+    for (const fn of this._accessListeners || []) { try { fn(userId ?? null); } catch { /* a listener never breaks the write */ } }
   }
 
   // ---- sessions -----------------------------------------------------------
@@ -752,11 +795,18 @@ class AuthStore {
     statements can therefore never leave the account with zero valid
     sessions after a successful login.
   */
-  insertSessionDisplacing({ id, userId, tokenHash, now, expiresAt, ip, userAgent }) {
+  insertSessionDisplacing(args) {
+    const out = this._insertSessionDisplacing(args);
+    if (out.displaced) this.emitAccessChanged(args.userId);
+    return out;
+  }
+
+  _insertSessionDisplacing({ id, userId, tokenHash, now, expiresAt, ip, userAgent, displace = true }) {
     return this.tx(() => {
       this.stmt(`INSERT INTO sessions (id, user_id, token_hash, created_at, expires_at, last_seen_at, ip, user_agent)
                  VALUES (?,?,?,?,?,?,?,?)`)
         .run(id, userId, tokenHash, now, expiresAt, now, ip || null, userAgent || null);
+      if (!displace) return { displaced: 0 };   // the security policy allows several sessions per account (WP-03)
       const r = this.stmt(`UPDATE sessions SET revoked_at = ?, revoke_reason = 'displaced'
                            WHERE user_id = ? AND id != ? AND revoked_at IS NULL`)
         .run(now, userId, id);
@@ -785,9 +835,50 @@ class AuthStore {
     this.stmt('UPDATE sessions SET last_seen_at = ? WHERE id = ?').run(now, sessionId);
   }
 
+  /* Why a token no longer signs anyone in (WP-03, UX-022): 'displaced', 'idle', 'expired', 'signout', ... or null when unknown. */
+  sessionEndReason(tokenHash, nowIso) {
+    const r = this.stmt(`SELECT s.revoked_at, s.revoke_reason, s.expires_at, u.disabled_at
+                         FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?`).get(tokenHash);
+    if (!r) return null;
+    if (r.disabled_at) return 'disabled';
+    if (r.revoked_at) return r.revoke_reason || 'revoked';
+    if (r.expires_at <= nowIso) return 'expired';
+    return null;
+  }
+
+  /* Is this session still live (WebSocket re-check after a revoke, PLT-017)? */
+  sessionIsLive(sessionId, nowIso) {
+    return !!this.stmt(`SELECT 1 FROM sessions s JOIN users u ON u.id = s.user_id
+                        WHERE s.id = ? AND s.revoked_at IS NULL AND s.expires_at > ? AND u.disabled_at IS NULL`).get(sessionId, nowIso);
+  }
+
+  /* Does the user own or manage at least one project (they may look people up to add them, SEC-004)? */
+  managesAnyProject(userId) {
+    return !!this.stmt("SELECT 1 FROM project_members WHERE user_id = ? AND role IN ('owner','manager') LIMIT 1").get(userId);
+  }
+
+  // ---- sign-in throttle (020) ---------------------------------------------
+
+  throttleGet(key) {
+    const r = this.stmt('SELECT attempts FROM login_throttle WHERE key = ?').get(key);
+    if (!r) return [];
+    try { const a = JSON.parse(r.attempts); return Array.isArray(a) ? a.filter((x) => typeof x === 'number') : []; } catch { return []; }
+  }
+
+  throttlePut(key, attempts, now) {
+    if (!attempts.length) { this.stmt('DELETE FROM login_throttle WHERE key = ?').run(key); return; }
+    this.stmt(`INSERT INTO login_throttle (key, attempts, updated_at) VALUES (?, ?, ?)
+               ON CONFLICT(key) DO UPDATE SET attempts = excluded.attempts, updated_at = excluded.updated_at`).run(key, JSON.stringify(attempts), now);
+  }
+
+  throttlePrune(olderThanIso) {
+    this.stmt('DELETE FROM login_throttle WHERE updated_at < ?').run(olderThanIso);
+  }
+
   revokeSessionById(sessionId, reason, now) {
     const r = this.stmt('UPDATE sessions SET revoked_at = ?, revoke_reason = ? WHERE id = ? AND revoked_at IS NULL')
       .run(now, reason, sessionId);
+    if (Number(r.changes)) this.emitAccessChanged(null);
     return Number(r.changes);
   }
 
@@ -797,6 +888,7 @@ class AuthStore {
         .run(now, reason, userId, exceptSessionId)
       : this.stmt('UPDATE sessions SET revoked_at = ?, revoke_reason = ? WHERE user_id = ? AND revoked_at IS NULL')
         .run(now, reason, userId);
+    if (Number(r.changes)) this.emitAccessChanged(userId);
     return Number(r.changes);
   }
 
@@ -978,10 +1070,12 @@ class AuthStore {
                VALUES (?,?,?,?,?)
                ON CONFLICT(project_id, user_id) DO UPDATE SET role = excluded.role`)
       .run(projectId, userId, role, now, addedBy || null);
+    this.emitAccessChanged(userId);
   }
 
   removeMember(projectId, userId) {
     const r = this.stmt('DELETE FROM project_members WHERE project_id = ? AND user_id = ?').run(projectId, userId);
+    if (Number(r.changes)) this.emitAccessChanged(userId);
     return Number(r.changes);
   }
 
@@ -992,6 +1086,54 @@ class AuthStore {
   // Called when a project disappears from disk or is deleted: memberships and
   // invitations point at nothing and are cleared. Revisions and audit rows
   // are history and stay.
+  // ---- project lifecycle (WP-06) -------------------------------------------
+
+  /** PLT-003: the folder was not there at a start. Marked, never deleted. */
+  markProjectMissing(projectId, now) { this.stmt('INSERT OR IGNORE INTO project_missing (project_id, since) VALUES (?, ?)').run(projectId, now); }
+  clearProjectMissing(projectId) { this.stmt('DELETE FROM project_missing WHERE project_id = ?').run(projectId); }
+  listMissingProjects() { return this.stmt('SELECT project_id AS projectId, since FROM project_missing ORDER BY since').all(); }
+  projectMissingSince(projectId) { const r = this.stmt('SELECT since FROM project_missing WHERE project_id = ?').get(projectId); return r ? r.since : null; }
+
+  /**
+   * PLT-004: whether an id was ever used by a project: a registered or deleted project, or rows left from one (documents, releases,
+   * members, review comments). A new project never takes such an id, so nothing of an earlier project can reappear under it.
+   */
+  projectIdUsed(id) {
+    return !!(this.stmt('SELECT 1 FROM projects WHERE id = ?').get(id)
+      || this.stmt('SELECT 1 FROM project_tombstones WHERE id = ?').get(id)
+      || this.stmt('SELECT 1 FROM documents WHERE project_id = ? LIMIT 1').get(id)
+      || this.stmt('SELECT 1 FROM releases WHERE project_id = ? LIMIT 1').get(id)
+      || this.stmt('SELECT 1 FROM project_members WHERE project_id = ? LIMIT 1').get(id)
+      || this.stmt('SELECT 1 FROM review_comments WHERE project_id = ? LIMIT 1').get(id));
+  }
+
+  /**
+   * PLT-004: a deleted project's content goes with it, in one transaction: documents with their revisions, state, locks and comments,
+   * releases, review comments, lifecycle and CIR links, extensions, project notifications. The audit log stays (it is the record of what
+   * happened); the id is tombstoned. Blobs are content-addressed and shared, so they are left for a later clean-up.
+   */
+  purgeProjectContent(projectId, { name = null, by = null, now }) {
+    return this.tx(() => {
+      const docs = 'SELECT id FROM documents WHERE project_id = ?';
+      const n = (sql) => Number(this.db.prepare(sql).run(projectId).changes || 0);
+      const out = {
+        revisions: n(`DELETE FROM revisions WHERE document_id IN (${docs})`),
+        docState: n(`DELETE FROM doc_state WHERE document_id IN (${docs})`),
+        docComments: n(`DELETE FROM doc_comments WHERE document_id IN (${docs})`),
+        releases: n('DELETE FROM releases WHERE project_id = ?'),
+        documents: n('DELETE FROM documents WHERE project_id = ?'),
+        reviewComments: n('DELETE FROM review_comments WHERE project_id = ?'),
+        lifecycle: n('DELETE FROM lifecycle_events WHERE project_id = ?'),
+        cirLinks: n('DELETE FROM cir_links WHERE project_id = ?'),
+        extensions: n('DELETE FROM project_ext WHERE project_id = ?'),
+        notifications: n('DELETE FROM notifications WHERE project_id = ?'),
+      };
+      this.stmt('DELETE FROM project_missing WHERE project_id = ?').run(projectId);
+      this.stmt('INSERT OR REPLACE INTO project_tombstones (id, name, deleted_at, deleted_by) VALUES (?, ?, ?, ?)').run(projectId, name, now, by);
+      return out;
+    });
+  }
+
   clearProjectGovernance(projectId) {
     this.stmt('DELETE FROM project_members WHERE project_id = ?').run(projectId);
     this.stmt("UPDATE project_invitations SET status = 'revoked' WHERE project_id = ? AND status = 'pending'").run(projectId);

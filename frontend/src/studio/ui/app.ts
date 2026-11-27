@@ -72,6 +72,8 @@ export interface StudioHost {
   identityTaken?(key: string): string | null;
   /** What the PDF engine formats a quick preview with (title, classification...): owned by the project's settings. */
   pdfSettings(): Partial<import('../export/pdf-settings').PublicationSettings> | undefined;
+  /** FE-006: "<user>/<project>" for drafts, or null when no draft may be kept (nobody signed in, no project). */
+  draftScope?(): string | null;
 }
 
 export class App {
@@ -128,7 +130,32 @@ export class App {
     this.build();
     this.applySettings();
     this.bindGlobal();
-    (window as unknown as { studio: App }).studio = this;
+    // FE-023: the handle is for development and the automated tests (navigator.webdriver), not for every page of the product.
+    if (import.meta.env.DEV || navigator.webdriver) (window as unknown as { studio: App }).studio = this;
+  }
+
+  /** Page-wide listeners, removed together by dispose(). */
+  private readonly globalListeners = new AbortController();
+
+  /** FE-023 / FE-024: remove every page-wide listener and forget the open documents (sign-out). The instance is not used again. */
+  dispose() {
+    this.globalListeners.abort();
+    this.closeContextMenu(); this.closeFileMenu();
+    for (const ed of [...this.editors]) { try { ed.destroy?.(); } catch { /* already gone */ } }
+    this.editors.length = 0;
+    this.active = null;
+    this.root.replaceChildren();
+    const w = window as unknown as { studio?: App };
+    if (w.studio === this) delete w.studio;
+  }
+
+  /** FE-001: a page-wide event belongs to the Studio only while the Studio is on the page and the event comes from inside it (or from the
+   *  page body, where focus rests after a click on empty space in the editor route). */
+  private ownsEvent(e: Event): boolean {
+    if (!this.root.isConnected) return false;
+    const t = e.target as Node | null;
+    if (!t || t === document || t === document.body || t === document.documentElement || t === window as unknown as Node) return true;
+    return this.root.contains(t) || !!this.fileMenu?.contains(t) || !!this.ctxMenu?.contains(t);   // both menus are placed on <body>
   }
 
   async init() {
@@ -423,30 +450,33 @@ export class App {
   }
 
   private bindGlobal() {
-    window.addEventListener('keydown', (e) => this.onKey(e), true);
+    const signal = this.globalListeners.signal;
+    window.addEventListener('keydown', (e) => this.onKey(e), { capture: true, signal });
     window.addEventListener('beforeunload', (e) => {
       if (this.editors.some((ed) => this.hasUnsavedWork(ed))) {
         for (const ed of this.editors) void this.saveDraft(ed);
         e.preventDefault();
         e.returnValue = '';
       }
-    });
+    }, { signal });
     document.addEventListener('dragover', (e) => {
-      if (e.dataTransfer?.types.includes('Files')) e.preventDefault();
-    });
+      if (this.ownsEvent(e) && e.dataTransfer?.types.includes('Files')) e.preventDefault();
+    }, { signal });
     document.addEventListener('drop', (e) => {
+      if (!this.ownsEvent(e)) return;                              // FE-023: a file dropped on another page is that page's
       if (!e.dataTransfer?.files.length || e.defaultPrevented) return; // the design view handles drops onto the page itself
       e.preventDefault();
       void this.dropFiles(e.dataTransfer.files, null);
-    });
+    }, { signal });
     document.addEventListener('mousedown', (e) => {
       if (this.ctxMenu && !this.ctxMenu.contains(e.target as Node)) this.closeContextMenu();
-    });
-    window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', () => this.applySettings());
-    window.addEventListener('studio:modal-closed', () => this.active?.focus());
+    }, { signal });
+    window.matchMedia?.('(prefers-color-scheme: dark)').addEventListener?.('change', () => this.applySettings(), { signal });
+    window.addEventListener('studio:modal-closed', () => { if (this.root.isConnected) this.active?.focus(); }, { signal });
   }
 
   private onKey(e: KeyboardEvent) {
+    if (!this.ownsEvent(e)) return;                                  // FE-001: never take another editor's Ctrl+S
     if (modalOpen()) return;
     // AltGr (Ctrl+Alt on Windows) types characters such as @ { } ł ś on many layouts: never take those for a shortcut
     if (e.getModifierState?.('AltGraph') && e.key.length === 1 && !/^[a-z]$/i.test(e.key)) return;
@@ -992,8 +1022,38 @@ export class App {
       return;
     }
     const text = ed.xml.hasPending && ed.xml.error ? ed.xml.text : ed.doc.toString();
-    await storage.put('drafts', ed.doc.id, { id: ed.doc.id, fileName: ed.doc.fileName, text, savedAt: Date.now() } satisfies Draft);
+    // Embedded: a draft is kept only under the signed-in person and the open project (FE-006, FE-024).
+    let scope: string | undefined;
+    if (this.host) { const s = this.host.draftScope?.(); if (!s) return; scope = s; }
+    await storage.put('drafts', ed.doc.id, { id: ed.doc.id, fileName: ed.doc.fileName, text, savedAt: Date.now(), scope } satisfies Draft);
   }
+
+  /** FE-006: the newest draft of `fileName` kept under `scope`, if any (embedded mode). */
+  async draftFor(scope: string, fileName: string): Promise<Draft | null> {
+    const all = ((await storage.all<Draft>('drafts').catch(() => [])) ?? []).filter((d) => d && d.text && d.scope === scope && d.fileName === fileName);
+    all.sort((a, b) => b.savedAt - a.savedAt);
+    return all[0] ?? null;
+  }
+
+  /** Remove drafts: those of one file in a scope, every draft of a scope, or (no argument) all of them (sign-out on a shared computer). */
+  async discardDrafts(scope?: string, fileName?: string): Promise<void> {
+    const all = ((await storage.all<Draft>('drafts').catch(() => [])) ?? []);
+    for (const d of all) {
+      if (!d) continue;
+      if (scope !== undefined && d.scope !== scope) continue;
+      if (fileName !== undefined && d.fileName !== fileName) continue;
+      await storage.del('drafts', d.id).catch(() => undefined);
+    }
+  }
+
+  /** Remove every draft one person kept, in any project (their own sign-out). */
+  async discardDraftsOf(userId: string): Promise<void> {
+    const all = ((await storage.all<Draft>('drafts').catch(() => [])) ?? []);
+    for (const d of all) if (d && (d.scope ?? '').split('/')[0] === userId) await storage.del('drafts', d.id).catch(() => undefined);
+  }
+
+  /** Give an open document the id of its draft, so later autosaves replace that draft and a save removes it. */
+  adoptDraftId(ed: DocumentEditor, id: string) { (ed.doc as unknown as { id: string }).id = id; }
 
   private async restoreDrafts() {
     const drafts = ((await storage.all<Draft>('drafts')) ?? []).filter((d) => d && d.text);

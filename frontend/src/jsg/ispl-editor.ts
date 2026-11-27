@@ -75,6 +75,8 @@ export class IsplEditor implements JsgEditorLike {
   destroy(): void { window.clearTimeout(this.pvTimer); this.preview.destroy(); document.removeEventListener('keydown', this.onKey); this.root.innerHTML = ''; this.root.classList.remove('jsg-ed', 'jsg-ro'); }
   isDirty(): boolean { return this.dirty; }
   markSaved(): void { this.dirty = false; this.host.onDirty(false); }
+  /** A recovered draft was loaded (FE-006): it counts as unsaved until it is saved. */
+  markDirty(): void { this.dirty = true; this.host.onDirty(true); }
   getXml(): string { return serializeJsg(this.doc); }
   getDoc(): JsgDoc { return this.doc; }
   setFindings(f: JsgFinding[]): void { this.findings = f; this.renderNav(); }

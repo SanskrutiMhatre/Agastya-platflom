@@ -13,11 +13,12 @@
 import { furnitureParams as defaultFurnitureParams, publisherLogoParams, mergeParams } from './sideText';
 import fs from 'fs';
 import path from 'path';
+import { pathToFileURL } from 'url';
 import { config, vendor } from '../config';
 import { projectDirFor, workspaceDir } from '../context';
 import { broadcast } from './broadcast';
 import { HttpError, bad } from './http';
-import { readProjectJson } from './projects';
+import { readProjectJson, csdbRel, mediaRel, pmRel } from './projects';
 import { printableBoxMm, releaseStateOf } from './release';
 
 const engineBuild = vendor('engine/build');
@@ -46,6 +47,9 @@ export function startRenderer(): void {
   try { fopd.start(); fopd.warmup(); }
   catch (e) { console.warn('[publisher] warm FOP renderer unavailable:', (e as Error).message); }
 }
+/** The folders a build may take pictures from (WP-02, vendor exception foGuard): the project and the shared templates and brand packs; the build folder and the engine are always allowed. */
+export const resourceRootsFor = (projectId: string): string[] => [projectDirFor(projectId), path.join(workspaceDir, 'templates'), path.dirname(LT_LOGO_FILE), config.schemasDir, config.pipelineDir];
+
 export function stopRenderer(): void { try { fopd.stop(); } catch { /* nothing to stop */ } }
 export const rendererStatus = () => ({ warm: !!fopd.isAvailable(), java: paths.JAVA, bundledJre: !!paths.hasBundledJre });
 
@@ -147,7 +151,8 @@ const LT_LOGO_FILE = path.resolve(__dirname, '..', '..', 'assets', 'default-publ
  * the logo only when it is Larsen & Toubro; another publisher with no logo prints none.
  */
 export function applyDefaultArtwork(projectId: string, effective: any, dir: string, log: (m: string) => void): void {
-  const art = (f: string): string => relFromProject(projectId, path.join(config.pipelineDir, 'jss', 'artwork', f), dir);
+  // WP-07 (PUB-020): an absolute file: URL, not ../ steps from the project (eleven of them, and no route at all when the workspace is on another drive)
+  const art = (f: string): string => pathToFileURL(path.join(config.pipelineDir, 'jss', 'artwork', f)).href;
   const has = (rel: unknown): boolean => typeof rel === 'string' && rel !== '' && fs.existsSync(path.resolve(dir, rel));
   const used: string[] = [];
   const branding = { ...(effective.branding ?? {}) };
@@ -156,7 +161,7 @@ export function applyDefaultArtwork(projectId: string, effective: any, dir: stri
     branding.publishers = branding.publishers.map((pub: any) => {
       if (has(pub?.logo) || !/l\s*&\s*t\b|larsen/i.test(`${pub?.name ?? ''} ${(pub?.addressLines ?? []).join(' ')}`)) return pub;
       used.push(`the logo of ${String(pub.name ?? 'a publisher').replace(/,\s*$/, '')}`);
-      return { ...pub, logo: relFromProject(projectId, LT_LOGO_FILE, dir) };
+      return { ...pub, logo: pathToFileURL(LT_LOGO_FILE).href };
     });
   }
   effective.branding = branding;
@@ -183,14 +188,14 @@ function prepareInput(projectId: string, project: any, effective: any, useDirect
     log(`JSS document (${project.jssDocType ?? 'jss'}): added ${book.pages} frame pages from Settings; the body is rendered as written`);
     return { input: COMPOSED_NAME, isS1000D: false };
   }
-  const pm = project.input?.pm || 'publication.xml';
+  const pm = pmRel(project);
   const pmAbs = path.join(dir, pm);
   if (!fs.existsSync(pmAbs)) throw bad(`Publication module not found: ${pm}`, 'NO_PM');
   const original = fs.readFileSync(pmAbs, 'utf8');
   const isS1000D = !/<\s*jssbook[\s>]/.test(original);
   if (!isS1000D) return { input: pm, isS1000D };
 
-  const csdbRelDir = project.input?.csdbDir || 'csdb';
+  const csdbRelDir = csdbRel(project);
   // modules with several revision files: pinned references -> that revision, unpinned -> the highest (services/lifecycle.ts)
   const rev = rewriteRevisionRefs(projectId, original, csdbRelDir);
   for (const n of rev.notes) log(n);
@@ -236,7 +241,7 @@ export function syncFrontMatter(projectId: string): void {
     const { project, effective } = effectiveConfig(projectId);
     const dir = projectDirFor(projectId);
     if (project.pipeline === 's1000dtofo') {
-      const pmAbs = path.join(dir, project.input?.pm || 'publication.xml');
+      const pmAbs = path.join(dir, pmRel(project));
       injectDirectFrontMatter(projectId, fs.existsSync(pmAbs) ? fs.readFileSync(pmAbs, 'utf8') : '', effective, () => undefined);
     } else {
       const fmDir = path.join(dir, 'jss', 'frontmatter');
@@ -257,7 +262,7 @@ export function syncFrontMatter(projectId: string): void {
 function brandFurnitureParams(project: any, effective: any, dir: string, log: (m: string) => void, released?: boolean): Array<[string, string]> {
   if (effective.layout?.profile !== 'xignal') return [];
   try {
-    const pmAbs = path.join(dir, project.input?.pm || 'publication.xml');
+    const pmAbs = path.join(dir, pmRel(project));
     const pmText = fs.existsSync(pmAbs) ? fs.readFileSync(pmAbs, 'utf8') : '';
     const brand = effective.brandPack ? brandEngine.loadBrandPack(path.join(workspaceDir, 'templates'), effective.brandPack) : null;
     if (effective.brandPack && !brand) log(`Brand pack "${effective.brandPack}" not found - building without its logo and company line`);
@@ -355,7 +360,7 @@ async function renderFull(projectId: string, gate: GatePass, log: (m: string) =>
   {
     const dir = opts.workDir ?? projectDirFor(projectId);
     const { project, effective } = effectiveConfig(projectId);
-    const pm = project.input?.pm || 'publication.xml';
+    const pm = pmRel(project);
     const pmAbs = path.join(dir, pm);
     const isS1000D = fs.existsSync(pmAbs) && !/<\s*jssbook[\s>]/.test(fs.readFileSync(pmAbs, 'utf8'));
     const useDirect = project.pipeline === 's1000dtofo' && isS1000D;
@@ -370,7 +375,7 @@ async function renderFull(projectId: string, gate: GatePass, log: (m: string) =>
     gate.verifyUnchanged();                       // what is rendered is what was validated
 
     const common = {
-      workDir: dir, xsltproc: paths.XSLTPROC, fop: paths.FOP_BAT, inputXml: input,
+      workDir: dir, xsltproc: paths.XSLTPROC, fop: paths.FOP_BAT, inputXml: input, resourceRoots: resourceRootsFor(projectId),
       foOut: 'jss-output.fo', pdfOut: PDF_NAME, classification,
       // Code No. / Rev No. belong to the JSS book's cover; the direct S1000D engine never prints them.
       layoutParams: useDirect
@@ -389,7 +394,7 @@ async function renderFull(projectId: string, gate: GatePass, log: (m: string) =>
       const result = useDirect
         ? await engineBuild.buildS1000dToFo({ ...common,
             stylesheetXsl: relFromProject(projectId, path.join(config.pipelineDir, 's1000dtofo', 's1000dtofo.xsl'), dir),
-            csdbDir: project.input?.csdbDir || 'csdb', mediaDir: project.input?.mediaDir || 'Media' })
+            csdbDir: csdbRel(project), mediaDir: mediaRel(project) })
         : await engineBuild.buildJss({ ...common,
             stage1Xsl: relFromProject(projectId, path.join(config.pipelineDir, 's1000dtojss', 's1000dtojss.xsl'), dir),
             stage2Xsl: relFromProject(projectId, path.join(config.pipelineDir, 'jsstofo', 'jsstofo.xsl'), dir),
@@ -439,7 +444,7 @@ export function buildPreview(projectId: string, dmFile: string): Promise<BuildRe
     for (const w of gate.warnings) log(`Note: ${w}`);
     const dir = projectDirFor(projectId);
     const { project, effective } = effectiveConfig(projectId);
-    const csdbRelDir = project.input?.csdbDir || 'csdb';
+    const csdbRelDir = csdbRel(project);
     const classification = effective.publication?.securityClassification ?? '';
     const cls = /^\d{2}$/.test(classification) ? classification : '01';
     const href = `${csdbRelDir}/${dmFile}`;
@@ -452,7 +457,7 @@ export function buildPreview(projectId: string, dmFile: string): Promise<BuildRe
 
     gate.verifyUnchanged();
     const common = {
-      workDir: dir, xsltproc: paths.XSLTPROC, fop: paths.FOP_BAT, inputXml: '_preview-pm.xml',
+      workDir: dir, xsltproc: paths.XSLTPROC, fop: paths.FOP_BAT, inputXml: '_preview-pm.xml', resourceRoots: resourceRootsFor(projectId),
       foOut: 'jss-preview.fo', pdfOut: PREVIEW_NAME, classification: cls,
       layoutParams: project.pipeline === 's1000dtofo'
         ? furnitureFor(projectId, project, effective, !!releaseLabel, dir, engineConfig.stage2Params(effective), () => undefined)
@@ -464,7 +469,7 @@ export function buildPreview(projectId: string, dmFile: string): Promise<BuildRe
       const result = project.pipeline === 's1000dtofo'
         ? await engineBuild.buildS1000dToFo({ ...common,
             stylesheetXsl: relFromProject(projectId, path.join(config.pipelineDir, 's1000dtofo', 's1000dtofo.xsl')),
-            csdbDir: csdbRelDir, mediaDir: project.input?.mediaDir || 'Media' })
+            csdbDir: csdbRelDir, mediaDir: mediaRel(project) })
         : await engineBuild.buildJss({ ...common,
             stage1Xsl: relFromProject(projectId, path.join(config.pipelineDir, 's1000dtojss', 's1000dtojss.xsl')),
             stage2Xsl: relFromProject(projectId, path.join(config.pipelineDir, 'jsstofo', 'jsstofo.xsl')),
@@ -506,13 +511,13 @@ export function buildConfiguredPublication(projectId: string, input: ConfigInput
     for (const w of gate.warnings) log(`Note: ${w}`);
     const dir = projectDirFor(projectId);
     const { project } = effectiveConfig(projectId);
-    const pmRelPath = project.input?.pm || 'publication.xml';
+    const pmRelPath = pmRel(project);
     const pmAbs = path.join(dir, pmRelPath);
     if (!fs.existsSync(pmAbs)) throw bad(`Publication module not found: ${pmRelPath}`, 'NO_PM');
     const pmText = fs.readFileSync(pmAbs, 'utf8');
     if (/<\s*jssbook[\s>]/.test(pmText)) throw bad('A configuration-specific publication needs an S1000D publication module, not a JSS book.', 'NOT_S1000D');
-    const csdbRelDir = project.input?.csdbDir || 'csdb';
-    const mediaRelDir = project.input?.mediaDir || 'Media';
+    const csdbRelDir = csdbRel(project);
+    const mediaRelDir = mediaRel(project);
 
     const sel = buildSelection(projectId, input);
     log(`Configuration: ${sel.label}`);

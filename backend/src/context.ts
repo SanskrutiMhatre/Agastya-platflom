@@ -12,11 +12,13 @@ import fs from 'fs';
 import path from 'path';
 import { config, nowIso, vendor } from './config';
 import { snapshotBeforeMigration } from './services/dbSnapshot';
+import { currentRequest } from './services/requestContext';
 
 /* eslint-disable @typescript-eslint/no-var-requires, @typescript-eslint/no-explicit-any */
 const { AuthStore } = require('./core/auth/store');
 const { SessionService } = require('./core/auth/sessions');
 const { RateLimiter } = require('./core/auth/rateLimit');
+const { createSecurityPolicy } = require('./core/auth/securityPolicy');
 const { createAuthz } = require('./core/auth/authz');
 const { DocIndex } = require('./core/collab/docindex');
 const { Revisions } = require('./core/collab/revisions');
@@ -75,8 +77,9 @@ const preMigrationSnapshot = snapshotBeforeMigration(sqlite, workspaceDir, '016-
 if (preMigrationSnapshot) console.log(`[migration] database copy before 016-s1000d-reference: ${preMigrationSnapshot}`);
 store.migrate(nowIso()); // additive migrations only
 
-export const sessionsSvc: any = new SessionService(store, { secureCookies: config.secureCookies });
-export const limiter: any = new RateLimiter();
+export const securityPolicy: any = createSecurityPolicy(store, nowIso);
+export const sessionsSvc: any = new SessionService(store, { secureCookies: config.secureCookies, policy: securityPolicy });
+export const limiter: any = new RateLimiter({ store });
 export const authz: any = createAuthz({ store, sessions: sessionsSvc, workspaceDir, projectDirFor });
 export const docIndex: any = new DocIndex(store);
 export const revisions: any = new Revisions(store);
@@ -89,20 +92,46 @@ export const { requireAuth, requireAdmin, requireRoles, requireProject, publicRo
 };
 
 /*
-  Append-only audit. Metadata is stripped of anything that looks like a secret
-  so no password, hash or token can land in a row even by accident, and a
-  failing audit write never breaks the operation it describes.
+  Append-only audit (WP-03, SEC-012, ENT-011).
+
+  Redaction is by explicit field name and by value shape, not by "any key containing hash": the former filter dropped
+  contentHash and every other fingerprint a release record needs. A field is removed when its name (case, "_" and "-"
+  ignored) is one of SECRET_KEYS, or when its value looks like a password hash or a session cookie.
+
+  Every row gets the client address of the request it belongs to (requestContext), when the caller did not give one.
+
+  A failing write still never breaks the operation it describes (the operation's own database write has usually
+  succeeded by then, and refusing it afterwards would be worse), but it is no longer only a console line: it is counted,
+  appended to workspace/logs/audit-failures.log, and shown to administrators (auditHealth(), GET /api/admin/health).
 */
+const SECRET_KEYS = new Set(['password', 'newpassword', 'currentpassword', 'oldpassword', 'temppassword', 'passwordhash', 'masterpassword',
+  'token', 'tokenhash', 'sessiontoken', 'resettoken', 'cookie', 'setcookie', 'secret', 'clientsecret', 'credential', 'credentials', 'apikey', 'authorization']);
+const SECRET_VALUE = /^\$(argon2(id|i|d)?|2[aby]?|scrypt)\$|agastya_session=/i;
+export function redactAuditMeta(meta: unknown): unknown {
+  if (meta == null) return null;
+  return JSON.parse(JSON.stringify(meta, (k, v) => {
+    if (k && SECRET_KEYS.has(k.toLowerCase().replace(/[_-]/g, ''))) return undefined;
+    if (typeof v === 'string' && SECRET_VALUE.test(v)) return '[redacted]';
+    return v;
+  }));
+}
+const auditFailures = { count: 0, last: null as null | { at: string; action: string; error: string } };
+export const auditHealth = (): { failures: number; last: typeof auditFailures.last } => ({ failures: auditFailures.count, last: auditFailures.last });
 export function audit(fields: Record<string, any>): void {
   try {
-    const meta = fields.meta == null ? null
-      : JSON.parse(JSON.stringify(fields.meta, (k, v) =>
-        /password|hash|token|secret|cookie|credential/i.test(k) ? undefined : v));
-    store.appendAudit({ at: nowIso(), ...fields, meta });
+    const meta = redactAuditMeta(fields.meta);
+    store.appendAudit({ at: nowIso(), ...fields, ip: fields.ip || currentRequest()?.ip || null, meta });
   } catch (e) {
+    auditFailures.count++;
+    auditFailures.last = { at: nowIso(), action: String(fields.action ?? ''), error: (e as Error).message };
     console.error('[audit] write failed (operation unaffected):', (e as Error).message);
+    try {
+      const dir = path.join(workspaceDir, 'logs'); fs.mkdirSync(dir, { recursive: true });
+      fs.appendFileSync(path.join(dir, 'audit-failures.log'), `${JSON.stringify({ ...auditFailures.last, actor: fields.actorUsername ?? null, ip: currentRequest()?.ip ?? null })}\n`);
+    } catch { /* the counter still shows it */ }
   }
 }
 
-export const clientIp = (req: { socket?: { remoteAddress?: string } }): string =>
-  (req.socket && req.socket.remoteAddress) || '';
+/** The client's address: Express's req.ip, which honours the trust-proxy setting (config.trustProxy, SEC-008); the socket peer otherwise. */
+export const clientIp = (req: { ip?: string; socket?: { remoteAddress?: string } }): string =>
+  String(req.ip || (req.socket && req.socket.remoteAddress) || '').replace(/^::ffff:/, '');

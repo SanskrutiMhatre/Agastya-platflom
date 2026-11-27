@@ -118,7 +118,7 @@ export function EditorPage() {
 
   return (
     <>
-      <header className="v2-top" style={{ height: 42 }}>
+      <header className="v2-top v2-edhead">
         <button className="icon-btn" onClick={() => setSide(!sideOpen)} title={sideOpen ? 'Hide the data module panel' : 'Show the data module panel'} aria-label={sideOpen ? 'Hide the data module panel' : 'Show the data module panel'} aria-pressed={sideOpen} data-testid="toggle-side"><Icon name="panel" size={17} /></button>
         <h1 style={{ fontSize: 14 }} className="v2-trunc">{ctx.summary.project.name}</h1>
         {activeDoc ? <span className="v2-hint v2-trunc v2-crumb" title={activeDoc.file ?? activeDoc.title}>/ {activeDoc.title || activeDoc.file}</span> : null}

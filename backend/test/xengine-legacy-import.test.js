@@ -103,7 +103,7 @@ for (const [layout, fileName] of [['flat', 'Legacy.zip'], ['jsspub', 'Legacy.jss
     assert.deepEqual(id.modules.map((m) => m.dmc), ['DMC-RDR-B-A00-00-00-02A-018A-D', 'DMC-RDR-B-A00-00-00-03A-044A-D', 'DMC-RDR-B-A07-00-00-02A-820A-D']);
     assert.ok(id.modules.every((m) => m.origin === 'imported')); assert.equal(id.pmc.code, 'PMC-RDR-1671Y-00061-00'); assert.equal(id.pmc.origin, 'imported');
     assert.ok(id.pictures.some((p) => p.icn === 'ICN-RDR-A-A000000-1-1671Y-02145-A-001-04' && p.origin === 'imported'), 'a picture keeps its ICN');
-    assert.deepEqual(id.show, { dmc: false, pmc: false, icn: false, toc: false });
+    assert.deepEqual(id.show, { dmc: false }, 'the record keeps only the DMC switch (c61ec89 removed the others)');
     // a section added afterwards belongs to the chapter's system and takes a free code of it; the imported ones are untouched
     const xml = g.json.xml.replace(/(<chapter number="1"[^>]*>[\s\S]*?)(<\/chapter>)/, '$1<section id="added"><title>Added later</title><para>x</para></section>$2');
     assert.equal((await w.put(`${U}/jss`, { xml, baseHash: g.json.hash })).status, 200);

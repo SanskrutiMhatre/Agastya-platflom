@@ -185,6 +185,16 @@ cross-module `dmRef`, ICN references, asset integrity).
   `publisherLogo: false` in project.json / `PATCH` `publisherLogo`, no screen for it yet), 30 mm wide; the name is printed only when there is no logo (S1000D requires the title page to NAME its publisher, BREX-S1-00113, so
   "the page names one" cannot decide it). The picture itself is data: `<productIllustration>` of the title-page module (Studio's Front matter template does not offer one). Tests: `xignal-cover.test.js` (+2), `publisher-logo.test.js` (new).
 
+* **Audit implementation, 2026-11-27** (`docs/audit/IMPLEMENTATION-LOG.md`; each change carries an `AGASTYA` / `WP-` comment; nothing in `license.js` was touched):
+  (1) `db.js` (WP-04, WP-06): `PRAGMA busy_timeout = 5000` and `foreign_keys = ON` at open; a new `close()` checkpoints the write-ahead log and closes the database at a clean stop.
+  (2) `workspace.js` (WP-06, PLT-004): `uniqueId` and `createProject` take an optional `isTaken` check, so the platform can refuse an id an earlier (deleted) project used; without it the behaviour is unchanged.
+  (3) `frontmatter.js` (WP-07, PUB-012): a description-of-symbols entry without a picture is written without `src` (it was `src=""`, which the stylesheet took for a picture); the page draws its empty frame.
+  (4) `foChecks.js` (WP-07, PUB-020): the FO image check resolves `file:` URLs and absolute paths as well as paths relative to the build folder, because the stencil's default artwork is now passed as `file:` URLs.
+  (5) `validateSchema.js` (WP-32, PERF-002): the project schema check batches modules by bytes (at most 3.5 MB of text per validator call, memory sized to the batch) instead of one call per schema; a batch the
+  validator cannot run is retried module by module, a module it cannot hold is reported as too large with the limit, and only a module that was judged counts in `checked`. Results for projects that validated before
+  are the same findings (`test/wp32-validation-scale.test.js`).
+  (6) `vendor/pipeline/jss/frontmatter/13-description-of-symbols.xml` (generated, shipped): the six symbol pictures that were never shipped are left out (WP-07, PUB-012).
+
 ## 11. Migration
 
 `017-s1000d-completion` (additive; nothing altered or dropped): `lifecycle_events`, `cir_links`, `ext_profiles`, `project_ext`. Existing data is unaffected;

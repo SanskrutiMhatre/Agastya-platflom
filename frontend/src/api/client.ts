@@ -16,8 +16,21 @@ export const setUnauthorizedHandler = (fn: Unauthorized): void => { onUnauthoriz
 /** For callers that cannot use `request` (an upload that reports progress goes through XMLHttpRequest): a 401 still signs the user out once. */
 export const signalUnauthorized = (): void => onUnauthorized();
 
-export async function request<T = unknown>(method: string, url: string, body?: unknown, opts: { raw?: boolean; quiet401?: boolean } = {}): Promise<T> {
+/**
+ * FE-003: while someone is signed in, a 401 does not throw their work away. The session store asks them to sign in again over the page
+ * (the editor stays mounted) and resolves true once they have; the request that got the 401 is then sent again, so a Save that met an
+ * expired session completes. It resolves false when they choose to sign out instead, and the request fails as before.
+ */
+type Reauth = () => Promise<boolean>;
+let reauth: Reauth | null = null;
+export const setReauthHandler = (fn: Reauth | null): void => { reauth = fn; };
+/** The sign-in endpoints themselves are never replayed (a wrong password is a 401 too). */
+const isAuthUrl = (url: string) => /^\/api\/auth\//.test(url);
+
+export async function request<T = unknown>(method: string, url: string, body?: unknown, opts: { raw?: boolean; quiet401?: boolean; background?: boolean; replayed?: boolean } = {}): Promise<T> {
   const headers: Record<string, string> = {};
+  // A timer's request (badge counts, status checks) is not the person working: it does not keep the session from going idle (WP-03).
+  if (opts.background) headers['x-agastya-background'] = '1';
   let payload: BodyInit | undefined;
   if (body instanceof FormData) payload = body;
   else if (body !== undefined) { headers['content-type'] = 'application/json'; payload = JSON.stringify(body); }
@@ -28,14 +41,18 @@ export async function request<T = unknown>(method: string, url: string, body?: u
   const type = res.headers.get('content-type') ?? '';
   const data = type.includes('json') ? await res.json().catch(() => null) : null;
   if (!res.ok) {
-    if (res.status === 401 && !opts.quiet401) onUnauthorized();
+    if (res.status === 401 && !opts.quiet401) {
+      if (reauth && !opts.replayed && !isAuthUrl(url)) {
+        if (await reauth()) return request<T>(method, url, body, { ...opts, replayed: true });
+      } else onUnauthorized();
+    }
     const message = (data && (data.error as string)) || `${res.status} ${res.statusText}`;
     throw new ApiError(res.status, message, data?.code, data ?? undefined);
   }
   return data as T;
 }
 
-export const get = <T,>(url: string, o?: { quiet401?: boolean }) => request<T>('GET', url, undefined, o);
+export const get = <T,>(url: string, o?: { quiet401?: boolean; background?: boolean }) => request<T>('GET', url, undefined, o);
 export const post = <T,>(url: string, body: unknown = {}, o?: { quiet401?: boolean }) => request<T>('POST', url, body, o);
 export const put = <T,>(url: string, body: unknown) => request<T>('PUT', url, body);
 export const patch = <T,>(url: string, body: unknown) => request<T>('PATCH', url, body);

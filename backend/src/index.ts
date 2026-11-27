@@ -6,9 +6,10 @@ import { tuneServer, sweepStaleUploads } from './services/uploads';
 import http from 'http';
 import { config, nowIso } from './config';
 import { createApp } from './app';
-import { store, audit, workspaceDir } from './context';
+import { store, audit, workspaceDir, registryDb } from './context';
+import { acquireWorkspaceLock, releaseWorkspaceLock } from './services/workspaceLock';
 import * as broadcast from './services/broadcast';
-import { reconcileRegistry } from './services/projects';
+import { reconcileRegistry, sweepPendingImports } from './services/projects';
 import { startRenderer, stopRenderer, rendererStatus } from './services/publisher';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -17,6 +18,10 @@ const { ensureBootstrapAdmin } = require('./core/auth/bootstrap');
 let server: http.Server | null = null;
 
 export async function start(port: number = config.port): Promise<number> {
+  // WP-06 (DEP-017): one server per data folder; a second one stops here naming the owner's process. Test harnesses that start several
+  // in-process apps on one workspace on purpose opt out with AGASTYA_NO_WORKSPACE_LOCK=1.
+  if (process.env.AGASTYA_NO_WORKSPACE_LOCK !== '1') acquireWorkspaceLock(workspaceDir);
+  try { sweepPendingImports(); } catch (e) { console.warn('[start] unfinished imports:', (e as Error).message); }    // REL-004: an import cut off by a crash
   await reconcileRegistry();
   await ensureBootstrapAdmin({ store, audit, now: () => new Date() });
 
@@ -49,11 +54,40 @@ export function stop(): void {
   stopRenderer();
   broadcast.close();
   if (server) { server.close(); server = null; }
+  releaseWorkspaceLock();
+}
+
+/**
+ * WP-06 (REL-003): a clean stop. New connections are refused at once; requests already running (a long build, a large upload) get up to
+ * `graceMs` to finish; then the write-ahead log is checkpointed, the database closed and the data folder given back.
+ */
+export function shutdownGracefully(graceMs = 15000): Promise<void> {
+  return new Promise((resolve) => {
+    const s = server; server = null;
+    let done = false;
+    const finish = (): void => {
+      if (done) return; done = true;
+      try { stopRenderer(); } catch { /* best effort */ }
+      try { registryDb.close(); } catch (e) { console.warn('[stop] database close:', (e as Error).message); }
+      releaseWorkspaceLock();
+      resolve();
+    };
+    try { broadcast.close(); } catch { /* best effort */ }
+    if (!s) return finish();
+    s.close(() => finish());
+    s.closeIdleConnections?.();                     // keep-alive sockets with nothing running must not hold the stop
+    setTimeout(() => { console.warn('[stop] requests still running after the grace period; stopping anyway'); s.closeAllConnections?.(); finish(); }, graceMs).unref();
+  });
 }
 
 if (require.main === module) {
   start().catch((e) => { console.error('Failed to start:', e); process.exit(1); });
-  const shutdown = (sig: string) => { console.log(`\n${sig} - shutting down`); stop(); setTimeout(() => process.exit(0), 500).unref(); };
+  let stopping = false;
+  const shutdown = (sig: string): void => {
+    if (stopping) return; stopping = true;
+    console.log(`\n${sig} - shutting down`);
+    void shutdownGracefully().then(() => process.exit(0));
+  };
   process.on('SIGINT', () => shutdown('SIGINT'));
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   // Windows cannot deliver SIGTERM to a child process, so the packaged launcher (and the Windows service) asks for a clean stop by closing this

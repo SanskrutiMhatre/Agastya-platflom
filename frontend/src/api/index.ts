@@ -21,6 +21,8 @@ export interface ProjectCard {
   format: 's1000d' | 'jss' | 'jsg'; domain: string | null; manualType: string | null; authoring: 'jss-xml' | null; jssDocType: string | null; autoAddToPublication: boolean; sideText: { enabled: boolean; publisher: string; draftNote: boolean }; headerLogo: boolean;
   role: ProjectRole; accessVia: 'project' | 'folder' | 'admin'; dmCount: number; hasPdf: boolean;
   createdAt: string; updatedAt: string; lastOpened: string | null; owners: string[];
+  /** WP-06: the folder was not found at the last start; the project is kept until an administrator restores the folder or deletes it. */
+  missingSince?: string | null;
 }
 export interface FolderView { key: string; name: string; owner: { id: string; username: string; fullName: string } | null; canManage: boolean; accessRole: string | null; projects: ProjectCard[] }
 export interface Overview {
@@ -56,7 +58,7 @@ export interface ReleaseOverview {
   pending: { id: string; scheduledAt: string; note: string | null; requestedAt: string; requestedBy: string | null } | null;
   sources: number; publicationRel: string;
   history: Array<{ id: string; releaseNumber: number | null; scheduledAt: string; status: string; note: string | null; requestedAt: string; requestedBy: string | null; decidedAt: string | null }>;
-  watermark: { enabled: boolean; text: string; style: string }; watermarkStyles: string[]; canSubmit: boolean; canApprove: boolean;
+  watermark: { enabled: boolean; text: string; style: string }; watermarkStyles: string[]; canSubmit: boolean; canApprove: boolean; approveBlocked?: string | null;
   review: Review;
 }
 
@@ -94,6 +96,10 @@ export const authApi = {
   onboarding: (b: { username: string; password: string }) => post<{ user: User }>('/api/auth/onboarding', b),
   changePassword: (currentPassword: string, newPassword: string) => post('/api/auth/change-password', { currentPassword, newPassword }),
   forgot: (username: string) => post('/api/auth/forgot', { username }, { quiet401: true }),
+  /** The person is working (typing, clicking) in a page that has not called the server for a while: keeps the session from going idle. */
+  activity: () => post<{ ok: true }>('/api/auth/activity', {}),
+  /** The same as me(), sent as a background check: it does not count as activity (FE-003 heartbeat). */
+  check: () => get<{ user: User }>('/api/auth/me', { quiet401: true, background: true }),
 };
 
 // ── Workspace / projects ──────────────────────────────────────────────────
@@ -160,7 +166,7 @@ export const contentApi = {
 
   validation: (id: string) => get<{ run: ValidationRun | null; schemaIssues: string[]; issue?: string }>(`${P(id)}/validation`),
   /** Fix the S1000D issue the project's checks use ('auto' = each module's own). Applies to the page AND the build / release checks. */
-  missingBrex: (id: string) => get<{ missing: string[] }>(`${P(id)}/brex/missing`),
+  missingBrex: (id: string) => get<{ missing: string[] }>(`${P(id)}/brex/missing`, { background: true }),
   createBrex: (id: string) => post<{ created: string[]; notes: string[] }>(`${P(id)}/brex/create`, {}),
   setValidationIssue: (id: string, issue: string) => put<{ issue: string }>(`${P(id)}/validation/issue`, { issue }),
   validate: (id: string, o: { issue?: string; brex?: boolean }) => post<{ run: ValidationRun }>(`${P(id)}/validation`, o).then((r) => r.run),
@@ -209,7 +215,7 @@ export interface Notice { id: number; kind: string; title: string; body: string 
 export interface Inbox { unread: number; items: Notice[] }
 export const notifyApi = {
   list: () => get<Inbox>('/api/notifications'),
-  unread: () => get<{ unread: number }>('/api/notifications/unread-count').then((r) => r.unread),
+  unread: () => get<{ unread: number }>('/api/notifications/unread-count', { background: true }).then((r) => r.unread),
   markRead: (ids?: number[]) => post<Inbox>('/api/notifications/read', ids ? { ids } : {}),
 };
 export const BACKUP_URL = '/api/backup';
@@ -258,7 +264,12 @@ export const platformApi = {
   clearPreviews: () => post<{ removed: number }>('/api/admin/maintenance/clear-previews'),
   rebuildPdfs: () => post<{ queued: number }>('/api/admin/maintenance/rebuild-pdfs'),
   AUDIT_CSV: '/api/admin/maintenance/audit.csv',
+  securityPolicy: () => get<{ policy: SecurityPolicy; defaults: SecurityPolicy }>('/api/admin/security-policy'),
+  saveSecurityPolicy: (b: Partial<SecurityPolicy>) => put<{ policy: SecurityPolicy }>('/api/admin/security-policy', b).then((r) => r.policy),
+  health: () => get<{ audit: { failures: number; last: { at: string; action: string; error: string } | null } | null }>('/api/admin/health'),
 };
+/** Account and session rules (backend/src/core/auth/securityPolicy.js). */
+export interface SecurityPolicy { idleMinutes: number; absoluteHours: number; singleSession: boolean; separationOfDuties: boolean; passwordMinLength: number }
 
 export const teamApi = {
   createUser: (b: { username: string; fullName: string; role: GlobalRole }) => post<{ user: User; tempPassword: string }>('/api/team/users', b),

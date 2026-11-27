@@ -10,6 +10,15 @@
 
 const fs = require('fs');
 const path = require('path');
+const { fileURLToPath } = require('url');
+
+// WP-07 (PUB-020): a reference may be relative to the build folder, absolute, or a file: URL (the stencil's default artwork); a data:
+// image is inline and always resolves.
+function resolves(dir, src) {
+    if (/^data:/i.test(src)) return true;
+    if (/^file:/i.test(src)) { try { return fs.existsSync(fileURLToPath(src)); } catch (e) { return false; } }
+    return fs.existsSync(path.isAbsolute(src) ? src : path.join(dir, src));
+}
 
 // fo:external-graphic carries src either bare or wrapped in url('...').
 const SRC_RE = /src="(?:url\((['"]?)([^'")]*)\1\)|([^"]*))"/g;
@@ -36,7 +45,7 @@ function checkImages(foPath, baseDir) {
     let empty = 0;
     for (const src of refs) {
         if (!src) { empty++; continue; }
-        if (fs.existsSync(path.join(dir, src))) continue;
+        if (resolves(dir, src)) continue;
         counts.set(src, (counts.get(src) || 0) + 1);
     }
     return {

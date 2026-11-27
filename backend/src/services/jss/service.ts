@@ -14,6 +14,8 @@ import path from 'path';
 import { config, vendor } from '../../config';
 import { projectDirFor } from '../../context';
 import { bad, conflict, HttpError } from '../http';
+import { checkXmlSafetyOf } from '../csdbGuard';
+const { checkXmlSafety } = require('../../core/auth/xmlGuard');
 import { syncIdentity } from '../xengine/project';
 import { parseTree, walk, norm, type MNode } from '../miniXml';
 import { wellFormedError } from '../wellFormed';
@@ -131,6 +133,8 @@ export function readSource(projectId: string): { xml: string; hash: string } {
 export async function writeSource(projectId: string, xml: string, baseHash?: string): Promise<{ hash: string; report: JssReport }> {
   if (typeof xml !== 'string' || !xml.trim()) throw bad('There is no document to save.', 'EMPTY');
   if (Buffer.byteLength(xml) > 50 * 1024 * 1024) throw bad('The document is larger than 50 MB.', 'TOO_LARGE');
+  checkXmlSafetyOf(xml);                         // WP-02: the same guard as every S1000D write (XXE, xi:include, entity bombs)
+  if (/<!DOCTYPE/i.test(xml.replace(/<!--[\s\S]*?-->/g, '').replace(/<!\[CDATA\[[\s\S]*?\]\]>/g, ''))) throw bad('A JSS document may not declare a DOCTYPE: the engine needs none, and entities are not supported in it.', 'DOCTYPE_REFUSED');   // PUB-014
   const wf = wellFormedError(xml);
   if (wf) throw new HttpError(400, `The document is not well-formed XML: ${wf}`, 'MALFORMED_XML');
   assertNativeJssXml(xml);                       // publication.xml stays the JSS document: never a publication module or a package contents list
@@ -412,7 +416,7 @@ export function composeBook(projectId: string, effective: any): { text: string; 
   let block: string = bookmetaXml(effective, `<issueDate year="${meta.year ?? ''}" month="${monthIdx >= 0 ? String(monthIdx + 1).padStart(2, '0') : ''}"/>`);
   for (const f of META_FIELDS) {
     if (!meta[f]) continue;
-    block = block.replace(new RegExp(`<${f}>[^<]*</${f}>`), `<${f}>${esc(meta[f])}</${f}>`);
+    block = block.replace(new RegExp(`<${f}>[^<]*</${f}>`), () => `<${f}>${esc(meta[f])}</${f}>`);   // a function: "$&", "$$", "$'" in a name stay text (PUB-024)
   }
 
   const dir = projectDirFor(projectId);
@@ -421,7 +425,9 @@ export function composeBook(projectId: string, effective: any): { text: string; 
   const joint = ((effective?.branding?.publishers as unknown[] | undefined)?.length ?? 0) > 1;
   const fmRel = 'jss/frontmatter';
   const fmAbs = prepareFrontMatterFiles(projectId, effective);
-  const have = new Set(fs.readdirSync(fmAbs));
+  // PUB-002: a page is checked again here, not only when it is saved: it can also be edited on disk or come back from an archive.
+  // An unsafe page is left out (the generated default prints in its place) rather than handed to xsltproc --xinclude.
+  const have = new Set(fs.readdirSync(fmAbs).filter((f) => !/\.xml$/i.test(f) || checkXmlSafety(fs.readFileSync(path.join(fmAbs, f), 'utf8')).ok));
   const rows: string[] = [];
   for (const page of enabledPages(effective?.frontMatter) as any[]) {
     if (page.id === 'titlePageJoint' && !joint) continue;

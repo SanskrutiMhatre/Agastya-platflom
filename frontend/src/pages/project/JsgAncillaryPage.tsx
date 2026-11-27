@@ -17,6 +17,7 @@ import { newPara, text, type Front, type Inline, type JsgDoc, type Para } from '
 import { coverCard } from '../../jsg/shared';
 import { JsgParseError, parseJsg, serializeJsg } from '../../jsg/xml';
 import { useUi } from '../../store/ui';
+import { useLeaveGuard } from '../../lib/leaveGuard';
 
 type Kind = 'always' | 'optional' | 'auto';
 interface PageDef { id: string; label: string; kind: Kind; hint: string }
@@ -145,11 +146,15 @@ export function JsgAncillaryPage() {
   const page = list.find((p) => p.id === sel) ?? list[0];
   const counts = useMemo(() => ({ on: list.filter(printed).length, off: list.filter((p) => !printed(p)).length }), [front, tick, list]);       // eslint-disable-line react-hooks/exhaustive-deps
 
+  // GAP-001: a rail click, a link or Back with unsaved front matter asks first (the browser's own question for closing the tab is asked above)
+  const guard = useLeaveGuard(dirty, { what: 'changes to the ancillary pages', save, unload: false });
+
   if (error) return <div className="v2-page"><Alert tone="bad">{error}</Alert></div>;
   if (!doc || !front) return <div className="v2-page"><Loading label="Opening the document…" /></div>;
 
   return (
     <div className="v2-page">
+      {guard}
       <PageHeader icon="file" title="Ancillary pages"
         sub={`The pages before the ${docType === 'ispl' ? 'plates' : 'chapters'}, in the order of the filled ${docType === 'ispl' ? 'list' : 'handbook'}: tick the ones to print, and edit what each says. Save, then build the PDF to see them.`}
         actions={writable ? <>
@@ -305,7 +310,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 function CoverEditor({ doc, ro, touch, skip }: { doc: JsgDoc; ro: boolean; touch: () => void; skip: string[] }) {
   const host = useRef<HTMLDivElement>(null);
   useEffect(() => { const el = host.current; if (!el) return; el.innerHTML = ''; const card = coverCard(el, doc, ro, touch, skip); card.style.margin = '0'; card.style.border = '0'; card.style.background = 'transparent'; card.style.padding = '0'; return () => { el.innerHTML = ''; }; }, [doc, ro, touch]);
-  return <div ref={host} data-testid="jsg-anc-cover" />;
+  // WP-07 (UX-018): the editor's cover card styled as platform fields (label above a full-width input, two columns where there is room)
+  return <div ref={host} className="v2-jsg-cover" data-testid="jsg-anc-cover" />;
 }
 
 function Buttons({ i, n, move, remove, ro }: { i: number; n: number; move: (from: number, to: number) => void; remove: (i: number) => void; ro: boolean }) {

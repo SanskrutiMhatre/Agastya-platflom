@@ -8,12 +8,13 @@
 import fs from 'fs';
 import path from 'path';
 import { DOMParser } from '@xmldom/xmldom';
-import { projectDirFor } from '../context';
+import { projectDirFor, workspaceDir } from '../context';
 import { bad } from './http';
 import { CSS } from './htmlPublish';
 import { vendor } from '../config';
 
 const fopd = vendor('engine/fopd');
+const foGuard = vendor('engine/foGuard');
 
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const strip = (xml: string) => xml.replace(/<!DOCTYPE[^[>]*(\[[\s\S]*?\])?\s*>/, '');
@@ -49,6 +50,7 @@ export function objectFo(xml: string, title: string): string {
 export async function objectPdf(projectId: string, xml: string, title: string): Promise<string> {
   const dir = projectDirFor(projectId); const foPath = path.join(dir, '_object.fo'); const pdfPath = path.join(dir, '_object.pdf');
   fs.writeFileSync(foPath, objectFo(xml, title), 'utf8');
+  foGuard.confineFo(foPath, { baseDir: dir, roots: [path.join(workspaceDir, 'templates')] });   // WP-02 / SEC-003
   await fopd.render({ baseDir: dir, foPath, pdfPath });
   fs.rmSync(foPath, { force: true });
   return pdfPath;

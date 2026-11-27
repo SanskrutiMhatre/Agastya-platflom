@@ -18,6 +18,7 @@ import path from 'path';
 import { nowIso } from '../config';
 import { store, docIndex, projectDirFor } from '../context';
 import { bad } from './http';
+import { csvText } from './csv';
 import { installedSchemaIssues } from './validation';
 
 type Row = Record<string, any>;
@@ -81,8 +82,8 @@ export function clearPreviewFiles(): { removed: number } {
 
 /** The audit log as CSV, newest first (up to the last 5000 events). */
 export function auditCsv(): string {
-  const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const rows = store.listAudit({ limit: 5000, before: null, action: null }) as Row[];
-  return ['time,actor,action,target type,target,project,ip,details',
-    ...rows.map((r) => [r.at, r.actor_username, r.action, r.target_type, r.target_id, r.project_id, r.ip, r.meta].map(esc).join(','))].join('\r\n') + '\r\n';
+  // WP-07 (ARC-020): one cell writer; a username or project name that starts with = is written as text
+  return csvText(['time', 'actor', 'action', 'target type', 'target', 'project', 'ip', 'details'],
+    rows.map((r) => [r.at, r.actor_username, r.action, r.target_type, r.target_id, r.project_id, r.ip, r.meta]));
 }

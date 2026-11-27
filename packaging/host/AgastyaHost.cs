@@ -467,12 +467,26 @@ namespace Agastya
     {
         private Supervisor sup;
         private Settings cfg;
+        private volatile bool failing;
         public AgastyaService(Settings s) { cfg = s; ServiceName = s.ServiceName; CanStop = true; CanShutdown = true; AutoLog = false; }
 
         protected override void OnStart(string[] args)
         {
             Host.Info("service starting (version " + Layout.Version + ")");
             sup = new Supervisor(cfg);
+            // WP-04 (DEP-022): when the supervisor gives up, the service must not sit in RUNNING with no server behind it. It stops with
+            // ERROR_PROCESS_ABORTED (1067), so the SCM records the failure and (failureflag 1, set at install) runs the recovery actions.
+            sup.StateChanged += delegate
+            {
+                if (!sup.GaveUp || failing) return;
+                failing = true;
+                ThreadPool.QueueUserWorkItem(delegate
+                {
+                    Host.Event(EventLogEntryType.Error, "Agastya Platform is stopping with an error: the server kept stopping. Logs: " + Layout.LogDir);
+                    ExitCode = 1067;
+                    try { Stop(); } catch (Exception e) { Host.Error("could not report the failure to the service manager: " + e.Message); }
+                });
+            };
             sup.Start();
             Host.Event(EventLogEntryType.Information, "Agastya Platform " + Layout.Version + " started on port " + cfg.Port + ".");
         }
@@ -535,6 +549,8 @@ namespace Agastya
             Sc("description \"" + cfg.ServiceName + "\" \"Offline S1000D authoring and publishing server.\"", out o);
             // Recover from a crash: restart after 5 s, then 30 s, then 60 s; reset the counter after a day.
             Sc("failure \"" + cfg.ServiceName + "\" reset= 86400 actions= restart/5000/restart/30000/restart/60000", out o);
+            // Run the recovery actions also when the service stops itself with an error (the supervisor gave up), not only on a crash.
+            Sc("failureflag \"" + cfg.ServiceName + "\" 1", out o);
             try { if (!EventLog.SourceExists(Host.EventSource)) EventLog.CreateEventSource(Host.EventSource, "Application"); } catch (Exception e) { Console.WriteLine("(event log source not registered: " + e.Message + ")"); }
             Console.WriteLine("Service '" + cfg.ServiceName + "' installed. Start it with:  AgastyaCtl.exe --start");
             return 0;
@@ -740,6 +756,7 @@ namespace Agastya
             "  AgastyaCtl.exe --start | --stop       start or stop the service\r\n" +
             "  AgastyaCtl.exe --quit                 ask a running tray application to close\r\n" +
             "  AgastyaCtl.exe --backup-db <label>    copy the database to <data>\\backups\\pre-upgrade-<label>-<time> (the installer does this before an upgrade)\r\n" +
+            "  AgastyaCtl.exe --reset-admin <user>   set a new password for <user> (Administrator; asks for it, never on the command line)\r\n" +
             "  AgastyaCtl.exe --version\r\n\r\n" +
             "Options: --home <folder>  keep configuration, data and logs under <folder>\r\n" +
             "         --port <n> --lan  (with --install-service) written to agastya.ini\r\n";
@@ -755,6 +772,7 @@ namespace Agastya
                 else if (a == "--port" && i + 1 < args.Length) port = args[++i];
                 else if (a == "--lan") lan = true;
                 else if (a == "--backup-db" && i + 1 < args.Length) { mode = a; label = args[++i]; }
+                else if (a == "--reset-admin" && i + 1 < args.Length) { mode = a; label = args[++i]; }
                 else if (a.StartsWith("--")) mode = a;
                 else { Console.Error.WriteLine("Unknown argument: " + a); return 2; }
             }
@@ -784,6 +802,7 @@ namespace Agastya
                         Console.WriteLine("server on port " + cfg.Port + ": " + (Probe.Alive(cfg.Port) ? "answering" : "not answering"));
                         return 0;
                     case "--backup-db": return BackupDatabase(cfg, label);
+                    case "--reset-admin": return ResetAdmin(cfg, label);
                     case "--quit":
                         try { EventWaitHandle.OpenExisting(QuitEventName(cfg.Port)).Set(); Console.WriteLine("Asked the running application to close."); return 0; }
                         catch (WaitHandleCannotBeOpenedException) { Console.WriteLine("The tray application is not running."); return 0; }
@@ -837,6 +856,21 @@ namespace Agastya
             Host.Info("database backed up to " + dest);
             Console.WriteLine("Database backed up to " + dest);
             return 0;
+        }
+
+        /// <summary>WP-04 (DEP-022): the break-glass reset against the configured data folder. The script asks for the password itself on this
+        /// console (no echo), so it never appears in a command line, the shell history or the process list.</summary>
+        private static int ResetAdmin(Settings cfg, string user)
+        {
+            if (!Host.IsAdmin()) { Console.Error.WriteLine("Resetting a password needs an elevated (Administrator) prompt."); return 3; }
+            if (string.IsNullOrEmpty(user) || user.StartsWith("-")) { Console.Error.WriteLine("Usage: AgastyaCtl.exe --reset-admin <username>"); return 2; }
+            string script = Path.Combine(Path.Combine(Path.Combine(Layout.AppDir, "backend"), "scripts"), "reset-admin.js");
+            if (!File.Exists(Layout.NodeExe) || !File.Exists(script)) { Console.Error.WriteLine("The installation is incomplete: " + script); return 1; }
+            ProcessStartInfo psi = new ProcessStartInfo(Layout.NodeExe, "\"" + script + "\" \"" + user.Replace("\"", "") + "\"");
+            psi.UseShellExecute = false;
+            psi.WorkingDirectory = Path.Combine(Layout.AppDir, "backend");
+            psi.EnvironmentVariables["AGASTYA_WORKSPACE_DIR"] = cfg.WorkspaceDir;
+            using (Process p = Process.Start(psi)) { p.WaitForExit(); Host.Info("reset-admin for " + user + " finished with code " + p.ExitCode); return p.ExitCode; }
         }
 
         private static int RunConsole(Settings cfg)

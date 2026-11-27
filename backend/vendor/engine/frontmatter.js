@@ -208,7 +208,7 @@ function firstAidXml(cfg, fallbackFigure) {
 */
 function symbolsXml(symbols, legends, engine) {
     const rows = (symbols || []).map(s =>
-        `        <symbol src="${escAttr(s.icon)}">${esc(s.text)}</symbol>`).join('\n');
+        (s.icon && String(s.icon).trim() ? `        <symbol src="${escAttr(s.icon)}">${esc(s.text)}</symbol>` : `        <symbol>${esc(s.text)}</symbol>`)   /* WP-07 (PUB-012): no picture, no src: the page draws the empty frame */).join('\n');
     const lg = legends || {};
     const s1000d = engine === 's1000dtofo';
     const notice = (tag, inner, text) =>

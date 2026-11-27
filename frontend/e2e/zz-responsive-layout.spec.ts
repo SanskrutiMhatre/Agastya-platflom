@@ -4,7 +4,7 @@
 // press is cut off at the right edge, and the page raises no script error. The screenshots themselves are saved to test-results/shots/layout-* so that a
 // person can look at them.
 //
-// The file name sorts last on purpose: platform.spec.ts creates the administrator through the first-run screen, and an earlier spec that made the
+// The file name sorts last on purpose: 00-platform.spec.ts creates the administrator through the first-run screen, and an earlier spec that made the
 // administrator through the API would take that screen away.
 
 import { test, expect, type APIRequestContext, type Browser, type Page } from '@playwright/test';

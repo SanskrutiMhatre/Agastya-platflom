@@ -123,7 +123,8 @@ export function registerWorkspaceRoutes(app: Express): void {
     // Deleting removes every data module on disk; make the caller say the project's name.
     const confirmName = String(req.query.confirm ?? '');
     const pj = P.readProjectJson(req.project.id);
-    if (confirmName !== (pj.name || req.project.id)) throw bad('Type the project name to confirm deletion.', 'CONFIRM_REQUIRED');
+    // WP-06 (PLT-003): a project whose folder is missing has no project.json to read; the name it was registered under is the one shown
+    if (confirmName !== (pj.name || store.getProjectRow(req.project.id)?.name || req.project.id)) throw bad('Type the project name to confirm deletion.', 'CONFIRM_REQUIRED');
     P.deleteProject(req.auth.user, req.project.id);
     res.json({ ok: true });
   }));

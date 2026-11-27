@@ -24,6 +24,7 @@ export interface JsgEditorLike {
   destroy(): void;
   isDirty(): boolean;
   markSaved(): void;
+  markDirty(): void;
   getXml(): string;
   setFindings(f: JsgFinding[]): void;
   /** Show (or stop showing) a document code beside each section heading; the document itself is not touched. */

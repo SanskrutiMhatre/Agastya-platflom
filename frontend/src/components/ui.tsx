@@ -17,7 +17,7 @@ export function Loading({ label = 'Loading…' }: { label?: string }) {
 }
 
 export function Empty({ title, children }: { title: string; children?: ReactNode }) {
-  return <div className="v2-empty"><strong>{title}</strong>{children}</div>;
+  return <div className="v2-empty"><strong className="v2-empty-title">{title}</strong>{children}</div>;
 }
 
 export function Badge({ tone, children, title }: { tone?: 'ok' | 'warn' | 'bad' | 'accent'; children: ReactNode; title?: string }) {

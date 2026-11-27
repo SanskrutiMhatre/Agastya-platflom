@@ -159,46 +159,126 @@ async function validateProjectSchema(dir, relFiles, opts) {
     for (const g of groups.values()) {
         const preload = preloadFor(g.issue);
         const schema = [{ fileName: g.file, contents: preload.find((p) => p.fileName === g.file).contents }];
+        const schemaBytes = preload.reduce((n, p) => n + Buffer.byteLength(p.contents, 'utf8'), 0);
         /*
-          fileName is the project-relative path, so every diagnostic comes back
-          naming the file it belongs to — the whole point of validating a batch
-          in one call rather than losing track of which document failed.
+          AGASTYA (audit WP-32, PERF-002): batches by BYTES, not one call per group. The validator's WebAssembly memory is fixed per call and
+          also holds the schema set (6-8 MB); one call with every module of a 1000-module project (8.9 MB of text) died with "memory access
+          out of bounds", the failure was reported once against the first module, and every module still counted as checked. Now: batches of
+          at most BATCH_BYTES of module text, each with memory sized to its content; a batch that still fails is retried module by module, so
+          exactly the module that cannot be checked is named; a module the validator cannot hold at all is reported as too large, with the
+          limit. Only a module that was actually judged counts in `checked`.
         */
-        const byName = new Map();
-        const docs = g.docs.map((d, i) => {
-            const flat = `${i}_${d.rel.split('/').pop()}`;
-            byName.set(flat, d.rel);
-            return { fileName: flat, contents: d.xml };
+        for (const batch of byteBatches(g.docs)) {
+            const failed = await validateBatch(batch, g, schema, preload, schemaBytes, issues);
+            if (!failed) continue;
+            if (batch.length === 1) { unjudged(batch[0], failed); continue; }
+            for (const d of batch) {
+                const one = await validateBatch([d], g, schema, preload, schemaBytes, issues);
+                if (one) unjudged(d, one);
+            }
+        }
+    }
+
+    function unjudged(d, err) {
+        checked--;
+        const size = Buffer.byteLength(d.xml, 'utf8');
+        const mb = (size / 1048576).toFixed(1);
+        const tooLarge = size > MAX_MODULE_BYTES;
+        const memory = /out of memory|memory access out of bounds|Cannot enlarge memory|Aborted/i.test(err);
+        notes.push({
+            sev: 'info', title: 'Schema check could not run', rel: d.rel, line: 1, loc: d.rel.split('/').pop(),
+            detail: tooLarge
+                ? `This module (${mb} MB) is too large for the schema validator (limit ${MAX_MODULE_BYTES / 1048576} MB of text per module); it was not checked against the schema.`
+                : memory
+                    ? `The schema validator ran out of memory on this module (${mb} MB); it was not checked against the schema.`
+                    : `Validating against the schema failed for this module: ${err}`,
+            tooLarge, memory,
         });
-        let res;
-        try {
-            res = await validateXML({ xml: docs, schema, preload });
-        } catch (e) {
-            notes.push({
-                sev: 'info', title: 'Schema check could not run', rel: g.docs[0].rel, line: 1,
-                loc: g.file, detail: `Validating against ${g.file} (Issue ${g.issue}) failed: ${(e && e.message) || String(e)}`,
-            });
-            continue;
-        }
-        for (const err of res.errors || []) {
-            const rel = byName.get(err.loc && err.loc.fileName) || g.docs[0].rel;
-            issues.push({
-                sev: 'crit',
-                title: 'Does not match the S1000D schema',
-                rel,
-                line: (err.loc && err.loc.lineNumber) || 1,
-                loc: `${rel.split('/').pop()}:${(err.loc && err.loc.lineNumber) || 1}`,
-                // libxml prefixes every one with "Schemas validity error : ",
-                // which is the same on all of them and so carries nothing.
-                detail: String(err.message || '').replace(/^Schemas validity error\s*:\s*/, '')
-                    + ` (Issue ${g.issue}, ${g.file})`,
-            });
-        }
     }
 
     issues.sort((a, b) => a.rel.localeCompare(b.rel) || a.line - b.line);
     notes.sort((a, b) => a.rel.localeCompare(b.rel));
     return { issues: [...issues, ...(o.includeNotes === false ? [] : notes)], checked };
+}
+
+// WP-32 (PERF-002): the measured ceiling of one call was about 7.2 MB of module text with the default 32 MiB; batches stay well under it and
+// get memory sized to what they carry, so no project size reaches the ceiling. With sized memory a single module of 25, 60 and 120 MB was
+// judged (measured 2026-11-27); MAX_MODULE_BYTES is what the 4 GiB WebAssembly maximum holds under memoryPagesFor, not a guess.
+const BATCH_BYTES = 3.5 * 1048576;
+const MAX_MODULE_BYTES = 256 * 1048576;
+const PAGE = 65536;
+
+/** Consecutive groups of documents of at most BATCH_BYTES of text each (a larger single document is a batch of its own). */
+function byteBatches(docs) {
+    const out = []; let cur = []; let bytes = 0;
+    for (const d of docs) {
+        const n = Buffer.byteLength(d.xml, 'utf8');
+        if (cur.length && bytes + n > BATCH_BYTES) { out.push(cur); cur = []; bytes = 0; }
+        cur.push(d); bytes += n;
+    }
+    if (cur.length) out.push(cur);
+    return out;
+}
+
+/** Memory for one call: the schema set and the documents as text, their parsed trees (several times the text), and headroom. */
+function memoryPagesFor(docBytes, schemaBytes) {
+    const need = 48 * 1048576 + 6 * schemaBytes + 12 * docBytes;
+    const max = Math.min(65536, Math.max(512, Math.ceil(need / PAGE)));        // at most 4 GiB, never below the library default
+    return { initialMemoryPages: 256, maxMemoryPages: max };
+}
+
+/**
+ * Validate one batch; push its schema errors onto `issues`. Returns null when the batch was judged, or the error message when the
+ * validator could not run on it (then nothing of the batch was pushed).
+ */
+async function validateBatch(batch, g, schema, preload, schemaBytes, issues) {
+    /*
+      fileName is the project-relative path, so every diagnostic comes back
+      naming the file it belongs to — the whole point of validating a batch
+      in one call rather than losing track of which document failed.
+    */
+    const byName = new Map();
+    let bytes = 0;
+    const docs = batch.map((d, i) => {
+        const flat = `${i}_${d.rel.split('/').pop()}`;
+        byName.set(flat, d.rel); bytes += Buffer.byteLength(d.xml, 'utf8');
+        return { fileName: flat, contents: d.xml };
+    });
+    if (batch.length === 1 && bytes > MAX_MODULE_BYTES) return 'too large';
+    let res;
+    try {
+        res = await validateXML({ xml: docs, schema, preload, ...memoryPagesFor(bytes, schemaBytes) });
+    } catch (e) {
+        return (e && e.message) || String(e);
+    }
+    /*
+      WP-32: xmllint ends each invalid document with "<name> fails to validate", a line with no location. It used to be pinned on the
+      batch's FIRST module, which accused a clean module. The name is in the message; the line is dropped when that module already has
+      its specific errors, and kept (on the right module) when it is all there is.
+    */
+    const errs = res.errors || [];
+    const specific = new Set(errs.filter((e) => e.loc && byName.has(e.loc.fileName)).map((e) => e.loc.fileName));
+    for (const err of errs) {
+        let flat = err.loc && err.loc.fileName;
+        if (!byName.has(flat)) {
+            const m = /^(\S+) fails to validate/.exec(String(err.message || ''));
+            flat = m && byName.has(m[1]) ? m[1] : null;
+            if (flat && specific.has(flat)) continue;
+        }
+        const rel = (flat && byName.get(flat)) || batch[0].rel;
+        issues.push({
+            sev: 'crit',
+            title: 'Does not match the S1000D schema',
+            rel,
+            line: (err.loc && err.loc.lineNumber) || 1,
+            loc: `${rel.split('/').pop()}:${(err.loc && err.loc.lineNumber) || 1}`,
+            // libxml prefixes every one with "Schemas validity error : ",
+            // which is the same on all of them and so carries nothing.
+            detail: String(err.message || '').replace(/^Schemas validity error\s*:\s*/, '')
+                + ` (Issue ${g.issue}, ${g.file})`,
+        });
+    }
+    return null;
 }
 
 

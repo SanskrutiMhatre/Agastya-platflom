@@ -20,7 +20,7 @@ import fs from 'fs';
 import path from 'path';
 import { nowIso, vendor } from '../config';
 import { projectDirFor } from '../context';
-import { readProjectJson, updateProjectJson, csdbRel, mediaRel, isS1000dProject } from './projects';
+import { readProjectJson, updateProjectJson, csdbRel, mediaRel, pmRel, isS1000dProject } from './projects';
 import { explore } from './pm';
 import { listDms } from './csdb';
 import { checkModuleBrex } from './brex';
@@ -33,6 +33,7 @@ const { validateProjectSchema, installedIssues } = vendor('engine/validateSchema
 import { getConfigRow } from './projectConfig';
 import { validateProject as validateApplicability } from './applicability';
 import { ISSUE_LABEL } from './s1000dRef';
+import { yielder } from './yieldLoop';
 const imagesEngine = vendor('engine/images');
 const fixIds = vendor('engine/fixIds');
 const fixEntities = vendor('engine/fixEntities');
@@ -47,6 +48,8 @@ export interface ValidationRun {
   summary: { error: number; warn: number; info: number }; issues: Issue[]; notes: string[];
   /** project-relative files the schema check could NOT judge (undeclared/unsupported issue, XInclude, the check could not run). Not the same as valid. */
   unchecked: string[];
+  /** WP-32 (PERF-002): why each unchecked file was not judged, in a sentence (the validator could not hold it, an issue that is not installed ...). */
+  uncheckedWhy?: Record<string, string>;
 }
 
 const reportFile = (projectId: string): string => path.join(projectDirFor(projectId), '.validation.json');
@@ -59,9 +62,9 @@ export function installedSchemaIssues(): string[] { return installedIssues(); }
 
 let seq = 0;
 /** Applicability reference problems (services/applicability), as validation issues with the data module and XML location. */
-function applicIssues(projectId: string): Issue[] {
+async function applicIssues(projectId: string): Promise<Issue[]> {
   try {
-    return validateApplicability(projectId).map((p) => norm('applic', { sev: p.severity === 'error' ? 'error' : 'warn', title: `Applicability ${p.code}`, rel: p.file, line: p.line, loc: p.location, detail: p.message }));
+    return (await validateApplicability(projectId)).map((p) => norm('applic', { sev: p.severity === 'error' ? 'error' : 'warn', title: `Applicability ${p.code}`, rel: p.file, line: p.line, loc: p.location, detail: p.message }));
   } catch (e) { return [norm('applic', { sev: 'warn', title: 'Applicability not checked', rel: '', line: 1, detail: (e as Error).message })]; }
 }
 
@@ -76,12 +79,14 @@ function norm(source: Issue['source'], i: any, fallbackSev: Severity = 'warn'): 
 }
 
 /** Graphic references that do not resolve, by the SAME order of resolution the pipelines use. */
-function missingGraphics(dir: string, csdb: string, media: string): Issue[] {
+async function missingGraphics(dir: string, csdb: string, media: string): Promise<Issue[]> {
   const csdbAbs = path.join(dir, csdb);
   if (!fs.existsSync(csdbAbs)) return [];
   const index = imagesEngine.buildFileIndex(dir, [csdb, media]);
   const out: Issue[] = [];
+  const tick = yielder();                                                // WP-32 (PERF-001 stop-gap): a turn for other requests between modules
   for (const fname of fs.readdirSync(csdbAbs).filter((f) => /^DMC-.*\.xml$/i.test(f))) {
+    await tick();
     let text: string;
     try { text = fs.readFileSync(path.join(csdbAbs, fname), 'utf8'); } catch { continue; }
     const entities = new Map<string, string>();
@@ -185,29 +190,33 @@ export async function runValidation(projectId: string, opts: { issue?: string; b
     } finally { fs.rmSync(hostDir, { recursive: true, force: true }); }
   }
 
+  // WP-32 (PERF-001 stop-gap): each scan is a turn of its own; run back to back they held the event loop for about 230 ms on 200 modules
+  const turn = () => new Promise<void>((resolve) => setImmediate(resolve));
   const issues: Issue[] = [
     ...xml.issues.map((i: any) => norm('xml', i, 'error')),
     ...schema.issues.map((i: any) => norm('xsd', i, 'error')),
     ...extIssues,
-    ...applicIssues(projectId),
-    ...missingGraphics(dir, csdb, media),
-    ...duplicateIds(dir, csdb),
-    ...undeclaredIcns(dir, csdb, media),
   ];
+  await turn(); issues.push(...(await applicIssues(projectId)));
+  await turn(); issues.push(...(await missingGraphics(dir, csdb, media)));
+  await turn(); issues.push(...duplicateIds(dir, csdb));
+  await turn(); issues.push(...undeclaredIcns(dir, csdb, media));
+  await turn();
 
   // Publication module: entries that name modules this project does not have.
   try {
     const ex = explore(projectId);
     for (const ref of ex.missing) {
-      issues.push(norm('pm', { sev: 'error', title: 'Publication entry has no data module', rel: pj.input?.pm || 'publication.xml', line: 1, loc: ref, detail: `The publication refers to "${ref}", which is not in this project's data modules - nothing is published for it.` }));
+      issues.push(norm('pm', { sev: 'error', title: 'Publication entry has no data module', rel: pmRel(pj), line: 1, loc: ref, detail: `The publication refers to "${ref}", which is not in this project's data modules - nothing is published for it.` }));
     }
     // revisions: a pinned issue the project does not hold; a reference to an obsolete (deleted) module
+    await turn();
     try {
-      const pmAbs = path.join(dir, pj.input?.pm || 'publication.xml');
-      if (fs.existsSync(pmAbs)) for (const p of pmRevisionProblems(projectId, fs.readFileSync(pmAbs, 'utf8'))) issues.push(norm('pm', { sev: 'error', title: p.code === 'OBSOLETE_MODULE' ? 'Publication refers to an obsolete module' : 'Pinned revision not in the project', rel: pj.input?.pm || 'publication.xml', line: 1, loc: p.ref, detail: `${p.message} Fix: ${p.fix}` }));
+      const pmAbs = path.join(dir, pmRel(pj));
+      if (fs.existsSync(pmAbs)) for (const p of pmRevisionProblems(projectId, fs.readFileSync(pmAbs, 'utf8'))) issues.push(norm('pm', { sev: 'error', title: p.code === 'OBSOLETE_MODULE' ? 'Publication refers to an obsolete module' : 'Pinned revision not in the project', rel: pmRel(pj), line: 1, loc: p.ref, detail: `${p.message} Fix: ${p.fix}` }));
     } catch { /* the revision check is advisory when the publication cannot be read */ }
     if (ex.totals.unplaced > 0) {
-      issues.push(norm('pm', { sev: 'info', title: 'Data modules not in the publication', rel: pj.input?.pm || 'publication.xml', line: 1, loc: `${ex.totals.unplaced}`, detail: `${ex.totals.unplaced} data module${ex.totals.unplaced === 1 ? ' is' : 's are'} in the project but not placed in any chapter, so they are not published.` }));
+      issues.push(norm('pm', { sev: 'info', title: 'Data modules not in the publication', rel: pmRel(pj), line: 1, loc: `${ex.totals.unplaced}`, detail: `${ex.totals.unplaced} data module${ex.totals.unplaced === 1 ? ' is' : 's are'} in the project but not placed in any chapter, so they are not published.` }));
     }
   } catch (e) { notes.push(`Publication checks skipped: ${(e as Error).message}`); }
 
@@ -215,7 +224,9 @@ export async function runValidation(projectId: string, opts: { issue?: string; b
   if (opts.brex && isS1000dProject(projectId)) {
     const csdbAbs = path.join(dir, csdb);
     const reported = new Set<string>();                                  // a BREX problem is the same for every module that names it: say it once
+    const tick = yielder();                                              // WP-32 (PERF-001 stop-gap): a turn for other requests between modules
     for (const d of listDms(projectId)) {
+      await tick();
       try {
         const text = fs.readFileSync(path.join(csdbAbs, d.file), 'utf8');
         const rep = checkModuleBrex(text, csdbAbs, issueUsed);
@@ -239,9 +250,9 @@ export async function runValidation(projectId: string, opts: { issue?: string; b
   const summary = { error: 0, warn: 0, info: 0 };
   for (const i of issues) summary[i.sev]++;
   // A file the schema check skipped or could not run is NOT valid: report it, so a gate can refuse it instead of reading silence as success.
-  const unchecked = new Set<string>();
-  for (const n of [...(schema.notes ?? []), ...(schema.issues ?? [])]) if (n.rel && /Not checked|could not run/i.test(String(n.title ?? ''))) unchecked.add(String(n.rel));
-  const run: ValidationRun = { ranAt: nowIso(), issueUsed, checked: xml.checked, schemaChecked: schema.checked, brexChecked, summary, issues, notes, unchecked: [...unchecked] };
+  const unchecked = new Set<string>(); const uncheckedWhy: Record<string, string> = {};
+  for (const n of [...(schema.notes ?? []), ...(schema.issues ?? [])]) if (n.rel && /Not checked|could not run/i.test(String(n.title ?? ''))) { unchecked.add(String(n.rel)); uncheckedWhy[String(n.rel)] = String(n.detail ?? n.title ?? '').slice(0, 300); }
+  const run: ValidationRun = { ranAt: nowIso(), issueUsed, checked: xml.checked, schemaChecked: schema.checked, brexChecked, summary, issues, notes, unchecked: [...unchecked], uncheckedWhy };
   try { fs.writeFileSync(reportFile(projectId), JSON.stringify(run)); } catch { /* the report is a convenience */ }
   return run;
 }

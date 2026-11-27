@@ -1,5 +1,5 @@
 // Shared set-up for the self-contained specs (import package, publish waivers, brand pack): an administrator, people with the roles under test,
-// and signed-in browser contexts. platform.spec.ts creates the administrator through the UI; these specs work whether or not it already did.
+// and signed-in browser contexts. 00-platform.spec.ts creates the administrator through the UI; these specs work whether or not it already did.
 
 import { expect, request as pwRequest, type APIRequestContext, type Browser, type Page } from '@playwright/test';
 

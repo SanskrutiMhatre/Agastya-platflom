@@ -218,8 +218,10 @@ test('a second author\'s save is not overwritten silently: the stale save is ref
   await sheet().locator('.jss-para').first().click(); await page.keyboard.type(' more');
   await page.keyboard.press('Control+s');
   await expect(page.getByText(/Someone else saved this document/)).toBeVisible({ timeout: 15_000 });
-  page.once('dialog', (dlg) => void dlg.accept());
-  await page.getByRole('button', { name: 'Reload the saved document' }).click();
+  // WP-05 (FE-007): the refused save keeps the author's text; opening the other version asks first, in the platform's dialog
+  await expect(page.getByTestId('conflict-download')).toBeVisible();
+  await page.getByTestId('conflict-reload').click();
+  await page.getByRole('button', { name: 'Discard my changes' }).click();
   await expect(sheet().locator('.jss-li').first()).toContainText('Search radar (long range)');
   await expect(state()).toHaveText(/All changes saved/);
 });

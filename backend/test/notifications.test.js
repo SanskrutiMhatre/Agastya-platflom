@@ -10,7 +10,7 @@ let h; let admin; let pm; let ann; let ben; let pid;
 async function person(creator, role, username, fullName) {
   const made = await creator.post('/api/team/users', { username, fullName, role });
   assert.equal(made.status, 201, JSON.stringify(made.json));
-  assert.equal(made.json.tempPassword, `${username}@${new Date().getFullYear()}`);
+  assert.ok(made.json.tempPassword.startsWith(`${username}-`) && /-[a-hjkmnp-z2-9]{8}$/.test(made.json.tempPassword), made.json.tempPassword);   // SEC-004
   const c = new h.Client(username);
   assert.equal((await c.post('/api/auth/login', { username, password: made.json.tempPassword })).status, 200);
   assert.equal((await c.post('/api/auth/onboarding', { username, password: PW })).status, 200);

@@ -105,6 +105,9 @@ export class JssEditor {
   /** Replace the whole document (after a reload from the server). History is cleared. */
   setDocument(doc: JssDoc): void { this.doc = doc; this.undoStack = []; this.redoStack = []; this.dirty = false; this.renderAll(); this.opts.host.onDirty(false); this.updateToolbar(); }
 
+  /** Put back a recovered draft (FE-006 / PUB-023): the document is replaced and counts as unsaved until it is saved. */
+  restoreDocument(doc: JssDoc): void { this.setDocument(doc); this.dirty = true; this.opts.host.onDirty(true); }
+
   /** Show (or stop showing) a code beside each section's heading; the document itself is not touched. */
   setSectionBadge(fn: EditorOptions['sectionBadge'] | undefined): void { this.opts.sectionBadge = fn; this.refreshLabels(); }
   /** The chapter a top-level section belongs to; 0 for a section lower down. */

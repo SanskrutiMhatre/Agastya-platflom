@@ -38,9 +38,18 @@ Upgrading and uninstalling never touch the data folder. **Back it up** (section 
 **Forgotten administrator password** (run on the server, in an elevated prompt):
 
 ```
-set AGASTYA_WORKSPACE_DIR=C:\ProgramData\Agastya Platform\workspace
-"C:\Program Files\Agastya Platform\runtime\node.exe" "C:\Program Files\Agastya Platform\app\backend\scripts\reset-admin.js" <username> <new-password>
+"C:\Program Files\Agastya Platform\AgastyaCtl.exe" --reset-admin <username>
 ```
+
+It uses the data folder from `agastya.ini`, asks for the new password twice and does not show it. It works while the server runs.
+From a script, run the script itself with the password on standard input:
+
+```
+set AGASTYA_WORKSPACE_DIR=C:\ProgramData\Agastya Platform\workspace
+"C:\Program Files\Agastya Platform\runtime\node.exe" "C:\Program Files\Agastya Platform\app\backend\scripts\reset-admin.js" <username> --stdin < password.txt
+```
+
+ The password is never accepted on the command line, where it would stay in the command history and be visible in the process list.
 
 The account must change the password at its next sign-in and every session is signed out.
 
@@ -92,8 +101,11 @@ The *Audit log* inside the application (Administrator) records who did what; it 
 
 ## 7. Backups
 
-Everything worth keeping is in the **data folder**. Back it up with your normal tool while the server is stopped, or use the application's own
-*Backup* page. To restore: stop the server, put the folder back, start it.
+Everything worth keeping is in the **data folder**. Back it up with your normal tool while the server is stopped. To restore: stop the
+server, put the folder back, start it.
+The application's *Backup* page (and *Project data export* under Administrator) makes an export of the project data, not a backup: it holds
+the projects, the people and their memberships and the last 5,000 activity events, but no passwords, platform settings or release records,
+and it cannot be restored from the application.
 Before every upgrade the installer copies `publisher.db` (and its `-wal`/`-shm` files) to `<data folder>\backups\pre-upgrade-<old version>-<date-time>\`.
 That copy covers the database only; it is a safety net, not a replacement for a backup of the whole folder.
 
@@ -134,8 +146,13 @@ The exit code is the standard Inno Setup one (0 = success; anything else is a fa
 ## 11. Security notes
 
 * The server listens on `127.0.0.1` unless `Bind` says otherwise. The product sends nothing to the internet and has no telemetry or update check.
-* The service runs as LocalService. A per-machine installation grants the *Users* group modify rights on the data and state folders (so the tray
-  application can run for any user). To restrict it to the service account and administrators, change those folders' permissions after installing.
+* The service runs as LocalService. On a per-machine installation the data and state folders (the database with password hashes, sessions and
+  the audit log; every project; the configuration and logs) are open only to SYSTEM, the Administrators and the identity that runs the server:
+  LOCAL SERVICE when the Windows service is installed, otherwise the person who installed it (whose tray application then runs the server).
+  Inheritance from `C:\ProgramData` is cut and an upgrade removes the *Users* grant earlier versions added. Other people use the platform through
+  the browser; they need no access to the folders. Check with `icacls "C:\ProgramData\Agastya Platform"`.
+* If the server keeps stopping, the service stops itself with error 1067 (it does not stay "Running" with nothing behind it); Windows then applies
+  the recovery actions (restart after 5 s, 30 s and 60 s) and the Application event log says why.
 * The program folder is not written to at run time; permissions on `C:\Program Files` are Windows' own.
 * The installer and executables are signed only if the person who built them had a code-signing certificate (see PACKAGING.md). An unsigned build makes
   Windows SmartScreen show *"Windows protected your PC"* the first time; verify the SHA-256 in `SHA256SUMS.txt` before choosing *Run anyway*.
@@ -151,3 +168,10 @@ The exit code is the standard Inno Setup one (0 = success; anything else is a fa
 | Publishing produces no PDF | `--doctor` (is Java found?), then the *Publication* page's log |
 | A PDF uses Liberation Sans instead of Arial | the build was made without Arial (see PACKAGING.md); this changes shapes, not line or page breaks |
 | Service will not start | Event Viewer → Application → *Agastya Platform*; `--doctor`; is the data folder writable by LocalService? |
+| The server log says the data folder "is already in use by another Agastya Platform server (process N)" | only one server may use a data folder. Stop the other one (the tray, the service, or a second copy started by hand). A server that crashed leaves `.agastya-server.lock` in the data folder; the next start takes it over by itself. Delete the file by hand only when the process it names is not an Agastya server. |
+| A project shows **Folder missing** | its folder under `projects\` was not there when the server started (a drive not mounted yet, antivirus quarantine, a moved folder, a partial restore). Nothing was deleted: the project keeps its members. Put the folder back and restart the server, or delete the project (type its name to confirm). |
+| A project from an import disappeared after a restart | the server was stopped while that import was still running; the half-made project is removed at the next start and the audit log says so (`project.import_discarded`). Import it again. |
+| "The server is busy for a moment" (503) | another program held the database longer than 5 seconds (a backup tool copying `publisher.db`, an antivirus scan, `--reset-admin`). Try again; configure backup tools to copy a stopped server's data folder, or the backup the platform makes. |
+
+A clean stop (the tray's Stop, `net stop`, closing the console) lets requests that are running finish for up to 15 seconds, then writes
+the database's journal back into `publisher.db` and gives the data folder back. A copy of the data folder taken after a clean stop is complete.

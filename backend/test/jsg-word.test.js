@@ -59,7 +59,12 @@ const create = async (name, body = {}) => {
   const r = await w.post('/api/projects', { name, format: 'jsg', domain: 'land', manualType: 'uhb', ...body }); assert.equal(r.status, 201, JSON.stringify(r.json));
   return { id: r.json.project.id, U: `/api/projects/${r.json.project.id}`, dir: path.join(h.ws, 'projects', r.json.project.id) };
 };
-const text = (pdf) => spawnSync('pdftotext', ['-layout', pdf, '-'], { encoding: 'utf8' }).stdout;
+// The stencil sets some titles letter-spaced as literal text ("C E R T I F I C A T E" in jsg-uhb.xsl and jsg-ispl.xsl); the order checks
+// read such a title as one word, so they look for the page and not for a spelling. xpdf's pdftotext (Git for Windows ships it) writes the
+// curly quotes of "APPX ‘A’" as `A'; poppler keeps them: both read the same.
+const text = (pdf) => spawnSync('pdftotext', ['-layout', pdf, '-'], { encoding: 'utf8' }).stdout
+  .replace(/\b(?:[A-Z] ){3,}[A-Z]\b/g, (m) => m.replace(/ /g, ''))
+  .replace(/`([A-Z])'/g, '‘$1’');
 const pages = (pdf) => Number(/Pages:\s+(\d+)/.exec(spawnSync('pdfinfo', [pdf], { encoding: 'utf8' }).stdout)[1]);
 
 test('Import from Word: the JSG styles become chapters, sections, clauses, paragraphs with marks, lists, a table with a merged cell, a captioned figure, a landscape section and an appendix', async () => {

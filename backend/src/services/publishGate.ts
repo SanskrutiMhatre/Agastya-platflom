@@ -77,7 +77,9 @@ export async function assertPublishable(projectId: string, scope: 'publication' 
   if (scope === 'publication') for (const i of run.issues as Issue[]) if (i.source === 'pm' && i.sev === 'error' && /Pinned revision|obsolete module/.test(i.title)) findings.push({ file: i.file, kind: 'revision', title: i.title, detail: i.detail.slice(0, 400), line: i.line });
   for (const rel of run.unchecked) {
     if (!want.has(rel.toLowerCase())) continue;
-    findings.push({ file: rel.split('/').pop() ?? rel, kind: 'unchecked', title: 'Could not be checked against a schema', detail: 'The schema check did not run for this module, so it cannot be treated as valid.', line: 1 });
+    // WP-32 (PERF-002): the reason travels with the module (too large for the validator, an issue that is not installed ...), never a generic line
+    const why = run.uncheckedWhy?.[rel];
+    findings.push({ file: rel.split('/').pop() ?? rel, kind: 'unchecked', title: 'Could not be checked against a schema', detail: why ? `${why} It cannot be treated as valid.` : 'The schema check did not run for this module, so it cannot be treated as valid.', line: 1 });
   }
   // business rules (BREX): fresh as well, read from the same files
   const csdbAbs = path.join(dir, csdbRel(readProjectJson(projectId)));
@@ -128,12 +130,18 @@ export async function assertPublishable(projectId: string, scope: 'publication' 
 
   if (findings.length) {
     const byKind = (...k: GateFinding['kind'][]) => [...new Set(findings.filter((f) => k.includes(f.kind)).map((f) => f.file))];
-    const schema = byKind('malformed', 'schema', 'unchecked');
+    const schema = byKind('malformed', 'schema');
+    const unchecked = byKind('unchecked').filter((f) => !schema.includes(f));
     const brex = byKind('brex');
     const applic = byKind('applic');
     const source = findings.filter((f) => f.kind === 'brex-source');
     const parts: string[] = [];
     if (schema.length) parts.push(`${schema.length} data module${schema.length === 1 ? ' is' : 's are'} not valid against the S1000D schema`);
+    // WP-32: say what really happened: not "not valid" for a module the validator never judged
+    if (unchecked.length) {
+      const big = findings.filter((f) => f.kind === 'unchecked' && /too large for the schema validator|ran out of memory/.test(f.detail)).length;
+      parts.push(`the schema check could not judge ${unchecked.length} data module${unchecked.length === 1 ? '' : 's'}${big ? ` (the validator ran out of memory or the module is too large: ${big})` : ''}`);
+    }
     if (brex.length) parts.push(`${brex.length} data module${brex.length === 1 ? ' breaks' : 's break'} the project's business rules (BREX)`);
     if (applic.length) parts.push(`${applic.length} data module${applic.length === 1 ? ' has' : 's have'} applicability references that do not resolve`);
     const revs = byKind('revision');

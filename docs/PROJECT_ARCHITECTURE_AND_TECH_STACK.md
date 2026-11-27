@@ -265,7 +265,7 @@ npm run dev:backend          # ts-node-dev --transpile-only, :4040
 npm run dev:frontend         # vite :5174, proxies /api and /ws to :4040
 npm run build                # tsc (backend) ; tsc --noEmit && vite build (frontend)
 npm start                    # rebuild if stale, then node backend/dist/index.js
-npm run reset-admin -- <username> <new-password>
+npm run reset-admin -- <username>          # asks for the password (or --stdin)
 npm run package:win [-- --build --no-installer --no-zip --no-arial]   # Windows installer/zip
 ```
 Gotchas: the e2e server runs `backend/dist`, so **build before testing** (root `npm test` does); Windows path limit 259 characters for the bundled native tools; proprietary Arial / Arial Narrow fonts are git-ignored (PDFs fall back to Liberation Sans if absent, `fop.xconf` omits missing faces); `SAMPLE PROJECTS/` and `manual format/` are git-ignored customer material and dependent tests skip themselves when absent; never `git add -A` on a tree holding them.

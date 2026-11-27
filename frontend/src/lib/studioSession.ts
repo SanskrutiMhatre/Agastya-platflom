@@ -21,6 +21,8 @@ import { csdbApi } from '../api/csdb';
 import type { ProjectRefs, ReferenceData } from '../studio/core/reference';
 import { ApiError } from '../api/client';
 import { useUi } from '../store/ui';
+import { onSignedOut, useSession } from '../store/session';
+import { downloadText } from './localDraft';
 import { setGrammarBase } from '../studio/core/grammar';
 import type { EditorDocument } from '../studio/core/document';
 import { App, type StudioHost } from '../studio/ui/app';
@@ -55,6 +57,35 @@ class StudioSession {
   constructor() {
     this.root.className = 'app';
     this.root.style.height = '100%';
+    // FE-024: the next person at this computer finds nothing of the previous one: no open document, no cached artwork and, after a
+    // sign-out they chose, no draft. When the session merely ended, the drafts stay under the person who wrote them (FE-006).
+    onSignedOut((explicit) => { void this.reset(explicit); });
+  }
+
+  private themeObserver: MutationObserver | null = null;
+
+  /** Draft scope: the signed-in person and the open project (FE-006). */
+  private draftScope(): string | null {
+    const u = useSession.getState().user;
+    return u && this.projectId ? `${u.id}/${this.projectId}` : null;
+  }
+
+  /** Close everything and drop the Studio instance; the next editor visit builds a fresh one. */
+  async reset(discardDrafts: boolean): Promise<void> {
+    const pending = this.starting;
+    const app = this.app ?? (pending ? await pending.catch(() => null) : null);
+    this.app = null; this.starting = null;
+    this.themeObserver?.disconnect(); this.themeObserver = null;
+    if (app) {
+      const u = useSession.getState().user;
+      if (discardDrafts && u) await app.discardDraftsOf(u.id).catch(() => undefined);
+      for (const icn of app.images.names()) await app.images.remove(icn).catch(() => undefined);
+      app.dispose();
+    }
+    this.root.remove();
+    this.refs = new WeakMap();
+    this.projectId = null; this.media = []; this.serverDms = []; this.settingsCache = undefined; this.projectRefs = null; this.reference = null;
+    useStudio.setState({ docs: [], ready: false, projectId: null });
   }
 
   private host(): StudioHost {
@@ -69,6 +100,7 @@ class StudioSession {
       identityTaken: (key) => this.identityTaken(key),
       changed: () => this.publish(),
       pdfSettings: () => this.settingsCache,
+      draftScope: () => this.draftScope(),
     };
   }
 
@@ -116,7 +148,9 @@ class StudioSession {
     const app = new App(this.root, this.host());
     this.app = app;
     // The page theme changes from the platform's own switch or the OS; the editor's views (CodeMirror) must follow.
-    new MutationObserver(() => app.applySettings()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    this.themeObserver?.disconnect();
+    this.themeObserver = new MutationObserver(() => app.applySettings());
+    this.themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     await app.init();
     useStudio.setState({ ready: true });
     return app;
@@ -225,10 +259,24 @@ class StudioSession {
       const pid = this.projectId;
       const doc = await read(pid);
       if (this.projectId !== pid) return;                 // the author switched project while it loaded: never open it into the other one
-      ed = await app.openText(doc.xml, file, null);
+      // FE-006 / S1K-004: unsaved changes this person made to this module (a crash, a closed tab, an ended session) are offered back.
+      const scope = this.draftScope();
+      const draft = scope ? await app.draftFor(scope, file) : null;
+      let restore = false;
+      if (draft && draft.text !== doc.xml) {
+        const when = new Date(draft.savedAt).toLocaleString();
+        const choice = await app.dialogs.confirm('Recover unsaved changes?', `You changed ${file} on ${when} and the changes were not saved. Recover them, or open the saved version and discard them?`,
+          [{ id: 'discard', label: 'Discard them', danger: true }, { id: 'restore', label: 'Recover my changes', primary: true }]);
+        if (this.projectId !== pid) return;
+        if (choice === 'restore') restore = true;
+        else if (choice === 'discard' && scope) await app.discardDrafts(scope, file);
+        // Escape / close: open the saved version and keep the draft for next time
+      }
+      ed = restore && draft ? await app.openText(draft.text, file, null, { draftId: draft.id }) : await app.openText(doc.xml, file, null);
       if (!ed) return;
       this.refs.set(ed.doc, object ? { file, hash: '', object: true } : { file, hash: doc.hash ?? '' });
-      ed.doc.markSaved();
+      if (!restore) ed.doc.markSaved();
+      else this.notify('Your unsaved changes are back. Save to keep them.', 'info');
       if (!object) await this.linkArtwork(doc.xml);
       app.updateChrome();
     } else {
@@ -297,7 +345,13 @@ class StudioSession {
       return true;
     } catch (e) {
       if (e instanceof ApiError && e.code === 'EDIT_CONFLICT') {
-        this.notify('Not saved: this data module was changed by someone else since you opened it. Copy your work, reopen it, and re-apply your changes.', 'error');
+        // FE-007: the author keeps their version: as a file now, and as the draft (kept until they save or discard it).
+        const app = this.app;
+        const name = ref?.file ?? ed.doc.fileName;
+        const choice = app ? await app.dialogs.confirm('Not saved: someone else changed this data module',
+          `${name} was saved by someone else after you opened it, so your save was refused. Your changes are still in the editor. Download your version to keep a copy, then reopen the module to see theirs and re-apply what you need.`,
+          [{ id: 'keep', label: 'Keep editing' }, { id: 'download', label: 'Download my version', primary: true }]) : null;
+        if (choice === 'download') downloadText(name.replace(/\.xml$/i, '') + ' (my version).xml', text);
       } else if (e instanceof ApiError && e.status === 403) {
         this.notify(e.message || 'You do not have permission to change this data module.', 'error');
       } else {

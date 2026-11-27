@@ -58,7 +58,7 @@ test('folders and projects: create, file, list', async () => {
   assert.equal(p.status, 201);
   pid = p.json.project.id;
   // Since Phase 19 a new module joins the publication by itself. The tests below are about the CSDB pool (unplaced / missing / placed), so this project opts out
-  // of that, with the supported setting; the automatic placement is covered by project-formats.test.js and the e2e platform.spec.ts.
+  // of that, with the supported setting; the automatic placement is covered by project-formats.test.js and the e2e 00-platform.spec.ts.
   assert.equal((await writer.patch(`/api/projects/${pid}`, { autoAddToPublication: false })).status, 200);
   assert.equal(p.json.project.folder, 'Navy');
   assert.equal((await writer.post('/api/projects', { name: 'test book' })).status, 409, 'project names are unique, case-insensitively');
@@ -188,7 +188,7 @@ test('release and watermark: unreleased builds are NOT RELEASED until an adminis
 test('access control: non-members see nothing; a viewer cannot write; an invited editor can', async () => {
   const mk = await admin.post('/api/admin/users', { username: 'priya', fullName: 'Priya Nair', role: 'author' });
   assert.equal(mk.status, 200);
-  assert.equal(mk.json.tempPassword, `priya@${new Date().getFullYear()}`, 'temporary password is username@year');
+  assert.match(mk.json.tempPassword, /^priya-[a-hjkmnp-z2-9]{8}$/, 'temporary password is username-<8 random characters> (SEC-004)');
   const priya = new h.Client('priya');
   const login = await priya.post('/api/auth/login', { username: 'priya', password: mk.json.tempPassword });
   assert.equal(login.status, 200);

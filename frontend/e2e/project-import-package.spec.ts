@@ -3,7 +3,7 @@
 // keeps, how a 700-file package stays readable, and who sees the action.
 //
 // Self-contained (creates its own people and projects through the API). The package is made at test time from public/samples. It must run after
-// platform.spec.ts only if that spec runs at all; on its own it creates the administrator itself.
+// 00-platform.spec.ts only if that spec runs at all; on its own it creates the administrator itself.
 
 import { test, expect, type Page, type APIRequestContext, type Locator } from '@playwright/test';
 import fs from 'node:fs';

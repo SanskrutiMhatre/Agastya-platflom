@@ -6,8 +6,11 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import { config, nowIso } from './config';
-import { diskFull } from './services/http';
-import { store, sessionsSvc, authz, audit, limiter, docIndex, projectDirFor, publicRoute } from './context';
+import { dbBusy, diskFull } from './services/http';
+import { store, sessionsSvc, authz, audit, limiter, docIndex, projectDirFor, publicRoute, clientIp, securityPolicy, auditHealth } from './context';
+import { requestContextMiddleware } from './services/requestContext';
+import { securityHeaders } from './services/securityHeaders';
+import { originAllowed } from './services/origin';
 import { registerWorkspaceRoutes } from './routes/workspace';
 import { registerProjectContentRoutes } from './routes/project-content';
 import { registerTeamRoutes } from './routes/team';
@@ -39,9 +42,12 @@ export function createApp(): express.Express {
   // S1000D reference catalogues, SNS presets, carry-over of the retired flat tables, and a configuration for every existing project (idempotent).
   try { const r = bootReference(); if (r.backfill.created) console.log(`[s1000d] configuration derived for ${r.backfill.created} existing project(s)`); } catch (e) { console.error('[s1000d] reference start-up failed:', (e as Error).stack); throw e; }
   const app = express();
-  // Trust exactly one proxy hop (a TLS-terminating reverse proxy), so req.secure - and therefore the Secure cookie flag - is right behind it.
-  app.set('trust proxy', 1);
+  // Which proxy may tell us the client's address and scheme (config.trustProxy, SEC-008): by default one on this machine only, so req.secure
+  // (the Secure cookie flag) is right behind a local TLS-terminating proxy and no client can choose its own address.
+  app.set('trust proxy', config.trustProxy);
   app.disable('x-powered-by');
+  app.use(requestContextMiddleware(clientIp));   // every audit row gets the client address; a 500 answers with this request's id (WP-03)
+  app.use(securityHeaders);                      // CSP, nosniff, framing, referrer (ENT-012, FE-017)
   app.use(express.json({ limit: '25mb' }));
 
   /*
@@ -51,14 +57,9 @@ export function createApp(): express.Express {
     In development the Vite proxy forwards the browser's Origin, so the dev
     server's own origin is allowed explicitly.
   */
-  const devOrigins = new Set((process.env.AGASTYA_DEV_ORIGINS ?? 'http://localhost:5174').split(',').map((s) => s.trim()).filter(Boolean));
   app.use((req, res, next) => {
     if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next();
-    const origin = req.headers.origin;
-    if (!origin) return next();
-    let host: string | null = null;
-    try { host = new URL(origin).host; } catch { /* malformed */ }
-    if (host && (host === req.headers.host || devOrigins.has(origin))) return next();
+    if (originAllowed(req.headers.origin, req.headers.host)) return next();
     return res.status(403).json({ error: 'Cross-origin request refused.' });
   });
 
@@ -71,6 +72,7 @@ export function createApp(): express.Express {
     collab: { closeDocumentConnectionsForUser: () => undefined },
     onProjectDecided: () => undefined,
     onAccess: notifyAccess,
+    securityPolicy, auditHealth,
   });
   registerJssGuard(app);                 // before every S1000D-side writer: a JSS document project's publication.xml is never replaced by them
   registerWorkspaceRoutes(app);
@@ -107,11 +109,17 @@ export function createApp(): express.Express {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
     const full = diskFull(err);
     if (full) { console.error('[api] disk full:', err.message); return void res.status(full.status).json({ error: full.message, code: full.code }); }
-    console.error('[api] unhandled:', err.stack ?? err);
-    res.status(500).json({ error: 'Internal error' });
+    const busy = dbBusy(err);
+    if (busy) { res.setHeader('Retry-After', '3'); return void res.status(busy.status).json({ error: busy.message, code: busy.code }); }
+    // body-parser and friends set a 4xx status on their own errors (a malformed JSON body is the client's mistake, not a 500)
+    const status = Number((err as any).status ?? (err as any).statusCode);
+    if (status >= 400 && status < 500) return void res.status(status).json({ error: status === 413 ? 'The request is too large.' : 'The request could not be read.', code: status === 413 ? 'TOO_LARGE' : 'BAD_REQUEST' });
+    const id = (req as any).requestId ?? '-';
+    console.error(`[api] ${id} unhandled:`, err.stack ?? err);
+    res.status(500).json({ error: 'Something went wrong on the server. If it happens again, give the administrator this reference.', code: 'INTERNAL', id });
   });
   return app;
 }

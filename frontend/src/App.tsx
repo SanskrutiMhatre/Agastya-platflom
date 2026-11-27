@@ -1,7 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import { useSession } from './store/session';
+import { authApi } from './api';
 import { Loading, Toasts } from './components/ui';
+import { ReauthDialog, UnreachableBanner } from './components/SessionDialogs';
 import { AuthScreens } from './pages/AuthScreens';
 import { AppShell } from './layouts/AppShell';
 import { Overview } from './pages/Overview';
@@ -32,7 +34,21 @@ export function App() {
   const status = useSession((s) => s.status);
   const load = useSession((s) => s.load);
   const user = useSession((s) => s.user);
+  const unreachable = useSession((s) => s.unreachable);
   useEffect(() => { void load(); }, [load]);
+
+  // WP-03 / FE-003: on every page (the editors included), typing or clicking is reported as activity at most every four minutes, so a working
+  // author is not signed out for being idle; and a background check every minute notices an ended session early, while the work is still
+  // on the page (the re-login dialog then appears over it). The check is not activity.
+  useEffect(() => {
+    if (status !== 'authed') return;
+    let last = Date.now();
+    const onActivity = () => { const now = Date.now(); if (now - last < 240_000) return; last = now; void authApi.activity().catch(() => undefined); };
+    const evs = ['keydown', 'pointerdown', 'wheel'] as const;
+    for (const e of evs) window.addEventListener(e, onActivity, { capture: true, passive: true });
+    const beat = setInterval(() => { if (!useSession.getState().reauth) void useSession.getState().check(); }, 60_000);
+    return () => { for (const e of evs) window.removeEventListener(e, onActivity, { capture: true }); clearInterval(beat); };
+  }, [status]);
 
   /*
     Everyone lands on their own dashboard after signing in. The browser keeps the address of whatever
@@ -49,7 +65,7 @@ export function App() {
   }, [status, nav]);
 
   let body;
-  if (status === 'loading') body = <Loading label="Starting…" />;
+  if (status === 'loading') body = <Loading label={unreachable ? 'Waiting for the server…' : 'Starting…'} />;
   else if (status !== 'authed') body = <AuthScreens />;
   else body = (
     <Routes>
@@ -82,5 +98,5 @@ export function App() {
       <Route path="*" element={<Navigate to="/overview" replace />} />
     </Routes>
   );
-  return <>{body}<Toasts /></>;
+  return <>{body}{status === 'authed' ? <ReauthDialog /> : null}<UnreachableBanner /><Toasts /></>;
 }

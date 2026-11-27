@@ -11,6 +11,7 @@ import { Alert, Badge, ConfirmModal, Empty, Field, Loading, Modal, ago, errText,
 import { useSession } from '../store/session';
 import { useUi } from '../store/ui';
 import { BackupButton } from '../components/Oversight';
+import { actionLabel } from '../lib/activity';
 
 function Account() {
   const { user, logout } = useSession();
@@ -40,7 +41,7 @@ function Account() {
         <h3 style={{ marginTop: 0 }}>Change password</h3>
         <form className="v2-stack" onSubmit={(e) => { e.preventDefault(); void change(); }}>
           <Field label="Current password"><input className="v2-input" type="password" value={cur} onChange={(e) => setCur(e.target.value)} autoComplete="current-password" /></Field>
-          <Field label="New password" hint="At least 8 characters, and not a common password."><input className="v2-input" type="password" value={p} onChange={(e) => setP(e.target.value)} autoComplete="new-password" /></Field>
+          <Field label="New password" hint="At least 15 characters (a few words make a good one), and not a common password or your name."><input className="v2-input" type="password" value={p} onChange={(e) => setP(e.target.value)} autoComplete="new-password" /></Field>
           <Field label="Repeat new password"><input className="v2-input" type="password" value={p2} onChange={(e) => setP2(e.target.value)} autoComplete="new-password" /></Field>
           {err ? <Alert tone="bad">{err}</Alert> : null}
           <div><button className="btn btn-primary" disabled={busy || !cur || !p}>Change password</button></div>
@@ -78,6 +79,9 @@ export function Users() {
   const [creating, setCreating] = useState(false);
   const [temp, setTemp] = useState<{ title: string; name: string; password: string } | null>(null);
   const [confirm, setConfirm] = useState<{ user: User; action: 'disable' | 'reset' } | null>(null);
+  // FE-012: a role change takes effect at once (what the person may see and do), so it is confirmed first
+  const [roleChange, setRoleChange] = useState<{ user: User; role: string } | null>(null);
+  const ROLE_NAME: Record<string, string> = { author: 'Author', project_manager: 'Project Manager', admin: 'Software administrator' };
 
   const act = async (fn: () => Promise<unknown>, ok: string) => { try { await fn(); toast(ok, 'success'); users.reload(); } catch (e) { toast(errText(e), 'error'); } };
 
@@ -96,7 +100,7 @@ export function Users() {
                 <td><strong>{u.fullName}</strong></td><td className="v2-mono">@{u.username}</td>
                 <td>
                   <select className="v2-select" style={{ width: 190 }} value={u.role} disabled={u.id === me?.id} aria-label={`Role of ${u.username}`}
-                    onChange={(e) => act(() => adminApi.updateUser(u.id, { role: e.target.value }), 'Role updated')}>
+                    onChange={(e) => setRoleChange({ user: u, role: e.target.value })}>
                     <option value="author">Author</option><option value="project_manager">Project Manager</option><option value="admin">Software administrator</option>
                   </select>
                 </td>
@@ -114,6 +118,7 @@ export function Users() {
 
       {creating ? <CreateUser roles={[['author', 'Author'], ['project_manager', 'Project Manager']]} create={(b) => adminApi.createUser(b)} onClose={() => setCreating(false)} onCreated={(name, pw) => { setCreating(false); users.reload(); setTemp({ title: 'Account created', name, password: pw }); }} /> : null}
       {temp ? <TempPassword {...temp} onClose={() => setTemp(null)} /> : null}
+      {roleChange ? <ConfirmModal title={`Make ${roleChange.user.fullName} a ${ROLE_NAME[roleChange.role] ?? roleChange.role}?`} confirmLabel="Change role" onClose={() => setRoleChange(null)} onConfirm={() => { const r = roleChange; setRoleChange(null); void act(() => adminApi.updateUser(r.user.id, { role: r.role }), 'Role updated'); }} body={<p>{roleChange.role === 'admin' ? 'A software administrator can manage every account, the settings and every project.' : roleChange.role === 'project_manager' ? 'A Project Manager can create projects and approve releases of the projects they manage.' : 'An author works only in the projects shared with them.'} The change applies at once; the audit log records it.</p>} /> : null}
       {confirm ? (
         <ConfirmModal title={confirm.action === 'reset' ? `Reset ${confirm.user.fullName}'s password?` : `Disable ${confirm.user.fullName}?`} danger={confirm.action === 'disable'}
           confirmLabel={confirm.action === 'reset' ? 'Reset password' : 'Disable account'} onClose={() => setConfirm(null)}
@@ -240,7 +245,7 @@ export function Audit() {
       <div className="v2-card">
         {a.loading && !a.data ? <Loading /> : !a.data?.length ? <Empty title="No entries" /> : (
           <table className="v2-table"><thead><tr><th>When</th><th>Who</th><th>Action</th><th>Project</th><th>From</th></tr></thead>
-            <tbody>{a.data.map((e) => <tr key={e.id}><td title={fmtDate(e.at)}>{ago(e.at)}</td><td>{e.actor ?? '—'}</td><td className="v2-mono">{e.action}</td><td className="v2-mono">{e.projectId ?? ''}</td><td className="v2-mono">{e.ip ?? ''}</td></tr>)}</tbody></table>
+            <tbody>{a.data.map((e) => <tr key={e.id}><td title={fmtDate(e.at)}>{ago(e.at)}</td><td>{e.actor ?? '—'}</td><td title={e.action}>{actionLabel(e.action)} <span className="v2-hint v2-mono">{e.action}</span></td><td className="v2-mono">{e.projectId ?? ''}</td><td className="v2-mono">{e.ip ?? ''}</td></tr>)}</tbody></table>
         )}
       </div>
     </div>

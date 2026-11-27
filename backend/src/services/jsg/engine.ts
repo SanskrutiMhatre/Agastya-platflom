@@ -9,7 +9,7 @@ import path from 'path';
 import { execFile } from 'child_process';
 import { pathToFileURL } from 'url';
 import { vendor } from '../../config';
-import { projectDirFor } from '../../context';
+import { projectDirFor, workspaceDir } from '../../context';
 import { broadcast } from '../broadcast';
 import { HttpError } from '../http';
 import { readProjectJson } from '../projects';
@@ -17,6 +17,7 @@ import { assertJsgPublishable, JSG_ENGINE_DIR, SOURCE_NAME, readSource } from '.
 
 const paths = vendor('engine/paths');
 const fontConf = vendor('engine/fontconf');
+const foGuard = vendor('engine/foGuard');
 
 export const FO_NAME = 'jsg-output.fo';
 export const PDF_NAME = 'jsg-output.pdf';
@@ -34,7 +35,7 @@ function serial<T>(key: string, task: () => Promise<T>): Promise<T> {
 function run(file: string, args: string[], cwd: string): Promise<{ stdout: string; stderr: string }> {
   const env = paths.childEnv({ ...(paths.hasBundledJre ? { JAVA_HOME: paths.JRE_HOME } : null) });
   return new Promise((resolve, reject) => {
-    execFile(file, args, { cwd, env, maxBuffer: 20 * 1024 * 1024, windowsHide: true }, (err, stdout, stderr) => {
+    execFile(file, file === paths.XSLTPROC ? paths.quoteSafeXsltArgs(args) : args, { cwd, env, maxBuffer: 20 * 1024 * 1024, windowsHide: true }, (err, stdout, stderr) => {
       if (err) { (err as any).stderr = stderr; return reject(err); }
       resolve({ stdout, stderr });
     });
@@ -75,7 +76,9 @@ export function buildJsgPdf(projectId: string): Promise<JsgBuild> {
     const dir = projectDirFor(projectId);
     const project = readProjectJson(projectId);
     const classification = String(/<classification>([^<]*)<\/classification>/.exec(readSource(projectId).xml)?.[1] ?? '').trim() || 'RESTRICTED';
-    const stylesheet = forward(path.relative(dir, path.join(JSG_ENGINE_DIR, 'jsg.xsl')));
+    // WP-07 (DEP-011): an absolute location, as the S1000D and JSS builds pass theirs: xsltproc joins a relative one to the working folder as
+    // a string, so a deep project folder plus the steps back out passed the 260-character limit of the 32-bit tool
+    const stylesheet = forward(path.resolve(JSG_ENGINE_DIR, 'jsg.xsl'));
     const warnings: string[] = [];
     // the stencil's own pictures (emblem, supplier logo, first-aid figures): an absolute file URL, so a workspace on another drive than the installation still finds them
     const assetsUrl = pathToFileURL(path.join(JSG_ENGINE_DIR, 'assets')).href;
@@ -88,6 +91,7 @@ export function buildJsgPdf(projectId: string): Promise<JsgBuild> {
         const x = await run(paths.XSLTPROC, ['--nonet', ...params, '-o', FO_NAME, stylesheet, SOURCE_NAME], dir);
         for (const l of x.stderr.split(/\r?\n/)) if (l.trim()) warnings.push(l.trim());
         gate.verifyUnchanged();                       // what is rendered is what was validated
+        { const m = foGuard.formatConfine(foGuard.confineFo(path.join(dir, FO_NAME), { baseDir: dir, roots: [JSG_ENGINE_DIR, path.join(workspaceDir, 'templates')] })); if (m) { log(`Security: ${m}`); warnings.push(m); } }   // WP-02 / SEC-003
         log('Generating PDF (FOP)...');
         const fopArgs: string[] = paths.FOP_ARGS.slice();
         const conf = fontConf.fopConf();

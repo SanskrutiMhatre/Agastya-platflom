@@ -137,9 +137,10 @@ export function EditorSide({ ctx, refreshKey, width, onCollapse }: { ctx: Projec
         <button className="icon-btn" onClick={onCollapse} title="Hide this panel" aria-label="Hide the data module panel" data-testid="collapse-side"><Icon name="panel" size={15} /></button>
       </div>
       <section className="v2-pside-section" style={{ flex: 1, minHeight: 120, borderTop: 0 }} aria-label="Data module list">
-        <header style={{ gap: 4 }}>
+        {/* WP-07 (UX-019): the row wraps instead of cutting the switch to "Publica" in a narrow panel */}
+        <header style={{ gap: 4, flexWrap: 'wrap', rowGap: 6 }}>
           {isCir ? <b className="v2-trunc" style={{ fontSize: 12.5 }}>{list.data?.length ?? 0} common data modules</b> : (
-            <div className="v2-seg" role="group" aria-label="Show">
+            <div className="v2-seg" role="group" aria-label="Show" style={{ flexShrink: 0 }}>
               <button className={view === 'tree' ? 'on' : ''} onClick={() => setView('tree')} aria-pressed={view === 'tree'} data-testid="view-tree">Publication</button>
               <button className={view === 'all' ? 'on' : ''} onClick={() => setView('all')} aria-pressed={view === 'all'} data-testid="view-all" title={`${list.data?.length ?? 0} data modules`}>All</button>
             </div>)}

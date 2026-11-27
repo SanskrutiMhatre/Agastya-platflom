@@ -13,6 +13,7 @@
 const fs = require('fs');
 const path = require('path');
 const { newId } = require('../auth/crypto');
+const { safeRelPath } = require('../auth/xmlGuard');
 
 // Source text files that carry document identity. Generated build artefacts
 // (driver stylesheet, FO output) are excluded — they are derived, not source.
@@ -71,7 +72,7 @@ class DocIndex {
     let pmName = 'publication.xml';
     try {
       const pj = JSON.parse(fs.readFileSync(path.join(projectDir, 'project.json'), 'utf8'));
-      pmName = (pj.input && pj.input.pm) || pmName;
+      pmName = (pj.input && typeof pj.input.pm === 'string' && safeRelPath(pj.input.pm)) || pmName;   // only a relative path inside the project (WP-01)
     } catch { /* defaults are fine */ }
 
     const onDisk = new Set(walkSourceFiles(projectDir, '', []));

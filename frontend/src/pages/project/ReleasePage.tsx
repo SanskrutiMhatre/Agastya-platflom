@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from 'react';
 import { contentApi, type ReviewComment, type ReviewState } from '../../api';
-import { Alert, Badge, Empty, Field, Loading, errText, fmtDate, ago, useAsync } from '../../components/ui';
+import { Alert, Badge, ConfirmModal, Empty, Field, Loading, errText, fmtDate, ago, useAsync } from '../../components/ui';
 import { Icon } from '../../components/Icon';
 import { PageHeader } from '../../components/PageHeader';
 import { ReviewReader } from '../../components/ReviewReader';
@@ -34,6 +34,7 @@ export function ReleasePage() {
   const [later, setLater] = useState(false);
   const [when, setWhen] = useState('');
   const [reason, setReason] = useState('');
+  const [confirmApprove, setConfirmApprove] = useState(false);
   const [text, setText] = useState('');
   const [dmFile, setDmFile] = useState('');
   const [reading, setReading] = useState('');
@@ -119,13 +120,14 @@ export function ReleasePage() {
               <p>Submitted {fmtDate(r.pending.requestedAt)}{r.pending.requestedBy ? ` by ${r.pending.requestedBy}` : ''}.{r.pending.note ? <> Note: “{r.pending.note}”.</> : null}</p>
               {r.canApprove ? (
                 <div className="v2-stack">
+                  {confirmApprove ? <ConfirmModal title="Approve and release this manual?" confirmLabel="Approve" onClose={() => setConfirmApprove(false)} onConfirm={() => { setConfirmApprove(false); act(() => contentApi.decideRelease(id, r.pending!.id, true), 'Approved - the manual is released'); }} body={<p>The in-work data modules it covers are issued and the manual becomes the released version{r.pending.scheduledAt ? ` on ${fmtDate(r.pending.scheduledAt)}` : ''}. The approval is recorded under your name.</p>} /> : null}
                   <Field label="Comments for the author" hint="Needed to send the manual back. Approving needs none."><textarea className="v2-textarea" rows={3} maxLength={4000} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="What must change?" data-testid="send-back-reason" /></Field>
                   <div className="v2-row">
-                    <button className="btn btn-primary" disabled={busy} onClick={() => act(() => contentApi.decideRelease(id, r.pending!.id, true), 'Approved - the manual is released')} data-testid="approve">Approve</button>
+                    <button className="btn btn-primary" disabled={busy} onClick={() => setConfirmApprove(true)} data-testid="approve">Approve</button>
                     <button className="btn" disabled={busy || (!reason.trim() && open.length === 0)} onClick={() => act(() => contentApi.sendBack(id, r.pending!.id, reason), 'Sent back to the author', () => setReason(''))} data-testid="send-back"><Icon name="undo" size={14} />Send back for changes</button>
                   </div>
                 </div>
-              ) : <p className="v2-hint">Only the Project Manager of this project, or an administrator, can approve it or send it back.</p>}
+              ) : r.approveBlocked ? <Alert tone="warn">{r.approveBlocked}</Alert> : <p className="v2-hint">Only the Project Manager of this project, or an administrator, can approve it or send it back.</p>}
               {writable ? <div style={{ marginTop: 10 }}><button className="btn btn-sm" disabled={busy} onClick={() => act(() => contentApi.withdrawRelease(id, r.pending!.id), 'Withdrawn')}>Withdraw the submission</button></div> : null}
             </div>
           ) : writable ? (

@@ -25,17 +25,31 @@ function createAuthz({ store, sessions, workspaceDir, projectDirFor }) {
   function resolveAuth(req) {
     if (req.auth !== undefined) return req.auth;
     req.auth = sessions.resolveFromCookieHeader(req.headers.cookie || '') || null;
-    if (req.auth) {
-      // Throttled last-seen touch: at most once a minute per session.
+    // Throttled last-seen touch: at most once a minute per session. last_seen_at is what the idle limit measures
+    // (WP-03), so a timer's request (x-agastya-background: badge counts, status checks) does not count as activity.
+    if (req.auth && req.headers['x-agastya-background'] !== '1') {
       const last = Date.parse(req.auth.session.lastSeenAt || 0) || 0;
       if (Date.now() - last > 60000) {
-        try { store.touchSession(req.auth.session.id, new Date().toISOString()); } catch { /* display-only */ }
+        try { store.touchSession(req.auth.session.id, new Date().toISOString()); } catch { /* the next request tries again */ }
       }
     }
     return req.auth;
   }
 
-  function deny401(res) {
+  // Why the person is no longer signed in, so the client can say so instead of silently showing the sign-in page (UX-022).
+  const END_MESSAGES = {
+    displaced: ['SESSION_DISPLACED', 'You were signed out because this account signed in on another computer or browser.'],
+    idle: ['SESSION_IDLE', 'You were signed out after a period without activity.'],
+    expired: ['SESSION_EXPIRED', 'Your session reached its time limit. Sign in again to continue.'],
+    disabled: ['ACCOUNT_DISABLED', 'This account has been disabled.'],
+    admin: ['SESSION_REVOKED', 'An administrator ended your session.'],
+    revoked: ['SESSION_REVOKED', 'Your session was ended.'],
+  };
+  function deny401(res, req) {
+    let reason = null;
+    try { reason = req && sessions.endReasonFromCookieHeader ? sessions.endReasonFromCookieHeader(req.headers.cookie || '') : null; } catch { reason = null; }
+    const known = reason && (END_MESSAGES[reason] || (/admin/.test(reason) ? END_MESSAGES.admin : null));
+    if (known) return res.status(401).json({ error: known[1], code: known[0], reason });
     return res.status(401).json({ error: 'Authentication required.', code: 'UNAUTHENTICATED' });
   }
   function deny404(res) {
@@ -150,7 +164,7 @@ function createAuthz({ store, sessions, workspaceDir, projectDirFor }) {
   function requireAuth(opts = {}) {
     const mw = function requireAuthGuard(req, res, next) {
       const auth = resolveAuth(req);
-      if (!auth) return deny401(res);
+      if (!auth) return deny401(res, req);
       const gate = gateCheck(auth.user, opts);
       if (gate) return deny403(res, gate.code, gate.error);
       next();
@@ -162,7 +176,7 @@ function createAuthz({ store, sessions, workspaceDir, projectDirFor }) {
   function requireAdmin() {
     const mw = function requireAdminGuard(req, res, next) {
       const auth = resolveAuth(req);
-      if (!auth) return deny401(res);
+      if (!auth) return deny401(res, req);
       const gate = gateCheck(auth.user);
       if (gate) return deny403(res, gate.code, gate.error);
       if (auth.user.role !== 'admin') {
@@ -182,7 +196,7 @@ function createAuthz({ store, sessions, workspaceDir, projectDirFor }) {
   function requireRoles(...roles) {
     const mw = function requireRolesGuard(req, res, next) {
       const auth = resolveAuth(req);
-      if (!auth) return deny401(res);
+      if (!auth) return deny401(res, req);
       const gate = gateCheck(auth.user);
       if (gate) return deny403(res, gate.code, gate.error);
       if (!roles.includes(auth.user.role)) return deny403(res, 'ROLE_REQUIRED', 'Your role does not allow that.');
@@ -202,7 +216,7 @@ function createAuthz({ store, sessions, workspaceDir, projectDirFor }) {
   function requireProject(minRole, { from = 'active', cap = 'project.access' } = {}) {
     const mw = function requireProjectGuard(req, res, next) {
       const auth = resolveAuth(req);
-      if (!auth) return deny401(res);
+      if (!auth) return deny401(res, req);
       const id = from === 'active' ? auth.user.activeProjectId
         : from === 'param' ? req.params.id
           : from(req);
@@ -211,7 +225,7 @@ function createAuthz({ store, sessions, workspaceDir, projectDirFor }) {
       }
       const v = evaluate(auth.user, id, { minRole, cap });
       if (!v.ok) {
-        if (v.http === 401) return deny401(res);
+        if (v.http === 401) return deny401(res, req);
         if (v.http === 404) return deny404(res);
         return deny403(res, v.code, v.error);
       }

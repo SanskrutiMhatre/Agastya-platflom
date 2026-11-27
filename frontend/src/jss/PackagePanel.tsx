@@ -52,7 +52,7 @@ export function PackagePanel({ id, writable, dirty, saveFirst, onImported }: { i
     <>
       <input ref={pick} type="file" accept=".zip,application/zip" hidden data-testid="jss-import-file" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setConfirm(f); }} />
       <button className="btn btn-sm" onClick={() => pick.current?.click()} disabled={!writable || busy !== ''} data-testid="jss-import" title={writable ? 'Replace this document with a finished project (a .zip)' : 'You have read-only access'}>{busy === 'import' ? <Spinner /> : <Icon name="upload" size={12} />}Import project</button>
-      <button className="btn btn-sm" onClick={() => void doExport()} disabled={busy !== ''} data-testid="jss-export" title="Download this document as a project package">{busy === 'export' ? <Spinner /> : <Icon name="download" size={12} />}Export</button>
+      <button className="btn btn-sm" onClick={() => void doExport()} disabled={busy !== ''} data-testid="jss-export" title="Download this document as a JSS package (.zip) for another JSS publishing tool">{busy === 'export' ? <Spinner /> : <Icon name="download" size={12} />}Export JSS package</button>
       {confirm ? (
         <Modal title="Import project" onClose={() => setConfirm(null)} width={460} buttons={<><button className="btn" onClick={() => setConfirm(null)}>Cancel</button><button className="btn btn-primary" data-testid="jss-import-confirm" onClick={() => void doImport(confirm)}>Import</button></>}>
           <p>This replaces the content of this document with <strong>{confirm.name}</strong>. Your document's title page details are kept, and the previous content is saved beside it as a backup.</p>

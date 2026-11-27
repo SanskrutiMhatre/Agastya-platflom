@@ -22,16 +22,28 @@ export const canBuild = (role: ProjectRole): boolean => role !== 'viewer';
 
 interface Item { to: string; label: string; icon: IconName; badge?: { text: string; tone: 'bad' | 'warn' | 'ok' } | null }
 
+/**
+ * FE-005: one shell per project. Keyed by the id, a move from one project to another (a link, Back, Forward) starts a fresh shell with no
+ * summary, so no render ever pairs the new id with the previous project's summary (which mounted the wrong kind of editor for one render).
+ */
 export function ProjectShell() {
   const { id = '' } = useParams();
+  return <ProjectShellFor key={id} id={id} />;
+}
+
+function ProjectShellFor({ id }: { id: string }) {
   const nav = useNavigate();
   const [summary, setSummary] = useState<Summary | null>(null);
   const [error, setError] = useState('');
 
   const load = useCallback(() => {
-    workspaceApi.summary(id).then((s) => { setSummary(s); setError(''); }).catch((e) => setError(errText(e)));
+    // A reply for another project (the shell was replaced meanwhile) is ignored by the unmount; one for an older request of this one is
+    // harmless, it is the same project.
+    let live = true;
+    workspaceApi.summary(id).then((s) => { if (live) { setSummary(s); setError(''); } }).catch((e) => { if (live) setError(errText(e)); });
+    return () => { live = false; };
   }, [id]);
-  useEffect(() => { setSummary(null); load(); }, [id, load]);
+  useEffect(() => load(), [load]);
 
   if (error) {
     return <div className="v2-page"><Alert tone="bad">{error === 'Not found.' ? 'This project does not exist, or you are not a member of it.' : error}</Alert><p><a href="/workspace" onClick={(e) => { e.preventDefault(); nav('/workspace'); }}>Back to the workspace</a></p></div>;

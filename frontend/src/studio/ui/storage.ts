@@ -7,6 +7,8 @@ export interface Draft {
   fileName: string;
   text: string;
   savedAt: number;
+  /** Embedded in the platform (FE-006): "<user>/<project>" the draft belongs to. Only that person, in that project, is offered it. */
+  scope?: string;
 }
 
 export interface RecentFile {

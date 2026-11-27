@@ -24,6 +24,7 @@ import * as PC from './projectConfig';
 import * as SNS from './sns';
 
 const { newId } = require('../core/auth/crypto');
+const { safeRelPath, safeArtworkRef } = require('../core/auth/xmlGuard');
 
 export interface User { id: string; username: string; fullName: string; role: string }
 
@@ -54,15 +55,68 @@ export function updateProjectJson(id: string, mutate: (pj: any) => void): any {
   return pj;
 }
 
-export const csdbRel = (pj: any): string => (pj.input && pj.input.csdbDir) || 'csdb';
+// ── Path fields of project.json (WP-01, SEC-002 / S1K-001 / PUB-001) ──────
+// `input.csdbDir`, `input.mediaDir` and `input.pm` are joined onto the project folder by every content route and by the
+// publisher. They are only ever honoured when they are a plain relative path inside the project; anything else (an
+// absolute or drive path, a UNC path, `..`, an empty segment, an alternate data stream, a reserved device name) is
+// ignored and the default is used. This is the read-site defence; the write sites (settings route, archive import)
+// refuse or drop such values too.
+const RESERVED_NAME = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\..*)?$/i;
+export function safeProjectRel(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const rel = safeRelPath(value.trim());
+  if (!rel) return null;
+  const segs = rel.split('/');
+  if (segs.some((s: string) => s.includes(':') || RESERVED_NAME.test(s) || /[<>"|?*\x00-\x1f]/.test(s) || /[. ]$/.test(s))) return null;
+  return rel;
+}
+const inputField = (pj: any, key: 'csdbDir' | 'mediaDir' | 'pm', def: string): string => safeProjectRel(pj?.input?.[key]) ?? def;
+/**
+ * Artwork references in a project.json (publisher logos, emblems, any key named like a logo or emblem) that a build
+ * would hand to FOP and that are not a relative path inside the project or a data: image (WP-02, SEC-003). By path.
+ */
+export function unsafeArtwork(value: any, at = 'project', depth = 0, out: string[] = []): string[] {
+  if (depth > 8 || value == null || typeof value !== 'object') return out;
+  for (const [k, v] of Object.entries(value)) {
+    const here = Array.isArray(value) ? `${at}[${k}]` : `${at}.${k}`;
+    if (typeof v === 'string' && /(^|[a-z])(logo|emblem)$/i.test(k) && !safeArtworkRef(v)) out.push(here);
+    else if (v && typeof v === 'object') unsafeArtwork(v, here, depth + 1, out);
+  }
+  return out;
+}
+/** The unsafe path values in a project.json (`input.*`), by key. Empty when the file is clean. */
+export function unsafeInputFields(pj: any): string[] {
+  const input = pj?.input;
+  if (input == null) return [];
+  if (typeof input !== 'object' || Array.isArray(input)) return ['input'];
+  return (['csdbDir', 'mediaDir', 'pm'] as const).filter((k) => input[k] !== undefined && input[k] !== null && input[k] !== '' && !safeProjectRel(input[k]));
+}
+/** A copy of `input` with every unsafe path field removed (the defaults then apply). */
+export function cleanInput(input: any): any {
+  if (input == null || typeof input !== 'object' || Array.isArray(input)) return undefined;
+  const out: any = { ...input };
+  for (const k of ['csdbDir', 'mediaDir', 'pm']) if (out[k] !== undefined && !safeProjectRel(out[k])) delete out[k];
+  return out;
+}
+
+/**
+ * project.json keys that only the platform itself sets (create, import, rename, move): the project settings route keeps
+ * them as they are on disk. `format`, `authoring` and `type` decide which engine and which routes a project gets (kind
+ * confusion, PUB-026); `input` decides where its files are (SEC-002); `name` and `group` have their own routes.
+ */
+export const PROTECTED_PROJECT_KEYS = ['id', 'format', 'authoring', 'jssDocType', 'domain', 'manualType', 'type', 'input', 'group', 'name'] as const;
+/** Same value for the protected-key check: null and a missing key are the same thing. */
+export const sameSetting = (a: unknown, b: unknown): boolean => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+export const csdbRel = (pj: any): string => inputField(pj, 'csdbDir', 'csdb');
 /** Is this an S1000D project? Business rules (BREX), the S1000D configuration and the CSDB belong to S1000D only; JSS and JSG projects have none of them. */
 export function isS1000dProject(projectId: string): boolean {
   const pj = readProjectJson(projectId);
   const format = pj.format ?? (pj.type === 'JSS' || pj.templateRef === 'uhb' ? 'jss' : 's1000d');
   return format === 's1000d';
 }
-export const mediaRel = (pj: any): string => (pj.input && pj.input.mediaDir) || 'Media';
-export const pmRel = (pj: any): string => (pj.input && pj.input.pm) || 'publication.xml';
+export const mediaRel = (pj: any): string => inputField(pj, 'mediaDir', 'Media');
+export const pmRel = (pj: any): string => inputField(pj, 'pm', 'publication.xml');
 
 // ── Project cards ─────────────────────────────────────────────────────────
 
@@ -79,6 +133,8 @@ export interface ProjectCard {
   folder: string; status: string; role: string; accessVia: 'project' | 'folder' | 'admin';
   dmCount: number; hasPdf: boolean; createdAt: string; updatedAt: string; lastOpened: string | null;
   owners: string[];
+  /** WP-06 (PLT-003): the project folder was not found at the last start (the row and memberships are kept); null when it is there. */
+  missingSince: string | null;
 }
 
 function countDms(id: string, pj: any): number {
@@ -111,6 +167,7 @@ export function projectCard(row: any, role: string, via: ProjectCard['accessVia'
     hasPdf: fs.existsSync(path.join(projectDirFor(row.id), 'jss-output.pdf')),
     createdAt: row.created_at, updatedAt: row.updated_at, lastOpened: row.last_opened || null,
     owners: store.listOwners(row.id).map((o: any) => o.full_name || o.username),
+    missingSince: store.projectMissingSince(row.id),
   };
 }
 
@@ -211,6 +268,7 @@ export async function createProject(user: User, input: CreateProjectInput): Prom
     pipeline: fmt ? fmt.pipeline : profile ? (profile.pipeline ?? 's1000dtojss') : input.pipeline === 's1000dtofo' ? 's1000dtofo' : 's1000dtojss',
     group: folder,
     staticFrontMatterDir: path.join(config.pipelineDir, 'jss', 'frontmatter'),
+    isTaken: (candidate: string) => store.projectIdUsed(candidate),       // WP-06 (PLT-004): never an id an earlier project had
   });
 
   if (fmt) updateProjectJson(id, (p) => { p.format = fmt!.format; p.domain = fmt!.domain; p.manualType = fmt!.manualType; });
@@ -240,6 +298,9 @@ export async function createProject(user: User, input: CreateProjectInput): Prom
   for (const sub of ['csdb', 'Media']) fs.mkdirSync(path.join(dir, sub), { recursive: true });
 
   const now = nowIso();
+  // WP-06 (PLT-002): the registry rows are inside the roll-back too: a database held by another process past the busy timeout must not
+  // leave a project folder nobody owns.
+  try {
   registryDb.upsertProject({ id, name, type: pj.type, template: pj.templateRef, now });
   store.setProjectRequestedBy(id, user.id, 'active', now);
   store.setProjectFolder(id, folderKey(folder) || null);
@@ -249,7 +310,6 @@ export async function createProject(user: User, input: CreateProjectInput): Prom
     store.setFolderOwnerIfAbsent(folderKey(folder), folder, user.id, now);
   }
   // S1000D configuration: a copy carries its source's; a new project gets what the wizard chose (or an unconstrained default).
-  try {
     if (fromId) PC.copyConfig(fromId, id, user.id);
     else {
       const base = cfgPatch ?? {};
@@ -263,8 +323,9 @@ export async function createProject(user: User, input: CreateProjectInput): Prom
       if (Array.isArray(cfgPatch?.dmTypes) && cfgPatch!.dmTypes.length) PC.setDmTypes(id, cfgPatch!.dmTypes);
     }
   } catch (e) {
-    // roll the half-made project back: its folder, its registry row, its configuration
-    try { workspace.deleteProject(workspaceDir, id); registryDb.deleteProject(id); store.clearProjectGovernance(id); PC.deleteProjectConfig(id); } catch { /* best effort */ }
+    // roll the half-made project back: its folder first (it needs no database), then its registry row and configuration
+    try { workspace.deleteProject(workspaceDir, id); } catch { /* best effort */ }
+    try { registryDb.deleteProject(id); store.clearProjectGovernance(id); PC.deleteProjectConfig(id); } catch { /* best effort */ }
     throw e;
   }
   await docIndex.syncProject(id, dir, now);
@@ -324,10 +385,70 @@ export function deleteProject(user: User, id: string): void {
   if (!row) throw notFound();
   assertNotCir(id, 'delete');
   removeReleasingRenderer(() => workspace.deleteProject(workspaceDir, id), 'The project');   // a built project's pictures can be held open by the warm renderer (services/renderer.ts); the rows below go only once the folder is gone
+  // WP-06 (PLT-004): the project's content goes with it (documents, revisions, locks, releases, comments) and its id is never reused;
+  // the audit log keeps the record of what happened.
+  const purged = store.purgeProjectContent(id, { name: row.name, by: user.id, now: nowIso() });
   registryDb.deleteProject(id);
   store.clearProjectGovernance(id);
   PC.deleteProjectConfig(id);
-  audit({ actorId: user.id, actorUsername: user.username, action: 'project.deleted', projectId: id, targetType: 'project', targetId: id, meta: { name: row.name } });
+  audit({ actorId: user.id, actorUsername: user.username, action: 'project.deleted', projectId: id, targetType: 'project', targetId: id, meta: { name: row.name, purged } });
+}
+
+// ── Imports that are cut off (WP-06, REL-004) ─────────────────────────────
+//
+// An import creates the project first and fills it after (files, configuration, index, comments). A marker file in the project folder
+// says "not finished yet": it is written as soon as the project exists and removed only when the import has finished. A failure inside
+// the import discards the project at once; a crash, a kill or a power cut leaves the marker, and the next start removes that project.
+
+const PENDING_MARK = '.agastya-import-pending';
+
+export function markImportPending(id: string, what: string): void {
+  fs.writeFileSync(path.join(projectDirFor(id), PENDING_MARK), JSON.stringify({ what, pid: process.pid, at: nowIso() }), 'utf8');
+}
+export function clearImportPending(id: string): void {
+  try { fs.rmSync(path.join(projectDirFor(id), PENDING_MARK), { force: true }); } catch { /* gone already */ }
+}
+
+/** Remove a project that never became one (an import that failed or was cut off): folder, rows, content, configuration. */
+export function discardProject(id: string, reason: string): void {
+  try { removeReleasingRenderer(() => workspace.deleteProject(workspaceDir, id), 'The project'); } catch (e) { console.warn(`[projects] ${id}: folder not removed: ${(e as Error).message}`); }
+  const name = store.getProjectRow(id)?.name ?? id;
+  store.purgeProjectContent(id, { name, by: null, now: nowIso() });
+  registryDb.deleteProject(id);
+  store.clearProjectGovernance(id);
+  try { PC.deleteProjectConfig(id); } catch { /* none */ }
+  audit({ actorId: null, actorUsername: 'system', action: 'project.import_discarded', projectId: id, targetType: 'project', targetId: id, meta: { name, reason } });
+}
+
+/**
+ * Run the filling part of an import: the project is marked pending first, discarded when `fill` throws, and unmarked when it finishes.
+ * Returns what `fill` returns.
+ */
+export async function fillImported<T>(id: string, what: string, fill: () => Promise<T>): Promise<T> {
+  markImportPending(id, what);
+  try {
+    const out = await fill();
+    clearImportPending(id);
+    return out;
+  } catch (e) {
+    try { discardProject(id, `${what} failed: ${(e as Error).message}`.slice(0, 300)); } catch { /* best effort */ }
+    throw e;
+  }
+}
+
+/** At start, before the registry is reconciled: every project still marked pending is an import that was cut off. */
+export function sweepPendingImports(): string[] {
+  const root = path.join(workspaceDir, 'projects');
+  const gone: string[] = [];
+  let names: string[] = [];
+  try { names = fs.readdirSync(root); } catch { return gone; }
+  for (const id of names) {
+    if (!fs.existsSync(path.join(root, id, PENDING_MARK))) continue;
+    try { discardProject(id, 'the import did not finish (the server stopped during it)'); gone.push(id); }
+    catch (e) { console.warn(`[projects] ${id}: an unfinished import could not be removed: ${(e as Error).message}`); }
+  }
+  if (gone.length) console.warn(`[projects] removed ${gone.length} project(s) left by an import that did not finish: ${gone.join(', ')}`);
+  return gone;
 }
 
 export function touchOpened(id: string): void {
@@ -496,7 +617,12 @@ export function setFolderAccess(user: User, keyOrName: string, grants: Array<{ u
 
 // ── Startup reconciliation (registry vs disk) ─────────────────────────────
 
-/** Import projects found on disk, drop rows whose folder is gone, restate the folder mirror. Mirrors JSS reconcileRegistry. */
+/**
+ * Import projects found on disk, restate the folder mirror, and mark registered projects whose folder is not there.
+ * WP-06 (PLT-003): a missing folder is never taken to mean "deleted": a drive not mounted yet, antivirus quarantine, a folder being
+ * moved or a partial restore would otherwise erase who may open what. The project keeps its row and memberships, is marked missing,
+ * and is shown to administrators, who restore the folder or delete the project. A folder that comes back clears the mark.
+ */
 export async function reconcileRegistry(): Promise<void> {
   const fsProjects: any[] = workspace.listProjects(workspaceDir);
   const ids = new Set<string>(fsProjects.map((p) => p.id));
@@ -504,13 +630,35 @@ export async function reconcileRegistry(): Promise<void> {
   for (const p of fsProjects) {
     if (!registryDb.getProject(p.id)) registryDb.upsertProject({ id: p.id, name: p.name, type: p.type, template: p.templateRef, now });
     store.setProjectFolder(p.id, folderKey(p.group) || null);
+    store.clearProjectMissing(p.id);
   }
+  const missing: string[] = [];
   for (const row of registryDb.listProjects()) {
     if (ids.has(row.id)) continue;
     if (fs.existsSync(workspace.projectDir(workspaceDir, row.id))) continue;
-    registryDb.deleteProject(row.id);
-    store.clearProjectGovernance(row.id);
+    if (!store.projectMissingSince(row.id)) audit({ actorId: null, actorUsername: 'system', action: 'project.folder_missing', projectId: row.id, targetType: 'project', targetId: row.id, meta: { name: row.name } });
+    store.markProjectMissing(row.id, now);
+    missing.push(row.id);
   }
+  if (missing.length) console.warn(`[projects] ${missing.length} project folder(s) not found: ${missing.join(', ')}. Kept and marked missing; an administrator restores the folder or deletes the project.`);
   await docIndex.reconcileAll(workspaceDir, [...ids], projectDirFor, now);
+  scanUnsafeProjectPaths();
   void vendor;
+}
+
+/**
+ * One check at every start (WP-01, decision D13: report, do not quarantine): a project.json whose file locations point
+ * outside the project is reported in the audit log and on the console. Nothing is changed or deleted; the read sites
+ * already ignore such values (`csdbRel`, `mediaRel`, `pmRel`), so the project opens on its standard folders.
+ */
+export function scanUnsafeProjectPaths(): Array<{ id: string; fields: string[] }> {
+  const found: Array<{ id: string; fields: string[] }> = [];
+  for (const row of registryDb.listProjects()) {
+    const fields = unsafeInputFields(readProjectJson(row.id));
+    if (!fields.length) continue;
+    found.push({ id: row.id, fields });
+    console.warn(`[projects] ${row.id}: project.json has unsafe file locations (${fields.join(', ')}); they are ignored and the standard folders are used.`);
+    audit({ actorId: null, actorUsername: 'system', action: 'project.unsafe_paths', projectId: row.id, targetType: 'project', targetId: row.id, meta: { fields } });
+  }
+  return found;
 }

@@ -27,7 +27,7 @@ import { importRwiProject, loadAndMap } from '../jss/rwi/importer';
 import { readRecord as readRwiRecord } from '../jss/rwi/record';
 import { Findings, type Finding } from '../jss/rwi/report';
 import { readPackage, RwiPackageError } from '../jss/rwi/source';
-import { createProject, csdbRel, deleteProject, isS1000dProject, mediaRel, pmRel, readProjectJson, type ProjectCard, type User } from '../projects';
+import { createProject, clearImportPending, csdbRel, discardProject, isS1000dProject, markImportPending, mediaRel, pmRel, readProjectJson, type ProjectCard, type User } from '../projects';
 import { adoptFromContents } from '../projectConfig';
 import { restoreSettings } from '../packageSettings';
 import { ZipStreamWriter } from '../zipio';
@@ -206,8 +206,14 @@ async function mapS1000d(hub: Hub, findings: Findings): Promise<{ doc: JssDocume
   } catch (e) { pkg.close(); throw e; }
 }
 
+// WP-06 (REL-004): a project made by a conversion is marked pending until convertHub has its result; a server stop in between leaves
+// the mark, and the next start removes the half-made project.
+const newProject = async (user: User, input: Parameters<typeof createProject>[1]): Promise<ProjectCard> => {
+  const card = await createProject(user, input); markImportPending(card.id, 'conversion'); return card;
+};
+
 async function toJss(user: User, hub: Hub, name: string, opts: TargetOpts): Promise<ConvertResult> {
-  const card = await createProject(user, { name, folder: opts.folder, format: 'jss', domain: opts.domain || 'land', manualType: opts.manualType || 'uhb' }); const id = card.id;
+  const card = await newProject(user, { name, folder: opts.folder, format: 'jss', domain: opts.domain || 'land', manualType: opts.manualType || 'uhb' }); const id = card.id;
   try {
     const type = jssTypeOfProject(id); if (!type?.chapters) throw bad('This kind of JSS manual has no chapter plan to import into yet. Choose another manual type.', 'IMPORT_TYPE');
     if (hub.from === 's1000d') {
@@ -226,12 +232,12 @@ async function toJss(user: User, hub: Hub, name: string, opts: TargetOpts): Prom
     const pictures = copyMedia(hub.mediaDir, path.join(projectDirFor(id), 'Media'));
     await writeJss(id, xml);
     return { ok: true, from: hub.from, to: 'jss', project: card, findings: hub.findings.list, counts: { ...countsOf(chapters), pictures }, identity: identitySummary(id) };
-  } catch (e) { try { deleteProject(user, id); } catch { /* leave nothing half-made */ } throw e; }
+  } catch (e) { try { discardProject(id, 'conversion failed'); } catch { /* leave nothing half-made */ } throw e; }
 }
 
 async function toJsg(user: User, hub: Hub, name: string, opts: TargetOpts): Promise<ConvertResult> {
   if ((opts.manualType || 'uhb') !== 'uhb') throw bad('Only a JSG User Handbook can be made from another format: an Illustrated Spare Parts List (plates, parts) has no counterpart in S1000D or JSS. Choose User Handbook.', 'JSG_TYPE_NOT_CONVERTIBLE');
-  const card = await createProject(user, { name, folder: opts.folder, format: 'jsg', domain: 'land', manualType: 'uhb' }); const id = card.id;
+  const card = await newProject(user, { name, folder: opts.folder, format: 'jsg', domain: 'land', manualType: 'uhb' }); const id = card.id;
   let close = (): void => undefined;
   try {
     let doc = hub.doc; let pictures = 0;
@@ -245,7 +251,7 @@ async function toJsg(user: User, hub: Hub, name: string, opts: TargetOpts): Prom
     const xml = withJsgBody(readJsg(id).xml, body, doc!.meta);
     await writeJsg(id, xml);
     return { ok: true, from: hub.from, to: 'jsg', project: card, findings: hub.findings.list, counts: { ...countsOf(doc!.chapters), pictures }, identity: identitySummary(id) };
-  } catch (e) { try { deleteProject(user, id); } catch { /* leave nothing half-made */ } throw e; } finally { close(); }
+  } catch (e) { try { discardProject(id, 'conversion failed'); } catch { /* leave nothing half-made */ } throw e; } finally { close(); }
 }
 
 /** The package files of a JSS (or JSG, through a short-lived JSS copy) document, as the S1000D importer reads them. */
@@ -254,7 +260,7 @@ async function exportEntries(user: User, hub: Hub, name: string): Promise<{ entr
   const direct = hub.from === 'jss' && projectId && readRwiRecord(projectId);
   if (!direct) {
     // a copy that carries the project's codes: the model code is the identity record's, so no "Project code" has to be asked for
-    const card = await createProject(user, { name: `${name} (export)`.slice(0, 80), format: 'jss', domain: 'land', manualType: 'uhb' }); temp = card.id;
+    const card = await newProject(user, { name: `${name} (export)`.slice(0, 80), format: 'jss', domain: 'land', manualType: 'uhb' }); temp = card.id;
     try {
       const type = jssTypeOfProject(temp)!;
       const chapters = hub.from === 'jss' ? hub.doc!.chapters : intoStencil(hub.doc!, hub.appendices, type.chapters!.map((c) => c.title), type.maxDepth, hub.findings);
@@ -263,7 +269,7 @@ async function exportEntries(user: User, hub: Hub, name: string): Promise<{ entr
       copyMedia(hub.mediaDir, path.join(projectDirFor(temp), 'Media'));
       await writeJss(temp, serializeJss({ docType: type.id, schemaVersion: '1.0', meta, chapters }));
       projectId = temp;
-    } catch (e) { try { deleteProject(user, temp); } catch { /* temp */ } throw e; }
+    } catch (e) { try { discardProject(temp, 'temporary export copy'); } catch { /* temp */ } throw e; }
   }
   try {
     const plan = await planExport(projectId!);
@@ -271,12 +277,12 @@ async function exportEntries(user: User, hub: Hub, name: string): Promise<{ entr
     if (plan.blocked) throw bad(`The document cannot be exported as S1000D yet: ${plan.report.findings.filter((f) => f.severity === 'error').map((f) => f.message).slice(0, 3).join(' ')}`, 'EXPORT_BLOCKED');
     const entries = plan.files.map((f) => ({ name: f.name, bytes: new Uint8Array(f.data ?? fs.readFileSync(f.abs!)) }));
     return { entries, findings: hub.findings.list };
-  } finally { if (temp) { try { deleteProject(user, temp); } catch { /* temp */ } } }
+  } finally { if (temp) { try { discardProject(temp, 'temporary export copy'); } catch { /* temp */ } } }
 }
 const safeMic = (projectId: string): string => { try { return identityOf(projectId).view.modelIdentCode; } catch { return ''; } };
 
 async function toS1000d(user: User, hub: Hub, name: string, opts: TargetOpts): Promise<ConvertResult> {
-  const card = await createProject(user, { name, folder: opts.folder, format: 's1000d' }); const id = card.id;
+  const card = await newProject(user, { name, folder: opts.folder, format: 's1000d' }); const id = card.id;
   try {
     let entries: Array<{ name: string; bytes: Uint8Array }>;
     if (hub.from === 's1000d') {
@@ -301,7 +307,7 @@ async function toS1000d(user: User, hub: Hub, name: string, opts: TargetOpts): P
       catch (e) { hub.findings.add('warning', 'settings-not-restored', `The package settings could not be applied: ${(e as Error).message}`); }
     }
     return { ok: true, from: hub.from, to: 's1000d', project: card, findings: hub.findings.list, counts: { chapters: hub.doc ? countsOf(hub.doc.chapters).chapters : 0, sections: res.imported.dms.length, pictures: res.imported.media.length }, imported: { dms: res.imported.dms.length, media: res.imported.media.length, withProblems: res.withProblems.length } };
-  } catch (e) { try { deleteProject(user, id); } catch { /* leave nothing half-made */ } throw e; }
+  } catch (e) { try { discardProject(id, 'conversion failed'); } catch { /* leave nothing half-made */ } throw e; }
 }
 
 /** Convert the hub to the target format as a new project called `name`. The source is not changed. */
@@ -310,6 +316,10 @@ export async function convertHub(user: User, hub: Hub, to: Format, name: string,
   // a project (or a lone JSS / JSG document) is never converted to its own format; an uploaded S1000D package imported as S1000D is the platform's ordinary S1000D import into a new project
   if (hub.from === to && (hub.projectId || !hub.zip)) throw bad(`The source is already ${label(to)}. Choose a different target format.`, 'SAME_FORMAT');
   const nm = String(name || `${hub.name} (${label(to)})`).trim().slice(0, 80);
-  try { return to === 'jss' ? await toJss(user, hub, nm, opts) : to === 'jsg' ? await toJsg(user, hub, nm, opts) : await toS1000d(user, hub, nm, opts); }
+  try {
+    const out = to === 'jss' ? await toJss(user, hub, nm, opts) : to === 'jsg' ? await toJsg(user, hub, nm, opts) : await toS1000d(user, hub, nm, opts);
+    if (out.project?.id) clearImportPending(out.project.id);
+    return out;
+  }
   finally { for (const c of hub.cleanup) c(); }
 }

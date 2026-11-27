@@ -65,7 +65,10 @@ const readModel = (abs: string): ReturnType<typeof parseModel> => parseModel(fs.
 export function readPm(projectId: string) {
   const abs = pmPath(projectId);
   if (!fs.existsSync(abs)) throw bad('This project has no publication module yet.', 'NO_PM');
-  const model = readModel(abs);
+  let model: ReturnType<typeof parseModel>;
+  // WP-07 (FE-009): a file that is not a publication module (a JSS or JSG document project, a damaged file) is the project's state, not a server bug
+  try { model = readModel(abs); }
+  catch (e) { throw bad(`The publication module of this project cannot be read: ${(e as Error).message}`, 'NOT_A_PM'); }
   const dms = listDms(projectId);
   return { ...model, counts: pmc.countEntries(model.entries), pool: unplaced(model.entries, dms), dms };
 }

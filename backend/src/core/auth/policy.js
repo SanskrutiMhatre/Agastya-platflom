@@ -24,20 +24,32 @@ const PASSWORD_MAX = 128;
 
 /*
   Central policy. Returns { ok: true } or { ok: false, error }.
-  There is explicitly NO "must not contain the username" rule.
+  There is explicitly NO "must not contain the username" rule, and no composition rule (NIST SP 800-63B-4).
+
+  `min` is the security policy's minimum length (default 15 there, RES-009; PASSWORD_MIN when no policy is given).
+  `context` words (the username, the person's name; the product names are always included) are refused when the
+  password is nothing but one of them with digits or symbols around it ("Asha2026!", "agastya-123"): the first thing
+  someone who knows the person would try (RES-009 "extend the blocklist with context words").
 */
-function validatePassword(password) {
+const PRODUCT_WORDS = ['agastya', 'agastyaplatform', 'jsspublisher', 's1000d', 'publisher'];
+function validatePassword(password, { min = PASSWORD_MIN, context = [] } = {}) {
   if (typeof password !== 'string' || password.length === 0) {
     return { ok: false, error: 'A password is required.' };
   }
-  if (password.length < PASSWORD_MIN) {
-    return { ok: false, error: `Password must be at least ${PASSWORD_MIN} characters.` };
+  if (password.length < min) {
+    return { ok: false, error: `Password must be at least ${min} characters.` };
   }
   if (password.length > PASSWORD_MAX) {
     return { ok: false, error: `Password must be at most ${PASSWORD_MAX} characters.` };
   }
   if (COMMON_PASSWORDS.has(password.toLowerCase())) {
     return { ok: false, error: 'That password is too common. Choose something less guessable.' };
+  }
+  const core = password.toLowerCase().replace(/[^a-z]/g, '');
+  const words = [...PRODUCT_WORDS, ...context.flatMap((w) => String(w || '').toLowerCase().split(/[\s._-]+/)), ...context.map((w) => String(w || '').toLowerCase().replace(/[^a-z]/g, ''))]
+    .filter((w) => w.length >= 3);
+  if (core && words.includes(core)) {
+    return { ok: false, error: 'That password is only your name, username or the product name with numbers or symbols added. Choose something less guessable.' };
   }
   return { ok: true };
 }
@@ -108,13 +120,17 @@ function surnameOf(fullName) {
 const TEMP_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
 
 /*
-  Temporary password: username@year. It is guessable by design (an administrator reads it out
-  once), so it only ever works for the first sign-in: the account is created with onboarding
-  pending and the forced-change gate, and the user must choose their own password before
-  anything else.
+  Temporary password: <username>-<8 random characters> (audit SEC-004 / PLT-014: the former username@year
+  could be guessed by anyone who knew a colleague's name). The random part comes from the CSPRNG
+  (crypto.randomInt, no modulo bias) over TEMP_ALPHABET, about 40 bits. It only ever works for the first
+  sign-in: the account is created with onboarding pending and the forced-change gate.
 */
-function tempPasswordFor(username, year = new Date().getFullYear()) {
-  return `${normalizeUsername(username)}@${year}`;
+const TEMP_RANDOM_LENGTH = 8;
+function tempPasswordFor(username) {
+  const { randomInt } = require('crypto');
+  let r = '';
+  for (let i = 0; i < TEMP_RANDOM_LENGTH; i++) r += TEMP_ALPHABET[randomInt(TEMP_ALPHABET.length)];
+  return `${normalizeUsername(username)}-${r}`;
 }
 
 const ascii = (s) => String(s || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '');

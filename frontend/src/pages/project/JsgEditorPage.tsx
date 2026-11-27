@@ -12,13 +12,14 @@ import { Icon } from '../../components/Icon';
 import { LazyPdfViewer } from '../../components/pdf/LazyPdfViewer';
 import { ThemeToggle } from '../../components/ThemeToggle';
 import { ConvertButton, ExportProjectButton, useSectionCode } from '../../components/DocCodes';
-import { Alert, Loading, Spinner, ago, errText } from '../../components/ui';
+import { Alert, ConfirmModal, Loading, Spinner, ago, errText } from '../../components/ui';
 import { canBuild, canWrite, useProject } from '../../layouts/ProjectShell';
 import { JsgEditor } from '../../jsg/editor';
 import { IsplEditor } from '../../jsg/ispl-editor';
 import type { GraphicInfo, JsgEditorLike } from '../../jsg/shared';
 import { JsgParseError, parseJsg } from '../../jsg/xml';
 import { useLeaveGuard } from '../../lib/leaveGuard';
+import { downloadText, useLocalDraft } from '../../lib/localDraft';
 import { useProgress } from '../../lib/progress';
 import { useUi } from '../../store/ui';
 
@@ -42,7 +43,18 @@ export function JsgEditorPage() {
   const [checking, setChecking] = useState(false);
   const [stale, setStale] = useState(false);
   const [importing, setImporting] = useState(false);
-  const [autosave, setAutosave] = useState(() => { try { return localStorage.getItem('agastya.jsg.autosave') === '1'; } catch { return false; } });
+  // PUB-023: autosave is on unless the author switched it off
+  const [autosave, setAutosave] = useState(() => { try { return localStorage.getItem('agastya.jsg.autosave') !== '0'; } catch { return true; } });
+  // FE-006 / PUB-023: a local draft while there are unsaved changes, offered back when the editor opens again
+  const draft = useLocalDraft(id, 'jsg', () => { const ed = editorRef.current; return ed && ed.isDirty() ? ed.getXml() : null; }, dirty, () => hashRef.current, loaded?.xml ?? null);
+  const recovered = useRef(false);
+  const recover = () => {
+    const d = draft.found; if (!d || !loaded) return;
+    try { parseJsg(d.xml); } catch (e) { toast(`The draft cannot be opened: ${errText(e)}`, 'error'); return; }
+    draft.dismiss(); recovered.current = true; setLoaded({ ...loaded, xml: d.xml });
+    toast('Your unsaved changes are back. Save to keep them.', 'info');
+  };
+  const [confirmReload, setConfirmReload] = useState(false);
   const wordInput = useRef<HTMLInputElement>(null);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [src, setSrc] = useState<string | null>(null);
@@ -75,7 +87,7 @@ export function JsgEditorPage() {
     setSaving(true);
     try {
       const out = await jsgApi.save(id, ed.getXml(), hashRef.current);
-      hashRef.current = out.hash; ed.markSaved(); setSavedAt(new Date()); applyFindings(out.report.findings);
+      hashRef.current = out.hash; ed.markSaved(); void draft.clear(); setSavedAt(new Date()); applyFindings(out.report.findings);
       if (out.report.errors) toast(`Saved as a draft: ${out.report.errors} error${out.report.errors === 1 ? '' : 's'} to fix before a PDF can be built.`, 'info');
       return true;
     } catch (e) {
@@ -117,7 +129,8 @@ export function JsgEditorPage() {
         notify: (m, kind) => toast(m, kind === 'error' ? 'error' : 'info'),
       },
     });
-    editorRef.current = editor; setDirty(editor.isDirty()); editor.setFindings(loaded.report.findings);
+    editorRef.current = editor; editor.setFindings(loaded.report.findings);
+    if (recovered.current) { recovered.current = false; editor.markDirty(); } else setDirty(editor.isDirty());
     return () => { editor.destroy(); editorRef.current = null; };
     // the editor is built once per loaded document
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -198,7 +211,7 @@ export function JsgEditorPage() {
   return (
     <>
       {guard}
-      <header className="v2-top" style={{ height: 42 }}>
+      <header className="v2-top v2-edhead">
         <h1 style={{ fontSize: 14 }} className="v2-trunc">{summary.project.name}</h1>
         {loaded ? <span className="v2-badge accent" title={`JSG document type ${loaded.docType}, from the stencil ${loaded.stencil}`}>JSG · {loaded.label}</span> : null}
         <span className={`v2-badge ${dirty ? 'warn' : 'ok'}`} data-testid="jsg-state" aria-live="polite">{saving ? 'Saving…' : dirty ? '● Unsaved changes' : savedAt ? `✓ Saved ${ago(savedAt.toISOString())}` : '✓ All changes saved'}</span>
@@ -221,7 +234,14 @@ export function JsgEditorPage() {
         <ThemeToggle />
       </header>
       {!writable ? <Alert tone="warn">You have {role} access to this project: you can read the document, but changes cannot be saved.</Alert> : null}
-      {stale ? <Alert tone="warn">Someone else saved this document after you opened it, so your save was refused. <button className="btn btn-sm" onClick={() => { if (!dirty || window.confirm('Reload the saved document? Your unsaved changes will be lost.')) void load(); }}>Reload the saved document</button></Alert> : null}
+      {stale ? <Alert tone="warn"><span data-testid="jsg-conflict">Someone else saved this document after you opened it, so your save was refused. Your changes are still here.</span>{' '}
+        <button className="btn btn-sm" onClick={() => { const ed = editorRef.current; if (ed) downloadText(`${summary.project.name || 'document'} (my version).xml`, ed.getXml()); }} data-testid="conflict-download">Download my version</button>{' '}
+        {role === 'manager' || role === 'owner' ? <><button className="btn btn-sm" onClick={() => void (async () => { try { const d = await jsgApi.read(id); hashRef.current = d.hash; setStale(false); if (await save()) toast('Saved: your version replaced the other one.', 'success'); } catch (e) { toast(errText(e), 'error'); } })()} data-testid="conflict-overwrite">Save mine over theirs</button>{' '}</> : null}
+        <button className="btn btn-sm" onClick={() => { if (!dirty) void load(); else setConfirmReload(true); }} data-testid="conflict-reload">Open their version</button></Alert> : null}
+      {confirmReload ? <ConfirmModal title="Open the other version?" danger confirmLabel="Discard my changes" body={<p>Your unsaved changes will be discarded. Download your version first if you want to keep a copy.</p>} onClose={() => setConfirmReload(false)} onConfirm={() => { setConfirmReload(false); void draft.clear(); void load(); }} /> : null}
+      {draft.found && !stale ? <Alert tone="warn"><span data-testid="draft-found">Unsaved changes from {new Date(draft.found.savedAt).toLocaleString()} were kept on this computer.</span>{' '}
+        <button className="btn btn-sm btn-primary" onClick={recover} data-testid="draft-recover">Recover them</button>{' '}
+        <button className="btn btn-sm" onClick={() => void draft.clear()} data-testid="draft-discard">Discard them</button></Alert> : null}
       {error ? <Alert tone="bad">{error}</Alert> : null}
       {!loaded && !error ? <Loading label="Opening the document…" /> : null}
       <div className="v2-split" data-testid="jsg-split" ref={splitRef} style={{ display: loaded ? undefined : 'none', ...(dragging ? { userSelect: 'none' } : {}) }}>
@@ -237,7 +257,7 @@ export function JsgEditorPage() {
           </div>
           <div style={{ flex: 1, minHeight: 0, position: 'relative' }} data-testid="pdf-pane">
             <LazyPdfViewer autoFit src={src} downloadName={`${summary.project.name}.pdf`}
-              placeholder={<div className="v2-center"><div className="v2-empty">
+              placeholder={<div className="v2-center"><div className="v2-empty v2-empty-steps">
                 <Icon name="pdf" size={30} />
                 <h3>No PDF yet</h3>
                 <ol>

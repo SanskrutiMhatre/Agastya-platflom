@@ -2,7 +2,7 @@
 // import the rich module -> open in the Studio -> it renders and is schema-valid -> the tag rules hold in the editor
 // -> type an edit and save with Ctrl+S -> the server has it -> Quick preview (browser engine and server FOP engine).
 //
-// Self-contained: creates its own author and project through the API (the UI sign-in is covered by platform.spec.ts).
+// Self-contained: creates its own author and project through the API (the UI sign-in is covered by 00-platform.spec.ts).
 
 import { test, expect, request as pwRequest, type Page, type APIRequestContext } from '@playwright/test';
 import path from 'node:path';

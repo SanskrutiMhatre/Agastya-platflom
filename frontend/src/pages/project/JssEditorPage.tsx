@@ -11,13 +11,14 @@ import { jssApi, type JssDocument, type JssFinding } from '../../api/jss';
 import { Icon } from '../../components/Icon';
 import { LazyPdfViewer } from '../../components/pdf/LazyPdfViewer';
 import { ThemeToggle } from '../../components/ThemeToggle';
-import { Alert, Loading, Spinner, ago, errText } from '../../components/ui';
+import { Alert, ConfirmModal, Loading, Spinner, ago, errText } from '../../components/ui';
 import { canBuild, canWrite, useProject } from '../../layouts/ProjectShell';
 import { JssEditor, type GraphicInfo } from '../../jss/editor';
 import { JssParseError, parseJss } from '../../jss/xml';
 import { PackagePanel } from '../../jss/PackagePanel';
 import { ConvertButton, ExportProjectButton, useSectionCode } from '../../components/DocCodes';
 import { useLeaveGuard } from '../../lib/leaveGuard';
+import { downloadText, useLocalDraft } from '../../lib/localDraft';
 import { useProgress } from '../../lib/progress';
 import { useUi } from '../../store/ui';
 
@@ -113,13 +114,28 @@ export function JssEditorPage() {
 
   const applyFindings = (findings: JssFinding[]) => editorRef.current?.setFindings(findings);
 
+  // PUB-023 / FE-006: a local draft while there are unsaved changes, offered back when the editor opens again
+  const draft = useLocalDraft(id, 'jss', () => { const ed = editorRef.current; return ed && ed.isDirty() ? ed.getXml() : null; }, dirty, () => hashRef.current, loaded?.xml ?? null);
+  const recover = () => {
+    const d = draft.found; const ed = editorRef.current; if (!d || !ed) return;
+    try { ed.restoreDocument(parseJss(d.xml)); draft.dismiss(); toast('Your unsaved changes are back. Save to keep them.', 'info'); }
+    catch (e) { toast(`The draft cannot be opened: ${errText(e)}`, 'error'); }
+  };
+  const [confirmReload, setConfirmReload] = useState(false);
+  // FE-007: after a refused save the author can keep their version: download it, or (managers and owners) save it over the other one
+  const overwrite = async () => {
+    try { const d = await jssApi.read(id); hashRef.current = d.hash; setStale(false); if (await save()) toast('Saved: your version replaced the other one.', 'success'); }
+    catch (e) { toast(errText(e), 'error'); }
+  };
+  const downloadMine = () => { const ed = editorRef.current; if (ed) downloadText(`${summary.project.name || 'document'} (my version).xml`, ed.getXml()); };
+
   const save = useCallback(async (): Promise<boolean> => {
     const ed = editorRef.current; if (!ed || !writable) return true;
     if (!ed.isDirty()) return true;
     setSaving(true);
     try {
       const out = await jssApi.save(id, ed.getXml(), hashRef.current);
-      hashRef.current = out.hash; ed.markSaved(); setSavedAt(new Date()); applyFindings(out.report.findings); ctx.reload();
+      hashRef.current = out.hash; ed.markSaved(); void draft.clear(); setSavedAt(new Date()); applyFindings(out.report.findings); ctx.reload();
       if (out.report.errors) toast(`Saved as a draft: ${out.report.errors} error${out.report.errors === 1 ? '' : 's'} to fix before a PDF can be built.`, 'info');
       return true;
     } catch (e) {
@@ -180,7 +196,7 @@ export function JssEditorPage() {
   return (
     <>
       {guard}
-      <header className="v2-top" style={{ height: 42 }}>
+      <header className="v2-top v2-edhead">
         <h1 style={{ fontSize: 14 }} className="v2-trunc">{summary.project.name}</h1>
         {loaded ? <span className="v2-badge accent" title={`Document type ${loaded.docType}, from the stencil ${loaded.stencil}`}>{loaded.label}</span> : null}
         <span className={`v2-badge ${dirty ? 'warn' : 'ok'}`} data-testid="jss-state" aria-live="polite">{saving ? 'Saving…' : dirty ? '● Unsaved changes' : savedAt ? `✓ Saved ${ago(savedAt.toISOString())}` : '✓ All changes saved'}</span>
@@ -189,7 +205,8 @@ export function JssEditorPage() {
         <button className="btn btn-sm" onClick={() => void save()} disabled={!writable || !dirty || saving} data-testid="jss-save" title={!writable ? 'You have read-only access' : !dirty ? 'Nothing to save' : 'Save the document (Ctrl+S)'}>{saving ? <Spinner /> : <Icon name="check" size={12} />}Save</button>
         <PackagePanel id={id} writable={writable} dirty={dirty} saveFirst={save} onImported={() => { setDirty(false); void load(); ctx.reload(); }} />
         <ConvertButton id={id} from="jss" name={summary.project.name} dirty={dirty} saveFirst={save} />
-        <ExportProjectButton id={id} dirty={dirty} saveFirst={save} />
+        {/* WP-07 (UX-019): two different exports, so two names; WP-22 folds them into the Document menu */}
+        <ExportProjectButton id={id} dirty={dirty} saveFirst={save} label="Export project" />
         <button className="btn btn-sm btn-primary" onClick={() => void generate()} disabled={!canBuild(role) || building || !loaded} data-testid="jss-generate" title={!canBuild(role) ? 'Reviewers, editors and owners can build the PDF' : 'Save, then build the whole publication as a PDF'}>{building ? <Spinner /> : <Icon name="play" size={12} />}{building ? 'Building…' : 'Generate PDF'}</button>
         <div className="v2-seg" role="group" aria-label="Editor layout">
           <button className={view === 'edit' ? 'on' : ''} onClick={() => setView('edit')} aria-pressed={view === 'edit'} title="Write only">Editor</button>
@@ -199,7 +216,14 @@ export function JssEditorPage() {
         <ThemeToggle />
       </header>
       {!writable ? <Alert tone="warn">You have {role} access to this project: you can read the document, but changes cannot be saved.</Alert> : null}
-      {stale ? <Alert tone="warn">Someone else saved this document after you opened it, so your save was refused. <button className="btn btn-sm" onClick={() => { if (!dirty || window.confirm('Reload the saved document? Your unsaved changes will be lost.')) void load(); }}>Reload the saved document</button></Alert> : null}
+      {stale ? <Alert tone="warn"><span data-testid="jss-conflict">Someone else saved this document after you opened it, so your save was refused. Your changes are still here.</span>{' '}
+        <button className="btn btn-sm" onClick={downloadMine} data-testid="conflict-download">Download my version</button>{' '}
+        {role === 'manager' || role === 'owner' ? <><button className="btn btn-sm" onClick={() => void overwrite()} data-testid="conflict-overwrite">Save mine over theirs</button>{' '}</> : null}
+        <button className="btn btn-sm" onClick={() => { if (!dirty) void load(); else setConfirmReload(true); }} data-testid="conflict-reload">Open their version</button></Alert> : null}
+      {confirmReload ? <ConfirmModal title="Open the other version?" danger confirmLabel="Discard my changes" body={<p>Your unsaved changes will be discarded. Download your version first if you want to keep a copy.</p>} onClose={() => setConfirmReload(false)} onConfirm={() => { setConfirmReload(false); void draft.clear(); void load(); }} /> : null}
+      {draft.found && !stale ? <Alert tone="warn"><span data-testid="draft-found">Unsaved changes from {new Date(draft.found.savedAt).toLocaleString()} were kept on this computer.</span>{' '}
+        <button className="btn btn-sm btn-primary" onClick={recover} data-testid="draft-recover">Recover them</button>{' '}
+        <button className="btn btn-sm" onClick={() => void draft.clear()} data-testid="draft-discard">Discard them</button></Alert> : null}
       {error ? <Alert tone="bad">{error}</Alert> : null}
       {!loaded && !error ? <Loading label="Opening the document…" /> : null}
       <div className="v2-split" data-testid="jss-split" ref={splitRef} style={{ display: loaded ? undefined : 'none', ...(dragging ? { userSelect: 'none' } : {}) }}>
@@ -215,7 +239,7 @@ export function JssEditorPage() {
           </div>
           <div style={{ flex: 1, minHeight: 0, position: 'relative' }} data-testid="pdf-pane">
             <LazyPdfViewer autoFit src={src} downloadName={`${summary.project.name}.pdf`}
-              placeholder={<div className="v2-center"><div className="v2-empty">
+              placeholder={<div className="v2-center"><div className="v2-empty v2-empty-steps">
                 <Icon name="pdf" size={30} />
                 <h3>No PDF yet</h3>
                 <ol>

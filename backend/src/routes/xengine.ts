@@ -14,7 +14,7 @@ import type { Express } from 'express';
 import { requireAuth, requireProject, audit } from '../context';
 import { wrap, bad } from '../services/http';
 import { diskUpload, discard, tooLarge, uploadTmp } from '../services/uploads';
-import { assertNotCir, deleteProject } from '../services/projects';
+import { assertNotCir } from '../services/projects';
 import * as archive from '../services/projectArchive';
 import { FORMATS, MATRIX, convertHub, hubFromProject, hubFromUpload, label, type Format } from '../services/xengine/convert';
 
@@ -64,7 +64,7 @@ export function registerXengineRoutes(app: Express): void {
         if (source !== 'auto' && source !== man.format) throw bad(`This archive is a ${label(man.format as Format)} project, not ${label(source)}. Choose ${label(man.format as Format)} (or Detect) as the source.`, 'WRONG_SOURCE');
         if (target !== man.format) throw bad(`This archive is a ${label(man.format as Format)} project; import it as ${label(man.format as Format)}, then convert the new project to ${label(target)} (Project > Convert).`, 'ARCHIVE_FORMAT');
         const o = (k: string): string | undefined => { const v = String(body[k] ?? '').trim(); return v || undefined; };
-        const done = await archive.restoreProjectArchive(req.auth.user, file.path, { name: o('name'), folder: o('folder'), discard: (id) => { try { deleteProject(req.auth.user, id); } catch { /* best effort */ } } });
+        const done = await archive.restoreProjectArchive(req.auth.user, file.path, { name: o('name'), folder: o('folder') });
         log(req, 'project.imported-as', done.project.id, { from: man.format, to: man.format, file: file.originalname, archive: true, files: done.counts.files, comments: done.counts.comments });
         return void res.status(201).json({ ok: true, from: man.format, to: man.format, project: done.project, findings: done.findings.map((f) => ({ severity: f.severity, code: 'project-archive', message: f.message })), counts: { chapters: 0, sections: 0, pictures: 0 }, restored: done.counts });
       }

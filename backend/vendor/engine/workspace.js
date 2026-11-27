@@ -103,9 +103,11 @@ function removeEmptyFolder(ws, name) {
 function slug(name) {
     return String(name).trim().toLowerCase().replace(/[^\w]+/g, '-').replace(/^-+|-+$/g, '') || 'project';
 }
-function uniqueId(ws, base) {
+// isTaken (WP-06, PLT-004): the platform also refuses an id it has used before (a deleted or missing project, rows left from one),
+// so a new project with an old name never inherits that project's documents, releases or locks.
+function uniqueId(ws, base, isTaken) {
     let id = base, n = 2;
-    while (fs.existsSync(projectDir(ws, id))) id = `${base}-${n++}`;
+    while (fs.existsSync(projectDir(ws, id)) || (isTaken && isTaken(id))) id = `${base}-${n++}`;
     return id;
 }
 
@@ -181,9 +183,9 @@ function copyDir(src, dst) {
 // Create a project. With `fromId`, clone that project (data and all). Otherwise
 // scaffold an empty project: project.json from the template, empty csdb/Media,
 // and the static front-matter pages copied from the app.
-function createProject(ws, { name, fromId, type, templateRef, staticFrontMatterDir, pipeline, group }) {
+function createProject(ws, { name, fromId, type, templateRef, staticFrontMatterDir, pipeline, group, isTaken }) {
     ensureWorkspace(ws);
-    const id = uniqueId(ws, slug(name || fromId || 'project'));
+    const id = uniqueId(ws, slug(name || fromId || 'project'), isTaken);
     const dst = projectDir(ws, id);
 
     if (fromId) {

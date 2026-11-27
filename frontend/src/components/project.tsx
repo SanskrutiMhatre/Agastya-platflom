@@ -30,6 +30,7 @@ export function ProjectCardView({ p, onOpen }: { p: ProjectCard; onOpen?: () => 
         <Badge>{p.dmCount} data module{p.dmCount === 1 ? '' : 's'}</Badge>
         {p.hasPdf ? <Badge tone="ok"><Icon name="pdf" size={11} />PDF built</Badge> : null}
         <Badge>{formatLabel(p)}</Badge>
+        {p.missingSince ? <Badge tone="bad" title={`The project folder was not found when the server started (${new Date(p.missingSince).toLocaleString()}). Nothing was deleted: restore the folder, or an administrator deletes the project.`}>Folder missing</Badge> : null}
       </div>
       <div className="v2-hint">{p.folder ? `in ${p.folder} · ` : ''}opened {ago(p.lastOpened ?? p.updatedAt)}{p.owners.length ? ` · owner ${p.owners[0]}` : ''}</div>
     </div>

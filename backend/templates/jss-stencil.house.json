@@ -178,27 +178,27 @@
     "cautionsNotes": [],
     "descriptionOfSymbols": [
       {
-        "icon": "Media/High_Voltage_Symbol.png",
+        "icon": "",
         "text": "This symbol indicates that this operation or action involves high voltage."
       },
       {
-        "icon": "Media/Flammable_Symbol.png",
+        "icon": "",
         "text": "This symbol indicates that this operation or action involves Highly Flammable material."
       },
       {
-        "icon": "Media/Emergency_Stop_Symbol.png",
+        "icon": "",
         "text": "This symbol indicates that system operation need to be stopped quickly."
       },
       {
-        "icon": "Media/Hot_Surface_Symbol.png",
+        "icon": "",
         "text": "This symbol indicates that this operation or action involves hot surface areas."
       },
       {
-        "icon": "Media/Antistalic_Symbol.png",
+        "icon": "",
         "text": "This symbol indicates that this operation or action to be carried out using antistatic wears."
       },
       {
-        "icon": "Media/Noise_symbol.png",
+        "icon": "",
         "text": "This symbol indicates that this operation or action involves high level sound noise."
       }
     ],
@@ -212,7 +212,6 @@
     "firstAidImageWidth": "58mm",
     "firstAidImageHeight": "115mm",
     "systemImages": [
-      "Media/Screenshot 2026-09-05 160259.png",
       ""
     ],
     "style": "s1000d",

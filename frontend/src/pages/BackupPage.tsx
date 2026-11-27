@@ -18,6 +18,7 @@ export function BackupPage() {
         </ul>
         <BackupButton label={admin ? 'Back up the platform' : 'Back up my projects'} />
         <p className="v2-hint" style={{ marginBottom: 0 }}>The file is built when you press the button, so it always holds the current state.</p>
+        {admin ? <p className="v2-hint" style={{ marginBottom: 0 }} data-testid="backup-scope">This is an export of the project data, not a database backup: it holds no passwords, platform settings or release records and cannot be restored from here. For a complete backup, copy the data folder of the stopped server (administrator guide, section 7).</p> : null}
       </div>
     </div>
   );

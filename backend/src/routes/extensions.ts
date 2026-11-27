@@ -1,7 +1,7 @@
 // Extension profiles: Administrators register (namespace + XSD); projects explicitly enable.
 import type { Express } from 'express';
 import { audit, requireAdmin, requireProject, store } from '../context';
-import { wrap, param } from '../services/http';
+import { wrap, param, forbidden } from '../services/http';
 import * as ext from '../services/extensions';
 import { isCirProject } from '../services/projects';
 
@@ -21,7 +21,7 @@ export function registerExtensionRoutes(app: Express): void {
     const on = ext.enabledFor(req.project.id); res.json({ profiles: ext.listProfiles().map((p) => ({ id: p.id, name: p.name, namespace: p.namespace, description: p.description, enabled: on.has(p.id) })) });
   }));
   app.put(`${base}/:profileId`, requireProject('manager', { from: 'param', cap: 'config.write' }), wrap((req, res) => {
-    if (isCirProject(req.project.id)) throw Object.assign(new Error('Extension profiles are not used in the shared repository.'), { status: 403 });
+    if (isCirProject(req.project.id)) throw forbidden('Extension profiles are not used in the shared repository.', 'CIR_NO_EXTENSIONS');      // WP-07 (PLT-024): a 403, not a 500
     ext.setEnabled(req.project.id, param(req, 'profileId'), req.body?.enabled !== false, req.auth.user.id);
     audit({ actorId: req.auth.user.id, actorUsername: req.auth.user.username, action: req.body?.enabled === false ? 'extension.disabled' : 'extension.enabled', projectId: req.project.id, targetType: 'project', targetId: req.project.id, meta: { profile: param(req, 'profileId') } });
     res.json({ ok: true });

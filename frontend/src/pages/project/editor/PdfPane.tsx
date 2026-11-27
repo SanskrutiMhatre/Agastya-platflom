@@ -165,7 +165,7 @@ export function PdfPane({ ctx, savedTick, onOpenAt, onPopped }: { ctx: ProjectCt
       {shown ? <div className="v2-hint v2-trunc" style={{ padding: '4px 10px' }} title={shown} data-testid="pdf-shown">{shown}</div> : null}
       <div style={{ flex: 1, minHeight: 0, position: 'relative' }} data-testid="pdf-pane">
         <LazyPdfViewer autoFit src={src} downloadName={`${summary.project.name}.pdf`}
-          placeholder={<div className="v2-center"><div className="v2-empty">
+          placeholder={<div className="v2-center"><div className="v2-empty v2-empty-steps">
             <Icon name="pdf" size={30} />
             <h3>No PDF yet</h3>
             <ol>

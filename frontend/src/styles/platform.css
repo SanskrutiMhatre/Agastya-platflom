@@ -42,6 +42,9 @@ a:hover { text-decoration: underline; }
 .v2-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .v2-top { display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 20px; background: var(--bg-elev); border-bottom: 1px solid var(--border); flex: none; }
 .v2-top h1 { font-size: 16px; margin: 0; font-weight: 650; }
+/* WP-07 (UX-006): the editors' header wraps onto a second row instead of pushing Split / PDF / Generate past the right edge (stop-gap before WP-22) */
+.v2-edhead { height: auto; min-height: 42px; flex-wrap: wrap; row-gap: 6px; padding-top: 5px; padding-bottom: 5px; }
+.v2-edhead > h1 { min-width: 0; flex: 0 1 auto; }
 .v2-crumbs { display: flex; align-items: center; gap: 6px; color: var(--text-muted); font-size: 13px; min-width: 0; }
 .v2-crumbs strong { color: var(--text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .v2-page { flex: 1; min-height: 0; overflow: auto; padding: 22px 28px 40px; }
@@ -66,7 +69,8 @@ a:hover { text-decoration: underline; }
 .v2-stack { display: flex; flex-direction: column; gap: 12px; }
 .v2-spread { justify-content: space-between; }
 .v2-empty { padding: 32px 16px; text-align: center; color: var(--text-muted); }
-.v2-empty strong { display: block; color: var(--text); margin-bottom: 4px; }
+/* WP-07 (UX-016, DS-004): only the title is a block; emphasis inside the text stays inline. Title and text are centred alike. */
+.v2-empty-title { display: block; color: var(--text); margin-bottom: 4px; }
 .v2-badge { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px; border-radius: 10px; font-size: 11px; font-weight: 600; background: var(--bg-sunken); color: var(--text-muted); border: 1px solid var(--border); white-space: nowrap; }
 .v2-badge.ok { background: var(--success-soft); color: var(--success); border-color: transparent; }
 .v2-badge.warn { background: var(--warning-soft); color: var(--warning); border-color: transparent; }
@@ -77,6 +81,18 @@ a:hover { text-decoration: underline; }
 .v2-input:focus, .v2-select:focus, .v2-textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
 .v2-field { display: flex; flex-direction: column; gap: 5px; }
 .v2-field > label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+/* WP-07 (UX-018): the JSG cover form (built by jsg/shared.ts coverCard) in the platform's field layout */
+.v2-jsg-cover .jsg-card > h3 { display: none; }
+.v2-jsg-cover .jsg-card { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 12px 16px; }
+.v2-jsg-cover .jsg-card > label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.v2-jsg-cover input { height: 32px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--bg-elev); color: var(--text); width: 100%; font: inherit; font-weight: 400; }
+.v2-jsg-cover input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+.v2-jsg-cover input:disabled { opacity: .7; }
+.v2-jsg-cover .jsg-card > div { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; }
+.v2-jsg-cover .jsg-tag { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.v2-jsg-cover .jsg-row { display: flex; gap: 6px; align-items: center; }
+.v2-jsg-cover .jsg-row > button, .v2-jsg-cover button.add { height: 28px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--bg-elev); color: var(--text); cursor: pointer; flex: none; align-self: flex-start; }
+.v2-jsg-cover .jsg-row > button:hover, .v2-jsg-cover button.add:hover { background: var(--bg-sunken); }
 .v2-hint { font-size: 12px; color: var(--text-faint); }
 .v2-error { color: var(--danger); font-size: 12.5px; }
 .v2-alert { padding: 10px 14px; border-radius: 8px; font-size: 13px; border: 1px solid var(--border); background: var(--bg-sunken); }
@@ -391,10 +407,11 @@ html.v2-compact .v2-card-pad { padding: 12px; }
 .v2-dmpanel .v2-dm { border-left: 3px solid transparent; border-radius: 0 6px 6px 0; }
 .v2-dmpanel .v2-dm.active { border-left-color: var(--accent); }
 .v2-dmpanel .v2-chap { font-size: 11.5px; font-weight: 650; letter-spacing: .02em; color: var(--text-muted); }
-.v2-empty { max-width: 300px; margin: 0 auto; padding: 20px 16px; text-align: left; color: var(--text-muted); }
-.v2-empty > svg { display: block; margin: 0 auto 6px; color: var(--text-faint); }
-.v2-empty h3 { margin: 0 0 8px; text-align: center; font-size: 14px; color: var(--text); }
-.v2-empty ol { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.6; }
+/* the editors' PDF placeholder: a narrow column of numbered steps (it used to restyle every .v2-empty) */
+.v2-empty-steps { max-width: 300px; margin: 0 auto; padding: 20px 16px; text-align: left; }
+.v2-empty-steps > svg { display: block; margin: 0 auto 6px; color: var(--text-faint); }
+.v2-empty-steps h3 { margin: 0 0 8px; text-align: center; font-size: 14px; color: var(--text); }
+.v2-empty-steps ol { margin: 0; padding-left: 18px; font-size: 12.5px; line-height: 1.6; }
 .v2-divider { width: 4px; }
 @media (max-width: 900px) {
   .v2-crumb, .v2-saved { display: none; }
@@ -429,4 +446,8 @@ html.v2-compact .v2-card-pad { padding: 12px; }
 
 /* the PDF viewer is dark in both themes: its empty-state text must read on it */
 [data-testid="pdf-pane"] .v2-empty, [data-testid="pdf-pane"] .v2-empty h3, [data-testid="pdf-pane"] .v2-empty > svg { color: #d5dae0; }
-[data-testid="pdf-pane"] .v2-empty strong { color: #fff; }
+[data-testid="pdf-pane"] .v2-empty strong { color: #fff; font-weight: 600; }
+
+/* FE-004: the server is not answering; the page stays usable. */
+.v2-offline-banner { position: fixed; left: 50%; top: 8px; transform: translateX(-50%); z-index: 1000; padding: 6px 14px; border-radius: 6px;
+  background: var(--warning-soft); color: var(--warning); border: 1px solid currentColor; font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,.15); }

@@ -42,10 +42,18 @@ function clearCookie({ secure = false } = {}) {
   return parts.join('; ');
 }
 
+/*
+  The session policy (WP-03; securityPolicy.js): `absoluteHours` is the lifetime from sign-in (the cookie's age too),
+  `idleMinutes` ends a session nobody has used for that long, `singleSession` decides whether a new sign-in ends the
+  others. Without a policy (unit tests) the defaults apply.
+*/
+const DEFAULT_POLICY = { read: () => ({ idleMinutes: 30, absoluteHours: 12, singleSession: true }) };
+
 class SessionService {
-  constructor(store, { now = () => new Date(), secureCookies = false } = {}) {
+  constructor(store, { now = () => new Date(), secureCookies = false, policy = DEFAULT_POLICY } = {}) {
     this.store = store;
     this.now = now;
+    this.policy = policy;
     // Manual override ONLY: force every cookie Secure regardless of what the
     // request looks like. Per-request auto-detection (isSecureReq, below) is
     // what actually covers the common case — this stays for an operator who
@@ -77,23 +85,34 @@ class SessionService {
   issue(userId, { ip, userAgent, req } = {}) {
     const token = newToken();
     const now = this.now();
+    const p = this.policy.read();
+    const ttl = (p.absoluteHours || 12) * 3600 * 1000;
     const { displaced } = this.store.insertSessionDisplacing({
       id: newId(),
       userId,
       tokenHash: sha256hex(token),
       now: now.toISOString(),
-      expiresAt: new Date(now.getTime() + SESSION_TTL_MS).toISOString(),
+      expiresAt: new Date(now.getTime() + ttl).toISOString(),
       ip, userAgent,
+      displace: p.singleSession !== false,
     });
-    return { token, displaced, cookie: cookieFor(token, { secure: this.isSecureReq(req) }) };
+    return { token, displaced, cookie: cookieFor(token, { secure: this.isSecureReq(req), maxAgeMs: ttl }) };
   }
 
-  // Resolve a request's cookie to session+user in one store query.
+  // Resolve a request's cookie to session+user in one store query. A session unused for longer than the idle limit is
+  // ended here (reason "idle"), so the limit holds for every route and the WebSocket alike.
   resolveFromCookieHeader(cookieHeader) {
     const token = parseCookies(cookieHeader)[COOKIE_NAME];
     if (!token || token.length < 20 || token.length > 128) return null;
-    const row = this.store.resolveSession(sha256hex(token), this.now().toISOString());
+    const now = this.now();
+    const row = this.store.resolveSession(sha256hex(token), now.toISOString());
     if (!row) return null;
+    const idle = this.policy.read().idleMinutes;
+    const seen = Date.parse(row.last_seen_at || row.session_created_at || 0) || 0;
+    if (idle > 0 && now.getTime() - seen > idle * 60 * 1000) {
+      try { this.store.revokeSessionById(row.session_id, 'idle', now.toISOString()); } catch { /* the next request tries again */ }
+      return null;
+    }
     return {
       session: {
         id: row.session_id,
@@ -114,6 +133,13 @@ class SessionService {
         createdAt: row.created_at,
       },
     };
+  }
+
+  /* Why the request's cookie no longer signs anyone in: 'displaced' | 'idle' | 'expired' | 'disabled' | 'signout' | ... | null (UX-022). */
+  endReasonFromCookieHeader(cookieHeader) {
+    const token = parseCookies(cookieHeader)[COOKIE_NAME];
+    if (!token || token.length < 20 || token.length > 128) return null;
+    try { return this.store.sessionEndReason(sha256hex(token), this.now().toISOString()); } catch { return null; }
   }
 
   revokeByCookieHeader(cookieHeader, reason) {

@@ -27,6 +27,7 @@ import crypto from 'crypto';
 import { nowIso } from '../config';
 import { store, projectDirFor } from '../context';
 import { bad, conflict, notFound } from './http';
+import { csvRow } from './csv';
 import { readProjectJson, csdbRel } from './projects';
 
 const { newId } = require('../core/auth/crypto');
@@ -361,10 +362,9 @@ export function exportProject(projectId: string, format: 'json' | 'csv'): { body
     const tree = (list: SnsNode[]): any[] => list.map((n) => ({ code: n.code, title: n.title, ...(n.children?.length ? { children: tree(n.children) } : {}) }));
     return { body: JSON.stringify({ format: 'agastya-sns', version: 1, tree: tree(treeOf(nodes)) }, null, 2), type: 'application/json', name: 'sns.json' };
   }
-  const q = (s: string) => `"${s.replace(/"/g, '""')}"`;
   const rows = ['system,subsystem,assembly,title', ...nodes.sort((a, b) => a.path.localeCompare(b.path)).map((n) => {
     const c = n.path.split('/');
-    return [c[0] ?? '', c[1] ?? '', c[2] ?? '', q(n.title)].join(',');
+    return csvRow([c[0] ?? '', c[1] ?? '', c[2] ?? '', n.title]);      // WP-07 (SEC-015): a title starting with = is text
   })];
   return { body: rows.join('\r\n') + '\r\n', type: 'text/csv', name: 'sns.csv' };
 }

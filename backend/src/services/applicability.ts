@@ -30,6 +30,7 @@ import { getConfig, updateConfig } from './projectConfig';
 import { defaultLetterFor } from './brex';
 import { listItems } from './adminConfig';
 import { IssueKey } from './s1000dRef';
+import { yielder } from './yieldLoop';
 
 const { validateDocument } = vendor('engine/validateSchema');
 
@@ -369,7 +370,9 @@ export function resolveApplicRef(ref: Element, lookup: DmLookup): ExternalApplic
 export const externalRefs = (doc: Document): Element[] => all(doc, 'applicRef').filter((r) => ['dmStatus', 'referencedApplicGroupRef'].includes((r.parentNode as Element | null)?.nodeName ?? ''));
 
 /** Every applicability reference problem in the project, each with the data module and the XML location. */
-export function validateProject(projectId: string): Problem[] {
+/** WP-32 (PERF-001 stop-gap): async, and it gives the event loop a turn between modules so a large project does not freeze the server. */
+export async function validateProject(projectId: string): Promise<Problem[]> {
+  const tick = yielder();
   const out: Problem[] = []; const dir = csdbDir(projectId); if (!fs.existsSync(dir)) return out;
   const rel = (f: string) => `${csdbRel(readProjectJson(projectId))}/${f}`;
   const { model, files } = readModel(projectId);
@@ -394,10 +397,12 @@ export function validateProject(projectId: string): Problem[] {
   // data modules (parsed once: the externalized references look other data modules up by DMC)
   const docs = new Map<string, Document>(); const byDmc = new Map<string, Document>();
   for (const d of listDms(projectId)) {
+    await tick();
     try { const doc = parse(fs.readFileSync(path.join(dir, d.file), 'utf8')); docs.set(d.file, doc); byDmc.set(dmcKey(doc.getElementsByTagName('dmCode')[0]), doc); } catch { /* unreadable: reported elsewhere */ }
   }
   const lookup: DmLookup = (dmc) => byDmc.get(dmc) ?? null;
   for (const [file, doc] of docs) {
+    await tick();
     if (tableSet.has(file)) continue;
     const root = doc.documentElement; if (!root || root.nodeName !== 'dmodule') continue;
     const applics = all(doc, 'applic');

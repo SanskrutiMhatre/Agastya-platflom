@@ -114,6 +114,8 @@ function Team() {
   const [authorRole, setAuthorRole] = useState<ProjectRole>('editor');
   const [manager, setManager] = useState('');
   const [remove, setRemove] = useState<{ userId: string; name: string } | null>(null);
+  // FE-012: changing someone's access is confirmed first
+  const [access, setAccess] = useState<{ userId: string; name: string; role: ProjectRole } | null>(null);
   const isOwner = role === 'owner' || me?.role === 'admin';
   const canManage = isOwner || role === 'manager';
 
@@ -135,7 +137,7 @@ function Team() {
               <td><strong>{x.fullName}</strong> <span className="v2-hint">@{x.username}</span>{x.disabled ? <> <Badge tone="bad">disabled</Badge></> : null}{x.userId === me?.id ? <> <Badge>you</Badge></> : null}</td>
               <td style={{ width: 210 }}>{locked(x.role)
                 ? <Badge tone={x.role === 'owner' || x.role === 'manager' ? 'accent' : undefined}>{PROJECT_LABEL[x.role]}</Badge>
-                : <select className="v2-select" value={x.role} aria-label={`Access of ${x.username}`} onChange={(e) => act(() => workspaceApi.setMemberRole(id, x.userId, e.target.value as ProjectRole), 'Access changed')}>{rowRoles.map((r) => <option key={r} value={r}>{PROJECT_LABEL[r]}</option>)}</select>}</td>
+                : <select className="v2-select" value={x.role} aria-label={`Access of ${x.username}`} onChange={(e) => setAccess({ userId: x.userId, name: x.fullName, role: e.target.value as ProjectRole })}>{rowRoles.map((r) => <option key={r} value={r}>{PROJECT_LABEL[r]}</option>)}</select>}</td>
               <td style={{ width: 44, textAlign: 'right' }}>{!locked(x.role) ? <button className="icon-btn" aria-label={`Remove ${x.username}`} onClick={() => setRemove({ userId: x.userId, name: x.fullName })}><Icon name="trash" /></button> : null}</td>
             </tr>))}</tbody></table>
         {m.data.invitations.length ? (
@@ -171,6 +173,7 @@ function Team() {
           ) : null}
         </div>
       ) : <Alert>Only the project's owner or its Project Manager can change who has access.</Alert>}
+      {access ? <ConfirmModal title={`Give ${access.name} ${PROJECT_LABEL[access.role]} access?`} confirmLabel="Change access" onClose={() => setAccess(null)} onConfirm={() => { const a = access; setAccess(null); void act(() => workspaceApi.setMemberRole(id, a.userId, a.role), 'Access changed'); }} body="The change applies at once." /> : null}
       {remove ? <ConfirmModal title={`Remove ${remove.name}?`} danger confirmLabel="Remove" onClose={() => setRemove(null)} body="They lose access to this project immediately." onConfirm={() => { const r = remove; setRemove(null); void act(() => workspaceApi.removeMember(id, r.userId), 'Removed from the project'); }} /> : null}
     </div>
   );

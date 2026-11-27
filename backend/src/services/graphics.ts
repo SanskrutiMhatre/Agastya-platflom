@@ -17,7 +17,7 @@ import { projectDirFor } from '../context';
 import { bad, conflict, notFound } from './http';
 import { removeReleasingRenderer } from './renderer';
 import { csdbDir, DM_FILE_RE, listMedia } from './csdb';
-import { readProjectJson, mediaRel, csdbRel } from './projects';
+import { readProjectJson, mediaRel, csdbRel, pmRel } from './projects';
 import { assetProblem } from './mediaFormats';
 import { riskyAllowed } from './assets';
 
@@ -36,9 +36,9 @@ function usage(projectId: string, names: string[]): Map<string, string[]> {
   // a JSS document (services/jss) holds its figures in the one source file
   const pjj = readProjectJson(projectId);
   if (pjj.authoring === 'jss-xml') {
-    const src = path.join(projectDirFor(projectId), (pjj.input && pjj.input.pm) || 'publication.xml');
+    const src = path.join(projectDirFor(projectId), pmRel(pjj));
     let xml = ''; try { xml = fs.readFileSync(src, 'utf8'); } catch { /* no document yet */ }
-    const title = (pjj.input && pjj.input.pm) || 'publication.xml';
+    const title = pmRel(pjj);
     for (const n of names) if (xml.includes(`/${n}"`)) out.get(n)!.push(title);
   }
   const dir = csdbDir(projectId);

@@ -295,6 +295,20 @@ begin
   Log(FileName + ' ' + Params + ' -> ' + IntToStr(Code));
 end;
 
+// WP-04: SYSTEM and Administrators full control, the server's identity modify, nobody else; inheritance removed.
+// S-1-5-18 SYSTEM, S-1-5-32-544 Administrators, S-1-5-19 LOCAL SERVICE, S-1-5-32-545 Users, S-1-5-11 Authenticated Users.
+procedure LockDownFolder(const Dir: String);
+var
+  Icacls, Who: String;
+begin
+  ForceDirectories(Dir);
+  Icacls := ExpandConstant('{sys}\icacls.exe');
+  if ServiceWanted then Who := '*S-1-5-19:(OI)(CI)M'
+  else Who := '"' + GetUserNameString + '":(OI)(CI)M';
+  RunHidden(Icacls, '"' + Dir + '" /inheritance:r /grant:r *S-1-5-18:(OI)(CI)F *S-1-5-32-544:(OI)(CI)F ' + Who + ' /C /Q');
+  RunHidden(Icacls, '"' + Dir + '" /remove:g *S-1-5-32-545 *S-1-5-11 /T /C /Q');
+end;
+
 procedure StopRunningCopy;
 var
   Ctl: String;
@@ -369,12 +383,17 @@ begin
     if SwitchGiven('LAN') then SetIniString('server', 'Bind', 'lan', IniPath);
   end;
 
-  // A per-machine installation is used by standard users (the tray application writes the logs and the database), so they get modify rights on
-  // the data and state folders - and only on those.
+  // The data folder holds the database (password hashes, sessions, the audit log) and every project; the state folder holds the
+  // configuration and the logs. On a per-machine installation only SYSTEM, the Administrators and the identity that runs the
+  // server may use them (audit WP-04: ENT-004, SEC-005, gate G-SEC-6): inheritance from C:\ProgramData (which gives every
+  // user read access) is cut, and the former "Users: modify" grant is removed. The server runs as LOCAL SERVICE when it is a
+  // Windows service (AgastyaCtl --install-service grants that account modify rights itself); without the service it runs in
+  // the tray of the person who installed it, who is granted modify rights here. A per-user installation (/CURRENTUSER)
+  // lives in that person's profile, whose permissions are already private.
   if IsAdminInstallMode then
   begin
-    RunHidden(ExpandConstant('{sys}\icacls.exe'), '"' + GetStateDir('') + '" /grant *S-1-5-32-545:(OI)(CI)M /C /Q');
-    RunHidden(ExpandConstant('{sys}\icacls.exe'), '"' + WantedDataDir + '" /grant *S-1-5-32-545:(OI)(CI)M /C /Q');
+    LockDownFolder(GetStateDir(''));
+    LockDownFolder(WantedDataDir);
   end;
 end;
 

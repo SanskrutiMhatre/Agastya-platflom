@@ -7,13 +7,13 @@ import path from 'path';
 import type { Express, RequestHandler } from 'express';
 import { diskUpload, uploadTmp } from '../services/uploads';
 import { ZipFileReader } from '../services/zipio';
-import { audit, requireAuth, requireProject } from '../context';
+import { audit, requireAuth, requireProject, store } from '../context';
 import { wrap, param, bad, HttpError } from '../services/http';
 import * as obj from '../services/csdbObjects';
 import * as assets from '../services/assets';
 import * as pk from '../services/packages';
 import { generateDml } from '../services/dispatch';
-import { isCirProject, createProject, deleteProject } from '../services/projects';
+import { isCirProject, createProject, markImportPending, clearImportPending, discardProject, readProjectJson } from '../services/projects';
 import { adoptFromContents } from '../services/projectConfig';
 import { readManifestOf } from '../services/projectArchive';
 import { restoreSettings, type RestoreReport } from '../services/packageSettings';
@@ -82,12 +82,13 @@ export function registerPackageRoutes(app: Express): void {
     const held = TOKEN_RE.test(token) ? pending.get(token) : undefined;
     if (!held || held.userId !== user.id || !fs.existsSync(held.file)) throw bad('That upload has expired. Choose the package again.', 'UPLOAD_EXPIRED');
     const card = await createProject(user, { name: req.body?.name, folder: req.body?.folder, format: req.body?.format, domain: req.body?.domain, manualType: req.body?.manualType });
+    markImportPending(card.id, 'package import');          // WP-06 (REL-004): a server stop before the end leaves no half-made project
     const role = 'owner'; let report; let packageSettings: unknown;
     try {
       report = await pk.importPackage(card.id, held.file, held.name, { overwrite: false, partial: false, skipChecks: false, replacePm: true, validate: true, enterprises: (card.format ?? 's1000d') === 's1000d', onManifest: (m) => { packageSettings = m?.project?.settings; } },{ id: user.id, username: user.username, role: user.role }, role);
-    } catch (e) { try { deleteProject(user, card.id); } catch { /* best effort */ } throw e; }
+    } catch (e) { try { discardProject(card.id, 'package import failed'); } catch { /* best effort */ } throw e; }
     if (!report.applied) {                                  // nothing was imported: do not leave an empty project behind
-      try { deleteProject(user, card.id); } catch { /* best effort */ }
+      try { discardProject(card.id, 'package import refused'); } catch { /* best effort */ }
       // Say WHY in the message itself: the most common reason first, how many files it covers, and how many other reasons there are. The whole report is in the body.
       const why = new Map<string, number>();
       for (const it of report.items) if (it.status === 'rejected' && it.message) why.set(it.message, (why.get(it.message) ?? 0) + 1);
@@ -97,18 +98,23 @@ export function registerPackageRoutes(app: Express): void {
         : (report.notes[0] ? ` ${report.notes[0]}` : ' The report says why.');
       return void res.status(422).json({ error: `The package was not imported, so no project was created.${lead}`, code: 'IMPORT_REFUSED', report });
     }
-    if ((card.format ?? 's1000d') === 's1000d' || card.format === 'jss') adoptFromContents(card.id, user.id);
+    if ((card.format ?? 's1000d') === 's1000d' || card.format === 'jss') {
+      try { adoptFromContents(card.id, user.id); } catch (e) { try { discardProject(card.id, 'package import failed'); } catch { /* best effort */ } throw e; }
+    }
     // What the exporting project CHOSE (partner, originator, codes, data module types, both SNS systems) comes back too - validated, and never over what the data modules say.
     let settings: RestoreReport | null = null;
     if ((card.format ?? 's1000d') === 's1000d') {
       try { settings = restoreSettings(card.id, user.id, packageSettings); }
       catch (e) { settings = { restored: [], notes: [`The package settings could not be applied: ${(e as Error).message}`] }; }
     }
+    clearImportPending(card.id);
     pending.delete(token); try { fs.unlinkSync(held.file); } catch { /* gone */ }
     audit({ actorId: user.id, actorUsername: user.username, action: 'project.imported', projectId: card.id, targetType: 'project', targetId: card.id, meta: { source: held.name, counts: report.counts, settings: settings?.restored ?? [] } });
     res.status(201).json({ project: card, report, settings });
   }));
 
+  // WP-07 (SEC-014, PLT-024): downloads are named after the project (the guard's req.project carries no name, so every file was project-project.zip)
+  const fileStem = (id: string): string => String(readProjectJson(id).name || store.getProjectRow(id)?.name || id).replace(/[^\w.-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 80) || 'project';
   const actor = (req: any) => ({ id: req.auth.user.id, username: req.auth.user.username, role: req.auth.user.role });
   const log = (req: any, action: string, meta?: unknown) => audit({ actorId: req.auth.user.id, actorUsername: req.auth.user.username, action, projectId: req.project.id, targetType: 'project', targetId: req.project.id, meta });
   const sendTemp = (res: any, tmp: string, name: string) => res.download(tmp, name, () => { try { fs.unlinkSync(tmp); } catch { /* gone */ } });
@@ -140,7 +146,7 @@ export function registerPackageRoutes(app: Express): void {
     const tmp = path.join(tmpRoot(), `${Date.now()}-export.zip`);
     try { await pk.exportProjectPackage(req.project.id, fs.createWriteStream(tmp)); } catch (e) { try { fs.unlinkSync(tmp); } catch { /* none */ } throw e; }
     log(req, 'package.exported', { kind: 'project' });
-    sendTemp(res, tmp, `${String(req.project.name ?? 'project').replace(/[^\w.-]+/g, '_')}-project.zip`);
+    sendTemp(res, tmp, `${fileStem(req.project.id)}-project.zip`);
   }));
   app.post(`${base}/packages/delivery`, view('viewer'), wrap(async (req, res) => {
     const tmp = path.join(tmpRoot(), `${Date.now()}-delivery.zip`); let info;
@@ -149,7 +155,7 @@ export function registerPackageRoutes(app: Express): void {
     log(req, 'package.exported', { kind: 'delivery', files: info.files.length, ddn: info.ddn, dml: info.dml });
     if (info.ddn) { try { createItem('ddn', { code: info.ddn.replace(/^DDN-/i, '').replace(/\.xml$/i, ''), recipient: String(req.body?.receiver?.name || req.body?.receiver?.code || ''), status: 'generated' }); } catch { /* already recorded */ } }   // the Administrator's dispatch record
     res.setHeader('X-Agastya-Package-Notes', encodeURIComponent(JSON.stringify(info.notes.slice(0, 5))).slice(0, 2000));   // a header must stay small; every note is in AGASTYA-MANIFEST.json
-    sendTemp(res, tmp, `${String(req.project.name ?? 'project').replace(/[^\w.-]+/g, '_')}-delivery.zip`);
+    sendTemp(res, tmp, `${fileStem(req.project.id)}-delivery.zip`);
   }));
   app.post(`${base}/packages/import`, view('editor', 'dm.write'), uploadOne, wrap(async (req, res) => {
     const f = (req as any).file as Express.Multer.File | undefined; if (!f) throw bad('No package uploaded.', 'NO_FILE');

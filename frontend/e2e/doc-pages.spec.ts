@@ -48,7 +48,7 @@ test('the rail of a JSS and a JSG document has Explore and Publication, and the 
     await expect(page.getByRole('link', { name: 'Explore' })).toBeVisible(); await expect(page.getByRole('link', { name: 'Publication' })).toBeVisible();
   }
   await page.getByRole('link', { name: 'Publication' }).click();
-  await expect(page.getByTestId('pub-tree')).toBeVisible(); await expect(page.getByText('Internal error')).toHaveCount(0); await expect(page.getByText('Not a publication module')).toHaveCount(0);
+  await expect(page.getByTestId('pub-tree')).toBeVisible(); await expect(page.getByText('Internal error')).toHaveCount(0); await expect(page.getByText('Something went wrong on the server')).toHaveCount(0); await expect(page.getByText('Not a publication module')).toHaveCount(0);
   await expect(chapterTitles().first()).toBeVisible();
   await page.screenshot({ path: path.join(SHOTS, '1-jsg-publication.png') });
 });

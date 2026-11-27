@@ -45,7 +45,7 @@ function useAction() {
 }
 
 function Login() {
-  const { login } = useSession();
+  const { login, signedOutReason } = useSession();
   const [u, setU] = useState('');
   const [p, setP] = useState('');
   const [forgot, setForgot] = useState(false);
@@ -60,17 +60,18 @@ function Login() {
           : <Form submit="Ask an administrator" busy={a.busy} error={a.error} onSubmit={() => a.run(async () => { await authApi.forgot(u); setSent(true); })}>
             <Field label="Username"><input className="v2-input" autoFocus value={u} onChange={(e) => setU(e.target.value)} autoComplete="username" /></Field>
           </Form>}
-        <p style={{ marginTop: 14 }}><a href="#" onClick={(e) => { e.preventDefault(); setForgot(false); setSent(false); }}>Back to sign in</a></p>
+        <p style={{ marginTop: 14 }}><a href="#" onClick={(e) => { e.preventDefault(); a.setError(''); setForgot(false); setSent(false); }}>Back to sign in</a></p>
       </Frame>
     );
   }
   return (
-    <Frame title="Sign in" sub="Offline, on-premises S1000D authoring and publishing.">
+    <Frame title="Sign in" sub="Offline, on-premises authoring and publishing for S1000D, JSS and JSG.">
+      {signedOutReason && <Alert tone="warn">{signedOutReason}</Alert>}
       <Form submit="Sign in" busy={a.busy} error={a.error} onSubmit={() => a.run(() => login(u, p))}>
         <Field label="Username"><input className="v2-input" autoFocus value={u} onChange={(e) => setU(e.target.value)} autoComplete="username" name="username" /></Field>
         <Field label="Password"><input className="v2-input" type="password" value={p} onChange={(e) => setP(e.target.value)} autoComplete="current-password" name="password" /></Field>
       </Form>
-      <p style={{ marginTop: 14 }}><a href="#" onClick={(e) => { e.preventDefault(); setForgot(true); }}>Forgot your password?</a></p>
+      <p style={{ marginTop: 14 }}><a href="#" onClick={(e) => { e.preventDefault(); a.setError(''); setForgot(true); }}>Forgot your password?</a></p>
     </Frame>
   );
 }
@@ -90,7 +91,7 @@ function Setup() {
       })}>
         <Field label="Full name"><input className="v2-input" autoFocus value={name} onChange={(e) => setName(e.target.value)} name="fullName" /></Field>
         <Field label="Username" hint="3–32 characters: lowercase letters, digits, dot, dash, underscore."><input className="v2-input" value={u} onChange={(e) => setU(e.target.value)} autoComplete="username" name="username" /></Field>
-        <Field label="Password" hint="At least 8 characters, and not a common password."><input className="v2-input" type="password" value={p} onChange={(e) => setP(e.target.value)} autoComplete="new-password" name="password" /></Field>
+        <Field label="Password" hint="At least 15 characters (a few words make a good one), and not a common password or your name."><input className="v2-input" type="password" value={p} onChange={(e) => setP(e.target.value)} autoComplete="new-password" name="password" /></Field>
         <Field label="Repeat password"><input className="v2-input" type="password" value={p2} onChange={(e) => setP2(e.target.value)} autoComplete="new-password" name="password2" /></Field>
       </Form>
     </Frame>

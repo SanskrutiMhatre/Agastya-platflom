@@ -55,7 +55,7 @@ class Lemminx {
         this.ready = new Promise((resolve, reject) => {
             if (!available()) return reject(new Error('LemMinX is not installed with this build'));
             const cat = writeCatalog();
-            this.proc = spawn(toolPaths.JAVA, ['-jar', JAR], { stdio: ['pipe', 'pipe', 'pipe'] });
+            this.proc = spawn(toolPaths.JAVA, ['-jar', JAR], { stdio: ['pipe', 'pipe', 'pipe'], env: toolPaths.childEnv(), windowsHide: true });   // the allow-listed environment (WP-02)
             this.proc.on('error', reject);
             this.proc.on('exit', () => { this.proc = null; this.ready = null; this.opened.clear(); });
             this.proc.stdout.on('data', (d) => this._read(d));

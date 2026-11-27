@@ -12,6 +12,7 @@ import { Alert, Badge, ConfirmModal, Loading, Spinner, errText, useAsync } from 
 import { canWrite, useProject } from '../../layouts/ProjectShell';
 import { parsePage } from '../../lib/ancillaryXml';
 import { useUi } from '../../store/ui';
+import { useLeaveGuard } from '../../lib/leaveGuard';
 
 type Mode = 'text' | 'xml';
 
@@ -50,9 +51,11 @@ export function AncillaryPage() {
   }, [id, pages]);
   useEffect(() => { if (sel) void load(sel); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [sel, pages.length]);
 
+  // FE-012 / GAP-001: switching to another page with unsaved changes asks in the platform's own dialog, not the browser's
+  const [switchTo, setSwitchTo] = useState<string | null>(null);
   const choose = (next: string) => {
     if (next === sel) return;
-    if (dirty && !window.confirm('You have unsaved changes to this page. Leave without saving?')) return;
+    if (dirty) { setSwitchTo(next); return; }
     setSel(next);
   };
 
@@ -63,16 +66,19 @@ export function AncillaryPage() {
     catch (e) { setPages(before); toast(errText(e), 'error'); }
   };
 
-  const save = async () => {
-    if (!page) return;
+  const save = async (): Promise<boolean> => {
+    if (!page) return false;
     setBusy(true); setError('');
     try {
       const saved = await ancillaryApi.save(id, page.id, current);
       setPages((all) => all.map((x) => (x.id === saved.id ? saved : x)));
       setXml(current); setDraft(current); setValues({});
       toast(`${page.label} saved. It is printed the next time you generate the PDF.`, 'success');
-    } catch (e) { setError(errText(e)); } finally { setBusy(false); }
+      return true;
+    } catch (e) { setError(errText(e)); return false; } finally { setBusy(false); }
   };
+  // GAP-001: leaving the page (rail, link, Back, closing the tab) with unsaved changes asks first
+  const guard = useLeaveGuard(dirty, { what: 'changes to this ancillary page', save });
 
   const reset = async () => {
     if (!page) return;
@@ -89,6 +95,8 @@ export function AncillaryPage() {
 
   return (
     <div className="v2-page">
+      {guard}
+      {switchTo ? <ConfirmModal title="Leave this page without saving?" danger confirmLabel="Discard my changes" body={<p>You have unsaved changes to {page?.label ?? 'this page'}. They are lost if you open another page now.</p>} onClose={() => setSwitchTo(null)} onConfirm={() => { const n = switchTo; setSwitchTo(null); setSel(n); }} /> : null}
       <PageHeader icon="file" title="Ancillary pages"
         sub="The pages before the body: choose which are printed, and edit what they say. Changes appear the next time you generate the PDF."
         stats={[{ label: 'Printed', value: `${printed} of ${pages.length}` }, { label: 'Edited by hand', value: pages.filter((p) => p.edited).length, tone: pages.some((p) => p.edited) ? 'accent' : undefined }]} />
