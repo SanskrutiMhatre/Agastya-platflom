@@ -58,6 +58,19 @@ export interface Config {
   pdfjsDir: string | undefined;
   /** First-run administrator (INITIAL_ADMIN_USERNAME / INITIAL_ADMIN_PASSWORD). Secret: never logged. */
   initialAdmin: { INITIAL_ADMIN_USERNAME: string | undefined; INITIAL_ADMIN_PASSWORD: string | undefined };
+  /**
+   * WP-12 (PLT-001, ENT-006, PLT-006): platform backups. `dir` (AGASTYA_BACKUP_DIR, default <workspace>/backups/platform) holds the archives;
+   * put it on a second disk in production. `intervalHours` (AGASTYA_BACKUP_INTERVAL_HOURS, default 24, 0 = no scheduled backup);
+   * `keep` (AGASTYA_BACKUP_KEEP "daily/weekly/monthly", default 7/4/12) applies to scheduled backups only; `keepMigrationSnapshots`
+   * (AGASTYA_KEEP_MIGRATION_SNAPSHOTS, default 5) the pre-migration database copies; `restoreTestDays` (AGASTYA_RESTORE_TEST_DAYS, default 7,
+   * 0 = off) how often the latest backup is restored into a scratch folder and checked.
+   */
+  backup: { dir: string; intervalHours: number; keep: { daily: number; weekly: number; monthly: number }; keepMigrationSnapshots: number; restoreTestDays: number };
+  /**
+   * WP-12 (PLT-007, ENT-015): how long housekeeping rows live, in days (0 = keep for ever). Sessions after they ended, read notifications,
+   * decided password-reset requests; audit rows older than `auditDays` are written to a compressed archive file first, then removed.
+   */
+  retention: { sessionsDays: number; notificationsDays: number; resetRequestsDays: number; auditDays: number };
 }
 
 /** A positive number from an environment; unset, empty or invalid (".env" files often leave `NAME=` blank) means the default, never 0 or NaN. */
@@ -65,6 +78,22 @@ export const envPositive = (name: string, fallback: number, env: Env = process.e
   const raw = env[name]; const n = raw === undefined || raw.trim() === '' ? NaN : Number(raw);
   return Number.isFinite(n) && n > 0 ? n : fallback;
 };
+
+/** A whole number >= 0 from an environment; unset or empty means the default; anything else is a configuration error (0 is meaningful: "off"). */
+export const envCount = (name: string, fallback: number, env: Env = process.env): number => {
+  const raw = env[name];
+  if (raw === undefined || raw.trim() === '') return fallback;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 0) throw new ConfigError(name, `"${raw}" is not a whole number of 0 or more.`);
+  return n;
+};
+
+function parseKeep(raw: string | undefined): { daily: number; weekly: number; monthly: number } {
+  if (raw === undefined || raw.trim() === '') return { daily: 7, weekly: 4, monthly: 12 };
+  const m = /^\s*(\d+)\s*\/\s*(\d+)\s*\/\s*(\d+)\s*$/.exec(raw);
+  if (!m) throw new ConfigError('AGASTYA_BACKUP_KEEP', `"${raw}" is not daily/weekly/monthly, for example 7/4/12.`);
+  return { daily: Number(m[1]), weekly: Number(m[2]), monthly: Number(m[3]) };
+}
 
 /** A configuration error names the variable, so start-up stops with something an administrator can act on. */
 export class ConfigError extends Error {
@@ -87,6 +116,7 @@ function parsePort(raw: string | undefined): number {
 
 /** Build one typed, validated configuration from an environment. Pure: reads nothing but `env`. */
 export function buildConfig(env: Env = process.env): Config {
+  const workspaceDir = env.AGASTYA_WORKSPACE_DIR ?? path.resolve(ROOT, '..', 'workspace');
   return {
     port: parsePort(env.PORT),
     host: env.AGASTYA_HOST || undefined,
@@ -95,7 +125,7 @@ export function buildConfig(env: Env = process.env): Config {
     pipelineDir: path.join(ROOT, 'vendor', 'pipeline'),
     schemasDir: path.join(ROOT, 'schemas'),
     seedTemplatesDir: path.join(ROOT, 'templates'),
-    workspaceDir: env.AGASTYA_WORKSPACE_DIR ?? path.resolve(ROOT, '..', 'workspace'),
+    workspaceDir,
     clientDist: env.AGASTYA_CLIENT_DIST ?? path.resolve(ROOT, '..', 'frontend', 'dist'),
     secureCookies: env.AGASTYA_SECURE_COOKIES === '1',
     trustProxy: parseTrustProxy(env.AGASTYA_TRUST_PROXY),
@@ -110,6 +140,19 @@ export function buildConfig(env: Env = process.env): Config {
     shutdownOnStdinClose: env.AGASTYA_SHUTDOWN_ON_STDIN_CLOSE === '1',
     pdfjsDir: env.AGASTYA_PDFJS_DIR || undefined,
     initialAdmin: { INITIAL_ADMIN_USERNAME: env.INITIAL_ADMIN_USERNAME, INITIAL_ADMIN_PASSWORD: env.INITIAL_ADMIN_PASSWORD },
+    backup: {
+      dir: env.AGASTYA_BACKUP_DIR || path.join(workspaceDir, 'backups', 'platform'),
+      intervalHours: envCount('AGASTYA_BACKUP_INTERVAL_HOURS', 24, env),
+      keep: parseKeep(env.AGASTYA_BACKUP_KEEP),
+      keepMigrationSnapshots: envCount('AGASTYA_KEEP_MIGRATION_SNAPSHOTS', 5, env),
+      restoreTestDays: envCount('AGASTYA_RESTORE_TEST_DAYS', 7, env),
+    },
+    retention: {
+      sessionsDays: envCount('AGASTYA_RETENTION_SESSIONS_DAYS', 30, env),
+      notificationsDays: envCount('AGASTYA_RETENTION_NOTIFICATIONS_DAYS', 90, env),
+      resetRequestsDays: envCount('AGASTYA_RETENTION_RESET_REQUESTS_DAYS', 90, env),
+      auditDays: envCount('AGASTYA_AUDIT_RETENTION_DAYS', 730, env),
+    },
   };
 }
 

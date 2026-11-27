@@ -12,7 +12,13 @@ import { createAppContext, redactAuditMeta, type AppContext } from './appContext
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const ctx: AppContext = createAppContext(config);
-ctx.start();
+try {
+  ctx.start();
+} catch (e) {
+  // WP-12: a refused database (newer build, edited migration, damaged file, no safety copy) stops the process with the operator's message on top.
+  console.error(`\n[start] ${(e as Error).message}\n`);
+  throw e;
+}
 
 /** The process's default application context. */
 export const defaultContext = (): AppContext => ctx;
