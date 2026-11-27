@@ -10,7 +10,8 @@
  */
 import { NS, nodePath } from '../core/xml';
 import type { Doctype } from '../core/xml';
-import { xsdRegex } from '../core/xsdRegex';
+import { xsdRegex } from '../../../../backend/src/shared/xsdRegex';
+import { valueMatches, contextApplies, isXPath2 } from '../../../../backend/src/shared/brexValues';
 import { DmCodeParts, find, formatDmc, readDmCode } from '../core/s1000d';
 import type { ValidationIssue } from './types';
 
@@ -116,55 +117,14 @@ function nodeValue(n: Node): string {
   return n.textContent ?? '';
 }
 
-function splitNum(s: string): [string, number] | null {
-  const m = s.match(/^(.*?)(\d+)$/);
-  return m ? [m[1], parseInt(m[2], 10)] : null;
-}
-
-const DECIMAL = /^[+-]?(\d+(\.\d*)?|\.\d+)$/;
-
-export function valueMatches(value: string, v: BrexValue): boolean {
-  switch (v.form) {
-    case 'range': {
-      const [lo, hi] = v.allowed.split('~');
-      if (hi == null) return value === lo;
-      // decimal bounds ("0.5~2.5") compare as numbers; the code-like ranges below ("A01~A09", "001~999") compare by their number part
-      if (DECIMAL.test(lo) && DECIMAL.test(hi) && (lo.includes('.') || hi.includes('.') || value.includes('.'))) {
-        if (!DECIMAL.test(value)) return false;
-        const n = parseFloat(value);
-        return n >= parseFloat(lo) && n <= parseFloat(hi);
-      }
-      const a = splitNum(lo);
-      const b = splitNum(hi);
-      const x = splitNum(value);
-      if (a && b && x && a[0] === b[0] && x[0] === a[0]) return x[1] >= a[1] && x[1] <= b[1];
-      return value >= lo && value <= hi && value.length === lo.length;
-    }
-    case 'pattern': {
-      const re = xsdRegex(v.allowed);
-      return re ? re.test(value) : true; // checkBrex reports the patterns it cannot evaluate; here they cannot reject anything
-    }
-    default:
-      return v.allowed.split('|').some((a) => a === value);
-  }
-}
-
-function contextApplies(context: string | null, schema: string | null): boolean {
-  if (!context) return true;
-  const m = context.match(/([a-zA-Z]+)\.xsd\s*$/);
-  if (!m || !schema) return true;
-  return m[1] === schema;
-}
+// valueMatches, contextApplies and isXPath2 are the server's own (backend/src/shared/brexValues.ts, WP-16 ARC-008): one definition for both engines.
+export { valueMatches };
 
 export interface BrexCheckResult {
   issues: ValidationIssue[];
   rules: number;
   skipped: number;
   skippedRules: { id: string; path: string; reason: string }[];
-}
-
-function isXPath2(path: string): boolean {
-  return /\b(for|some|every)\s+\$|\bif\s*\(|\b(matches|tokenize|replace|ends-with|lower-case|upper-case|exists|empty|distinct-values|string-join|matches)\s*\(|\s(eq|ne|lt|le|gt|ge)\s/.test(path);
 }
 
 /** Evaluates an XPath 1.0 expression returning nodes in document order. */

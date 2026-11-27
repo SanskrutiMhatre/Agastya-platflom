@@ -1,9 +1,12 @@
-/**
- * XML Schema regular expressions (the `pattern` facet, BREX value patterns) as JavaScript ones. They differ in small ways that
- * matter: patterns are anchored, `\i` / `\c` (name characters) exist only in XSD, and `\-` is a legal escape outside a class
- * (which a JavaScript pattern with the `u` flag rejects). What cannot be translated faithfully yields `null`: callers must treat
- * that as "cannot tell", never as "matches" or "does not match" silently.
- */
+// XML Schema regular expressions (the `pattern` facet, BREX value patterns) as JavaScript ones.
+//
+// ONE source for the server and the browser (audit WP-16, S1K-003 / ARC-008): the backend build compiles it from here and the Studio bundles it
+// from here (frontend/src/studio/core/xsdRegex.ts re-exports it), so the two cannot drift apart again. Everything in backend/src/shared/ is plain
+// TypeScript with no Node or DOM dependency, valid under both tsconfig files.
+//
+// XSD and JavaScript patterns differ in small ways that matter: patterns are anchored, `\i` / `\c` (name characters) exist only in XSD, and `\-` is a legal escape
+// outside a class (which a JavaScript pattern with the `u` flag rejects). What cannot be translated faithfully yields `null`: callers must treat
+// that as "cannot tell", never as "matches" or "does not match" silently.
 const cache = new Map<string, RegExp | null>();
 
 const NAME_START = 'A-Za-z_:';
@@ -48,13 +51,9 @@ export function xsdRegex(pattern: string): RegExp | null {
     try {
       re = new RegExp(anchored, 'u');
     } catch {
-      // `\-`, `\_`… are plain escapes in XSD but errors under /u; retry without it, unless Unicode properties are used
+      // `\-`, `\_`... are plain escapes in XSD but errors under /u; retry without it, unless Unicode properties are used
       if (!/\\[pP]\{/.test(src)) {
-        try {
-          re = new RegExp(anchored);
-        } catch {
-          re = null;
-        }
+        try { re = new RegExp(anchored); } catch { re = null; }
       }
     }
   }

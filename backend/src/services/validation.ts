@@ -38,11 +38,10 @@ const imagesEngine = vendor('engine/images');
 const fixIds = vendor('engine/fixIds');
 const fixEntities = vendor('engine/fixEntities');
 
-export type Severity = 'error' | 'warn' | 'info';
-export interface Issue {
-  id: string; source: 'xml' | 'xsd' | 'brex' | 'graphics' | 'ids' | 'icn' | 'pm' | 'applic';
-  sev: Severity; title: string; rel: string; file: string; line: number; loc: string; detail: string;
-}
+import { issueOf as norm, runRuleSets, summarise, turn, type Issue, type RuleSet, type ValidationInput } from './validationFramework';
+
+// WP-16: the finding model and the runner are the framework's (validationFramework.ts); this file holds the S1000D rule sets.
+export type { Severity, Issue } from './validationFramework';
 export interface ValidationRun {
   ranAt: string; issueUsed: string; checked: number; schemaChecked: number; brexChecked: number;
   summary: { error: number; warn: number; info: number }; issues: Issue[]; notes: string[];
@@ -60,22 +59,11 @@ export function lastRun(projectId: string): ValidationRun | null {
 
 export function installedSchemaIssues(): string[] { return installedIssues(); }
 
-let seq = 0;
 /** Applicability reference problems (services/applicability), as validation issues with the data module and XML location. */
 async function applicIssues(projectId: string): Promise<Issue[]> {
   try {
     return (await validateApplicability(projectId)).map((p) => norm('applic', { sev: p.severity === 'error' ? 'error' : 'warn', title: `Applicability ${p.code}`, rel: p.file, line: p.line, loc: p.location, detail: p.message }));
   } catch (e) { return [norm('applic', { sev: 'warn', title: 'Applicability not checked', rel: '', line: 1, detail: (e as Error).message })]; }
-}
-
-function norm(source: Issue['source'], i: any, fallbackSev: Severity = 'warn'): Issue {
-  const sev: Severity = i.sev === 'error' || i.sev === 'warn' || i.sev === 'info' ? i.sev : fallbackSev;
-  const rel = String(i.rel ?? '');
-  return {
-    id: `${source}-${++seq}`, source, sev, title: String(i.title ?? 'Problem'), rel,
-    file: rel.split('/').pop() ?? rel, line: Math.max(1, Number(i.line) || 1),
-    loc: String(i.loc ?? ''), detail: String(i.detail ?? i.message ?? ''),
-  };
 }
 
 /** Graphic references that do not resolve, by the SAME order of resolution the pipelines use. */
@@ -141,6 +129,70 @@ function undeclaredIcns(dir: string, csdb: string, media: string): Issue[] {
   } catch { return []; }
 }
 
+/** Publication module: entries that name modules this project does not have, revision references, modules left out of the book. */
+async function publicationIssues(input: ValidationInput): Promise<{ issues: Issue[]; notes: string[] }> {
+  const { projectId, dir, pm } = input;
+  const issues: Issue[] = []; const notes: string[] = [];
+  try {
+    const ex = explore(projectId);
+    for (const ref of ex.missing) {
+      issues.push(norm('pm', { sev: 'error', title: 'Publication entry has no data module', rel: pm, line: 1, loc: ref, detail: `The publication refers to "${ref}", which is not in this project's data modules - nothing is published for it.` }));
+    }
+    // revisions: a pinned issue the project does not hold; a reference to an obsolete (deleted) module
+    await turn();
+    try {
+      const pmAbs = path.join(dir, pm);
+      if (fs.existsSync(pmAbs)) for (const p of pmRevisionProblems(projectId, fs.readFileSync(pmAbs, 'utf8'))) issues.push(norm('pm', { sev: 'error', title: p.code === 'OBSOLETE_MODULE' ? 'Publication refers to an obsolete module' : 'Pinned revision not in the project', rel: pm, line: 1, loc: p.ref, detail: `${p.message} Fix: ${p.fix}` }));
+    } catch { /* the revision check is advisory when the publication cannot be read */ }
+    if (ex.totals.unplaced > 0) {
+      issues.push(norm('pm', { sev: 'info', title: 'Data modules not in the publication', rel: pm, line: 1, loc: `${ex.totals.unplaced}`, detail: `${ex.totals.unplaced} data module${ex.totals.unplaced === 1 ? ' is' : 's are'} in the project but not placed in any chapter, so they are not published.` }));
+    }
+  } catch (e) { notes.push(`Publication checks skipped: ${(e as Error).message}`); }
+  return { issues, notes };
+}
+
+/** Business rules (BREX) of every data module, by the module's own BREX chain. */
+async function brexIssues(input: ValidationInput): Promise<{ issues: Issue[]; notes: string[]; checked: number }> {
+  const { projectId, dir, csdb, issueUsed } = input;
+  const issues: Issue[] = []; const notes: string[] = [];
+  let checked = 0;
+  const csdbAbs = path.join(dir, csdb);
+  const reported = new Set<string>();                                  // a BREX problem is the same for every module that names it: say it once
+  const tick = yielder();                                              // WP-32 (PERF-001 stop-gap): a turn for other requests between modules
+  for (const d of listDms(projectId)) {
+    await tick();
+    try {
+      const text = fs.readFileSync(path.join(csdbAbs, d.file), 'utf8');
+      const rep = checkModuleBrex(text, csdbAbs, issueUsed);
+      checked++;
+      for (const f of rep.result.findings) {
+        issues.push(norm('brex', { sev: f.severity === 'error' ? 'error' : 'warn', title: `BREX ${f.ruleId}`, rel: `${csdb}/${d.file}`, line: 1, loc: f.where, detail: f.message + (f.found !== undefined ? ` [found: ${f.found}]` : '') + ` (from ${f.brexSource})` }));
+      }
+      for (const p of rep.problems) {
+        const key = `${p.kind}|${p.brex}|${p.ruleId ?? ''}`;
+        if (reported.has(key)) continue;
+        reported.add(key);
+        issues.push(norm('brex', { sev: p.severity === 'error' ? 'error' : 'warn', title: p.kind === 'invalid-rule' || p.kind === 'unenforced-rule' ? 'BREX rule cannot be used' : 'BREX data module unavailable', rel: `${csdb}/${d.file}`, line: 1, loc: p.brex, detail: p.message }));
+      }
+      if (rep.result.rulesSkipped) notes.push(`${d.file}: ${rep.result.rulesSkipped} BREX rule${rep.result.rulesSkipped === 1 ? '' : 's'} could not be evaluated here (XPath 2.0 or unsupported) and ${rep.result.rulesSkipped === 1 ? 'is' : 'are'} not enforced.`);
+    } catch (e) { notes.push(`BREX check failed for ${d.file}: ${(e as Error).message}`); }
+  }
+  return { issues, notes, checked };
+}
+
+/**
+ * The S1000D rule sets after the schema stage, in the order their issues are listed (WP-16). Each takes the plain `ValidationInput` and returns
+ * plain issues, so a worker can run them (WP-14). BREX is opt-in (the Validation page asks for it) and exists for S1000D projects only.
+ */
+export const S1000D_RULE_SETS: readonly RuleSet[] = [
+  { id: 'applic', standard: 's1000d', run: async (i) => ({ issues: await applicIssues(i.projectId) }) },
+  { id: 'graphics', standard: 's1000d', run: async (i) => ({ issues: await missingGraphics(i.dir, i.csdb, i.media) }) },
+  { id: 'ids', standard: 's1000d', run: async (i) => ({ issues: duplicateIds(i.dir, i.csdb) }) },
+  { id: 'icn', standard: 's1000d', run: async (i) => ({ issues: undeclaredIcns(i.dir, i.csdb, i.media) }) },
+  { id: 'pm', standard: 's1000d', run: publicationIssues },
+  { id: 'brex', standard: 's1000d', applies: (i) => i.brex && i.s1000d, run: brexIssues },
+];
+
 /** The S1000D issue the project's checks use: 'auto' (each module's own declaration) or one of the installed issues. */
 export function projectIssue(projectId: string): string {
   // The project's S1000D issue, when its configuration sets one, IS the issue its checks use: one setting, not two.
@@ -190,65 +242,21 @@ export async function runValidation(projectId: string, opts: { issue?: string; b
     } finally { fs.rmSync(hostDir, { recursive: true, force: true }); }
   }
 
-  // WP-32 (PERF-001 stop-gap): each scan is a turn of its own; run back to back they held the event loop for about 230 ms on 200 modules
-  const turn = () => new Promise<void>((resolve) => setImmediate(resolve));
   const issues: Issue[] = [
     ...xml.issues.map((i: any) => norm('xml', i, 'error')),
     ...schema.issues.map((i: any) => norm('xsd', i, 'error')),
     ...extIssues,
   ];
-  await turn(); issues.push(...(await applicIssues(projectId)));
-  await turn(); issues.push(...(await missingGraphics(dir, csdb, media)));
-  await turn(); issues.push(...duplicateIds(dir, csdb));
-  await turn(); issues.push(...undeclaredIcns(dir, csdb, media));
-  await turn();
-
-  // Publication module: entries that name modules this project does not have.
-  try {
-    const ex = explore(projectId);
-    for (const ref of ex.missing) {
-      issues.push(norm('pm', { sev: 'error', title: 'Publication entry has no data module', rel: pmRel(pj), line: 1, loc: ref, detail: `The publication refers to "${ref}", which is not in this project's data modules - nothing is published for it.` }));
-    }
-    // revisions: a pinned issue the project does not hold; a reference to an obsolete (deleted) module
-    await turn();
-    try {
-      const pmAbs = path.join(dir, pmRel(pj));
-      if (fs.existsSync(pmAbs)) for (const p of pmRevisionProblems(projectId, fs.readFileSync(pmAbs, 'utf8'))) issues.push(norm('pm', { sev: 'error', title: p.code === 'OBSOLETE_MODULE' ? 'Publication refers to an obsolete module' : 'Pinned revision not in the project', rel: pmRel(pj), line: 1, loc: p.ref, detail: `${p.message} Fix: ${p.fix}` }));
-    } catch { /* the revision check is advisory when the publication cannot be read */ }
-    if (ex.totals.unplaced > 0) {
-      issues.push(norm('pm', { sev: 'info', title: 'Data modules not in the publication', rel: pmRel(pj), line: 1, loc: `${ex.totals.unplaced}`, detail: `${ex.totals.unplaced} data module${ex.totals.unplaced === 1 ? ' is' : 's are'} in the project but not placed in any chapter, so they are not published.` }));
-    }
-  } catch (e) { notes.push(`Publication checks skipped: ${(e as Error).message}`); }
-
-  let brexChecked = 0;
-  if (opts.brex && isS1000dProject(projectId)) {
-    const csdbAbs = path.join(dir, csdb);
-    const reported = new Set<string>();                                  // a BREX problem is the same for every module that names it: say it once
-    const tick = yielder();                                              // WP-32 (PERF-001 stop-gap): a turn for other requests between modules
-    for (const d of listDms(projectId)) {
-      await tick();
-      try {
-        const text = fs.readFileSync(path.join(csdbAbs, d.file), 'utf8');
-        const rep = checkModuleBrex(text, csdbAbs, issueUsed);
-        brexChecked++;
-        for (const f of rep.result.findings) {
-          issues.push(norm('brex', { sev: f.severity === 'error' ? 'error' : 'warn', title: `BREX ${f.ruleId}`, rel: `${csdb}/${d.file}`, line: 1, loc: f.where, detail: f.message + (f.found !== undefined ? ` [found: ${f.found}]` : '') + ` (from ${f.brexSource})` }));
-        }
-        for (const p of rep.problems) {
-          const key = `${p.kind}|${p.brex}|${p.ruleId ?? ''}`;
-          if (reported.has(key)) continue;
-          reported.add(key);
-          issues.push(norm('brex', { sev: p.severity === 'error' ? 'error' : 'warn', title: p.kind === 'invalid-rule' || p.kind === 'unenforced-rule' ? 'BREX rule cannot be used' : 'BREX data module unavailable', rel: `${csdb}/${d.file}`, line: 1, loc: p.brex, detail: p.message }));
-        }
-        if (rep.result.rulesSkipped) notes.push(`${d.file}: ${rep.result.rulesSkipped} BREX rule${rep.result.rulesSkipped === 1 ? '' : 's'} could not be evaluated here (XPath 2.0 or unsupported) and ${rep.result.rulesSkipped === 1 ? 'is' : 'are'} not enforced.`);
-      } catch (e) { notes.push(`BREX check failed for ${d.file}: ${(e as Error).message}`); }
-    }
-  }
+  // WP-16: the S1000D rule sets, by the framework's runner (each a turn of its own, WP-32), in the order the issues were always listed
+  const input: ValidationInput = { projectId, dir, csdb, media, pm: pmRel(pj), issueUsed, s1000d: isS1000dProject(projectId), brex: !!opts.brex };
+  const sets = await runRuleSets(S1000D_RULE_SETS, input);
+  issues.push(...sets.issues);
+  notes.push(...sets.notes);
+  const brexChecked = sets.checked.brex ?? 0;
 
   for (const n of schema.notes ?? []) if (n.sev === 'info' && n.title) notes.push(`${n.rel}: ${n.title}`);
 
-  const summary = { error: 0, warn: 0, info: 0 };
-  for (const i of issues) summary[i.sev]++;
+  const summary = summarise(issues);
   // A file the schema check skipped or could not run is NOT valid: report it, so a gate can refuse it instead of reading silence as success.
   const unchecked = new Set<string>(); const uncheckedWhy: Record<string, string> = {};
   for (const n of [...(schema.notes ?? []), ...(schema.issues ?? [])]) if (n.rel && /Not checked|could not run/i.test(String(n.title ?? ''))) { unchecked.add(String(n.rel)); uncheckedWhy[String(n.rel)] = String(n.detail ?? n.title ?? '').slice(0, 300); }

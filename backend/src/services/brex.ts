@@ -40,7 +40,8 @@ import path from 'path';
 import crypto from 'crypto';
 import { DOMParser } from '@xmldom/xmldom';
 import * as xpath from 'xpath';
-import { xsdRegex } from './xsdRegex';
+import { xsdRegex } from '../shared/xsdRegex';
+import { valueMatches, contextApplies, isXPath2 } from '../shared/brexValues';
 import { headOf } from './xmlHead';
 
 export interface BrexValue {
@@ -283,45 +284,13 @@ export function repairXPath(expr: string): string {
   return expr.replace(FUNCTION_SPACE, '$1(');
 }
 
-/** XPath 2.0 constructs this XPath 1.0 engine does not have: such a rule is reported as not enforced, not as invalid. */
-export function isXPath2(p: string): boolean {
-  return /\b(for|some|every)\s+\$|\bif\s*\(|\b(matches|tokenize|replace|ends-with|lower-case|upper-case|exists|empty|distinct-values|string-join)\s*\(|\s(eq|ne|lt|le|gt|ge)\s/.test(p);
-}
+/** XPath 2.0 constructs this XPath 1.0 engine does not have (shared with the Studio: backend/src/shared/brexValues.ts, WP-16). */
+export { isXPath2 };
 
 // ── Value forms ──────────────────────────────────────────────────────────────
 
-function splitNum(s: string): [string, number] | null {
-  const m = s.match(/^(.*?)(\d+)$/);
-  return m ? [m[1], parseInt(m[2], 10)] : null;
-}
-const DECIMAL = /^[+-]?(\d+(\.\d*)?|\.\d+)$/;
-
-/** Does `value` satisfy one `objectValue`? (single: one value or `a|b|c`; range: `lo~hi`; pattern: an XSD regular expression.) */
-export function valueMatches(value: string, v: BrexValue): boolean {
-  switch (v.form) {
-    case 'range': {
-      const [lo, hi] = v.allowed.split('~');
-      if (hi == null) return value === lo;
-      // decimal bounds ("0.5~2.5") compare as numbers; code-like ranges ("A01~A09", "001~999") by their number part
-      if (DECIMAL.test(lo) && DECIMAL.test(hi) && (lo.includes('.') || hi.includes('.') || value.includes('.'))) {
-        if (!DECIMAL.test(value)) return false;
-        const n = parseFloat(value);
-        return n >= parseFloat(lo) && n <= parseFloat(hi);
-      }
-      const a = splitNum(lo);
-      const b = splitNum(hi);
-      const x = splitNum(value);
-      if (a && b && x && a[0] === b[0] && x[0] === a[0]) return x[1] >= a[1] && x[1] <= b[1];
-      return value >= lo && value <= hi && value.length === lo.length;
-    }
-    case 'pattern': {
-      const re = xsdRegex(v.allowed);
-      return re ? re.test(value) : true; // a pattern that cannot be translated is reported by the caller; here it cannot reject anything
-    }
-    default:
-      return v.allowed.split('|').some((a) => a === value);
-  }
-}
+// valueMatches is shared with the Studio (backend/src/shared/brexValues.ts, WP-16 ARC-008): one definition for both engines.
+export { valueMatches };
 
 // ── Checking a document ──────────────────────────────────────────────────────
 
@@ -355,12 +324,6 @@ function locate(node: Node): string {
 }
 
 const valueOf = (node: Node): string => (node.nodeType === 2 ? (node as Attr).value : (node.textContent ?? '')).trim();
-
-function contextApplies(context: string | null, schema: string | null): boolean {
-  if (!context) return true;
-  const m = context.match(/([a-zA-Z]+)\.xsd\s*$/);
-  return !m || !schema || m[1] === schema;
-}
 
 /** How many nodes a rule's objectPath selects in a document, or null when it cannot be evaluated here (XPath 2.0, a parse error). For tests and diagnostics. */
 export function matchCount(documentXml: string, objectPath: string): number | null {

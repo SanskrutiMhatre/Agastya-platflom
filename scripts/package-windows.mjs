@@ -87,6 +87,8 @@ const feDist = path.join(root, 'frontend', 'dist', 'index.html');
 if (!fs.existsSync(beDist) || !fs.existsSync(feDist)) fail('There is no build. Run with --build (or npm run build first).');
 if (newest(path.join(root, 'backend', 'src')) > fs.statSync(beDist).mtimeMs) fail('backend/dist is older than backend/src. Run with --build.');
 if (newest(path.join(root, 'frontend', 'src')) > fs.statSync(feDist).mtimeMs) fail('frontend/dist is older than frontend/src. Run with --build.');
+// WP-16: the Studio bundles backend/src/shared (the BREX value forms and the XSD-pattern translator it shares with the server)
+if (newest(path.join(root, 'backend', 'src', 'shared')) > fs.statSync(feDist).mtimeMs) fail('frontend/dist is older than backend/src/shared, which it bundles. Run with --build.');
 
 // ---- 2. the Node.js runtime ----------------------------------------------------------------------------------------------------------------
 if (!fs.existsSync(nodeExe)) fail(`node.exe not found: ${nodeExe}`);
