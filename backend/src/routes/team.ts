@@ -15,7 +15,9 @@ import { wrap, param, bad, notFound, conflict, forbidden } from '../services/htt
 import { activityFor, monitoredProjects, pendingApprovals } from '../services/activity';
 import { notify, adminIds, list as listNotifications } from '../services/notifications';
 import { notifyAccess } from '../services/access-notify';
-import { writeBackup } from '../services/backup';
+import { PassThrough } from 'stream';
+import { pipeline } from 'stream/promises';
+import { writeBackup, exportsRunning } from '../services/backup';
 import { oversightFor } from '../services/oversight';
 import { requireAuth } from '../context';
 
@@ -128,16 +130,26 @@ export function registerTeamRoutes(app: Express): void {
     res.json(listNotifications(req.auth.user.id));
   }));
 
-  // ── Backup: a ZIP of what this person can open (administrators: the whole platform) ──
-  app.get('/api/backup', requireAuth(), wrap((req, res) => {
+  // ── Project files export: a ZIP of what this person can open (administrators: every project). Not the platform backup (routes/backups.ts) ──
+  // WP-12 (PERF-006, PLT-005, DEP-025): streamed from disk with back-pressure, one export at a time per server; a client that goes away
+  // stops the export instead of leaving it waiting.
+  app.get('/api/backup', requireAuth(), wrap(async (req, res) => {
     const u = req.auth.user;
+    if (exportsRunning() > 0) throw conflict('An export is being written for someone else; try again in a moment.', 'BUSY');
     const stamp = nowIso().replace(/[:.]/g, '-').slice(0, 19);
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="agastya-${u.role === 'admin' ? 'platform' : u.username}-backup-${stamp}.zip"`);
-    const chunks: Buffer[] = [];
-    const result = writeBackup(u, (b) => chunks.push(b));
-    audit({ actorId: u.id, actorUsername: u.username, action: 'backup.exported', ip: clientIp(req), meta: result });
-    res.end(Buffer.concat(chunks));
+    res.setHeader('Cache-Control', 'no-store');
+    const pass = new PassThrough();
+    const sent = pipeline(pass, res).catch(() => undefined);      // a closed connection ends the pipeline and errors `pass`, which stops the writer
+    try {
+      const result = await writeBackup(u, pass);
+      audit({ actorId: u.id, actorUsername: u.username, action: 'backup.exported', ip: clientIp(req), meta: result });
+    } catch (e) {
+      pass.destroy(e as Error); res.destroy();
+      console.error('[export] project files export stopped:', (e as Error).message);
+    }
+    await sent;
   }));
 
   void param; void notFound;

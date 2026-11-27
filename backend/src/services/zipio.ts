@@ -12,6 +12,7 @@
 // and a compression-ratio ceiling. Encrypted entries and unsupported methods are refused, never skipped silently.
 // =============================================================================
 
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import zlib from 'zlib';
@@ -182,6 +183,9 @@ const w32 = (n: number) => { const b = Buffer.alloc(4); b.writeUInt32LE(n >>> 0)
 const w64 = (n: number) => { const b = Buffer.alloc(8); b.writeBigUInt64LE(BigInt(n)); return b; };
 function dosOf(d: Date) { return { time: (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1), date: ((Math.max(1980, d.getFullYear()) - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate() }; }
 
+/** One entry as written: the stored name, the uncompressed size, its CRC-32 and SHA-256 (of the bytes actually read). */
+export interface ZipAdded { name: string; size: number; crc32: number; sha256: string }
+
 interface CenRec { name: Buffer; method: number; time: number; date: number; crc: number; csize: number; size: number; offset: number }
 
 export class ZipStreamWriter {
@@ -196,15 +200,15 @@ export class ZipStreamWriter {
     if (!this.out.write(b)) await new Promise<void>((res, rej) => { const ok = () => { this.out.off('error', fail); res(); }; const fail = (e: Error) => { this.out.off('drain', ok); rej(e); }; this.out.once('drain', ok); this.out.once('error', fail); });
   }
 
-  /** Add a file from disk, streamed: never held in memory. */
-  async addFile(name: string, abs: string, opts: { store?: boolean } = {}): Promise<void> {
+  /** Add a file from disk, streamed: never held in memory. Returns what was written (WP-12: the backup manifest records the SHA-256). */
+  async addFile(name: string, abs: string, opts: { store?: boolean } = {}): Promise<ZipAdded> {
     const st = fs.statSync(abs);
-    await this.addStream(name, fs.createReadStream(abs, { highWaterMark: 256 * 1024 }), st.size, st.mtime, opts.store);
+    return this.addStream(name, fs.createReadStream(abs, { highWaterMark: 256 * 1024 }), st.size, st.mtime, opts.store);
   }
 
-  async addBuffer(name: string, data: Buffer, mtime = new Date()): Promise<void> { await this.addStream(name, Readable.from([data]), data.length, mtime); }
+  async addBuffer(name: string, data: Buffer, mtime = new Date()): Promise<ZipAdded> { return this.addStream(name, Readable.from([data]), data.length, mtime); }
 
-  private async addStream(rawName: string, src: Readable, knownSize: number, mtime: Date, store?: boolean): Promise<void> {
+  private async addStream(rawName: string, src: Readable, knownSize: number, mtime: Date, store?: boolean): Promise<ZipAdded> {
     const name = Buffer.from(safeEntryName(rawName), 'utf8');
     const method = store || knownSize === 0 ? 0 : 8;
     const big = this.opts.forceZip64 || knownSize >= 0xf0000000 || this.offset >= 0xf0000000;
@@ -213,12 +217,14 @@ export class ZipStreamWriter {
     const extra = big ? Buffer.concat([w16(1), w16(16), w64(0), w64(0)]) : Buffer.alloc(0);
     await this.put(Buffer.concat([w32(SIG_LOCAL), w16(big ? 45 : 20), w16(0x0808), w16(method), w16(time), w16(date), w32(0), w32(big ? U32 : 0), w32(big ? U32 : 0), w16(name.length), w16(extra.length), name, extra]));
     let crc = 0, size = 0, csize = 0;
-    const meter = new Transform({ transform(c, _e, cb) { crc = zlib.crc32(c, crc); size += c.length; cb(null, c); } });
+    const sha = crypto.createHash('sha256');
+    const meter = new Transform({ transform(c, _e, cb) { crc = zlib.crc32(c, crc); sha.update(c); size += c.length; cb(null, c); } });
     const counter = new Transform({ transform(c, _e, cb) { csize += c.length; cb(null, c); } });
     const sink = new Writable({ write: (c, _e, cb) => { this.put(c).then(() => cb(), cb); } });
     await pipeline(src, meter, ...(method === 8 ? [zlib.createDeflateRaw({ level: 6 })] : []), counter, sink);
     await this.put(big ? Buffer.concat([w32(SIG_DESC), w32(crc), w64(csize), w64(size)]) : Buffer.concat([w32(SIG_DESC), w32(crc), w32(csize), w32(size)]));
     this.cen.push({ name, method, time, date, crc, csize, size, offset });
+    return { name: name.toString('utf8'), size, crc32: crc >>> 0, sha256: sha.digest('hex') };
   }
 
   async finish(): Promise<void> {

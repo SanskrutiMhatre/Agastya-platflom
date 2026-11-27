@@ -21,7 +21,9 @@ import fs from 'fs';
 import path from 'path';
 import type { Config } from './config';
 import { openSqlite, type SqlDatabase } from './storage/sqlite';
-import { snapshotBeforeMigration } from './storage/dbSnapshot';
+import { checkOrder, inspectSchema, quickCheck, recordApplied, snapshotBeforePendingMigrations, type MigrationStep } from './storage/schema';
+import { ORDER as MIGRATION_ORDER, forDialect } from './storage/migrations';
+import { buildInfo } from './services/version';
 import { LocalFolderStore, type ContentStore } from './storage/contentStore';
 import type { LimiterStore, SessionStore } from './storage/authStores';
 import { createSqliteRepositories, type Repositories } from './repositories';
@@ -39,6 +41,8 @@ const { Revisions } = require('./core/collab/revisions');
 /* eslint-enable */
 
 const nowIso = (): string => new Date().toISOString();
+/** The SQLite bodies of the migrations, as AuthStore.migrate runs them (the checksums are taken over these). */
+const MIGRATION_STEPS: MigrationStep[] = forDialect('sqlite');
 
 /** Who a person is (core/auth/provider.js). Roles, memberships and sessions stay in the platform. */
 export interface AuthProvider {
@@ -204,13 +208,19 @@ export function createAppContext(config: Config, o: AppContextOverrides = {}): A
     start() {
       if (started) return { snapshot };
       /**
-       * Before the S1000D reference-configuration migration (016) first runs on a database that already holds projects, keep a consistent copy
-       * of it (VACUUM INTO) in workspace/backups/. Manual rollback is documented in docs/S1000D_REFERENCE_CONFIG.md. A fresh database has nothing
-       * to protect.
+       * WP-12 (PLT-006, PLT-011, DEP-002, ENT-013, PLT-013), in this order, all before anything is written:
+       *   the migration list is well formed; the file passes quick_check; the database is not from a newer build and no applied migration
+       *   was edited (refused with a SchemaError naming the cause); then ONE verified copy before the first pending migration of any number
+       *   (the old code protected 016 only) - if the copy cannot be made, nothing is migrated. A fresh database has nothing to protect.
+       * Then the additive migrations run, and their checksums, the program version and PRAGMA user_version are recorded.
        */
-      snapshot = snapshotBeforeMigration(db, workspaceDir, '016-s1000d-reference', nowIso());
-      if (snapshot) console.log(`[migration] database copy before 016-s1000d-reference: ${snapshot}`);
+      checkOrder(MIGRATION_ORDER);
+      quickCheck(db);
+      const state = inspectSchema(db, MIGRATION_STEPS);
+      snapshot = snapshotBeforePendingMigrations(db, workspaceDir, state, nowIso(), config.backup.keepMigrationSnapshots);
+      if (snapshot) console.log(`[migration] database copy before ${state.pending[0]}: ${snapshot}`);
       store.migrate(nowIso()); // additive migrations only
+      recordApplied(db, MIGRATION_STEPS, buildInfo().version);
       started = true;
       return { snapshot };
     },

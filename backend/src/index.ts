@@ -6,7 +6,8 @@ import { tuneServer, sweepStaleUploads } from './services/uploads';
 import type http from 'http';
 import { config, nowIso } from './config';
 import { createApp } from './app';
-import { store, audit, workspaceDir, registryDb } from './context';
+import { store, audit, workspaceDir, registryDb, defaultContext } from './context';
+import { startScheduler, stopScheduler } from './services/dataProtection';
 import { acquireWorkspaceLock, releaseWorkspaceLock } from './services/workspaceLock';
 import * as broadcast from './services/broadcast';
 import { reconcileRegistry, sweepPendingImports } from './services/projects';
@@ -41,6 +42,7 @@ export async function start(port: number = config.port): Promise<number> {
 
   try { sweepStaleUploads(); } catch { /* the temp folder is a convenience */ }
   setInterval(() => { try { sweepStaleUploads(); } catch { /* best effort */ } }, 3600_000).unref();     // aborted uploads must not pile up on a server that stays up
+  startScheduler(defaultContext());   // WP-12: scheduled backup, weekly restore test, retention (first run 10 minutes after start)
   // WP-26: Mode A listens on loopback only, Mode B on the network with TLS only (services/network.ts; the certificate was checked above).
   const l = await listen(app, port, config, material, (s) => { tuneServer(s); broadcast.attach(s); });
   servers = l.servers;
@@ -54,6 +56,7 @@ export async function start(port: number = config.port): Promise<number> {
 }
 
 export function stop(): void {
+  stopScheduler();
   stopRenderer();
   broadcast.close();
   for (const s of servers) s.close();
@@ -71,6 +74,7 @@ export function shutdownGracefully(graceMs = 15000): Promise<void> {
     let done = false;
     const finish = (): void => {
       if (done) return; done = true;
+      stopScheduler();
       try { stopRenderer(); } catch { /* best effort */ }
       try { registryDb.close(); } catch (e) { console.warn('[stop] database close:', (e as Error).message); }
       releaseWorkspaceLock();
