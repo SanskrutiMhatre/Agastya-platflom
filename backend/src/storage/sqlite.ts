@@ -7,6 +7,7 @@
 // =============================================================================
 
 import path from 'path';
+import { instrumentDatabase } from '../services/metrics';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { DatabaseSync } = require('node:sqlite');
 
@@ -52,7 +53,8 @@ export function openSqlite(workspaceDir: string): SqlDatabase {
   // WP-06 (PLT-010): enforced references, stated rather than left to the library default.
   db.exec('PRAGMA foreign_keys = ON;');
   db.exec(BASE_SCHEMA);
-  return db;
+  // WP-28: every statement is timed (services/metrics.ts: on a synchronous engine a slow statement is a lock wait that stalls everyone)
+  return instrumentDatabase(db);
 }
 
 /** WP-06 (REL-003): a clean stop writes the write-ahead log back into the database file and closes it. */

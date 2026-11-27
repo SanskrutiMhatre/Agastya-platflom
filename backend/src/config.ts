@@ -61,6 +61,11 @@ export interface Config {
   baseHashCompat: boolean;
   /** WP-11 (RES-001): how long a check-out lease lasts unless it is renewed (AGASTYA_LEASE_MINUTES, default 60). */
   leaseMinutes: number;
+  /**
+   * WP-28: at most this many WebSocket connections on the server (AGASTYA_WS_MAX_CLIENTS, default 1000; a team server has 25-50 authors
+   * with a few tabs each). One session may hold at most 8 (services/broadcast.ts). A refused upgrade answers 503 / 429.
+   */
+  wsMaxClients: number;
   /** The packaged launcher asks for a clean stop by closing standard input (AGASTYA_SHUTDOWN_ON_STDIN_CLOSE=1). */
   shutdownOnStdinClose: boolean;
   /** A pdfjs-dist folder to use for structure recovery before the bundled candidates (AGASTYA_PDFJS_DIR). */
@@ -96,7 +101,10 @@ export interface Config {
    * (AGASTYA_KEEP_MIGRATION_SNAPSHOTS, default 5) the pre-migration database copies; `restoreTestDays` (AGASTYA_RESTORE_TEST_DAYS, default 7,
    * 0 = off) how often the latest backup is restored into a scratch folder and checked.
    */
-  backup: { dir: string; intervalHours: number; keep: { daily: number; weekly: number; monthly: number }; keepMigrationSnapshots: number; restoreTestDays: number };
+  backup: { dir: string; intervalHours: number; keep: { daily: number; weekly: number; monthly: number }; keepMigrationSnapshots: number; restoreTestDays: number;
+    /** WP-28 (PRD-007 warm standby): after every scheduled backup a verified copy goes to this folder (AGASTYA_BACKUP_COPY_DIR, absolute: a second
+     *  disk, or a share the standby machine can reach); the copies are pruned like the originals. null = no copy. */
+    copyTo: string | null };
   /**
    * WP-12 (PLT-007, ENT-015): how long housekeeping rows live, in days (0 = keep for ever). Sessions after they ended, read notifications,
    * decided password-reset requests; audit rows older than `auditDays` are written to a compressed archive file first, then removed.
@@ -225,6 +233,14 @@ export const envCount = (name: string, fallback: number, env: Env = process.env)
   return n;
 };
 
+/** WP-28: the warm-standby copy folder must be absolute (a relative path would depend on the service's working folder). */
+function parseCopyDir(raw: string | undefined): string | null {
+  const v = (raw ?? '').trim();
+  if (!v) return null;
+  if (!path.isAbsolute(v)) throw new ConfigError('AGASTYA_BACKUP_COPY_DIR', `"${v}" is not an absolute folder path.`);
+  return path.resolve(v);
+}
+
 function parseKeep(raw: string | undefined): { daily: number; weekly: number; monthly: number } {
   if (raw === undefined || raw.trim() === '') return { daily: 7, weekly: 4, monthly: 12 };
   const m = /^\s*(\d+)\s*\/\s*(\d+)\s*\/\s*(\d+)\s*$/.exec(raw);
@@ -348,6 +364,7 @@ export function buildConfig(env: Env = process.env): Config {
     workspaceLock: env.AGASTYA_NO_WORKSPACE_LOCK !== '1',
     baseHashCompat: env.AGASTYA_BASEHASH_COMPAT === '1',
     leaseMinutes: envPositive('AGASTYA_LEASE_MINUTES', 60, env),
+    wsMaxClients: envPositive('AGASTYA_WS_MAX_CLIENTS', 1000, env),
     shutdownOnStdinClose: env.AGASTYA_SHUTDOWN_ON_STDIN_CLOSE === '1',
     pdfjsDir: env.AGASTYA_PDFJS_DIR || undefined,
     initialAdmin: { INITIAL_ADMIN_USERNAME: env.INITIAL_ADMIN_USERNAME, INITIAL_ADMIN_PASSWORD: env.INITIAL_ADMIN_PASSWORD },
@@ -365,6 +382,7 @@ export function buildConfig(env: Env = process.env): Config {
       keep: parseKeep(env.AGASTYA_BACKUP_KEEP),
       keepMigrationSnapshots: envCount('AGASTYA_KEEP_MIGRATION_SNAPSHOTS', 5, env),
       restoreTestDays: envCount('AGASTYA_RESTORE_TEST_DAYS', 7, env),
+      copyTo: parseCopyDir(env.AGASTYA_BACKUP_COPY_DIR),
     },
     retention: {
       sessionsDays: envCount('AGASTYA_RETENTION_SESSIONS_DAYS', 30, env),

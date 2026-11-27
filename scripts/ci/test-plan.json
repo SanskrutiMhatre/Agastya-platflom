@@ -8,7 +8,7 @@
     "rbac.test.js", "routes-guarded.test.js", "phase17-security.test.js", "wp02-routes.test.js", "wp03-auth.test.js",
     "wp04-reset-admin.test.js", "xml-guard.test.js", "settings-hostile-input.test.js", "import-enterprise-refusal.test.js",
     "authz-matrix.test.js", "auth-core.test.js", "auth-http.test.js", "ws-broadcast.test.js", "admin-ops.test.js", "wp26-network.test.js",
-    "wp27-directory.test.js", "wp27-permissions.test.js", "wp29-audit-trail.test.js", "wp29-audit-coverage.test.js"
+    "wp27-directory.test.js", "wp27-permissions.test.js", "wp29-audit-trail.test.js", "wp29-audit-coverage.test.js", "wp28-team-server.test.js"
   ],
   "pdfSmoke": [
     "pdf-furniture.test.js", "jss-change-notice.test.js", "jss-cover-foot.test.js", "jss-cover-isolation.test.js", "jsg-engine.test.js",
@@ -22,6 +22,6 @@
   ],
   "scriptTests": {
     "_comment": "node:test files outside backend/test, by gate stage, paths from the repository root. release-tools (WP-24) runs first in the package stage and on its own with --stages release-tools.",
-    "release-tools": ["scripts/release/release.test.mjs", "scripts/release/host.test.mjs", "scripts/release/update.test.mjs", "scripts/release/installer.test.mjs", "scripts/release/host-audit.test.mjs"]
+    "release-tools": ["scripts/release/release.test.mjs", "scripts/release/host.test.mjs", "scripts/release/update.test.mjs", "scripts/release/installer.test.mjs", "scripts/release/host-audit.test.mjs", "scripts/release/teamserver.test.mjs"]
   }
 }

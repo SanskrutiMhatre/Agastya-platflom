@@ -23,7 +23,7 @@ import type { MigrationStep } from '../storage/schema';
 import { buildInfo } from './version';
 import { lastCheckpointAt, verifyAudit, writeCheckpoint } from './auditTrail';
 import {
-  BackupError, backupRunning, createPlatformBackup, listBackups, pruneScheduledBackups, verifyPlatformBackup,
+  BackupError, backupRunning, copyBackupTo, createPlatformBackup, listBackups, pruneScheduledBackups, verifyPlatformBackup,
   type BackupKind, type BackupListItem, type CreatedBackup, type RestoreReport,
 } from './platformBackup';
 
@@ -38,6 +38,8 @@ export interface DataProtectionState {
   lastRetention?: JobResult & { counts?: Record<string, number> };
   /** WP-29: the daily verification of the audit chain. */
   lastAuditVerify?: JobResult;
+  /** WP-28: the last copy to the warm-standby folder */
+  lastCopy?: JobResult;
 }
 
 const stateFile = (ctx: AppContext): string => path.join(ctx.config.backup.dir, 'backup-state.json');
@@ -168,8 +170,10 @@ export async function tick(ctx: AppContext, now = new Date().toISOString()): Pro
   const done: string[] = [];
   const b = ctx.config.backup; const st = readState(ctx);
   if (b.intervalHours > 0 && !backupRunning() && olderThan(st.lastScheduledAt, b.intervalHours * 3600_000 - 60_000, now)) {
-    try { await backupNow(ctx, 'scheduled', null, now); done.push('backup'); } catch (e) { console.error('[backup] scheduled backup failed:', (e as Error).message); }
+    let made: CreatedBackup | null = null;
+    try { made = await backupNow(ctx, 'scheduled', null, now); done.push('backup'); } catch (e) { console.error('[backup] scheduled backup failed:', (e as Error).message); }
     try { const removed = pruneScheduledBackups(b.dir, b.keep); if (removed.length) ctx.audit({ actorId: null, actorUsername: 'system', action: 'backup.pruned', targetType: 'backup', meta: { removed } }); } catch (e) { console.error('[backup] pruning failed:', (e as Error).message); }
+    if (made && b.copyTo) { if (await copyToStandby(ctx, made, b.copyTo, now)) done.push('copy'); }
   }
   if (b.restoreTestDays > 0 && olderThan(readState(ctx).lastRestoreTest?.at, b.restoreTestDays * 86400_000, now) && listBackups(b.dir).length) {
     try { await restoreTest(ctx, undefined, null, now); done.push('restore-test'); } catch (e) { console.error('[backup] restore test failed:', (e as Error).message); }
@@ -188,6 +192,26 @@ export async function tick(ctx: AppContext, now = new Date().toISOString()): Pro
   return done;
 }
 
+/**
+ * WP-28 (PRD-007 warm standby): copy a new scheduled backup to the standby folder (AGASTYA_BACKUP_COPY_DIR), compared by SHA-256, and prune the
+ * copies like the originals. A failure is audited and sent to the administrators; the backup itself stays good.
+ */
+export async function copyToStandby(ctx: AppContext, made: CreatedBackup, folder: string, now = new Date().toISOString()): Promise<boolean> {
+  try {
+    fs.mkdirSync(folder, { recursive: true });
+    const out = await copyBackupTo(made.file, folder);
+    writeState(ctx, { lastCopy: { at: now, ok: true, name: made.name } });
+    ctx.audit({ actorId: null, actorUsername: 'system', action: 'backup.copied', targetType: 'backup', targetId: made.name, meta: { standby: true, sha256: out.sha256 } });
+    try { pruneScheduledBackups(folder, ctx.config.backup.keep); } catch (e) { console.error('[backup] pruning the standby copies failed:', (e as Error).message); }
+    return true;
+  } catch (e) {
+    writeState(ctx, { lastCopy: { at: now, ok: false, name: made.name, message: (e as Error).message } });
+    ctx.audit({ actorId: null, actorUsername: 'system', action: 'backup.copy_failed', targetType: 'backup', targetId: made.name, meta: { standby: true, error: (e as Error).message } });
+    tellAdmins(ctx, 'The backup could not be copied to the standby folder', (e as Error).message, now);
+    return false;
+  }
+}
+
 let timers: NodeJS.Timeout[] = [];
 /** Start the schedule: first run 10 minutes after start (never during start-up), then every hour. Timers do not keep the process alive. */
 export function startScheduler(ctx: AppContext, firstDelayMs = 10 * 60_000): void {
@@ -203,6 +227,8 @@ export interface DataProtectionStatus {
   intervalHours: number;
   keep: { daily: number; weekly: number; monthly: number };
   restoreTestDays: number;
+  /** WP-28: the warm-standby folder every scheduled backup is copied to (null = none) */
+  copyTo: string | null;
   running: boolean;
   backups: BackupListItem[];
   /** The newest backup that exists, and its age in days. */
@@ -219,7 +245,7 @@ export function status(ctx: AppContext, now = new Date().toISOString()): DataPro
   const newest = backups[0];
   const latest = newest ? { ...newest, ageDays: Math.floor((Date.parse(now) - Date.parse(newest.createdAt)) / 86400_000) } : null;
   return {
-    dir: b.dir, intervalHours: b.intervalHours, keep: b.keep, restoreTestDays: b.restoreTestDays, running: backupRunning(), backups, latest,
+    dir: b.dir, intervalHours: b.intervalHours, keep: b.keep, restoreTestDays: b.restoreTestDays, copyTo: b.copyTo, running: backupRunning(), backups, latest,
     stale: !latest || latest.ageDays >= 7, state: readState(ctx),
     schema: { applied: ctx.repos.appliedMigrations().length, known: STEPS.length, latest: STEPS.length ? STEPS[STEPS.length - 1].name : null },
   };

@@ -26,6 +26,8 @@ import { lastDoc } from '../../lib/continueDoc';
 import { countLabel } from '../../lib/problems';
 import { PROJECT_LABEL, may } from '../../lib/roles';
 import { useUi } from '../../store/ui';
+import { useSession } from '../../store/session';
+import { WorkingNow } from '../../components/WorkingNow';
 
 const REVIEW_WORDS: Record<string, string> = { draft: 'Not submitted', in_review: 'Waiting for the Project Manager', changes_requested: 'Changes requested', approved: 'Approved and released' };
 
@@ -43,6 +45,7 @@ export function ProjectHomePage() {
   const { id, summary, role, can, reload } = useProject();
   const nav = useNavigate();
   const toast = useUi((s) => s.toast);
+  const me = useSession((s) => s.user);
   const [checking, setChecking] = useState(false);
   const p = summary.project;
   const s1000d = (p.format ?? 's1000d') === 's1000d';
@@ -127,6 +130,7 @@ export function ProjectHomePage() {
             </ul> : <p className="v2-hint" style={{ padding: '10px 16px', margin: 0 }}>{activity.loading ? 'Loading…' : 'No activity in the last seven days.'}</p>}
           </section>
         ) : null}
+        <WorkingNow projectId={id} format={p.format ?? 's1000d'} canBreak={role === 'owner' || role === 'manager' || me?.role === 'admin'} />
       </div>
     </div>
   );
