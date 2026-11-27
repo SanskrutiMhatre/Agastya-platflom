@@ -974,3 +974,93 @@ order of 08 section 7:
   suites. `scripts/ci/lint.mjs` reports `any.backend` 282 against a baseline of 280: not from this package (no TypeScript changed here).
 * Not done: the end-to-end acceptance "full 100-module publish at most 40 s" was not measured through the server (the FO stage it was
   dominated by is now under 1 s); a re-check on a newer libxslt if the toolchain changes.
+
+### WP-16 One validation framework and shared helpers (S1K-002, S1K-003, S1K-006, S1K-007, PUB-022, ARC-007, ARC-008, ARC-018, PUB-028) - done in part (see limits)
+
+Behaviour-preserving unless stated; decisions taken from the audit's recommendations (no owner question).
+
+* **Validation framework** (`services/validationFramework.ts`, 03 section 4): one finding model (`Issue`, `issueOf` = the former private
+  `norm`), rule sets per standard (`RuleSet`: id, standard, `applies(input)`, `run(input)`), one runner (`runRuleSets`: in order, a
+  `setImmediate` turn before each set, as WP-32 put between the scans) and `summarise`. A rule set takes plain data (`ValidationInput`: ids,
+  folders, issue in use, flags) and returns plain data, never a request, so WP-14 can run it in a worker. `validation.ts` keeps the schema
+  stage (well-formedness, XSD, extensions: what it finds decides what the others read) and lists the S1000D rule sets
+  (`S1000D_RULE_SETS`: applic, graphics, ids, icn, pm, brex; BREX only when asked and only for an S1000D project). Same issues, same order,
+  same notes, same messages; the only difference is one more event-loop turn (before BREX). `Issue`/`Severity` are re-exported from
+  `validation.ts` for the existing importers.
+* **Format-neutral gate (S1K-006)** (`services/publishChecks.ts`, a leaf): `registerPublishCheck({ format, owns, check })`, the S1000D check
+  registered by `publishGate.ts` as the default, the JSS check by `jss/service.ts` when the engine loads (the `documentCreators` pattern of
+  WP-10; `app.ts` and `publisher.ts` load it). `assertPublishable` is one line; `publishGate.ts` no longer imports the JSS service. Messages
+  and codes unchanged (`NOT_S1000D` for a one-module preview of a JSS document). JSG keeps publishing through its own engine
+  (`assertJsgPublishable`) and is not registered: registering it would change what the S1000D publish route does for a JSG project.
+* **Waiver subjects (S1K-002)** (`publishWaivers.ts`): `waiverSubject()` takes the issue/language suffix and `.xml` off and folds the case, at
+  write time (stored as the gate names it) and at match time (a stored older waiver still matches); a missing `DMC-` prefix is accepted.
+  Matching is now equality of the normalised subjects. Changed on purpose: the former `endsWith` match let a waiver for `022A-D` cover every
+  BREX ending so, and a file-name subject (`..._001-00_EN-US.XML`) was accepted (201) and never matched; now it matches.
+* **One source for the XSD-pattern translator and the BREX value forms (S1K-003, ARC-008)**: `backend/src/shared/xsdRegex.ts` and
+  `backend/src/shared/brexValues.ts` (`valueMatches`, `contextApplies`, `isXPath2`; no Node, DOM or outside imports, checked by the test).
+  The backend compiles them; the Studio imports them by relative path (`frontend/src/studio/validation/brex.ts`, `ui/panels.ts`);
+  `frontend/src/studio/core/xsdRegex.ts` and `backend/src/services/xsdRegex.ts` are gone. `vite.config.ts` lets the dev server read that
+  folder (`server.fs.allow`: the default root plus `backend/src/shared`); `scripts/package-windows.mjs` treats a change there as making
+  `frontend/dist` stale. The BREX parse and document walk stay per runtime (xmldom + `xpath` vs the browser DOM); the parity suite stays as
+  the guard. The frontend `isXPath2` had `matches` twice in its alternation: same semantics.
+* **Shared helpers (PUB-028, S1K-007)**: `backend/src/lib/xml.ts` (`escText` & < >, `escAttr` & < > ", `readAttrs`) and `lib/hash.ts`
+  (`sha256`, `sha256File` streamed in 1 MB blocks, `sha256FileOr`). Replaced: the 14 `esc` copies (each caller keeps the variant it had:
+  `escAttr` where the copy escaped `"`), the 6 attribute escapers built on them (`escA`/`escAttr` in jsg/docx, jsg/service, jss/service,
+  jss/rwi/canonical, jss/rwi/serialize, jssdm/toDms, and the inline one in xengine/jsg-model), `importer/xmlScan` `escapeText/escapeAttr`
+  (now re-exports), the 5 named hash helpers (`csdbIndex.sha`, `jss/service.sha`, `jsg/service.sha`, `jss/rwi/exporter.sha`,
+  `publishGate.sha` = `sha256FileOr`) and the streaming file hash of `packages.ts`; the attribute reader of `csdbIndex`, `csdbObjects`,
+  `lifecycle`, `sns/dms`, `findings`, `packages`, `projectConfig` (2) and `jssdm/fromDms` is `readAttrs` (re-exported by `xmlHead.ts`, as
+  S1K-007 asked). Exported names (`esc`, `sha`, `escA`, `escapeText`) are kept as re-exports, so no importer changed. Left on purpose:
+  the two serialisers that escape attributes as `& " <` without `>` (`miniXml.ts`, `importer/xmlScan.ts` setAttrs) - switching them would
+  change bytes the importer writes; the inline hashes that slice or hash JSON (`applicEval`, `jss/ancillary`, `release` digest Buffers).
+* **JSS document projects (PUB-022, ARC-018)**: `projectRecord.assertS1000dPublication(projectId)` (409 `JSS_PROJECT_PROTECTED`, the guard's
+  message) is called by the writers themselves: `pm.writePm` (PUT pmc, import/assign, placeNewDm, sample), the `pmc/import` route before it
+  writes, `importer/apply.applyImport`, `sns/service.applyDerived` and `jssdm.generateForProject` with `pm: 'merge'`. `routes/jss-guard.ts`
+  stays as defence in depth (decision: no global allow-list middleware, the audit's own recommendation is "decide inside the writers").
+  Found while doing it: `POST sns-rows/derive` with `apply` (one of the "NOT VERIFIED" writers of ARC-018) was not in the guard's list and
+  its writer did not check the project kind (on a JSS project without data modules it stopped at "empty publication"; with modules in the
+  CSDB nothing stood between it and the JSS document - read from the code, not reproduced on the old build); it is now refused with 409. Kept as designed: a NEW JSS project made from an S1000D package
+  (`POST /api/projects/import`, format jss) takes the package's publication (`xengine-import-wizard.test.js` "keeps the data"), so the
+  package importer does not assert; `packages/import` into an existing JSS project is refused by the guard as before.
+* New test `test/wp16-validation-framework.test.js` (default backend stage: `test-plan.json` lists only the special stages): lib helpers
+  pinned (escapes, attributes, 2 MB streamed hash, the services hand out the shared functions); the duplicate scan (no escaper, hash helper,
+  attribute reader, XSD translator or BREX value-form function outside `lib/` and `shared/`, the Studio copy is gone, both runtimes import
+  `shared/`, `shared/` is runtime-free); the framework (normalisation, order, skipped set, a turn between sets, S1000D rule-set list and the
+  BREX condition); the gate registry (JSS check owns a JSS project, the S1000D one is the default, a probe format plugs in without touching
+  the gate, `publishGate.ts` code has no JSS reference); waiver subjects (file name = bare code = no prefix; a different BREX and a mere
+  suffix do not match; the second form replaces instead of adding); and the table of every route that can write publication.xml on a JSS
+  project (PUT pmc, pmc/import, import/apply, import/assign, packages/import, dms-import, sns-rows/derive apply, jssdm/generate merge: 409
+  and the file byte-identical) plus the writers called below the routes (writePm, applyImport, applyDerived: 409).
+* Verified (backend `tsc` 0 errors, frontend `tsc --noEmit` 0 errors, `scripts/ci/lint.mjs` green with `any.backend` lowered 280 -> 279
+  (the untyped `norm` parameter went); each backend file alone, `--test-concurrency=1`, `AGASTYA_CLIENT_DIST` at the main checkout's
+  `frontend/dist`): new `wp16-validation-framework` 6/6; `wp32-validation-scale` 8/8, `wp32-validator-crash` 1/1, `brex` 16/16,
+  `applicability` 4/4, `repeated-dm-ids` 6/6, `extensions` 5/5, `jss-authoring` 12/12 (1 skip: stencils not in the checkout),
+  `importer-repairs` 19/19, `importer-scan` 16/16, `importer-structure` 12/12, `jssdm` 20/20, `jssdm-http` 9/9, `wp10-seams` 11/11,
+  `wp10-storage-contract` 10/10, `publish-waivers` 2/2, `html-gate` 1/1, `html-publish` 6/6, `csdb-objects` 4/4, `import` 5/5,
+  `importer-http` 12/12, `packages` 10/10, `project-formats` 4/4, `routes-guarded` 1/1, `settings-hostile-input` 6/6, `sns` 16/16,
+  `sns-http` 10/10, `sns-polish` 4/4, `sns-separation` 6/6, `lifecycle` 5/5, `lifecycle-reinstate` 2/2, `jsg-engine` 7/7, `jsg-ispl` 5/5,
+  `wp07-jsg-deep-path` 1/1, `xengine-convert` 7/7, `xengine-import-wizard` 4/4, `xengine-legacy-import` 5/5, `xengine-identity` 11/11,
+  `xengine-content-types` 2/2, `xengine-pictures` 2/2, `pm-multi-ref` 5/5, `object-docs` 4/4, `api` 17/17, `phase13` 12/12,
+  `import-enterprise-refusal` 2/2, `wp06-lifecycle` 5/5, `brex-gate` 3/3 (962 s), `publish-gate` 21/24 then the three failures re-run
+  alone 4/4 (with the 5-0 setup): the three were HTTP 500 from `EPERM ... rename ... %TEMP%\jsspub-s1000d-catalog.xml` in
+  `vendor/engine/catalog.js` - every process on the machine writes that ONE temp file, and other agents' suites ran at the same time
+  (a pre-existing shared-temp race, not touched here; worth its own fix: a per-process catalog name). Frontend: `brex-parity` 4/4
+  (AGASTYA_VERIFY=1, against this build of the server engine), `lib/waivers.test.ts` 12/12, `vite build` to a scratch folder bundles
+  `backend/src/shared` (the Studio chunk contains the shared code). Not runnable here: `brex-xpath` (needs a native `xmllint` on PATH;
+  4/4 fail with no libxml2 counts, an environment limit).
+* `wp32-event-loop` (limit 100 ms) did not hold on this machine under the load of the parallel agents (CPU at 99 %, validation 16-21 s
+  instead of 11.6 s). A/B on the same load, the 8a04aa2 build against this one, alternately: base 82.8 / 140.1 ms, WP-16 131.9 / 86.4 /
+  119.3 ms (two more single runs of WP-16: 95.3 ms pass, 136.2 ms). The stall is one BREX check of one module stretched by the load
+  (WP-32's stated limit, WP-14's job); the runner adds no work to a turn. To be re-checked by the lead on a quiet machine.
+* Not done, and why:
+  - ARC-007 document model (JSS/JSG vocabulary in `jss/rwi/canonical.ts`, `xengine/jsg-model.ts`, `frontend/src/jss/xml.ts`,
+    `frontend/src/jsg/xml.ts`): the copies have already diverged in output (the editor writes `indent="none"`, drops empty marks,
+    self-closes an empty `xref`, writes a chapter `orientation` and a section title on the section's own line; the backend canonical model has none of these, and the two name a
+    notice's content differently).
+    One shared module therefore changes what the converters or the editor write: a behaviour decision with the round-trip suites, not a
+    mechanical refactor. Recommended as its own change: the editor's writer (the superset) moved to `backend/src/shared/`, the canonical
+    model extended to it, `xengine-convert`, `jss/jss.test.ts`, `jsg/jsg.test.ts` as the guard.
+  - ZIP: `services/zip.ts` (the weak writer) guards the backup, which WP-12 (in parallel) owns; `importer/zipRead.ts` was left beside
+    `zipio.ts`. PNG encoders: the vendor copy stays (ARC-007 says so).
+  - `serial` (2 job chains) and `runTool` (process runner): WP-14's job service, as 03 section 3 recommends. `paths.ts` / `atomic.ts`: WP-11.
+  - Frontend escapers (`studio/core/xml.ts` and the JSS/JSG editors' own) were not part of the PUB-028 count and were not touched.
