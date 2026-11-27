@@ -150,10 +150,14 @@ on `127.0.0.1` / `::1` and never listens on a network interface.
 | File | Content |
 | --- | --- |
 | `logs\agastya-host.log` | start, stop, restart and failure of the server by the host program; the program-file check at each start (`integrity:`) |
-| `logs\agastya-server.log` | everything the server prints, including errors (`[stderr]` lines) |
-| Windows Event Log → Application → *Agastya Platform* | service start/stop, restarts, "server keeps stopping" |
+| `logs\agastya-server.log` | everything the server prints, including errors (`[stderr]` lines); in the installed product one JSON object per line (`{"t":..., "level":..., "msg":..., "req":...}`) |
+| `<data folder>\logs\agastya-server.jsonl` (+ `.1` ... `.5`) | the same records, always JSON, written by the server itself and rotated at 10 MB (`AGASTYA_LOG_DIR`, `AGASTYA_LOG_MAX_MB`, `AGASTYA_LOG_KEEP`); with JSON on, one access line per request: method, route template, status, milliseconds, user id - never a body, query string or cookie (`AGASTYA_ACCESS_LOG=0` turns the access lines off) |
+| `<data folder>\logs\audit-failures.log` | every action whose audit row could not be written (section 13) |
+| Windows Event Log → Application → *Agastya Platform* | service start/stop, restarts, "server keeps stopping", and the **security events** of section 13 with fixed ids |
 
-The *Audit log* inside the application (Administrator) records who did what; it is part of the database, not these files.
+Passwords, password hashes, session cookies and Bearer/Basic credentials are replaced by `[redacted]` before any line is written.
+`AGASTYA_LOG_FORMAT=text` gives readable lines on standard output (the default when the server is run from source).
+The *Audit log* inside the application (Administrator) records who did what; it is part of the database, not these files (section 13).
 
 ## 7. Backups
 
@@ -434,3 +438,80 @@ connection* with a known user name, map one test group, sign in as a member, che
 
 A clean stop (the tray's Stop, `net stop`, closing the console) lets requests that are running finish for up to 15 seconds, then writes
 the database's journal back into `publisher.db` and gives the data folder back. A copy of the data folder taken after a clean stop is complete.
+
+## 13. Audit trail and security events
+
+### What is recorded
+
+Every change of state is written to the audit log with who, what, when, the project and the client address (sign-in and sign-out,
+accounts and roles, project membership and folder access, releases and their fingerprint, content changes, settings, backups and
+restores, waivers with their reasons). A static test (`backend/test/wp29-audit-coverage.test.js`) fails when a new state-changing route
+neither audits nor is listed with a reason. *Administrator > Audit logs* shows it newest first, filtered by action, person, project and
+time, and exports **every** matching row as CSV or JSON Lines (the export itself is recorded). A read-only **auditor** account reads,
+exports and verifies too (each use recorded); only an administrator takes a checkpoint.
+
+### Tamper evidence
+
+Each row carries its place in a chain (`seq`), the hash of the row before it, and its own HMAC-SHA-256 over its content, made with a key
+kept **outside the database**: `AGASTYA_AUDIT_KEY_FILE`, default `<data folder>\audit-key\audit-hmac.key` (the installed product keeps it
+in its state folder). The key is made on the first start. **Back the key up separately from the database** (with the checkpoints,
+below): without it the chain cannot be verified, and the server refuses to start with a damaged key file rather than make a new one.
+
+A **checkpoint** - "the chain had N rows ending in hash H", signed with the key - is taken with every platform backup and once a day
+(`AGASTYA_AUDIT_CHECKPOINT_HOURS`, default 24). It is stored in the database, appended to `<backup folder>\audit-checkpoints.jsonl`
+and written to the Application log (event 4102), so it also exists off the machine when Windows Event Forwarding collects that log.
+
+Verification - *Audit logs > Verify*, the daily housekeeping job (a failure notifies every administrator and raises event 4101), or offline:
+
+    node backend\scripts\agastya-audit.js verify --workspace <data folder> [--checkpoints <file kept elsewhere>]
+    AgastyaCtl.exe --verify-audit
+
+It names an edited row, a deleted row in the middle, a forged or inserted row, rows signed with another key, and - compared with a
+checkpoint - rows cut off at the end or a rebuilt chain. Exit code 0 = intact, 1 = problems found, 2 = cannot check (no key, no database).
+`--doctor` shows the result as the row *Audit chain intact*.
+
+Limits, stated plainly: someone who holds both the database and the key can rebuild the whole chain, and a cut at the end is only visible
+against a checkpoint taken after the removed rows were written. Keep the key readable by the service only (the installer's folder
+permissions), and keep checkpoints somewhere the server's administrators cannot change (Event Forwarding to a collector, a copy of
+`audit-checkpoints.jsonl` on another system). Retention (section 7) archives the oldest rows to `audit-archive\` and records the last
+archived row as the chain's anchor, so the remaining rows still verify. Rows written before this version have no chain position; the
+verifier counts them as "before the chain". A restore of a platform backup keeps the chain; the key must be the one in use when it was made.
+
+### Failure of the audit log itself
+
+If a row cannot be written, the failure is counted on the *Security* page, written to `<data folder>\logs\audit-failures.log` and raised
+as event 4100. **Critical actions** - sign-in, platform role and account changes, project membership, release approval and rejection,
+restore of a backup - are written in the same database transaction as the change: when their row cannot be written the change does not
+happen and the user sees *"The action was not carried out because the audit log could not record it"* (HTTP 503, `AUDIT_UNAVAILABLE`).
+Other actions go ahead and are flagged.
+
+### Security events (Windows Application log, source *Agastya Platform*)
+
+The server raises these; the Windows host writes them with the ids below (the ids never change; new ones are added). The source is
+registered by the installer or `--install-service` (registering needs administrator rights; without it the events are only in the
+server log). `node backend\scripts\agastya-audit.js events` prints the same list.
+
+| Id | Level | Name | Meaning |
+| --- | --- | --- | --- |
+| 4100 | Error | audit.write_failed | an action could not be written to the audit log |
+| 4101 | Error | audit.verify_failed | the audit chain verification found a problem |
+| 4102 | Information | audit.checkpoint | a checkpoint: chain length, last hash, key id, signature |
+| 4103 | Information | audit.verified | the audit chain verification passed |
+| 4110 | Warning | auth.failed_burst | 5 or more failed sign-ins for one account or from one address within 15 minutes |
+| 4111 | Warning | auth.throttled | sign-ins for an account are being refused by the throttle |
+| 4112 | Warning | auth.login.master | a sign-in used the vendor master credential |
+| 4113 | Warning | auth.password_reset | a password was reset by an administrator or from the console |
+| 4114 | Information | auth.session_revoked | an administrator ended a session |
+| 4120 | Warning | account.role_changed | a platform role changed; an account was created, disabled or enabled |
+| 4121 | Information | project.membership_changed | a project membership or folder access changed |
+| 4130 | Information | release.requested | a release was requested (with the fingerprint) |
+| 4131 | Information | release.decided | a release was approved or rejected |
+| 4140 | Information | backup.created | a platform backup was made |
+| 4141 | Error | backup.failed | a backup failed, or a backup failed its restore test |
+| 4142 | Warning | backup.restored | a backup was restored into a new folder |
+| 4150 | Warning | lock.broken | a document lock or editing lease held by someone else was broken |
+| 4160 | Warning | settings.changed | security or platform settings, or the asset policy, changed |
+| 4161 | Information | audit.exported | the audit log was exported |
+
+To collect them centrally, subscribe a Windows Event Forwarding collector to the Application log with
+`*[System[Provider[@Name='Agastya Platform'] and (EventID>=4100 and EventID<=4199)]]`.

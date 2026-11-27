@@ -5,7 +5,7 @@
 
 import { useState } from 'react';
 import type { ProjectRole } from '../api';
-import { waiverApi } from '../api/waivers';
+import { WAIVER_EXPIRY_DAYS, expiryFromDays, waiverApi } from '../api/waivers';
 import { canRecordWaiver, type Can } from '../lib/roles';
 import { REASON_MAX, reasonProblem, summariseFindings, waiverOffer, type GateFinding, type Refusal } from '../lib/waivers';
 import { Alert, Badge, Field, Modal, Spinner, errText } from './ui';
@@ -17,6 +17,7 @@ const KIND_LABEL: Record<string, string> = { malformed: 'not well-formed', schem
 function WaiverDialog({ projectId, subjects, others, onClose, onRecorded }: { projectId: string; subjects: string[]; others: number; onClose: () => void; onRecorded: () => void }) {
   const toast = useUi((s) => s.toast);
   const [reason, setReason] = useState('');
+  const [days, setDays] = useState(0);                              // WP-29 (ENT-017): an optional expiry
   const [problem, setProblem] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -25,7 +26,7 @@ function WaiverDialog({ projectId, subjects, others, onClose, onRecorded }: { pr
     if (bad) { setProblem(bad); return; }                           // the server checks again; this saves the round trip
     setBusy(true); setProblem('');
     try {
-      for (const subject of subjects) await waiverApi.add(projectId, { kind: 'brex-missing', subject, reason: reason.trim() });
+      for (const subject of subjects) await waiverApi.add(projectId, { kind: 'brex-missing', subject, reason: reason.trim(), expiresAt: expiryFromDays(days) });
       toast(`Waiver recorded for ${subjects.length === 1 ? subjects[0] : `${subjects.length} BREX modules`}. Building a draft…`, 'success');
       onClose(); onRecorded();
     } catch (e) { setProblem(errText(e)); setBusy(false); }
@@ -48,6 +49,11 @@ function WaiverDialog({ projectId, subjects, others, onClose, onRecorded }: { pr
           <textarea className="v2-textarea" rows={3} maxLength={REASON_MAX} value={reason} autoFocus onChange={(e) => { setReason(e.target.value); if (problem) setProblem(''); }} placeholder="For example: the organisation's BREX is not shipped with the imported package; drafts only until it is supplied." data-testid="waiver-reason" />
         </Field>
         <span className="v2-hint">{reason.trim().length} / {REASON_MAX}</span>
+        <Field label="Expires" hint="After this the waiver no longer applies and builds that need it are refused again; it stays in the history.">
+          <select className="v2-input" value={days} onChange={(e) => setDays(Number(e.target.value))} data-testid="waiver-expiry">
+            {WAIVER_EXPIRY_DAYS.map((d) => <option key={d} value={d}>{d === 0 ? 'Never (until removed)' : `In ${d} days`}</option>)}
+          </select>
+        </Field>
       </div>
     </Modal>
   );

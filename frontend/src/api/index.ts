@@ -284,7 +284,32 @@ export const platformApi = {
   AUDIT_CSV: '/api/admin/maintenance/audit.csv',
   securityPolicy: () => get<{ policy: SecurityPolicy; defaults: SecurityPolicy }>('/api/admin/security-policy'),
   saveSecurityPolicy: (b: Partial<SecurityPolicy>) => put<{ policy: SecurityPolicy }>('/api/admin/security-policy', b).then((r) => r.policy),
-  health: () => get<{ audit: { failures: number; last: { at: string; action: string; error: string } | null } | null }>('/api/admin/health'),
+  health: () => get<{ audit: { failures: number; last: { at: string; action: string; error: string } | null; lastVerification?: { at: string; ok: boolean; summary: string } | null } | null }>('/api/admin/health'),
+};
+
+/** WP-29: the audit viewer's and the export's filters (backend/src/routes/audit.ts auditFilterOf). */
+export interface AuditQuery { action?: string; actor?: string; project?: string; from?: string; to?: string }
+/** The query string of the filters that are set ("" when none), values encoded, in a fixed order. */
+export function auditQueryString(q: AuditQuery): string {
+  const parts = (['action', 'actor', 'project', 'from', 'to'] as const)
+    .filter((k) => (q[k] ?? '').trim() !== '')
+    // a date alone as "to" means up to the end of that day (a date input gives 2026-11-27, which would otherwise mean its first instant)
+    .map((k) => { const v = (q[k] as string).trim(); return `${k}=${encodeURIComponent(k === 'to' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? `${v}T23:59:59.999Z` : v)}`; });
+  return parts.join('&');
+}
+export interface AuditVerifyReport {
+  ok: boolean; at: string; keyId: string; chained: number; beforeChain: number; summary: string; problemCount: number;
+  head: { seq: number; hash: string };
+  anchor: { seq: number; archive: string | null } | null;
+  checkpoints: { checked: number; newest: { at: string; seq: number } | null };
+  problems: Array<{ kind: string; id?: number; seq?: number; message: string }>;
+}
+export const auditApi = {
+  /** A GET (an auditor, who may not POST, verifies too); `fresh`: every press walks the chain again. */
+  verify: () => get<{ report: AuditVerifyReport }>('/api/admin/audit/verify', { fresh: true }).then((r) => r.report),
+  checkpoint: () => post<{ checkpoint: { id: number; at: string; seq: number; row_hash: string } }>('/api/admin/audit/checkpoint').then((r) => r.checkpoint),
+  /** The streamed export of every row matching the filters (a download link; the export is itself audited). */
+  exportUrl: (format: 'csv' | 'jsonl', q: AuditQuery) => { const s = auditQueryString(q); return `/api/admin/audit/export?format=${format}${s ? `&${s}` : ''}`; },
 };
 /** WP-12: platform backups (backend/src/routes/backups.ts, services/dataProtection.ts). Administrators only. */
 export interface BackupItem { name: string; bytes: number; createdAt: string; kind: 'manual' | 'scheduled' | 'pre-update' | 'cli' }
@@ -338,7 +363,11 @@ export const adminApi = {
   rejectRelease: (id: string) => post(`/api/admin/releases/${id}/reject`),
   sessions: () => get<{ sessions: Array<{ id: string; username: string; fullName: string; role: string; createdAt: string; lastSeenAt: string | null; ip: string | null; userAgent: string | null }> }>('/api/admin/sessions').then((r) => r.sessions),
   revokeSession: (id: string) => post(`/api/admin/sessions/${id}/revoke`),
-  audit: (limit = 200, action?: string) => get<{ entries: Array<{ id: number; at: string; actor: string | null; action: string; targetType: string | null; projectId: string | null; ip: string | null; meta: unknown }> }>(`/api/admin/audit?limit=${limit}${action ? `&action=${encodeURIComponent(action)}` : ''}`).then((r) => r.entries),
+  /** WP-29: `filter` is an action prefix (as before) or the full set of filters. */
+  audit: (limit = 200, filter?: string | AuditQuery) => {
+    const s = auditQueryString(typeof filter === 'string' ? { action: filter } : (filter ?? {}));
+    return get<{ entries: Array<{ id: number; at: string; actor: string | null; action: string; targetType: string | null; projectId: string | null; ip: string | null; meta: unknown; seq?: number | null }> }>(`/api/admin/audit?limit=${limit}${s ? `&${s}` : ''}`).then((r) => r.entries);
+  },
 };
 
 // ── Access: directory sign-on, groups, a project's group grants and capability rules (WP-27, backend/src/routes/access.ts) ──

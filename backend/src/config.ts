@@ -14,6 +14,7 @@
 // =============================================================================
 
 import path from 'path';
+import { defaultKeyFile } from './core/auth/auditChain';
 
 const ROOT = path.resolve(__dirname, '..');
 
@@ -102,10 +103,46 @@ export interface Config {
    */
   retention: { sessionsDays: number; notificationsDays: number; resetRequestsDays: number; auditDays: number };
   /**
+   * WP-29 (ENT-003): the key of the audit chain lives in a file outside the database (AGASTYA_AUDIT_KEY_FILE; default
+   * <workspace>/audit-key/audit-hmac.key; the packaged product points it at its state folder, outside the data folder). Made on first start.
+   * `checkpointHours` (AGASTYA_AUDIT_CHECKPOINT_HOURS, default 24, 0 = only with backups): how often a signed checkpoint is taken.
+   */
+  audit: { keyFile: string; checkpointHours: number };
+  /**
+   * WP-29 (ENT-007, RES-004): server logs. `format` (AGASTYA_LOG_FORMAT) `json` = one JSON object per line on standard output (the default
+   * when NODE_ENV=production, which the packaged host sets), `text` = the readable console lines of a developer run. `dir`
+   * (AGASTYA_LOG_DIR, default <workspace>/logs; "off" = none) also gets agastya-server.jsonl, always JSON, rotated at `maxBytes`
+   * (AGASTYA_LOG_MAX_MB, default 10) keeping `keep` old files (AGASTYA_LOG_KEEP, default 5). `access` (AGASTYA_ACCESS_LOG, default on with
+   * JSON) adds one line per request: method, route, status, milliseconds, user id - never a body, a query string or a cookie.
+   * `eventSink` (AGASTYA_EVENT_SINK) `host` = security events are also written to standard output as `##agastya-event|id|level|text` lines,
+   * which the Windows host turns into Application-log entries with stable ids (docs/OPERATIONS.md section 13).
+   */
+  log: { format: 'json' | 'text'; dir: string | null; maxBytes: number; keep: number; access: boolean; eventSink: 'host' | 'none' };
+  /**
    * WP-27 (ENT-005, DEP-015): directory sign-on over LDAPS, Mode B only (null = local accounts only, as in Mode A). Set by
    * AGASTYA_DIRECTORY_URL and its companions; the group-to-role mapping is kept in the database and edited by administrators.
    */
   directory: DirectoryConfig | null;
+}
+
+function parseLogFormat(raw: string | undefined, nodeEnv: string | undefined): 'json' | 'text' {
+  const v = (raw ?? '').trim().toLowerCase();
+  if (v === '') return nodeEnv === 'production' ? 'json' : 'text';
+  if (v === 'json' || v === 'text') return v;
+  throw new ConfigError('AGASTYA_LOG_FORMAT', `"${raw}" is not a log format: use "json" or "text".`);
+}
+function parseOnOff(name: string, raw: string | undefined, fallback: boolean): boolean {
+  const v = (raw ?? '').trim().toLowerCase();
+  if (v === '') return fallback;
+  if (/^(1|on|true|yes)$/.test(v)) return true;
+  if (/^(0|off|false|no)$/.test(v)) return false;
+  throw new ConfigError(name, `"${raw}" is not on or off.`);
+}
+function parseEventSink(raw: string | undefined): 'host' | 'none' {
+  const v = (raw ?? '').trim().toLowerCase();
+  if (v === '' || v === 'none') return 'none';
+  if (v === 'host') return 'host';
+  throw new ConfigError('AGASTYA_EVENT_SINK', `"${raw}" is not an event sink: use "host" (the Windows host writes the Application log) or "none".`);
 }
 
 /** The directory connection (AGASTYA_DIRECTORY_*). The service account's password and the CA come from files, never from the environment. */
@@ -335,6 +372,22 @@ export function buildConfig(env: Env = process.env): Config {
       resetRequestsDays: envCount('AGASTYA_RETENTION_RESET_REQUESTS_DAYS', 90, env),
       auditDays: envCount('AGASTYA_AUDIT_RETENTION_DAYS', 730, env),
     },
+    audit: {
+      keyFile: defaultKeyFile(workspaceDir, env),
+      checkpointHours: envCount('AGASTYA_AUDIT_CHECKPOINT_HOURS', 24, env),
+    },
+    log: (() => {
+      const format = parseLogFormat(env.AGASTYA_LOG_FORMAT, env.NODE_ENV);
+      const dirRaw = (env.AGASTYA_LOG_DIR ?? '').trim();
+      return {
+        format,
+        dir: /^(off|none|0)$/i.test(dirRaw) ? null : dirRaw ? path.resolve(dirRaw) : path.join(workspaceDir, 'logs'),
+        maxBytes: envCount('AGASTYA_LOG_MAX_MB', 10, env) * 1024 * 1024 || 10 * 1024 * 1024,
+        keep: envCount('AGASTYA_LOG_KEEP', 5, env),
+        access: parseOnOff('AGASTYA_ACCESS_LOG', env.AGASTYA_ACCESS_LOG, format === 'json'),
+        eventSink: parseEventSink(env.AGASTYA_EVENT_SINK),
+      };
+    })(),
     directory: parseDirectory(env, mode),
   };
 }

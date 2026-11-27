@@ -18,7 +18,6 @@ import path from 'path';
 import { nowIso } from '../config';
 import { store, docIndex, projectDirFor } from '../context';
 import { bad } from './http';
-import { csvText } from './csv';
 import { installedSchemaIssues } from './validation';
 import { deriveAccent } from './accent';
 
@@ -83,10 +82,4 @@ export function clearPreviewFiles(): { removed: number } {
   return { removed };
 }
 
-/** The audit log as CSV, newest first (up to the last 5000 events). */
-export function auditCsv(): string {
-  const rows = store.listAudit({ limit: 5000, before: null, action: null }) as Row[];
-  // WP-07 (ARC-020): one cell writer; a username or project name that starts with = is written as text
-  return csvText(['time', 'actor', 'action', 'target type', 'target', 'project', 'ip', 'details'],
-    rows.map((r) => [r.at, r.actor_username, r.action, r.target_type, r.target_id, r.project_id, r.ip, r.meta]));
-}
+// The audit log export moved to services/auditTrail.ts exportAudit (WP-29): streamed, unlimited, same first eight columns.

@@ -16,6 +16,11 @@ export interface RetentionRepository {
   auditRowsBefore(beforeIso: string, afterId: number, limit: number): Array<Record<string, unknown> & { id: number }>;
   /** Remove audit rows older than `beforeIso` with id <= maxId (the ones the caller archived). */
   deleteAuditUpTo(beforeIso: string, maxId: number): number;
+  /** WP-29: the lowest id of an audit row NOT older than `beforeIso` (null = none). Retention removes only rows before it, so it always
+   *  takes a prefix of the chain and never opens a gap in the middle of it. */
+  firstAuditIdNotBefore(beforeIso: string): number | null;
+  /** WP-29: the last chained row retention removed (after archiving it); the first remaining row of the chain is checked against it. */
+  setAuditAnchor(a: { seq: number; row_hash: string; archived_at: string; archive: string | null }): void;
 }
 
 const n = (r: { changes: number | bigint }): number => Number(r.changes);
@@ -35,5 +40,14 @@ export class SqliteRetentionRepository extends SqliteRepository implements Reten
   }
   deleteAuditUpTo(beforeIso: string, maxId: number): number {
     return n(this.q('DELETE FROM audit_log WHERE at < ? AND id <= ?').run(beforeIso, maxId));
+  }
+  firstAuditIdNotBefore(beforeIso: string): number | null {
+    const r = this.q('SELECT MIN(id) AS id FROM audit_log WHERE at >= ?').get(beforeIso) as { id: number | null } | undefined;
+    return r && r.id !== null ? Number(r.id) : null;
+  }
+  setAuditAnchor(a: { seq: number; row_hash: string; archived_at: string; archive: string | null }): void {
+    this.q(`INSERT INTO audit_chain_anchor (id, seq, row_hash, archived_at, archive) VALUES (1,?,?,?,?)
+            ON CONFLICT(id) DO UPDATE SET seq = excluded.seq, row_hash = excluded.row_hash, archived_at = excluded.archived_at, archive = excluded.archive`)
+      .run(a.seq, a.row_hash, a.archived_at, a.archive);
   }
 }

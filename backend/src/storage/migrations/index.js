@@ -29,6 +29,7 @@ const ORDER = [
   '022-audit-project-index',
   '023-document-leases',
   '024-directory-groups-permissions',
+  '025-audit-chain',               // WP-29
 ];
 
 const MIGRATIONS = ORDER.map((name) => require(`./${name}`));

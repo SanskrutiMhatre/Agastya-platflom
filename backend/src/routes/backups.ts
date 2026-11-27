@@ -86,6 +86,8 @@ export function registerBackupRoutes(app: Express): void {
     try {
       const file = backupPath(ctx.config.backup.dir, String(req.params.name));
       const target = folderArg(req.body?.target, 'restore folder');
+      // WP-29 (G-REL-8): a restore is a critical action - it is recorded BEFORE it runs, and refused (503) when it cannot be recorded
+      ctx.auditStrict({ actorId: actor(req).id, actorUsername: actor(req).username, action: 'backup.restore_started', targetType: 'backup', targetId: path.basename(file), meta: { target } });
       const rep = await restorePlatformBackup(file, target, migrationSteps());
       ctx.audit({ actorId: actor(req).id, actorUsername: actor(req).username, action: 'backup.restored', targetType: 'backup', targetId: path.basename(file), meta: { target: rep.target, files: rep.files, rows: rep.rows } });
       res.json({

@@ -28,7 +28,7 @@
 
 import type { Express, Request, RequestHandler } from 'express';
 import fs from 'fs';
-import { audit, defaultContext, requireAdmin, requireGlobal, requireProject, store, repos } from '../context';
+import { audit, auditedTx, defaultContext, requireAdmin, requireGlobal, requireProject, store, repos } from '../context';
 import { wrap, param, bad, notFound, forbidden, conflict, HttpError } from '../services/http';
 import { capabilityTable } from '../services/permissions';
 import { lastDirectorySync, runDirectorySync } from '../services/directorySync';
@@ -52,6 +52,10 @@ function groupOr404(id: string): { id: string; name: string } {
 export function registerAccessRoutes(app: Express): void {
   const log = (req: Request, action: string, meta: Record<string, unknown>, extra: Record<string, unknown> = {}): void =>
     audit({ actorId: who(req).id, actorUsername: who(req).username, action, meta, ...extra });
+  // WP-29 (ENT-003): who may do what is a critical change - the change and its audit row are one transaction; when the row cannot be
+  // written the change does not happen (503 AUDIT_UNAVAILABLE). Notifications to live sessions (emitAccessChanged) follow the commit.
+  const critical = <T>(req: Request, action: string, meta: Record<string, unknown>, extra: Record<string, unknown>, fn: () => T): T =>
+    auditedTx({ actorId: who(req).id, actorUsername: who(req).username, action, meta, ...extra }, fn);
 
   // ── Directory sign-on ───────────────────────────────────────────────────
   app.get('/api/admin/directory', requireGlobal('access.read'), wrap((_req, res) => {
@@ -101,15 +105,17 @@ export function registerAccessRoutes(app: Express): void {
     if (groupId) groupOr404(groupId);
     if (!globalRole && !groupId) throw bad('A mapping gives a global role, a local group, or both.');
     if (repos.access.listDirectoryMappings().some((m) => m.group_dn.toLowerCase() === groupDn.toLowerCase())) throw conflict('That directory group is already mapped.', 'DUPLICATE');
-    const m = repos.access.addDirectoryMapping({ id: newId(), groupDn, globalRole, groupId, now: nowIso(), by: who(req).id });
-    log(req, 'directory.mapping.added', { groupDn, globalRole, groupId });
+    const m = critical(req, 'directory.mapping.added', { groupDn, globalRole, groupId }, {},
+      () => repos.access.addDirectoryMapping({ id: newId(), groupDn, globalRole, groupId, now: nowIso(), by: who(req).id }));
     res.status(201).json({ mapping: m });
   }));
 
   app.delete('/api/admin/directory/mappings/:mappingId', requireAdmin(), wrap((req, res) => {
     const m = repos.access.listDirectoryMappings().find((x) => x.id === param(req, 'mappingId'));
-    if (!m || !repos.access.deleteDirectoryMapping(m.id)) throw notFound('No such mapping.');
-    log(req, 'directory.mapping.removed', { groupDn: m.group_dn, globalRole: m.global_role, groupId: m.group_id });
+    if (!m) throw notFound('No such mapping.');
+    critical(req, 'directory.mapping.removed', { groupDn: m.group_dn, globalRole: m.global_role, groupId: m.group_id }, {}, () => {
+      if (!repos.access.deleteDirectoryMapping(m.id)) throw notFound('No such mapping.');
+    });
     res.json({ ok: true });
   }));
 
@@ -145,9 +151,8 @@ export function registerAccessRoutes(app: Express): void {
   app.delete('/api/admin/groups/:groupId', requireAdmin(), wrap((req, res) => {
     const g = groupOr404(param(req, 'groupId'));
     const members = repos.access.listGroupMembers(g.id).map((m) => m.user_id);
-    repos.transaction(() => repos.access.deleteGroup(g.id));
+    critical(req, 'group.deleted', { groupId: g.id, name: g.name, members: members.length }, {}, () => repos.access.deleteGroup(g.id));
     for (const u of members) store.emitAccessChanged(u);
-    log(req, 'group.deleted', { groupId: g.id, name: g.name, members: members.length });
     res.json({ ok: true });
   }));
 
@@ -160,18 +165,19 @@ export function registerAccessRoutes(app: Express): void {
     const g = groupOr404(param(req, 'groupId'));
     const u = store.findUserByUsername(String(req.body?.username ?? '').trim());
     if (!u) throw notFound('No account with that user name.');
-    repos.access.addGroupMember(g.id, u.id, 'local', nowIso(), who(req).id);
+    critical(req, 'group.member.added', { groupId: g.id, group: g.name, username: u.username }, { targetType: 'user', targetId: u.id },
+      () => repos.access.addGroupMember(g.id, u.id, 'local', nowIso(), who(req).id));
     store.emitAccessChanged(u.id);
-    log(req, 'group.member.added', { groupId: g.id, group: g.name, username: u.username }, { targetType: 'user', targetId: u.id });
     res.status(201).json({ members: repos.access.listGroupMembers(g.id) });
   }));
 
   app.delete('/api/admin/groups/:groupId/members/:userId', requireAdmin(), wrap((req, res) => {
     const g = groupOr404(param(req, 'groupId'));
     const userId = param(req, 'userId');
-    if (!repos.access.removeGroupMember(g.id, userId)) throw notFound('That account is not in the group.');
+    critical(req, 'group.member.removed', { groupId: g.id, group: g.name }, { targetType: 'user', targetId: userId }, () => {
+      if (!repos.access.removeGroupMember(g.id, userId)) throw notFound('That account is not in the group.');
+    });
     store.emitAccessChanged(userId);
-    log(req, 'group.member.removed', { groupId: g.id, group: g.name }, { targetType: 'user', targetId: userId });
     res.json({ members: repos.access.listGroupMembers(g.id) });
   }));
 
@@ -203,9 +209,9 @@ export function registerAccessRoutes(app: Express): void {
     const role = String(req.body?.role ?? '');
     if (!PROJECT_ROLES.includes(role)) throw bad(`role is one of ${PROJECT_ROLES.join(', ')}.`);
     if ((RANK[role] || 0) > grantorRank(req)) throw forbidden('You cannot grant a role above your own on this project.', 'ROLE_ABOVE_YOURS');
-    repos.access.setProjectGroupGrant(pid, g.id, role as ProjectRole, nowIso(), who(req).id);
+    critical(req, 'project.access.group-granted', { groupId: g.id, group: g.name, role }, { projectId: pid, targetType: 'project', targetId: pid },
+      () => repos.access.setProjectGroupGrant(pid, g.id, role as ProjectRole, nowIso(), who(req).id));
     for (const m of repos.access.listGroupMembers(g.id)) store.emitAccessChanged(m.user_id);
-    log(req, 'project.access.group-granted', { groupId: g.id, group: g.name, role }, { projectId: pid, targetType: 'project', targetId: pid });
     res.json(describe(pid));
   }));
 
@@ -215,9 +221,9 @@ export function registerAccessRoutes(app: Express): void {
     const held = repos.access.listProjectGroupGrants(pid).find((x) => x.group_id === g.id);
     if (!held) throw notFound('That group holds no role on this project.');
     if ((RANK[held.role] || 0) > grantorRank(req)) throw forbidden('You cannot remove a grant above your own role.', 'ROLE_ABOVE_YOURS');
-    repos.access.removeProjectGroupGrant(pid, g.id);
+    critical(req, 'project.access.group-removed', { groupId: g.id, group: g.name, role: held.role }, { projectId: pid, targetType: 'project', targetId: pid },
+      () => repos.access.removeProjectGroupGrant(pid, g.id));
     for (const m of repos.access.listGroupMembers(g.id)) store.emitAccessChanged(m.user_id);
-    log(req, 'project.access.group-removed', { groupId: g.id, group: g.name, role: held.role }, { projectId: pid, targetType: 'project', targetId: pid });
     res.json(describe(pid));
   }));
 
@@ -242,9 +248,9 @@ export function registerAccessRoutes(app: Express): void {
       const g = groupOr404(String(b.subject ?? ''));
       subjectId = g.id; subjectName = g.name;
     }
-    const rule = repos.access.putRule({ id: newId(), project_id: pid, subject_type: subjectType, subject_id: subjectId, capability, effect, created_at: nowIso(), created_by: who(req).id });
+    const rule = critical(req, 'project.access.rule-set', { subjectType, subject: subjectName, capability, effect }, { projectId: pid, targetType: 'project', targetId: pid },
+      () => repos.access.putRule({ id: newId(), project_id: pid, subject_type: subjectType, subject_id: subjectId, capability, effect, created_at: nowIso(), created_by: who(req).id }));
     if (subjectType === 'user') store.emitAccessChanged(subjectId); else for (const m of repos.access.listGroupMembers(subjectId)) store.emitAccessChanged(m.user_id);
-    log(req, 'project.access.rule-set', { subjectType, subject: subjectName, capability, effect }, { projectId: pid, targetType: 'project', targetId: pid });
     res.status(201).json({ rule, ...describe(pid) });
   }));
 
@@ -253,9 +259,9 @@ export function registerAccessRoutes(app: Express): void {
     const r = repos.access.listRules(pid).find((x) => x.id === param(req, 'ruleId'));
     if (!r) throw notFound('No such rule on this project.');
     if (r.effect === 'allow' && (RANK[capabilityTable()[r.capability]] || 0) > grantorRank(req)) throw forbidden('You cannot remove an allowance above your own role.', 'ROLE_ABOVE_YOURS');
-    repos.access.deleteRule(pid, r.id);
+    critical(req, 'project.access.rule-removed', { subjectType: r.subject_type, subjectId: r.subject_id, capability: r.capability, effect: r.effect }, { projectId: pid, targetType: 'project', targetId: pid },
+      () => repos.access.deleteRule(pid, r.id));
     if (r.subject_type === 'user') store.emitAccessChanged(r.subject_id); else for (const m of repos.access.listGroupMembers(r.subject_id)) store.emitAccessChanged(m.user_id);
-    log(req, 'project.access.rule-removed', { subjectType: r.subject_type, subjectId: r.subject_id, capability: r.capability, effect: r.effect }, { projectId: pid, targetType: 'project', targetId: pid });
     res.json(describe(pid));
   }));
 }

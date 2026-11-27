@@ -7,7 +7,11 @@ import fs from 'fs';
 import path from 'path';
 import { config, nowIso } from './config';
 import { dbBusy, diskFull } from './services/http';
-import { store, sessionsSvc, authz, audit, limiter, docIndex, projectDirFor, publicRoute, clientIp, securityPolicy, auditHealth, authProvider, defaultContext } from './context';
+import { store, sessionsSvc, authz, audit, auditedTx, limiter, docIndex, projectDirFor, publicRoute, clientIp, securityPolicy, auditHealth, authProvider, defaultContext } from './context';
+import { signInThrottled } from './services/securityEvents';
+import { accessLog } from './services/log';
+import { HttpError } from './services/http';
+import { registerAuditRoutes } from './routes/audit';
 import { readiness } from './services/readiness';
 import { requestContextMiddleware } from './services/requestContext';
 import { securityHeaders } from './services/securityHeaders';
@@ -59,6 +63,7 @@ export function createApp(): express.Express {
   app.set('trust proxy', config.trustProxy);
   app.disable('x-powered-by');
   app.use(requestContextMiddleware(clientIp));   // every audit row gets the client address; a 500 answers with this request's id (WP-03)
+  if (config.log.access) app.use(accessLog());   // WP-29: one structured line per request (method, route template, status, ms, user id)
   app.use(securityHeaders);                      // CSP, nosniff, framing, referrer (ENT-012, FE-017); HSTS on TLS in Mode B (WP-26)
   // WP-26: the Host must name this server (DNS rebinding); the same rule guards the WebSocket upgrade (services/broadcast.ts).
   app.use((req, res, next) => {
@@ -112,6 +117,7 @@ export function createApp(): express.Express {
     onProjectDecided: () => undefined,
     onAccess: notifyAccess,
     securityPolicy, auditHealth, authProvider,
+    auditedTx, onSignInThrottled: signInThrottled,       // WP-29: critical actions in one transaction with their audit row; event 4111
   });
   registerJssGuard(app);                 // before every S1000D-side writer: a JSS document project's publication.xml is never replaced by them
   registerWorkspaceRoutes(app);
@@ -136,6 +142,7 @@ export function createApp(): express.Express {
   registerProblemRoutes(app);            // WP-22: the one problems model and the team's reviewed marks
   registerBrandRoutes(app);
   registerBackupRoutes(app);             // WP-12: platform backup, verify, copy, restore into a new folder (administrators)
+  registerAuditRoutes(app);              // WP-29: audit chain verification, checkpoints, streamed export, event catalogue (administrators)
   registerAccessRoutes(app);             // WP-27: directory sign-on administration, groups, project group grants and capability rules
   // The client's `can` map is read from the guards just registered (WP-13, FE-019): one rule, stated once, on the server.
   setCapabilityTable(capabilityTableFrom(app), readableCapabilitiesFrom(app));
@@ -157,6 +164,8 @@ export function createApp(): express.Express {
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    // a handler outside wrap() that throws an HttpError (WP-29: AUDIT_UNAVAILABLE from a critical action) answers with its own status
+    if (err instanceof HttpError && !res.headersSent) return void res.status(err.status).json({ error: err.message, code: err.code, ...(err.extra ?? {}) });
     const full = diskFull(err);
     if (full) { console.error('[api] disk full:', err.message); return void res.status(full.status).json({ error: full.message, code: full.code }); }
     const busy = dbBusy(err);

@@ -4,7 +4,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
-import { adminApi, authApi, teamApi, type GlobalRole, type User } from '../api';
+import { adminApi, auditApi, auditQueryString, authApi, teamApi, type AuditQuery, type AuditVerifyReport, type GlobalRole, type User } from '../api';
 import { globalLabel } from '../lib/roles';
 import { Icon } from '../components/Icon';
 import { ThemeChoiceControl } from '../components/ThemeToggle';
@@ -250,18 +250,49 @@ function Sessions() {
 export const plainIp = (ip: string | null): string => (ip ?? '').replace(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i, '$1');
 
 export function Audit() {
-  const [typed, setTyped] = useState('');
-  const [filter, setFilter] = useState('');
+  const [typed, setTyped] = useState<AuditQuery>({});
+  const [filter, setFilter] = useState<AuditQuery>({});
   // WP-18 (FE-020): the filter asks the server once the typing pauses, not once per key
   useEffect(() => { const t = setTimeout(() => setFilter(typed), 300); return () => clearTimeout(t); }, [typed]);
-  const a = useAsync(() => adminApi.audit(300, filter || undefined), [filter]);
-  // WP-22 (UX-025): narrow the rows the server sent by who and by day, and show an IPv4 address without its IPv6 wrapper
-  const [who, setWho] = useState(''); const [day, setDay] = useState('');
-  const rows = (a.data ?? []).filter((e) => (!who || (e.actor ?? '').toLowerCase().includes(who.toLowerCase())) && (!day || e.at.slice(0, 10) === day));
-  const drawn = useProgressive(rows.length, `${filter}|${who}|${day}`);     // WP-18 (FE-030): first rows now, more on scroll
+  const key = auditQueryString(filter);
+  const a = useAsync(() => adminApi.audit(300, filter), [key]);
+  // WP-29 supersedes WP-22's client-side who/day narrowing: person, project and dates are asked of the server (and reach the export);
+  // WP-22's plainIp display is kept below
+  const rows = a.data ?? [];
+  const drawn = useProgressive(rows.length, key);     // WP-18 (FE-030): first rows now, more on scroll
+  // WP-29: verify the chain, and export every row matching the filters (not only the 300 shown)
+  const [verifying, setVerifying] = useState(false);
+  const [report, setReport] = useState<AuditVerifyReport | null>(null);
+  const [verr, setVerr] = useState('');
+  const verify = async () => {
+    setVerifying(true); setVerr('');
+    try { setReport(await auditApi.verify()); } catch (e) { setVerr(errText(e)); } finally { setVerifying(false); }
+  };
+  const set = (k: keyof AuditQuery) => (e: React.ChangeEvent<HTMLInputElement>) => setTyped({ ...typed, [k]: e.target.value });
+  const enter = (e: React.KeyboardEvent) => { if (e.key === 'Enter') setFilter(typed); };
   return (
     <div className="v2-stack">
-      <div className="v2-row"><input className="v2-input" style={{ width: 280 }} placeholder="Filter by action, e.g. release.approved" value={typed} onChange={(e) => setTyped(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') setFilter(typed); }} aria-label="Filter audit log by action" /><input className="v2-input" style={{ width: 160 }} placeholder="Who" value={who} onChange={(e) => setWho(e.target.value)} aria-label="Filter audit log by user" data-testid="audit-who" /><input className="v2-input" type="date" style={{ width: 160 }} value={day} onChange={(e) => setDay(e.target.value)} aria-label="Filter audit log by day" data-testid="audit-day" /><button className="btn" onClick={a.reload}><Icon name="refresh" />Refresh</button></div>
+      <div className="v2-row" style={{ flexWrap: 'wrap', gap: 8 }}>
+        <input className="v2-input" style={{ width: 220 }} placeholder="Action, e.g. release.approved" value={typed.action ?? ''} onChange={set('action')} onKeyDown={enter} aria-label="Filter audit log by action" />
+        <input className="v2-input" style={{ width: 140 }} placeholder="Person" value={typed.actor ?? ''} onChange={set('actor')} onKeyDown={enter} aria-label="Filter audit log by person" data-testid="audit-actor" />
+        <input className="v2-input" style={{ width: 180 }} placeholder="Project id" value={typed.project ?? ''} onChange={set('project')} onKeyDown={enter} aria-label="Filter audit log by project" data-testid="audit-project" />
+        <label className="v2-row" style={{ gap: 4 }}>From <input className="v2-input" type="date" value={typed.from ?? ''} onChange={set('from')} aria-label="Entries from this date" data-testid="audit-from" /></label>
+        <label className="v2-row" style={{ gap: 4 }}>To <input className="v2-input" type="date" value={typed.to ?? ''} onChange={set('to')} aria-label="Entries up to this date" data-testid="audit-to" /></label>
+        <button className="btn" onClick={a.reload}><Icon name="refresh" />Refresh</button>
+      </div>
+      <div className="v2-row" style={{ flexWrap: 'wrap', gap: 8 }}>
+        <a className="btn" href={auditApi.exportUrl('csv', filter)} download data-testid="audit-export-csv"><Icon name="download" />Export CSV</a>
+        <a className="btn" href={auditApi.exportUrl('jsonl', filter)} download data-testid="audit-export-jsonl"><Icon name="download" />Export JSON Lines</a>
+        <button className="btn" onClick={verify} disabled={verifying} data-testid="audit-verify"><Icon name="check" />{verifying ? 'Verifying…' : 'Verify chain'}</button>
+        <span className="v2-hint">The export holds every matching entry, not only those shown.</span>
+      </div>
+      {verr ? <Alert tone="bad">{verr}</Alert> : null}
+      {report ? (
+        <Alert tone={report.ok ? 'ok' : 'bad'}>
+          <span data-testid="audit-verify-result">{report.ok ? 'Intact' : 'Problems found'}: {report.summary}.</span>
+          {!report.ok ? <ul style={{ margin: '6px 0 0' }}>{report.problems.slice(0, 20).map((p, i) => <li key={i}>{p.message}</li>)}{report.problemCount > 20 ? <li>… and {report.problemCount - 20} more (run AgastyaCtl --verify-audit for the full list)</li> : null}</ul> : null}
+        </Alert>
+      ) : null}
       <div className="v2-card">
         {a.loading && !a.data ? <Loading /> : !rows.length ? <Empty title="No entries" /> : (
           <table className="v2-table"><thead><tr><th>When</th><th>Who</th><th>Action</th><th>Project</th><th>From</th></tr></thead>

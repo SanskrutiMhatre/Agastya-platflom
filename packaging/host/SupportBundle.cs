@@ -156,7 +156,7 @@ namespace Agastya
 
                 if (File.Exists(Layout.ConfigFile)) { Add(zip, "agastya.ini", MaskIni(File.ReadAllText(Layout.ConfigFile))); items.Add("agastya.ini"); }
 
-                foreach (string name in new string[] { "agastya-host.log", "agastya-host.log.1", "agastya-server.log", "agastya-server.log.1" })
+                foreach (string name in new string[] { "agastya-host.log", "agastya-host.log.1", "agastya-server.log", "agastya-server.log.1", "agastya-server.jsonl" })
                 {
                     string f = Path.Combine(Layout.LogDir, name);
                     if (!File.Exists(f)) continue;

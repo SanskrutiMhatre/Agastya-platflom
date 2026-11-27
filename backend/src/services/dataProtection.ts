@@ -21,6 +21,7 @@ import type { AppContext } from '../appContext';
 import { forDialect } from '../storage/migrations';
 import type { MigrationStep } from '../storage/schema';
 import { buildInfo } from './version';
+import { lastCheckpointAt, verifyAudit, writeCheckpoint } from './auditTrail';
 import {
   BackupError, backupRunning, createPlatformBackup, listBackups, pruneScheduledBackups, verifyPlatformBackup,
   type BackupKind, type BackupListItem, type CreatedBackup, type RestoreReport,
@@ -35,6 +36,8 @@ export interface DataProtectionState {
   lastScheduledAt?: string;
   lastRestoreTest?: JobResult & { files?: number; rows?: number };
   lastRetention?: JobResult & { counts?: Record<string, number> };
+  /** WP-29: the daily verification of the audit chain. */
+  lastAuditVerify?: JobResult;
 }
 
 const stateFile = (ctx: AppContext): string => path.join(ctx.config.backup.dir, 'backup-state.json');
@@ -63,6 +66,9 @@ const actorOf = (a?: { id: string; username: string } | null): { actorId: string
 /** A platform backup now. Audited; a scheduled one that fails also notifies the administrators. */
 export async function backupNow(ctx: AppContext, kind: BackupKind, actor?: { id: string; username: string } | null, now = new Date().toISOString()): Promise<CreatedBackup> {
   try {
+    // WP-29 (ENT-003, ENT-006): a signed audit checkpoint with every backup - in the database the backup holds, in the backup folder's
+    // checkpoint file and in the Application log - so a later cut at the end of the chain is detectable against it.
+    try { writeCheckpoint(ctx, `backup (${kind})`, now); } catch (e) { console.error('[audit] checkpoint before the backup failed:', (e as Error).message); }
     const made = await createPlatformBackup({ db: ctx.db, workspaceDir: ctx.workspaceDir, backupDir: ctx.config.backup.dir, kind, nowIso: now, version: buildInfo().version, createdBy: actor?.username ?? null });
     writeState(ctx, { lastBackup: { at: now, ok: true, name: made.name }, ...(kind === 'scheduled' ? { lastScheduledAt: now } : {}) });
     ctx.audit({ ...actorOf(actor), action: 'backup.created', targetType: 'backup', targetId: made.name,
@@ -110,8 +116,11 @@ export function runRetention(ctx: AppContext, now = new Date().toISOString()): R
   if (r.auditDays > 0) {
     const cut = daysBefore(now, r.auditDays);
     const rows: Array<Record<string, unknown> & { id: number }> = [];
+    // WP-29: only the oldest rows up to the first one that is still young are taken, so retention removes a PREFIX of the chain and never
+    // opens a gap in the middle of it (a row written with an old time after a young one stays until everything before it goes).
+    const stop = R.firstAuditIdNotBefore(cut);
     for (let after = 0; ;) {
-      const page = R.auditRowsBefore(cut, after, 5000);
+      const page = R.auditRowsBefore(cut, after, 5000).filter((x) => stop === null || x.id < stop);
       if (!page.length) break;
       rows.push(...page); after = page[page.length - 1].id;
     }
@@ -129,7 +138,14 @@ export function runRetention(ctx: AppContext, now = new Date().toISOString()): R
       if (back.length !== rows.length) throw new Error('The audit archive could not be read back; no audit row was removed.');
       fs.renameSync(tmp, file);
       archive = { file: path.relative(ctx.workspaceDir, file), sha256: crypto.createHash('sha256').update(body).digest('hex') };
-      counts.auditArchived = R.deleteAuditUpTo(cut, last.id);
+      // WP-29: the last archived row of the chain becomes its anchor, in the same transaction as the removal
+      const chained = rows.filter((x) => x.seq !== null && x.seq !== undefined);
+      const lastChained = chained.length ? chained.reduce((a, b) => (Number(b.seq) > Number(a.seq) ? b : a)) : null;
+      const arch = archive;
+      counts.auditArchived = ctx.repos.transaction(() => {
+        if (lastChained) R.setAuditAnchor({ seq: Number(lastChained.seq), row_hash: String(lastChained.row_hash), archived_at: now, archive: arch.file });
+        return R.deleteAuditUpTo(cut, last.id);
+      });
     }
   }
   writeState(ctx, { lastRetention: { at: now, ok: true, counts } });
@@ -138,6 +154,14 @@ export function runRetention(ctx: AppContext, now = new Date().toISOString()): R
 }
 
 const olderThan = (iso: string | undefined, ms: number, now: string): boolean => !iso || Date.parse(now) - Date.parse(iso) >= ms;
+
+/** WP-29: verify the audit chain, record the result, tell the administrators when it is broken. */
+export function auditVerifyJob(ctx: AppContext, now = new Date().toISOString()): ReturnType<typeof verifyAudit> {
+  const rep = verifyAudit(ctx, { now });
+  writeState(ctx, { lastAuditVerify: { at: now, ok: rep.ok, message: rep.summary } });
+  if (!rep.ok) tellAdmins(ctx, 'The audit log failed its integrity check', rep.summary, now);
+  return rep;
+}
 
 /** One run of the schedule. Each job is independent: one failing does not stop the others. */
 export async function tick(ctx: AppContext, now = new Date().toISOString()): Promise<string[]> {
@@ -152,6 +176,14 @@ export async function tick(ctx: AppContext, now = new Date().toISOString()): Pro
   }
   if (olderThan(readState(ctx).lastRetention?.at, 86400_000 - 60_000, now)) {
     try { runRetention(ctx, now); done.push('retention'); } catch (e) { console.error('[retention] failed:', (e as Error).message); }
+    // WP-29: the daily housekeeping also verifies the audit chain; a broken chain is raised as Application-log event 4101, recorded in the
+    // job state, shown on the Security page and sent to every administrator's notifications.
+    try { auditVerifyJob(ctx, now); } catch (e) { console.error('[audit] verification failed to run:', (e as Error).message); }
+  }
+  // WP-29: a signed checkpoint every config.audit.checkpointHours (default daily) when no backup took one in that time
+  const cpHours = ctx.config.audit.checkpointHours;
+  if (cpHours > 0 && olderThan(lastCheckpointAt(ctx) ?? undefined, cpHours * 3600_000 - 60_000, now)) {
+    try { writeCheckpoint(ctx, 'scheduled', now); done.push('audit-checkpoint'); } catch (e) { console.error('[audit] checkpoint failed:', (e as Error).message); }
   }
   return done;
 }

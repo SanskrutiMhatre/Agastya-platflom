@@ -712,6 +712,9 @@ namespace Agastya
             psi.StandardOutputEncoding = Encoding.UTF8; psi.StandardErrorEncoding = Encoding.UTF8;
             psi.WorkingDirectory = Path.Combine(Path.Combine(programDir, "app"), "backend");
             psi.EnvironmentVariables["NODE_ENV"] = "production";
+            // WP-29: a script that opens the database (first-admin, the backup tool) writes audit rows with the server's key, kept in the
+            // state folder - never a second key beside the database
+            psi.EnvironmentVariables["AGASTYA_AUDIT_KEY_FILE"] = Host.AuditKeyFile;
             StringBuilder sb = new StringBuilder();
             using (Process p = new Process())
             {

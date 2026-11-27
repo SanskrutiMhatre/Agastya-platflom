@@ -53,12 +53,21 @@ export async function checkOut(projectId: string, rel: string, part: string, act
 }
 
 /** Check in. `breakIt`: remove another author's lease (the route allows it to owners, managers and administrators). */
-export async function checkIn(projectId: string, rel: string, part: string, actor: LeaseActor, breakIt = false): Promise<{ released: boolean; holder: string | null }> {
+/**
+ * `inTx` (WP-29): runs the release in one transaction with its audit row - the routes pass auditedTx for a BREAK, so a break whose audit
+ * row cannot be written does not happen (fail closed).
+ */
+export interface CheckInResult { released: boolean; holder: string | null }
+export async function checkIn(projectId: string, rel: string, part: string, actor: LeaseActor, breakIt = false,
+  inTx?: (fn: () => CheckInResult) => CheckInResult): Promise<CheckInResult> {
   const id = await docId(projectId, rel);
-  const row = repos.leases.get(id, part);
-  if (!row) return { released: false, holder: null };
-  if (row.user_id !== actor.id && !breakIt && live(row, nowIso())) throw checkedOut(row);
-  return { released: repos.leases.release(id, part, row.user_id === actor.id || breakIt ? null : actor.id), holder: row.username };
+  const run = (): CheckInResult => {
+    const row = repos.leases.get(id, part);
+    if (!row) return { released: false, holder: null };
+    if (row.user_id !== actor.id && !breakIt && live(row, nowIso())) throw checkedOut(row);
+    return { released: repos.leases.release(id, part, row.user_id === actor.id || breakIt ? null : actor.id), holder: row.username };
+  };
+  return inTx ? inTx(run) : run();
 }
 
 /**

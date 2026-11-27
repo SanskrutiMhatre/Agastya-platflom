@@ -32,6 +32,7 @@ export function registerIdentityRoutes(app: Express): void {
   app.put(`${base}/visibility`, requireProject('editor', { from: 'param', cap: 'dm.write' }), wrap((req, res) => {
     if (!isObject(req.body)) throw bad('Send { "dmc": true }.', 'BAD_BODY');
     const out = changeVisibility(req.project.id, req.body as any);
+    log(req, 'identity.visibility', req.body);       // WP-29 (G-SEC-5): every state change is audited
     res.json({ ok: true, identity: out.view });
   }));
 }

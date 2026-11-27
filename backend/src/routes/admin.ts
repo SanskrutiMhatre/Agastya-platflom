@@ -12,7 +12,8 @@
 // =============================================================================
 
 import type { Express } from 'express';
-import { audit, requireAdmin, requireAuth, requireGlobal, store } from '../context';
+import { audit, requireAdmin, requireAuth, requireGlobal, store, defaultContext } from '../context';
+import { exportAudit } from '../services/auditTrail';
 import { capabilityTable, readableCapabilities } from '../services/permissions';
 import { wrap, param } from '../services/http';
 import { COLLECTIONS, createItem, deleteItem, listItems, specOf, updateItem } from '../services/adminConfig';
@@ -135,8 +136,11 @@ export function registerAdminRoutes(app: Express): void {
     })();
     res.status(202).json({ queued: ids.length });
   }));
-  app.get('/api/admin/maintenance/audit.csv', requireGlobal('audit.read'), wrap((req, res) => {   // WP-27: auditors export it too
+  // WP-29 (ENT-003): the whole log, streamed oldest first in pages - formerly the newest 5 000 rows only
+  app.get('/api/admin/maintenance/audit.csv', requireGlobal('audit.read'), wrap(async (req, res) => {   // WP-27: auditors export it too (the export is audited)
     log(req, 'maintenance.audit-export');
-    res.type('text/csv').attachment('agastya-audit-log.csv').send(platform.auditCsv());
+    res.type('text/csv').attachment('agastya-audit-log.csv');
+    try { await exportAudit(defaultContext(), {}, 'csv', res); } catch (e) { if (!res.headersSent) throw e; res.destroy(); return; }
+    res.end();
   }));
 }
