@@ -401,7 +401,10 @@ const sbomOut = path.join(outDir, `${stageName}-SBOM.cdx.json`);
 fs.copyFileSync(path.join(stage, 'SBOM.cdx.json'), sbomOut);
 const verifier = path.join(outDir, 'Verify-Release.ps1');
 fs.copyFileSync(path.join(root, 'scripts', 'signing', 'Verify-Release.ps1'), verifier);
-outputs.push(sbomOut, verifier);
+// the deployment kit's detection rule for Intune / Configuration Manager (DEP-014, ENT-014; docs/DEPLOYMENT-KIT.md)
+const detect = path.join(outDir, 'Detect-AgastyaPlatform.ps1');
+fs.copyFileSync(path.join(root, 'packaging', 'deploy', 'Detect-AgastyaPlatform.ps1'), detect);
+outputs.push(sbomOut, verifier, detect);
 for (const f of ['SHA256SUMS.txt.sig']) fs.rmSync(path.join(outDir, f), { force: true });   // never leave the signature of an older build
 fs.writeFileSync(path.join(outDir, 'SHA256SUMS.txt'), formatSums(outDir, outputs.map((f) => path.basename(f))));
 if (signed && signing.canSignManifest) { try { log(signDetached(signing, [path.join(outDir, 'SHA256SUMS.txt')])); } catch (e) { fail(e.message); } }

@@ -207,3 +207,24 @@ describe('AgastyaCtl --support-bundle', { skip }, () => {
     assert.match(fs.readFileSync(path.join(out, 'integrity.txt'), 'utf8'), /program files match MANIFEST\.sha256/);
   });
 });
+
+describe('deployment detection rule (G-DEP-3)', { skip }, () => {
+  test('reports installed only when the uninstall entry and AgastyaCtl.exe exist and reach the version', () => {
+    // a throwaway AppId under HKCU (the per-user install shape), removed afterwards; the product's real AppId is never touched
+    const appId = crypto.randomUUID().toUpperCase();
+    const key = `HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{${appId}}_is1`;
+    cleanups.push(() => spawnSync('reg', ['delete', key, '/f'], { encoding: 'utf8' }));
+    const dir = path.join(tmp, 'installed'); fs.mkdirSync(dir, { recursive: true });
+    const detect = (min) => spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.join(ROOT, 'packaging', 'deploy', 'Detect-AgastyaPlatform.ps1'),
+      '-AppId', appId, '-MinimumVersion', min], { encoding: 'utf8' });
+    let r = detect('0.0.0');
+    assert.equal(r.status, 0); assert.equal(r.stdout.trim(), '', 'not installed: no output');
+    for (const [n, v] of [['DisplayVersion', '0.0.0'], ['InstallLocation', dir]]) assert.equal(spawnSync('reg', ['add', key, '/v', n, '/t', 'REG_SZ', '/d', v, '/f'], { encoding: 'utf8' }).status, 0);
+    r = detect('0.0.0'); assert.equal(r.stdout.trim(), '', 'an entry whose program folder lost AgastyaCtl.exe is not "installed"');
+    fs.copyFileSync(compileCtl(), path.join(dir, 'AgastyaCtl.exe'));
+    r = detect('0.0.0'); assert.equal(r.status, 0); assert.match(r.stdout, /^Agastya Platform 0\.0\.0 installed in .* \(per-user\)/);
+    assert.equal(detect('2.0.0').stdout.trim(), '', 'an older version than required is not detected');
+    spawnSync('reg', ['delete', key, '/f']);
+    assert.equal(detect('0.0.0').stdout.trim(), '', 'after uninstall: not detected');
+  });
+});
