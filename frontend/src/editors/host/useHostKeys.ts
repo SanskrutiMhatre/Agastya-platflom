@@ -4,6 +4,7 @@
 //   Ctrl+.                 focus mode (only the page and a slim header)
 //   Ctrl+F, Ctrl+H         find, find and replace   (the JSS editor; JSG and the Studio have their own find bar on the same keys)
 //   Escape                 close the find bar, or leave focus mode
+//   Alt+Shift+N, Alt+Shift+P   next, previous review comment (WP-22, UX-009; the comments panel opens)
 //
 // The handler listens on the window after the editors' own handlers: a key an editor has already taken (preventDefault) is left alone, and nothing
 // happens while a dialog is open. The S1000D Studio has the palette, F1 and Ctrl+. in its own command registry; when the keyboard is in the Studio it
@@ -17,6 +18,8 @@ export interface HostKeyActions {
   focus?: () => void;
   /** open find (false) or find and replace (true); undefined where the editor has its own find bar */
   find?: (replace: boolean) => void;
+  /** WP-22: step to the next (1) or previous (-1) open review comment */
+  comment?: (dir: 1 | -1) => void;
   /** Escape: close what the host has open; returns true when it closed something */
   escape?: () => boolean;
 }
@@ -35,6 +38,7 @@ export function useHostKeys(actions: HostKeyActions, enabled = true): void {
       if (e.key === 'F1' && !mod && a.shortcuts) { e.preventDefault(); a.shortcuts(); return; }
       if (mod && !e.shiftKey && !e.altKey && k === '.' && a.focus) { e.preventDefault(); a.focus(); return; }
       if (mod && !e.shiftKey && !e.altKey && (k === 'f' || k === 'h') && a.find) { e.preventDefault(); a.find(k === 'h'); return; }
+      if (e.altKey && e.shiftKey && !mod && (k === 'n' || k === 'p') && a.comment) { e.preventDefault(); a.comment(k === 'n' ? 1 : -1); return; }
       if (e.key === 'Escape' && a.escape) {
         const t = e.target as HTMLElement | null;
         if (t?.closest?.('[role="menu"], .jsg-find, .find-bar')) return;          // a menu or another find bar closes itself

@@ -34,7 +34,11 @@ export function toolbarCommands(root: HTMLElement | null, group: string): Palett
 
 const words = (s: string): string[] => s.toLowerCase().split(/\s+/).filter(Boolean);
 
-export function CommandPalette({ commands, onClose }: { commands: PaletteCommand[]; onClose: () => void }) {
+/** WP-22: the same list serves the platform's quick switcher (components/QuickSwitcher.tsx), with its own title, words and test ids. */
+export interface PaletteText { title: string; placeholder: string; label: string; none: string }
+const PALETTE_TEXT: PaletteText = { title: 'Command palette', placeholder: 'Type a command…', label: 'Command', none: 'No command matches' };
+
+export function CommandPalette({ commands, onClose, text = PALETTE_TEXT }: { commands: PaletteCommand[]; onClose: () => void; text?: PaletteText }) {
   const [q, setQ] = useState('');
   const [at, setAt] = useState(0);
   const listRef = useRef<HTMLUListElement>(null);
@@ -65,8 +69,8 @@ export function CommandPalette({ commands, onClose }: { commands: PaletteCommand
   };
 
   return (
-    <Modal title="Command palette" onClose={onClose} width={560}>
-      <input className="v2-input" autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Type a command…" aria-label="Command" data-testid="palette-input"
+    <Modal title={text.title} onClose={onClose} width={560}>
+      <input className="v2-input" autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={text.placeholder} aria-label={text.label} data-testid="palette-input"
         role="combobox" aria-expanded="true" aria-controls="palette-list" aria-activedescendant={shown[at] ? `palette-${at}` : undefined}
         onKeyDown={(e) => {
           if (e.key === 'ArrowDown') { e.preventDefault(); setAt((i) => Math.min(shown.length - 1, i + 1)); }
@@ -79,7 +83,7 @@ export function CommandPalette({ commands, onClose }: { commands: PaletteCommand
             onMouseMove={() => setAt(i)} onMouseDown={(e) => e.preventDefault()} onClick={() => pick(c)}>
             <span className="v2-palette-label">{c.label}</span><span className="v2-palette-group">{c.group}</span>{c.keys ? <kbd className="v2-kbd">{c.keys}</kbd> : null}
           </li>
-        )) : <li className="v2-palette-none" role="option" aria-selected="false" aria-disabled="true">No command matches “{q}”.</li>}
+        )) : <li className="v2-palette-none" role="option" aria-selected="false" aria-disabled="true">{text.none} “{q}”.</li>}
       </ul>
     </Modal>
   );

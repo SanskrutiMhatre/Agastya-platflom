@@ -11,6 +11,8 @@ import type { SaveStateInput } from './saveState';
 import type { EditorLayout } from './useEditorLayout';
 import { useHostKeys } from './useHostKeys';
 import { DOC_IDS } from './testIds';
+import { CommentsButton, CommentsPanel, useEditorComments } from './EditorComments';
+import type { Can } from '../../lib/roles';
 
 export interface DocEditorShellProps {
   kind: 'jss' | 'jsg';
@@ -30,9 +32,13 @@ export interface DocEditorShellProps {
   /** the host's find bar (the JSS editor has none of its own) */
   find: boolean;
   readOnly: boolean;
+  /** WP-22 (UX-009): the project, for its review comments in the header */
+  projectId: string;
+  can: Can;
 }
 
-export function DocEditorShell({ kind, shortcuts, layout, title, crumb, saveState, actions, guard, banners, loaded, hostRef, pdf, find, readOnly }: DocEditorShellProps) {
+export function DocEditorShell({ kind, shortcuts, layout, title, crumb, saveState, actions, guard, banners, loaded, hostRef, pdf, find, readOnly, projectId, can }: DocEditorShellProps) {
+  const comments = useEditorComments(projectId, can);
   const toast = useUi((s) => s.toast);
   const [palette, setPalette] = useState(false);
   const [keysOpen, setKeysOpen] = useState(false);
@@ -47,7 +53,8 @@ export function DocEditorShell({ kind, shortcuts, layout, title, crumb, saveStat
     shortcuts: () => setKeysOpen(true),
     focus: toggleFocus,
     find: find ? openFind : undefined,
-    escape: () => { if (finding) { setFinding(null); return true; } if (focus) { setFocus(false); return true; } return false; },
+    comment: comments.comments.length ? comments.step : undefined,
+    escape: () => { if (finding) { setFinding(null); return true; } if (comments.shown) { comments.setShown(false); return true; } if (focus) { setFocus(false); return true; } return false; },
   });
 
   const commands = useMemo<PaletteCommand[]>(() => {
@@ -73,7 +80,8 @@ export function DocEditorShell({ kind, shortcuts, layout, title, crumb, saveStat
     <>
       {guard}
       <EditorHeader layout={layout} title={title} crumb={crumb} state={<SaveStateChip state={saveState} ids={DOC_IDS[kind].state} />}
-        actions={<span className="v2-edactions" ref={actionsRef}>{actions}</span>} onPalette={() => setPalette(true)} onShortcuts={() => setKeysOpen(true)} />
+        actions={<span className="v2-edactions" ref={actionsRef}>{actions}</span>} extra={<CommentsButton state={comments} />} onPalette={() => setPalette(true)} onShortcuts={() => setKeysOpen(true)} />
+      <CommentsPanel projectId={projectId} state={comments} />
       {banners}
       {finding && find ? <FindBar key={finding.n} root={() => hostRef.current?.querySelector<HTMLElement>('[data-testid="jss-paper"], .jsg-sheet') ?? hostRef.current} replace={finding.replace} readOnly={readOnly} onClose={() => setFinding(null)} notify={(m) => toast(m, 'info')} /> : null}
       <div className={`v2-split${focus ? ' is-focus' : ''}`} {...DOC_IDS[kind].split} ref={splitRef} style={{ display: loaded ? undefined : 'none', ...(dragging ? { userSelect: 'none' } : {}) }}>

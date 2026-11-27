@@ -19,6 +19,8 @@ export function projectRailItems(id: string, summary: RailSummary): RailItem[] {
     { to: `/projects/${id}/editor`, label: 'Editor', icon: 'editor' },
     { to: `/projects/${id}/graphics`, label: 'Graphics', icon: 'image' },
   ] : [
+    // WP-22 (UX-007): the Project Home ("what is the state of this manual and what is next"), first; opening a project still lands in the Editor
+    { to: `/projects/${id}/home`, label: 'Home', icon: 'home' },
     { to: `/projects/${id}/editor`, label: 'Editor', icon: 'editor' },
     { to: `/projects/${id}/explore`, label: 'Explore', icon: 'explore' },
     { to: `/projects/${id}/publication`, label: 'Publication', icon: 'book' },

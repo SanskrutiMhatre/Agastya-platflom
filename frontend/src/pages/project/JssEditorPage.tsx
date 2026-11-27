@@ -96,7 +96,7 @@ export function JssEditorPage() {
   };
 
   return (
-    <DocEditorShell kind="jss" shortcuts="jss" layout={layout} title={summary.project.name} hostRef={hostRef} loaded={!!loaded} find readOnly={!writable}
+    <DocEditorShell kind="jss" shortcuts="jss" projectId={id} can={can} layout={layout} title={summary.project.name} hostRef={hostRef} loaded={!!loaded} find readOnly={!writable}
       crumb={loaded ? <span className="v2-badge accent" title={`Document type ${loaded.docType}, from the stencil ${loaded.stencil}`}>{loaded.label}</span> : null}
       saveState={host.saveState} guard={host.guard} banners={host.banners(recover)}
       actions={<>
