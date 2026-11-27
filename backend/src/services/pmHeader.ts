@@ -8,7 +8,10 @@
 //
 // `completePmStatus` puts the status back together in schema order: each element the new text has is kept; one it lacks is taken from the earlier
 // version of the same publication (the package's own file, or the file on disk before the save) when that had it; a required one neither has gets a
-// neutral default (the enterprise of the data modules or 00000, applicability "All", the default S1000D BREX of the issue). Nothing outside
+// neutral default (the enterprise of the data modules or 00000, an applicability whose display text is EMPTY, the default S1000D BREX of the issue).
+// The applicability is empty, not "All": the author never said what the book applies to, and the page heads read the publication's
+// applicability (headers_footers.xsl), so a filled-in "All" printed a new word on every page of existing books; empty is valid (pm.xsd:
+// displayText with one simplePara, mixed content) and prints what it printed before - the Xignal layout still shows "All" by its own rule. Nothing outside
 // <pmStatus> changes. The vendored writer itself is not changed.
 
 import { DOMParser, XMLSerializer } from '@xmldom/xmldom';
@@ -53,7 +56,7 @@ export function completePmStatus(xml: string, prior?: string | null, defaults: P
     if (!got.length) {
       const code = defaults.enterpriseCode || '00000';
       if (name === 'responsiblePartnerCompany') got = [`<responsiblePartnerCompany enterpriseCode="${code.replace(/[^A-Za-z0-9]/g, '')}"/>`];
-      else if (name === 'applic' && !has('applicRef')) got = ['<applic><displayText><simplePara>All</simplePara></displayText></applic>'];
+      else if (name === 'applic' && !has('applicRef')) got = ['<applic><displayText><simplePara/></displayText></applic>'];
       else if (name === 'brexDmRef') got = [defaults.brexDmRef || DEFAULT_BREX];
       else if (name === 'qualityAssurance') got = ['<qualityAssurance><unverified/></qualityAssurance>'];
       else if (name === 'security') got = ['<security securityClassification="01"/>'];

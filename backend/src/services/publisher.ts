@@ -323,7 +323,7 @@ function resolveMarks(projectId: string, effective: any, pipeline: string, log: 
 type EffectiveConfig = ReturnType<typeof effectiveConfig>;
 export function pdfInfoFor(projectId: string, project: EffectiveConfig['project'], effective: EffectiveConfig['effective'], dir: string): PdfInfo {
   const pub = effective?.publication ?? {};
-  const publishers = ((effective?.branding?.publishers ?? []) as Array<{ name?: string }>).map((p) => String(p?.name ?? '').trim()).filter(Boolean).join(', ');
+  const publishers = ((effective?.branding?.publishers ?? []) as Array<{ name?: string }>).map((p) => String(p?.name ?? '').trim().replace(/[\s,;]+$/, '')).filter(Boolean).join(', ');   // a name typed with a trailing comma gave "A,, B"
   let text = ''; try { text = fs.readFileSync(path.join(dir, pmRel(project)), 'utf8'); } catch { /* no publication file */ }
   if (/<\s*jssbook[\s>]/.test(text)) {
     const type = isJssAuthored(projectId) ? jssTypeOfProject(projectId) : undefined;
