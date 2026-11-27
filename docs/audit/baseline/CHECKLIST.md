@@ -238,4 +238,5 @@ One line per redesign batch: which groups, the parity report (`verification-resu
 | Batch | Groups | Parity report | Before / after tests | Owner sign-off |
 |---|---|---|---|---|
 | WP-22 (2026-11-27) | 1, 2, 3, 4, 5, 7, 8, 9, 13, 14, 16 | `check:parity` PASS, nothing removed | e2e `wp22-navigation.spec` 7/7; visual/a11y suite (6 baselines updated: light+dark publication, validation, release) | |
+| WP-35 (2026-11-27, branch `wp35-redesign`) | 1, 2, 3, 6, 9, 11, 12, 14, 16 | `check:parity` PASS, nothing removed (only additions); baseline re-captured with `parity:update` | before (e6f486c): visual/a11y run with the WP-35 changes 48 passed / 19 failed (the layout-class clash, then intended pictures); after: visual/a11y/keyboard 67 passed, 7 skipped (keyboard spec's own dark-theme skip); e2e `wp35-redesign` 4/4, `jsg-editor` 11/11, `wp05-dataloss` 10/10, `zz-core-routes` 5/5; 15 baselines updated (light+dark administrator, overview, projects, publication, release, sign-in, workspace; light settings) | pending |
 | | | | | |
