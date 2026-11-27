@@ -23,8 +23,9 @@ export type Env = Record<string, string | undefined>;
 export interface Config {
   port: number;
   /**
-   * Address to listen on. Unset keeps Node's default (every interface), which is what a developer running from source expects. The packaged
-   * product sets 127.0.0.1 so a fresh install is reachable from this machine only; an administrator opens it to the LAN on purpose.
+   * Address to listen on (AGASTYA_HOST). Unset in Mode A = the loopback interface only, 127.0.0.1 and ::1 (WP-26; it used to be every
+   * interface, so a server started from source answered the whole network in plain HTTP). Unset in Mode B = every interface, TLS only.
+   * The packaged product sets 127.0.0.1; an administrator opens it to the network on purpose (Mode B).
    */
   host: string | undefined;
   root: string;
@@ -58,13 +59,62 @@ export interface Config {
   pdfjsDir: string | undefined;
   /** First-run administrator (INITIAL_ADMIN_USERNAME / INITIAL_ADMIN_PASSWORD). Secret: never logged. */
   initialAdmin: { INITIAL_ADMIN_USERNAME: string | undefined; INITIAL_ADMIN_PASSWORD: string | undefined };
+  /**
+   * WP-26 (ENT-001, SEC-006, DEP-010): the deployment shape (AGASTYA_MODE). `local` = Mode A, one person on this computer: the server listens
+   * on the loopback interface only and refuses any other AGASTYA_HOST. `server` = Mode B, a server on the network: every listener on a
+   * non-loopback address serves TLS only (AGASTYA_TLS_*), so a Mode B server without a certificate stops at start naming the variable.
+   */
+  mode: DeploymentMode;
+  /** The certificate files of the TLS listener (null = plain HTTP, allowed on loopback only). Read and checked at start by services/network.ts. */
+  tls: TlsFiles | null;
+  /**
+   * Host names (and addresses) the server answers to besides the loopback names (AGASTYA_SERVER_NAMES, comma-separated; "*" = any). The
+   * certificate's subjectAltName entries are added at start. A request for any other Host gets 421: a page on another site that rebinds
+   * its DNS name to this server reads nothing and creates nothing (DNS rebinding), over HTTP and over the WebSocket alike.
+   */
+  serverNames: string[];
+  /** Strict-Transport-Security max-age in seconds on TLS answers (AGASTYA_HSTS_MAX_AGE; 0 = no header). No includeSubDomains, no preload. */
+  hstsMaxAge: number;
+  /**
+   * WP-12 (PLT-001, ENT-006, PLT-006): platform backups. `dir` (AGASTYA_BACKUP_DIR, default <workspace>/backups/platform) holds the archives;
+   * put it on a second disk in production. `intervalHours` (AGASTYA_BACKUP_INTERVAL_HOURS, default 24, 0 = no scheduled backup);
+   * `keep` (AGASTYA_BACKUP_KEEP "daily/weekly/monthly", default 7/4/12) applies to scheduled backups only; `keepMigrationSnapshots`
+   * (AGASTYA_KEEP_MIGRATION_SNAPSHOTS, default 5) the pre-migration database copies; `restoreTestDays` (AGASTYA_RESTORE_TEST_DAYS, default 7,
+   * 0 = off) how often the latest backup is restored into a scratch folder and checked.
+   */
+  backup: { dir: string; intervalHours: number; keep: { daily: number; weekly: number; monthly: number }; keepMigrationSnapshots: number; restoreTestDays: number };
+  /**
+   * WP-12 (PLT-007, ENT-015): how long housekeeping rows live, in days (0 = keep for ever). Sessions after they ended, read notifications,
+   * decided password-reset requests; audit rows older than `auditDays` are written to a compressed archive file first, then removed.
+   */
+  retention: { sessionsDays: number; notificationsDays: number; resetRequestsDays: number; auditDays: number };
 }
+
+export type DeploymentMode = 'local' | 'server';
+/** PEM certificate + key, or one PKCS#12 (.pfx) file; the passphrase of either comes from a file, never from the environment itself. */
+export interface TlsFiles { certFile?: string; keyFile?: string; pfxFile?: string; passphraseFile?: string }
 
 /** A positive number from an environment; unset, empty or invalid (".env" files often leave `NAME=` blank) means the default, never 0 or NaN. */
 export const envPositive = (name: string, fallback: number, env: Env = process.env): number => {
   const raw = env[name]; const n = raw === undefined || raw.trim() === '' ? NaN : Number(raw);
   return Number.isFinite(n) && n > 0 ? n : fallback;
 };
+
+/** A whole number >= 0 from an environment; unset or empty means the default; anything else is a configuration error (0 is meaningful: "off"). */
+export const envCount = (name: string, fallback: number, env: Env = process.env): number => {
+  const raw = env[name];
+  if (raw === undefined || raw.trim() === '') return fallback;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 0) throw new ConfigError(name, `"${raw}" is not a whole number of 0 or more.`);
+  return n;
+};
+
+function parseKeep(raw: string | undefined): { daily: number; weekly: number; monthly: number } {
+  if (raw === undefined || raw.trim() === '') return { daily: 7, weekly: 4, monthly: 12 };
+  const m = /^\s*(\d+)\s*\/\s*(\d+)\s*\/\s*(\d+)\s*$/.exec(raw);
+  if (!m) throw new ConfigError('AGASTYA_BACKUP_KEEP', `"${raw}" is not daily/weekly/monthly, for example 7/4/12.`);
+  return { daily: Number(m[1]), weekly: Number(m[2]), monthly: Number(m[3]) };
+}
 
 /** A configuration error names the variable, so start-up stops with something an administrator can act on. */
 export class ConfigError extends Error {
@@ -85,19 +135,92 @@ function parsePort(raw: string | undefined): number {
   return n;
 }
 
+/** True for an address or name that can only reach this computer: 127.0.0.0/8, ::1, IPv4-mapped loopback, "localhost" and *.localhost (RFC 6761). */
+export function isLoopbackHost(host: string): boolean {
+  const h = host.trim().toLowerCase().replace(/^\[(.*)\]$/, '$1');
+  if (h === 'localhost' || h.endsWith('.localhost')) return true;
+  if (h === '::1' || h === '0:0:0:0:0:0:0:1') return true;
+  return /^(::ffff:)?127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h);
+}
+
+function parseMode(raw: string | undefined): DeploymentMode {
+  const v = (raw ?? '').trim().toLowerCase();
+  if (v === '' || v === 'local' || v === 'a') return 'local';
+  if (v === 'server' || v === 'b') return 'server';
+  throw new ConfigError('AGASTYA_MODE', `"${raw}" is not a deployment mode: use "local" (Mode A, this computer only) or "server" (Mode B, TLS on the network).`);
+}
+
+function parseTls(env: Env): TlsFiles | null {
+  const pick = (n: string): string | undefined => { const v = env[n]; return v === undefined || v.trim() === '' ? undefined : v.trim(); };
+  const certFile = pick('AGASTYA_TLS_CERT'); const keyFile = pick('AGASTYA_TLS_KEY'); const pfxFile = pick('AGASTYA_TLS_PFX');
+  const passphraseFile = pick('AGASTYA_TLS_PASSPHRASE_FILE');
+  if (pfxFile && (certFile || keyFile)) throw new ConfigError('AGASTYA_TLS_PFX', 'give either a PKCS#12 file (AGASTYA_TLS_PFX) or a PEM certificate and key (AGASTYA_TLS_CERT, AGASTYA_TLS_KEY), not both.');
+  if (certFile && !keyFile) throw new ConfigError('AGASTYA_TLS_KEY', 'AGASTYA_TLS_CERT is set but the private key file is not (PEM).');
+  if (keyFile && !certFile) throw new ConfigError('AGASTYA_TLS_CERT', 'AGASTYA_TLS_KEY is set but the certificate file is not (PEM: the server certificate first, then any intermediate CA).');
+  if (!certFile && !pfxFile) {
+    if (passphraseFile) throw new ConfigError('AGASTYA_TLS_PASSPHRASE_FILE', 'is set but no certificate is (AGASTYA_TLS_PFX, or AGASTYA_TLS_CERT and AGASTYA_TLS_KEY).');
+    return null;
+  }
+  return { certFile, keyFile, pfxFile, passphraseFile };
+}
+
+const HOST_NAME = /^(\*\.)?[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/;
+const ADDRESS = /^\[?[0-9a-f:.]+\]?$/;
+
+function parseServerNames(raw: string | undefined): string[] {
+  const names = (raw ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+  for (const n of names) {
+    if (n !== '*' && !HOST_NAME.test(n) && !ADDRESS.test(n)) {
+      throw new ConfigError('AGASTYA_SERVER_NAMES', `"${n}" is not a host name or an address (no scheme and no port, for example "docs.example.local, 10.0.0.5").`);
+    }
+  }
+  return names.map((n) => n.replace(/^\[(.*)\]$/, '$1'));
+}
+
+function parseHsts(raw: string | undefined): number {
+  if (raw === undefined || raw.trim() === '') return 15552000;          // 180 days
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 0) throw new ConfigError('AGASTYA_HSTS_MAX_AGE', `"${raw}" is not a whole number of seconds (0 turns the header off).`);
+  return n;
+}
+
+/**
+ * The listening rules of WP-26, checked before anything listens: Mode A never binds a network address, and Mode B binds one only with TLS.
+ * A reverse proxy on the same computer that terminates TLS is the documented alternative: Mode B listening on 127.0.0.1 behind it.
+ */
+function checkListening(mode: DeploymentMode, host: string | undefined, tls: TlsFiles | null): void {
+  if (mode === 'local') {
+    if (host !== undefined && !isLoopbackHost(host)) {
+      throw new ConfigError('AGASTYA_HOST', `"${host}" is not a loopback address. Mode A (AGASTYA_MODE=local, the default) serves this computer only; `
+        + 'to serve the network set AGASTYA_MODE=server with a TLS certificate (AGASTYA_TLS_CERT and AGASTYA_TLS_KEY, or AGASTYA_TLS_PFX).');
+    }
+    return;
+  }
+  const networked = host === undefined || !isLoopbackHost(host);
+  if (networked && !tls) {
+    throw new ConfigError('AGASTYA_TLS_CERT', `Mode B listens on ${host ?? 'every network interface'} and serves TLS only there: set AGASTYA_TLS_CERT and AGASTYA_TLS_KEY `
+      + '(PEM) or AGASTYA_TLS_PFX. Behind a reverse proxy on this computer that terminates TLS, set AGASTYA_HOST=127.0.0.1 instead.');
+  }
+}
+
 /** Build one typed, validated configuration from an environment. Pure: reads nothing but `env`. */
 export function buildConfig(env: Env = process.env): Config {
+  const mode = parseMode(env.AGASTYA_MODE);
+  const host = env.AGASTYA_HOST?.trim() || undefined;
+  const tls = parseTls(env);
+  checkListening(mode, host, tls);
+  const workspaceDir = env.AGASTYA_WORKSPACE_DIR ?? path.resolve(ROOT, '..', 'workspace');
   return {
     port: parsePort(env.PORT),
-    host: env.AGASTYA_HOST || undefined,
+    host,
     root: ROOT,
     vendorDir: path.join(ROOT, 'vendor'),
     pipelineDir: path.join(ROOT, 'vendor', 'pipeline'),
     schemasDir: path.join(ROOT, 'schemas'),
     seedTemplatesDir: path.join(ROOT, 'templates'),
-    workspaceDir: env.AGASTYA_WORKSPACE_DIR ?? path.resolve(ROOT, '..', 'workspace'),
+    workspaceDir,
     clientDist: env.AGASTYA_CLIENT_DIST ?? path.resolve(ROOT, '..', 'frontend', 'dist'),
-    secureCookies: env.AGASTYA_SECURE_COOKIES === '1',
+    secureCookies: env.AGASTYA_SECURE_COOKIES === '1' || tls !== null,          // TLS on: every cookie Secure (WP-26)
     trustProxy: parseTrustProxy(env.AGASTYA_TRUST_PROXY),
     devOrigins: (env.AGASTYA_DEV_ORIGINS ?? 'http://localhost:5174').split(',').map((s) => s.trim()).filter(Boolean),
     limits: {
@@ -110,6 +233,23 @@ export function buildConfig(env: Env = process.env): Config {
     shutdownOnStdinClose: env.AGASTYA_SHUTDOWN_ON_STDIN_CLOSE === '1',
     pdfjsDir: env.AGASTYA_PDFJS_DIR || undefined,
     initialAdmin: { INITIAL_ADMIN_USERNAME: env.INITIAL_ADMIN_USERNAME, INITIAL_ADMIN_PASSWORD: env.INITIAL_ADMIN_PASSWORD },
+    mode,
+    tls,
+    serverNames: parseServerNames(env.AGASTYA_SERVER_NAMES),
+    hstsMaxAge: parseHsts(env.AGASTYA_HSTS_MAX_AGE),
+    backup: {
+      dir: env.AGASTYA_BACKUP_DIR || path.join(workspaceDir, 'backups', 'platform'),
+      intervalHours: envCount('AGASTYA_BACKUP_INTERVAL_HOURS', 24, env),
+      keep: parseKeep(env.AGASTYA_BACKUP_KEEP),
+      keepMigrationSnapshots: envCount('AGASTYA_KEEP_MIGRATION_SNAPSHOTS', 5, env),
+      restoreTestDays: envCount('AGASTYA_RESTORE_TEST_DAYS', 7, env),
+    },
+    retention: {
+      sessionsDays: envCount('AGASTYA_RETENTION_SESSIONS_DAYS', 30, env),
+      notificationsDays: envCount('AGASTYA_RETENTION_NOTIFICATIONS_DAYS', 90, env),
+      resetRequestsDays: envCount('AGASTYA_RETENTION_RESET_REQUESTS_DAYS', 90, env),
+      auditDays: envCount('AGASTYA_AUDIT_RETENTION_DAYS', 730, env),
+    },
   };
 }
 

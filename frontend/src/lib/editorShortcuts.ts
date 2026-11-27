@@ -36,7 +36,7 @@ export const EDITOR_SHORTCUTS: EditorShortcut[] = [
   jss('merge', ['Backspace'], 'At the start of a block: join it with the one before', 'caret at the start of a block'),
   jss('nextField', ['ArrowDown'], 'At the end of a block: go to the next one', 'caret at the end of a block'),
   jss('prevField', ['ArrowUp'], 'At the start of a block: go to the one before', 'caret at the start of a block'),
-  jss('goto', ['Enter'], 'Go to the heading of an outline row or the place of a problem', 'outline row, problems row'),
+  jss('goto', ['Enter', 'Space'], 'Go to the heading of an outline row or the place of a problem (Space too, WP-23)', 'outline row, problems row'),
   jss('dialogOk', ['Enter'], 'Confirm the dialog', 'a JSS dialog (not in a text area or on a button)', 'jss/dom.ts'),
   jss('dialogCancel', ['Escape'], 'Cancel the dialog, or close a pop-up menu', 'a JSS dialog or pop-up menu', 'jss/dom.ts'),
 

@@ -40,6 +40,14 @@ a:hover { text-decoration: underline; }
 .v2-nav .v2-count { margin-left: auto; font-size: 11px; background: var(--accent); color: var(--accent-text); border-radius: 10px; padding: 0 6px; min-width: 18px; text-align: center; line-height: 18px; }
 .v2-side-foot { margin-top: auto; padding: 8px; border-top: 1px solid var(--border); }
 .v2-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+/* WP-23 (UX-005): the main landmark of the shell (it fills the column like the page did), the skip link and the keyboard target of a table row */
+.v2-main-region { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.v2-main-region:focus, main.v2-main:focus { outline: none; }
+.v2-skip { position: absolute; left: 8px; top: 8px; z-index: var(--z-tooltip); padding: 6px 12px; min-height: 24px; border-radius: var(--radius-sm); background: var(--accent); color: var(--accent-text); font-weight: 600; text-decoration: none; transform: translateY(-200%); }
+.v2-skip:focus, .v2-skip:focus-visible { transform: none; outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.v2-row-link { padding: 0; margin: 0; border: 0; background: none; font: inherit; color: inherit; text-align: inherit; text-decoration: none; cursor: pointer; }
+.v2-row-link:hover { text-decoration: underline; }
+.v2-row-link:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 2px; }
 .v2-top { display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 20px; background: var(--bg-elev); border-bottom: 1px solid var(--border); flex: none; }
 .v2-top h1 { font-size: 16px; margin: 0; font-weight: 650; }
 /* WP-07 (UX-006): the editors' header wraps onto a second row instead of pushing Split / PDF / Generate past the right edge (stop-gap before WP-22) */
@@ -136,6 +144,9 @@ a:hover { text-decoration: underline; }
 
 /* ------------------------------------------------------------ toasts */
 .v2-toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 300; }
+/* WP-23: the two live regions of Toasts (ui.tsx); an empty region takes no room and adds no gap */
+.v2-toast-region { display: flex; flex-direction: column; gap: 8px; }
+.v2-toast-region:empty { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .v2-toast { padding: 10px 14px; border-radius: 8px; background: var(--text); color: var(--bg-elev); box-shadow: var(--shadow-2); font-size: 13px; max-width: 420px; }
 .v2-toast.error { background: var(--toast-error); color: var(--text-on-solid); }
 .v2-toast.success { background: var(--toast-success); color: var(--text-on-solid); }
@@ -245,7 +256,7 @@ a:hover { text-decoration: underline; }
 .v2-ph-main { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .v2-ph-icon { width: 46px; height: 46px; border-radius: 12px; background: linear-gradient(135deg, var(--accent-soft), var(--bg-active)); color: var(--accent); display: grid; place-items: center; flex: none; }
 .v2-ph-text { flex: 1; min-width: 200px; }
-.v2-ph-text h2 { margin: 0; font-size: 21px; font-weight: 700; letter-spacing: -.01em; }
+.v2-ph-text :is(h1, h2) { margin: 0; font-size: 21px; font-weight: 700; letter-spacing: -.01em; }
 .v2-ph-text p { margin: 3px 0 0; color: var(--text-muted); font-size: 13px; }
 .v2-ph-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .v2-ph-stats { display: flex; gap: 10px; flex-wrap: wrap; margin: 16px 0 0; padding: 0; }

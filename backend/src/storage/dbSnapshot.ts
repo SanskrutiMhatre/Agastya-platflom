@@ -1,4 +1,8 @@
 // =============================================================================
+// WP-12: AppContext.start() no longer calls this; storage/schema.ts snapshotBeforePendingMigrations protects EVERY pending migration (not only
+// 016), verifies the copy and stops the upgrade when it fails. This function is kept, unchanged, for test/db-snapshot.test.js and any operator
+// script that used it.
+//
 // A consistent copy of publisher.db, taken once before a migration first runs on a database that already holds projects.
 //
 // The copy is made with VACUUM INTO, so it is a complete, valid database even while the original is in WAL mode. It is never taken for a fresh

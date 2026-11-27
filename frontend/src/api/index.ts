@@ -266,6 +266,27 @@ export const platformApi = {
   saveSecurityPolicy: (b: Partial<SecurityPolicy>) => put<{ policy: SecurityPolicy }>('/api/admin/security-policy', b).then((r) => r.policy),
   health: () => get<{ audit: { failures: number; last: { at: string; action: string; error: string } | null } | null }>('/api/admin/health'),
 };
+/** WP-12: platform backups (backend/src/routes/backups.ts, services/dataProtection.ts). Administrators only. */
+export interface BackupItem { name: string; bytes: number; createdAt: string; kind: 'manual' | 'scheduled' | 'pre-update' | 'cli' }
+interface BackupJob { at: string; ok: boolean; name?: string; message?: string }
+export interface BackupStatus {
+  dir: string; intervalHours: number; keep: { daily: number; weekly: number; monthly: number }; restoreTestDays: number; running: boolean;
+  backups: BackupItem[]; latest: (BackupItem & { ageDays: number }) | null; stale: boolean;
+  state: { lastBackup?: BackupJob; lastScheduledAt?: string; lastRestoreTest?: BackupJob & { files?: number; rows?: number }; lastRetention?: BackupJob & { counts?: Record<string, number> } };
+  schema: { applied: number; known: number; latest: string | null };
+}
+export interface RestoreReport { target: string; createdAt: string; version: string; files: number; bytes: number; tables: number; rows: number; schema: { applied: number; pendingHere: string[] } }
+const B = (name: string) => `/api/admin/backups/${encodeURIComponent(name)}`;
+export const backupApi = {
+  status: () => get<BackupStatus>('/api/admin/backups'),
+  create: () => post<{ name: string; bytes: number; files: number; tables: number; createdAt: string }>('/api/admin/backups'),
+  verify: (name: string) => post<{ ok: boolean; report: RestoreReport }>(`${B(name)}/verify`),
+  copy: (name: string, folder: string) => post<{ file: string; sha256: string }>(`${B(name)}/copy`, { folder }),
+  restore: (name: string, target: string) => post<{ report: RestoreReport; next: string[] }>(`${B(name)}/restore`, { target }),
+  remove: (name: string) => del<{ ok: boolean }>(B(name)),
+  downloadUrl: (name: string) => `${B(name)}/download`,
+};
+
 /** Account and session rules (backend/src/core/auth/securityPolicy.js). */
 export interface SecurityPolicy { idleMinutes: number; absoluteHours: number; singleSession: boolean; separationOfDuties: boolean; passwordMinLength: number }
 

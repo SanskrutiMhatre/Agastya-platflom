@@ -200,7 +200,10 @@ export class App {
     this.ribbonEl = ribbon;
     this.editorHost = h('div', { class: 'editor-host' });
     this.startPage = h('div', { class: 'start-page' });
-    const center = h('main', { class: 'center' }, this.find.el, this.editorHost, this.startPage);
+    // WP-23: inside the platform the project shell's <main> already holds the Studio; one main landmark per page (a region here instead)
+    const center = this.host
+      ? h('div', { class: 'center', role: 'region', 'aria-label': 'Document' }, this.find.el, this.editorHost, this.startPage)
+      : h('main', { class: 'center' }, this.find.el, this.editorHost, this.startPage);
     this.leftPane = h('aside', { class: 'pane pane-left' }, this.outline.el, h('div', { class: 'pane-resize', 'data-pane': 'left' }));
     const rtabs = h('div', { class: 'panel-tabs pane-tabs', role: 'tablist' },
       h('button', { class: 'panel-tab', 'data-rtab': 'attributes', role: 'tab', on: { click: () => this.setRightTab('attributes') } }, 'Attributes'),

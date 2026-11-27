@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 import { signalUnauthorized } from '../api/client';
 import { useSession } from '../store/session';
+import { CLIENT_VERSION } from './handshake';
 
 /** The server closes a socket whose session ended (sign-out, a newer sign-in, idle or time limit, account disabled) with this code. */
 const SESSION_ENDED = 4401;
@@ -20,7 +21,8 @@ let wanted = 0;
 function connect() {
   if (socket || wanted === 0) return;
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  const ws = new WebSocket(`${proto}://${location.host}/ws`);
+  // WP-26: the page's version rides on the upgrade (a browser cannot set headers there); a server that no longer accepts it refuses with 426.
+  const ws = new WebSocket(`${proto}://${location.host}/ws?client=${encodeURIComponent(CLIENT_VERSION)}`);
   socket = ws;
   ws.onopen = () => { retry = 0; };
   ws.onmessage = (ev) => { try { const m = JSON.parse(ev.data) as ProgressMsg; listeners.forEach((l) => l(m)); } catch { /* ignore malformed */ } };

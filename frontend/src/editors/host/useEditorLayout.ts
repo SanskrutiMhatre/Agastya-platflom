@@ -6,7 +6,8 @@
 //   split   the divider between the editor and the PDF, dragged with the mouse or moved with the arrow keys; remembered per format.
 //   narrow  below 900 px two panes side by side are unusable: Split shows the editor alone.
 
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { splitterKeys } from '../../components/a11y';
 
 export type EditorView = 'edit' | 'split' | 'pdf';
 export type EditorFormat = 'editor' | 'jss' | 'jsg';           // 'editor' = the S1000D Studio (its keys predate the other two)
@@ -66,12 +67,8 @@ export function useEditorLayout({ format, split: [min, max, def], onResize }: Ed
     window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
   };
   /** The divider is a focusable separator: the arrow keys move it (WCAG 2.1.1). */
-  const dividerKey = (e: ReactKeyboardEvent) => {
-    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-    e.preventDefault();
-    const next = Math.min(max, Math.max(min, pct + (e.key === 'ArrowRight' ? 2 : -2)));
-    setPct(next); write(SPLIT, String(Math.round(next))); resize.current?.();
-  };
+  // WP-23 (keyboard-operable splitter): arrows by 2, PageUp/PageDown by 8, Home/End to the limits; the divider carries aria-valuenow/min/max
+  const dividerKey = splitterKeys(pct, min, max, 2, (next) => { setPct(next); write(SPLIT, String(next)); resize.current?.(); });
 
   return { view, setView, pct, dragging, startDrag, dividerKey, splitRef, narrow, focus, setFocus, toggleFocus, reveal, splitRange: [min, max] as const };
 }

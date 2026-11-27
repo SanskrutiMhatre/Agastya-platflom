@@ -648,7 +648,7 @@ export class JssEditor {
     this.outlineEl.textContent = '';
     this.outlineEl.append(h('h3', {}, 'Outline'));
     const add = (node: Chapter | Section, label: string, num: string, cls: string) => {
-      const row = h('div', { class: `jss-ol ${cls}`, role: 'button', tabindex: 0, title: label, on: { click: () => this.scrollToNode(node), keydown: (e: KeyboardEvent) => { if (e.key === 'Enter') this.scrollToNode(node); } } }, h('span', { class: 'n' }, num), h('span', {}, label));
+      const row = h('div', { class: `jss-ol ${cls}`, role: 'button', tabindex: 0, title: label, on: { click: () => this.scrollToNode(node), keydown: (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.scrollToNode(node); } } } }, h('span', { class: 'n' }, num), h('span', {}, label));
       this.elNode.set(row, node); row.setAttribute('data-ol', ''); this.outlineEl.append(row);
     };
     const walk = (children: Children, indent: number) => { for (const c of children) if (isSection(c)) { add(c, c.title || '(untitled)', this.numbers.heading.get(c) ?? '', ''); (this.outlineEl.lastElementChild as HTMLElement).style.paddingLeft = `${12 + indent * 12}px`; walk(c.children, indent + 1); } };
@@ -690,7 +690,7 @@ export class JssEditor {
     this.problemsEl.append(h('summary', {}, this.findings.length ? `Problems: ${errors} error${errors === 1 ? '' : 's'}, ${warns} warning${warns === 1 ? '' : 's'}` : 'No problems found'));
     if (errors) this.problemsEl.open = true;
     for (const f of this.findings) {
-      this.problemsEl.append(h('div', { class: 'jss-pr', role: 'button', tabindex: 0, on: { click: () => this.goTo(f.location), keydown: (e: KeyboardEvent) => { if (e.key === 'Enter') this.goTo(f.location); } } },
+      this.problemsEl.append(h('div', { class: 'jss-pr', role: 'button', tabindex: 0, on: { click: () => this.goTo(f.location), keydown: (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.goTo(f.location); } } } },
         h('span', { class: `sev ${f.severity}`, title: f.severity }), h('span', { class: 'rule' }, f.rule), h('span', {}, f.message), h('span', { class: 'at' }, `line ${f.line}`)));
     }
   }

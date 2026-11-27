@@ -10,7 +10,21 @@ Port=@PORT@
 ; loopback = reachable from this computer only (recommended).
 ; lan      = reachable from other computers too. The Windows firewall still has to allow it (see OPERATIONS.md).
 ; Or give one specific IPv4 address of this computer.
+; Anything other than loopback is a server on the network (Mode B) and needs a certificate under [tls]: the server does not start without one.
 Bind=@BIND@
+; Other names people use to reach this server, comma-separated (the names in the certificate are always accepted).
+;ServerNames=docs.example.local
+
+[tls]
+; The server's certificate (Mode B). Either a PEM certificate and its key, or one .pfx file. A relative path is relative to this file's folder.
+; The passphrase of an encrypted key or a .pfx is read from a file; keep these files readable by the service and administrators only.
+; Prefer a certificate from your organisation's CA. Without one, "node app\backend\scripts\make-tls-cert.js" makes one (OPERATIONS.md).
+;Certificate=tls\server.pem
+;Key=tls\server-key.pem
+;Pfx=tls\server.pfx
+;PassphraseFile=tls\passphrase.txt
+; Strict-Transport-Security max-age in seconds on HTTPS answers (0 = none). Default 15552000 (180 days).
+;HstsMaxAge=15552000
 
 [storage]
 ; Where projects, house templates and the database are kept. Back this folder up.

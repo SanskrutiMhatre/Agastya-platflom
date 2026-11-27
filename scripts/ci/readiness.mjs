@@ -51,16 +51,22 @@ gate('QA-001', 'the release artefacts were built from this commit, from a clean 
   }
   return { status: bad.length ? 'FAIL' : 'PASS', detail: bad.join('; ') || `commit ${head.slice(0, 12)}, ${(b.outputs || []).length} artefacts verified` };
 });
-gate('G-SEC-11a', 'the executables and the installer carry a valid Authenticode signature', () => {
+gate('G-SEC-11a', 'the installer and the product executables carry a valid, time-stamped Authenticode signature', () => {
   if (process.platform !== 'win32') return { status: 'NOT RUN', detail: 'Windows only' };
-  const exes = fs.existsSync(RELEASE) ? fs.readdirSync(RELEASE).filter((n) => /\.exe$/i.test(n)) : [];
+  // WP-24: the installer, and AgastyaPlatform.exe / AgastyaCtl.exe of the staged product (the audit's "installer + 2 executables")
+  const exes = fs.existsSync(RELEASE) ? fs.readdirSync(RELEASE).filter((n) => /\.exe$/i.test(n)).map((n) => path.join(RELEASE, n)) : [];
+  for (const d of fs.existsSync(RELEASE) ? fs.readdirSync(RELEASE).filter((n) => /^Agastya-Platform-.*-win-x64$/.test(n)) : []) {
+    for (const e of ['AgastyaPlatform.exe', 'AgastyaCtl.exe']) if (fs.existsSync(path.join(RELEASE, d, e))) exes.push(path.join(RELEASE, d, e));
+  }
   if (!exes.length) return { status: 'NOT RUN', detail: `no .exe in ${RELEASE}` };
   const bad = [];
   for (const e of exes) {
-    const r = ps(`(Get-AuthenticodeSignature -LiteralPath '${path.join(RELEASE, e).replace(/'/g, "''")}').Status`);
-    if (r.stdout.trim() !== 'Valid') bad.push(`${e}: ${r.stdout.trim() || r.stderr.trim()}`);
+    const r = ps(`$s = Get-AuthenticodeSignature -LiteralPath '${e.replace(/'/g, "''")}'; '{0}|{1}' -f $s.Status, [bool]$s.TimeStamperCertificate`);
+    const [status, ts] = r.stdout.trim().split('|');
+    if (status !== 'Valid') bad.push(`${path.basename(e)}: ${status || r.stderr.trim()}`);
+    else if (ts !== 'True') bad.push(`${path.basename(e)}: Valid but not time-stamped`);
   }
-  return { status: bad.length ? 'FAIL' : 'PASS', detail: bad.join('; ') || `${exes.length} signed` };
+  return { status: bad.length ? 'FAIL' : 'PASS', detail: bad.join('; ') || `${exes.length} file(s) Valid and time-stamped` };
 });
 gate('G-SEC-11b', 'the Node runtime the product ships has at least 12 months of support left', () => {
   // WP-13 (ENT-008): what is checked is the runtime the product SHIPS - the one recorded in release/BUILD-INFO.json when a release is present,
@@ -82,9 +88,37 @@ gate('G-SEC-11b', 'the Node runtime the product ships has at least 12 months of 
   const bad = months < min || (shipped && pinned && Number(shipped.split('.')[0]) !== Number(pinned.split('.')[0]));
   return { status: bad ? 'FAIL' : 'PASS', detail: notes.join('; ') };
 });
-gate('RES-005', 'a software bill of materials is shipped with the release', () => {
-  const sbom = fs.existsSync(RELEASE) ? fs.readdirSync(RELEASE).filter((n) => /sbom|\.cdx\.json$|\.spdx(\.json)?$/i.test(n)) : [];
-  return sbom.length ? { status: 'PASS', detail: sbom.join(', ') } : { status: 'NOT RUN', detail: `no SBOM in ${RELEASE} (RES-005 is not implemented yet)` };
+gate('RES-005', 'a software bill of materials ships with the release, is listed in the checksums and checks', () => {
+  // WP-24: the packager writes <stage>-SBOM.cdx.json (CycloneDX 1.5) and lists it in SHA256SUMS.txt, whose signature therefore covers it
+  const sbom = fs.existsSync(RELEASE) ? fs.readdirSync(RELEASE).filter((n) => /\.cdx\.json$/i.test(n)) : [];
+  if (!sbom.length) return { status: 'NOT RUN', detail: `no *.cdx.json in ${RELEASE} (build with npm run package:win)` };
+  const sums = path.join(RELEASE, 'SHA256SUMS.txt');
+  const listed = fs.existsSync(sums) ? fs.readFileSync(sums, 'utf8') : '';
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'release', 'sbom.mjs'), '--check', path.join(RELEASE, sbom[0])], { encoding: 'utf8' });
+  const bad = [];
+  if (!listed.includes(`*${sbom[0]}`)) bad.push(`${sbom[0]} is not listed in SHA256SUMS.txt`);
+  if (r.status !== 0) bad.push((r.stderr || r.stdout).trim().split(/\r?\n/).slice(0, 4).join(' '));
+  return { status: bad.length ? 'FAIL' : 'PASS', detail: bad.join('; ') || `${sbom[0]}: ${r.stdout.trim()}` };
+});
+gate('G-SEC-11c', 'the release verifies offline: checksums, their signature, the signed manifest of every product file, one signer', () => {
+  if (!fs.existsSync(path.join(RELEASE, 'SHA256SUMS.txt'))) return { status: 'NOT RUN', detail: `no SHA256SUMS.txt in ${RELEASE}` };
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'scripts', 'release', 'verify-release.mjs'), '--release', RELEASE, '--require-signed', '--require-timestamp', '--json'], { encoding: 'utf8', maxBuffer: 64 << 20 });
+  let res; try { res = JSON.parse(r.stdout); } catch { return { status: 'FAIL', detail: (r.stderr || r.stdout).trim().slice(0, 400) }; }
+  const fails = res.rows.filter((x) => x.status === 'FAIL');
+  return { status: res.ok ? 'PASS' : 'FAIL', detail: fails.map((x) => `${x.check}: ${x.detail}`).join('; ') || `${res.rows.length} checks passed` };
+});
+gate('G-DEP-4', 'the doctor detects seeded faults; --verify and the support bundle behave (fault-injection test)', () => {
+  if (process.platform !== 'win32') return { status: 'NOT RUN', detail: 'Windows only' };
+  const r = spawnSync(process.execPath, ['--test', '--test-concurrency=1', path.join(ROOT, 'scripts', 'release', 'host.test.mjs')], { encoding: 'utf8', maxBuffer: 64 << 20 });
+  const pass = /# pass (\d+)/.exec(r.stdout)?.[1]; const fail = /# fail (\d+)/.exec(r.stdout)?.[1];
+  return { status: r.status === 0 ? 'PASS' : 'FAIL', detail: `scripts/release/host.test.mjs: ${pass ?? '?'} pass, ${fail ?? '?'} fail (seeded: missing runtime, missing JRE, port in use, bad ini value, read-only data folder; not seeded: low disk, stopped service, expired TLS certificate)` };
+});
+gate('G-DEP-3', 'the deployment detection rule reports the installed copy', () => {
+  if (!INSTALL) return { status: 'NOT RUN', detail: 'pass --install <folder of an installed copy>; the SCCM/Intune run itself is manual (docs/DEPLOYMENT-KIT.md)' };
+  const version = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
+  const r = spawnSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', path.join(ROOT, 'packaging', 'deploy', 'Detect-AgastyaPlatform.ps1'), '-MinimumVersion', version], { encoding: 'utf8' });
+  const out = r.stdout.trim();
+  return { status: r.status === 0 && out ? 'PASS' : 'FAIL', detail: out || `not detected (exit ${r.status})` };
 });
 gate('G-SEC-6', 'the installed copy grants write access to its data folder only to administrators and the service identity', () => {
   if (!INSTALL) return { status: 'NOT RUN', detail: 'pass --install <folder of an installed copy>' };
@@ -98,8 +132,16 @@ gate('G-DEP-6', 'doctor passes on a clean install', () => {
   if (!INSTALL) return { status: 'NOT RUN', detail: 'pass --install <folder of an installed copy>' };
   const ctl = path.join(INSTALL, 'AgastyaCtl.exe');
   if (!fs.existsSync(ctl)) return { status: 'FAIL', detail: `${ctl} is missing` };
-  const r = spawnSync(ctl, ['doctor'], { encoding: 'utf8' });
+  const r = spawnSync(ctl, ['--doctor'], { encoding: 'utf8' });   // was 'doctor', which the host rejects as an unknown argument (fixed in WP-24)
   return { status: r.status === 0 ? 'PASS' : 'FAIL', detail: (r.stdout || r.stderr).trim().split(/\r?\n/).slice(-1)[0] || `exit ${r.status}` };
+});
+gate('DEP-013', 'every file of the installed copy matches its signed manifest (AgastyaCtl --verify --require-signed)', () => {
+  if (!INSTALL) return { status: 'NOT RUN', detail: 'pass --install <folder of an installed copy>' };
+  const ctl = path.join(INSTALL, 'AgastyaCtl.exe');
+  if (!fs.existsSync(ctl)) return { status: 'FAIL', detail: `${ctl} is missing` };
+  const r = spawnSync(ctl, ['--verify', '--require-signed'], { encoding: 'utf8', maxBuffer: 16 << 20 });
+  const lines = (r.stdout || r.stderr).trim().split(/\r?\n/).filter((l) => /^\[(FAIL|WARN)\]/.test(l));
+  return { status: r.status === 0 ? 'PASS' : 'FAIL', detail: lines.join(' | ') || (r.stdout || '').trim().split(/\r?\n/).slice(-1)[0] };
 });
 
 const allowNotRun = argv.includes('--allow-not-run');

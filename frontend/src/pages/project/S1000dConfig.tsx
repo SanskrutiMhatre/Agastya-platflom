@@ -11,6 +11,7 @@ import { Icon } from '../../components/Icon';
 import { Alert, Badge, ConfirmModal, Empty, Field, Loading, Modal, errText, useAsync } from '../../components/ui';
 import { useProject } from '../../layouts/ProjectShell';
 import { useUi } from '../../store/ui';
+import { tablistKeys } from '../../components/a11y';
 
 type Section = 'identity' | 'codes' | 'types' | 'sns';
 const SECTIONS: Array<[Section, string]> = [['identity', 'Identity'], ['codes', 'Information codes'], ['types', 'Data module types'], ['sns', 'SNS']];
@@ -29,7 +30,7 @@ export function S1000dConfig() {
       {b.config.origin.by === 'migration' && b.config.origin.notes.length ? (
         <Alert tone="warn"><b>Derived from the existing data modules.</b> This project was set up before S1000D configuration existed. Please review it.<ul style={{ margin: '6px 0 0 18px' }}>{b.config.origin.notes.map((n) => <li key={n}>{n}</li>)}</ul></Alert>
       ) : null}
-      <div className="v2-tabs" role="tablist" aria-label="S1000D configuration">
+      <div className="v2-tabs" role="tablist" aria-label="S1000D configuration" onKeyDown={tablistKeys}>
         {SECTIONS.map(([k, label]) => <button key={k} role="tab" aria-selected={section === k} className={`v2-tab ${section === k ? 'active' : ''}`} onClick={() => setSection(k)} data-testid={`s1000d-tab-${k}`}>{label}</button>)}
       </div>
       {section === 'identity' ? <Identity b={b} id={id} can={can} reload={bundle.reload} /> : null}

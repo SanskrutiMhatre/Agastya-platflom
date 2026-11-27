@@ -11,6 +11,8 @@
 param(
   [Parameter(Mandatory)][string]$Setup,
   [string]$Label = 'run',
+  # WP-24: a signed release must show Authenticode signatures (time-stamped) on Setup and the installed executables, and a signed manifest
+  [switch]$RequireSigned,
   [string]$VmName = 'AGASTYA-INSTALL-TEST',
   [string]$WorkDir = (Join-Path $env:TEMP 'agastya-vmtest')
 )
@@ -119,6 +121,45 @@ foreach ($r in $acl) {
   Check "no ACE for Users or anyone else on $($r.dir)" (($extra.Count -eq 0) -and ($r.text -notmatch 'BUILTIN\\Users|Authenticated Users|Everyone')) ($r.text)
   Check "inheritance from ProgramData cut on $($r.dir)" (-not $r.inherited) ($r.text)
 }
+
+# WP-24 (DEP-003, DEP-013, DEP-024, G-SEC-11): signatures, the file manifest, a seeded file fault and the support bundle, inside the no-NIC guest
+Say '--- release integrity: Authenticode, AgastyaCtl --verify, a seeded file fault, the support bundle'
+$v = G {
+  param($req)
+  $app = 'C:\Program Files\Agastya Platform'
+  $sig = foreach ($f in @('C:\agtest\Setup.exe', "$app\AgastyaPlatform.exe", "$app\AgastyaCtl.exe", "$app\unins000.exe")) {
+    $s = Get-AuthenticodeSignature -LiteralPath $f; '{0}={1}{2}' -f (Split-Path -Leaf $f), $s.Status, $(if ($s.TimeStamperCertificate) { '+ts' } else { '' })
+  }
+  $va = if ($req) { @('--verify', '--require-signed') } else { @('--verify') }
+  $ver = & "$app\AgastyaCtl.exe" @va 2>&1 | Out-String; $vx = $LASTEXITCODE
+  # seeded fault: one byte added to a server file must make --verify fail; the original is put back
+  $js = "$app\app\backend\dist\index.js"; Copy-Item $js C:\agtest\index.js.orig -Force
+  Add-Content -LiteralPath $js -Value ' '
+  $bad = & "$app\AgastyaCtl.exe" --verify 2>&1 | Out-String; $bx = $LASTEXITCODE
+  Copy-Item C:\agtest\index.js.orig $js -Force
+  $again = & "$app\AgastyaCtl.exe" --verify 2>&1 | Out-String; $ax = $LASTEXITCODE
+  & "$app\AgastyaCtl.exe" --support-bundle C:\agtest\bundle.zip 2>&1 | Out-Null; $sx = $LASTEXITCODE
+  $names = @(); $leak = $false
+  if (Test-Path C:\agtest\bundle.zip) {
+    Remove-Item C:\agtest\bundle -Recurse -Force -ErrorAction SilentlyContinue
+    Expand-Archive C:\agtest\bundle.zip C:\agtest\bundle -Force
+    $names = Get-ChildItem C:\agtest\bundle -Recurse -File | ForEach-Object { $_.FullName.Substring('C:\agtest\bundle\'.Length) }
+    $leak = [bool](Select-String -Path (Get-ChildItem C:\agtest\bundle -Recurse -File).FullName -SimpleMatch 'Correct-Horse-9!' -List)
+  }
+  $hostLog = Get-Content 'C:\ProgramData\Agastya Platform\logs\agastya-host.log' -ErrorAction SilentlyContinue | Select-String 'integrity:' | Select-Object -Last 1
+  [pscustomobject]@{ sig = $sig; verifyExit = $vx; verify = $ver.Trim(); badExit = $bx; bad = $bad.Trim(); againExit = $ax; bundleExit = $sx; names = ($names -join ','); leak = $leak; startCheck = [string]$hostLog }
+} @([bool]$RequireSigned)
+Say "  info  signatures: $($v.sig -join ', ')"
+if ($RequireSigned) {
+  Check 'Setup.exe, both executables and the uninstaller are Valid and time-stamped' (@($v.sig | Where-Object { $_ -notmatch '=Valid\+ts$' }).Count -eq 0) ($v.sig -join ', ')
+} else {
+  Check 'no signature is broken (HashMismatch)' (@($v.sig | Where-Object { $_ -match 'HashMismatch' }).Count -eq 0) ($v.sig -join ', ')
+}
+Check 'AgastyaCtl --verify: the installed files match the manifest' ($v.verifyExit -eq 0) $v.verify
+Check 'AgastyaCtl --verify names a changed server file' (($v.badExit -eq 1) -and ($v.bad -match 'changed: app/backend/dist/index\.js')) $v.bad
+Check 'AgastyaCtl --verify passes again once the file is restored' ($v.againExit -eq 0) "exit=$($v.againExit)"
+Check 'the server logged the start-up file check' ($v.startCheck -match 'integrity:') $v.startCheck
+Check 'support bundle written, without the database or the admin password' (($v.bundleExit -eq 0) -and ($v.names -match 'doctor\.txt') -and ($v.names -notmatch 'publisher\.db') -and (-not $v.leak)) "exit=$($v.bundleExit) files=$($v.names) leak=$($v.leak)"
 
 # ------------------------------------------------------------------ phase 2: reboot
 Say '--- phase 2: reboot the guest, the service must come back by itself'

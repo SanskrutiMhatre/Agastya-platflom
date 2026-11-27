@@ -169,7 +169,7 @@ export function buildCommands(): Command[] {
   add({ id: 'tools.ids', label: 'Generate missing IDs', icon: 'id', group: 'Tools', run: (a, ed) => { const n = ed!.generateIds(); a.toast(n ? `Generated ${n} ID${n === 1 ? '' : 's'}` : 'All referenceable elements already have IDs', 'info'); }, enabled: editable });
   add({ id: 'tools.settings', label: 'Settings…', icon: 'settings', keys: ['Mod+,'], group: 'Tools', global: true, run: (a) => a.dialogs.settings() });
   add({ id: 'tools.shortcuts', label: 'Keyboard shortcuts', icon: 'keyboard', keys: ['F1'], group: 'Tools', global: true, run: (a) => a.dialogs.shortcuts() });
-  add({ id: 'tools.palette', label: 'Command palette…', icon: 'palette', keys: ['Mod+Shift+P', 'Mod+K'], group: 'Tools', global: true, run: (a) => a.dialogs.palette() });
+  add({ id: 'tools.palette', label: 'Command palette…', icon: 'palette', keys: ['Mod+K', 'Mod+Shift+P'], group: 'Tools', global: true, run: (a) => a.dialogs.palette() });   // WP-23 (UX-027): Ctrl+K first, Ctrl+Shift+P kept (WP-21: the same Ctrl+K as the host)
   add({ id: 'tools.about', label: 'About S1000D Studio', icon: 'info', group: 'Tools', global: true, run: (a) => a.dialogs.about() });
   return c;
 }

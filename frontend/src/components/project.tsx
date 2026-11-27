@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { ISSUE_OPTIONS, issueLabel, referenceApi, s1000dApi, workspaceApi, type FormatInfo, type NewProjectConfig, type PackageDetection, type ProjectCard, type ProjectRole } from '../api';
 import { useUi } from '../store/ui';
 import { Icon } from './Icon';
-import { Badge, Field, Modal, ago, errText, Alert, useAsync } from './ui';
+import { Badge, ConfirmModal, Field, Modal, ago, errText, Alert, useAsync } from './ui';
 import { refusalHint, refusalReasons, type RefusalReason } from './importRefusal';
 import { xengineApi, type ConvertResult } from '../api/xengine';
 import { FindingsList } from './DocCodes';
@@ -167,6 +167,11 @@ export function CreateProjectModal({ folders, defaultFolder = '', startWith, onC
   };
   /** Leaving the result of a conversion: the lists behind the dialog learn of the new project. */
   const leave = () => { if (done) onCreated(done.project); onClose(); };
+  // WP-23 (UX-004): Escape, the close button or a click beside the dialog no longer throw away a wizard that holds input; they ask first.
+  // The Cancel button is the explicit way out and closes at once (decision recorded in the implementation log).
+  const [askDiscard, setAskDiscard] = useState(false);
+  const holdsInput = !done && (!!name.trim() || !!file || !!mic.trim() || !!rpc.code.trim() || !!org.code.trim());
+  const requestClose = () => { if (holdsInput) setAskDiscard(true); else onClose(); };
 
   const rpcPick = (list: Array<{ cage: string; name: string }> | undefined, v: { code: string; name: string }, set: (x: { code: string; name: string }) => void, optional: boolean) =>
     list?.length ? (
@@ -203,8 +208,8 @@ export function CreateProjectModal({ folders, defaultFolder = '', startWith, onC
     </>
   );
 
-  return (
-    <Modal title={done ? 'Import finished' : `New project — ${TITLES[stepId]}${order().length > 2 ? ` (${pos + 1} of ${order().length})` : ''}`} onClose={done ? leave : onClose} width={680} buttons={done ? <>
+  return (<>
+    <Modal title={done ? 'Import finished' : `New project — ${TITLES[stepId]}${order().length > 2 ? ` (${pos + 1} of ${order().length})` : ''}`} onClose={done ? leave : requestClose} width={680} buttons={done ? <>
       <button className="btn" onClick={leave} data-testid="wiz-done-close">Close</button>
       <button className="btn btn-primary" onClick={() => { leave(); nav(`/projects/${done.project.id}`); }} data-testid="wiz-done-open">Open “{done.project.name}”</button>
     </> : <>
@@ -329,5 +334,7 @@ export function CreateProjectModal({ folders, defaultFolder = '', startWith, onC
         ) : null}
       </div>
     </Modal>
-  );
+    {askDiscard ? <ConfirmModal title="Discard the new project?" body="What you entered in this wizard is lost." confirmLabel="Discard" danger
+      onConfirm={() => { setAskDiscard(false); onClose(); }} onClose={() => setAskDiscard(false)} /> : null}
+  </>);
 }

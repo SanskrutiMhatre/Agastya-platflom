@@ -9,6 +9,7 @@ import { globalLabel } from '../lib/roles';
 import { Badge, Empty, ago, fmtDate } from './ui';
 import { RoleBadge } from './project';
 import { Icon } from './Icon';
+import { tablistKeys } from './a11y';
 
 type Tab = 'projects' | 'people' | 'feed';
 
@@ -22,7 +23,7 @@ export function ActivityView({ report, single = false }: { report: ActivityRepor
 
   return (
     <div className="v2-stack">
-      <div className="v2-tabs" role="tablist" style={{ marginBottom: 0 }}>
+      <div className="v2-tabs" role="tablist" aria-label="Activity views" onKeyDown={tablistKeys} style={{ marginBottom: 0 }}>
         {tabs.map(([t, label]) => <button key={t} role="tab" aria-selected={tab === t} className={`v2-tab ${tab === t ? 'active' : ''}`} onClick={() => setTab(t)}>{label}</button>)}
       </div>
 

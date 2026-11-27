@@ -3,13 +3,15 @@
 // There is no project "overview" page; opening a project lands in the Editor.
 
 import { useCallback, useEffect, useState } from 'react';
-import { NavLink, Outlet, useNavigate, useOutletContext, useParams } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { workspaceApi, type ProjectRole, type Summary } from '../api';
 import { Icon } from '../components/Icon';
 import { projectRailItems } from './projectRail';
 import { Alert, Loading, errText } from '../components/ui';
 import { MissingBrex } from '../components/MissingBrex';
 import { may, type Can } from '../lib/roles';
+import { MAIN_ID, SkipLink, useDocumentTitle } from '../components/a11y';
+import { useApp } from '../store/appSettings';
 
 export interface ProjectCtx {
   id: string;
@@ -48,8 +50,14 @@ function ProjectShellFor({ id }: { id: string }) {
   }, [id]);
   useEffect(() => load(), [load]);
 
+  // WP-23 (UX-005, WCAG 2.4.2): "Publication · Project name · Agastya Platform"
+  const loc = useLocation();
+  const appName = useApp((st) => st.settings.appName);
+  const section = summary ? projectRailItems(id, summary).find((i) => loc.pathname.startsWith(i.to))?.label : null;
+  useDocumentTitle(section, summary?.project.name, appName);
+
   if (error) {
-    return <div className="v2-page"><Alert tone="bad">{error === 'Not found.' ? 'This project does not exist, or you are not a member of it.' : error}</Alert><p><a href="/workspace" onClick={(e) => { e.preventDefault(); nav('/workspace'); }}>Back to the workspace</a></p></div>;
+    return <main className="v2-page"><Alert tone="bad">{error === 'Not found.' ? 'This project does not exist, or you are not a member of it.' : error}</Alert><p><a href="/workspace" onClick={(e) => { e.preventDefault(); nav('/workspace'); }}>Back to the workspace</a></p></main>;
   }
   if (!summary) return <Loading />;
 
@@ -60,6 +68,7 @@ function ProjectShellFor({ id }: { id: string }) {
   const ctx: ProjectCtx = { id, summary, role: summary.role, can: (summary.project.can ?? {}) as Can, reload: load };
   return (
     <div className="v2-pshell">
+      <SkipLink />
       <aside className="v2-rail" aria-label="Project navigation">
         <NavLink to={isCir ? '/cir' : '/workspace'} className="v2-rail-item v2-rail-back" data-tip={isCir ? 'Back to the repository' : 'Back to workspace'} aria-label={isCir ? 'Back to the repository' : 'Back to workspace'}><Icon name="back" size={18} /></NavLink>
         <div className="v2-rail-project" data-tip={`${summary.project.name} · ${summary.role}`} aria-label={`Project ${summary.project.name}`}>
@@ -74,10 +83,10 @@ function ProjectShellFor({ id }: { id: string }) {
           ))}
         </nav>
       </aside>
-      <div className="v2-main" style={{ minWidth: 0 }}>
+      <main id={MAIN_ID} className="v2-main" style={{ minWidth: 0 }} tabIndex={-1}>
         {s1000d ? <MissingBrex projectId={id} canCreate={canWrite(ctx.can)} /> : null}
         <Outlet context={ctx} />
-      </div>
+      </main>
     </div>
   );
 }
