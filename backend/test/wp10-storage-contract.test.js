@@ -250,6 +250,43 @@ function contract(engine, make) {
       }
     } finally { e.close(); }
   });
+
+  // WP-29 (ENT-003, ENT-017): the audit repository the chain verifier, the export and the waiver history use
+  withRepos('audit: chained rows in sequence, filters (action prefix, actor any case, project, time), paging, checkpoints, anchor, waiver events', (R, e) => {
+    const A = R.audit;
+    assert.equal(A.firstChained(), null); assert.equal(A.anchor(), null); assert.deepEqual(A.checkpoints(5), []);
+    e.audit({ actorUsername: 'Alice', action: 'release.approved', projectId: 'p1', at: '2026-11-01T00:00:00.000Z' });
+    e.audit({ actorUsername: 'bob', action: 'release.rejected', projectId: 'p2', at: '2026-11-10T00:00:00.000Z' });
+    e.audit({ actorUsername: 'alice', action: 'member.added', projectId: 'p1', at: '2026-11-20T00:00:00.000Z' });
+    e.audit({ actorUsername: 'carol', action: 'release_x', at: '2026-11-21T00:00:00.000Z' });
+    const rows = A.chainedAfter(0, 10);
+    assert.deepEqual(rows.map((r) => r.seq), [1, 2, 3, 4]);
+    assert.equal(rows[1].prev_hash, rows[0].row_hash);
+    assert.deepEqual(A.chainedAfter(2, 10).map((r) => r.seq), [3, 4]);
+    assert.equal(A.rowAtSeq(3).action, 'member.added'); assert.equal(A.rowAtSeq(99), null);
+    assert.equal(A.firstChained().seq, 1);
+    assert.deepEqual(A.unchained(A.firstChained().id, 10), { before: 0, after: 0, afterIds: [] });
+    assert.equal(A.count({}), 4);
+    assert.equal(A.count({ action: 'release.' }), 2, 'a prefix; "_" in the filter is literal, not a wildcard');
+    assert.equal(A.count({ action: 'release_' }), 1);
+    assert.equal(A.count({ actor: 'ALICE' }), 2, 'actor matches in any case');
+    assert.equal(A.count({ project: 'p1', from: '2026-11-05T00:00:00.000Z' }), 1);
+    assert.equal(A.count({ to: '2026-11-10T00:00:00.000Z' }), 2, '"to" includes its instant');
+    const p1 = A.page({}, 0, 3); assert.equal(p1.length, 3);
+    assert.deepEqual(A.page({}, p1[2].id, 3).map((r) => r.seq), [4], 'paging continues after the last id');
+    assert.ok(A.actionCounts().some((c) => c.action === 'release.approved' && c.n === 1));
+    const id = A.insertCheckpoint({ at: now, seq: 4, row_hash: rows[3].row_hash, chain_key: rows[3].chain_key, reason: 'test', signature: 'ab' });
+    assert.ok(id > 0); assert.equal(A.checkpoints(5)[0].seq, 4);
+    R.retention.setAuditAnchor({ seq: 2, row_hash: rows[1].row_hash, archived_at: now, archive: 'a.jsonl.gz' });
+    R.retention.setAuditAnchor({ seq: 3, row_hash: rows[2].row_hash, archived_at: later, archive: 'b.jsonl.gz' });
+    assert.deepEqual(A.anchor(), { seq: 3, row_hash: rows[2].row_hash, archived_at: later, archive: 'b.jsonl.gz' }, 'one anchor, replaced');
+    assert.equal(R.retention.firstAuditIdNotBefore('2026-11-15T00:00:00.000Z'), rows[2].id);
+    assert.equal(R.retention.firstAuditIdNotBefore('2030-01-01T00:00:00.000Z'), null);
+    A.insertWaiverEvent({ project_id: 'p1', waiver_id: 'w1', event: 'added', kind: 'brex-missing', subject: 'S', reason: 'why', expires_at: null, actor: 'alice', at: now });
+    A.insertWaiverEvent({ project_id: 'p1', waiver_id: 'w1', event: 'removed', kind: 'brex-missing', subject: 'S', reason: 'done', expires_at: null, actor: 'alice', at: later });
+    A.insertWaiverEvent({ project_id: 'p2', waiver_id: 'w2', event: 'added', kind: 'brex-missing', subject: 'T', reason: 'x', expires_at: later, actor: 'bob', at: now });
+    assert.deepEqual(A.waiverEvents('p1', 10).map((w) => [w.event, w.reason]), [['removed', 'done'], ['added', 'why']], 'newest first, one project');
+  });
 }
 
 contract('sqlite', makeSqlite);

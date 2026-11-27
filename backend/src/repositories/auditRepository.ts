@@ -7,6 +7,7 @@
 import { SqliteRepository } from './sqliteBase';
 
 export type AuditRow = Record<string, unknown> & { id: number };
+/** `from` and `to` are inclusive ISO instants (the viewer sends the end of the day for a date). */
 export interface AuditFilter { action?: string | null; actor?: string | null; project?: string | null; from?: string | null; to?: string | null }
 export interface AuditCheckpoint { id?: number; at: string; seq: number; row_hash: string; chain_key: string; reason: string; signature: string }
 export interface AuditAnchor { seq: number; row_hash: string; archived_at: string; archive: string | null }
@@ -42,7 +43,7 @@ function whereOf(f: AuditFilter): { sql: string; args: Array<string | number> } 
   if (f.actor) { where.push('actor_username = ? COLLATE NOCASE'); args.push(String(f.actor)); }
   if (f.project) { where.push('project_id = ?'); args.push(String(f.project)); }
   if (f.from) { where.push('at >= ?'); args.push(String(f.from)); }
-  if (f.to) { where.push('at < ?'); args.push(String(f.to)); }
+  if (f.to) { where.push('at <= ?'); args.push(String(f.to)); }
   return { sql: where.length ? ` AND ${where.join(' AND ')}` : '', args };
 }
 

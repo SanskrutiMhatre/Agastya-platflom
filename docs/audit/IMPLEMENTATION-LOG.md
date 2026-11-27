@@ -1390,3 +1390,71 @@ Behaviour-preserving unless stated; decisions taken from the audit's recommendat
     `zipio.ts`. PNG encoders: the vendor copy stays (ARC-007 says so).
   - `serial` (2 job chains) and `runTool` (process runner): WP-14's job service, as 03 section 3 recommends. `paths.ts` / `atomic.ts`: WP-11.
   - Frontend escapers (`studio/core/xml.ts` and the JSS/JSG editors' own) were not part of the PUB-028 count and were not touched.
+
+## Phase 7
+
+### WP-29 Audit trail, retention and operations (ENT-003, REL-008, ENT-017, ENT-020, RES-004; gates G-SEC-4, G-SEC-5, G-REL-8) - done, with the limits listed
+
+Decisions taken from the audit (no owner question): an HMAC-SHA-256 hash chain with the key in a file outside the database (not a
+signature per row, not an external timestamping service, which an air-gapped site cannot reach); signed checkpoints kept in three places
+(database, backup folder, Windows Application log) so a cut at the end is visible; critical actions fail closed, all others go ahead and
+are flagged (ENT-003); a reason is kept for every waiver change, and a waiver may expire, at most 3 years ahead (ENT-017); stable event
+ids 4100-4199 written by the existing host program, no new agent (RES-004); the event source is registered at install time only.
+
+* **Migration 023-audit-chain** (additive; numbered 023 because `checkOrder` refuses gaps and 022 was the last on this branch - the lead
+  asked for 025+, see the hand-back: renumber at merge if WP-11/WP-27 take 023/024 - file name and `name`, `migrations/index.js` ORDER,
+  `wp10-seams` list, `wp12-migrations` `LAST_INDEX` key). `audit_log` gains `seq, prev_hash, row_hash, chain_key` (via the idempotent
+  `columns` mechanism); new `postSql` step (runs after columns; in the checksum only when present) adds the unique `ix_audit_seq` and
+  `ix_audit_actor`; tables `audit_checkpoints`, `audit_chain_anchor` (one row), `publish_waiver_events`. Rows from before keep `seq` NULL
+  and are counted "before the chain", never rewritten.
+* **Chain** (`core/auth/auditChain.js`, `store.appendAudit`): each row's HMAC covers its canonical content and the previous hash; the
+  append reads the head and inserts in one IMMEDIATE transaction (or a SAVEPOINT inside a caller's); `store.tx` is now re-entrant through
+  savepoints. Key: `AGASTYA_AUDIT_KEY_FILE`, default `<data>\audit-key\audit-hmac.key`; the packaged host points it at
+  `<state>\keys\audit-hmac.key`. Made on first start; a damaged key file stops the start; the offline tools never make one.
+* **Verification** (`services/auditTrail.ts`, `storage/auditOffline.ts`, `scripts/agastya-audit.js verify`, `AgastyaCtl --verify-audit`,
+  `POST /api/admin/audit/verify`, the daily housekeeping job, `npm run doctor` and `--doctor` rows): names edited, deleted, forged and
+  outside-the-chain rows, rows under another key, invalid checkpoint signatures, a tail cut and a rebuilt chain against a checkpoint.
+  Exit 0/1/2. A failure raises event 4101 and notifies administrators. Retention archives only a prefix of the chain and records the anchor
+  in the same transaction. Checkpoints: with every backup, every `AGASTYA_AUDIT_CHECKPOINT_HOURS` (24), and on demand.
+* **Fail closed** (`appContext.auditStrict/auditedTx`, `AuditUnavailableError` 503 `AUDIT_UNAVAILABLE`): sign-in, platform role and account
+  enable/disable/update, project membership (add, assign, role change, remove), release approve/reject (both routes), backup restore. Any
+  other failed audit write: counted on the Security page, `<data>\logs\audit-failures.log` (with `critical`), event 4100.
+* **Coverage** (G-SEC-5, `test/wp29-audit-coverage.test.js`, readiness G-SEC-5b): every POST/PUT/PATCH/DELETE in `src/routes` and
+  `core/auth/routes.js` audits or is on a reasoned allow-list (27 entries; stale entries fail too). It found two gaps, now audited:
+  identity visibility (`identity.visibility`) and review comment resolve/reopen.
+* **Fingerprint** (ENT-020): `release.requested`, `release.approved`, `release.rejected` carry the content hash.
+* **Export and viewer**: `GET /api/admin/audit/export?format=csv|jsonl&action&actor&project&from&to` streams every row (2 000 a page,
+  back-pressure), itself audited; the maintenance `audit.csv` lost its 5 000-row cap; the viewer filters by person, project and inclusive
+  time. Admin UI: filters, filtered CSV/JSON Lines export, "Verify chain" with the problems; Security page shows the last verification.
+* **Waivers** (ENT-017): history (added/replaced/removed with reasons) returned with the list and shown on the Publication page; removal
+  asks for a reason; optional expiry (30/90/180 days) in the record dialog; an expired waiver no longer applies and is marked.
+* **Security events** (`services/securityEvents.ts`): 19 ids (table in `docs/OPERATIONS.md` section 13, kept equal by a test), raised from
+  the audit writer by action, plus a failed-sign-in burst (5 in 15 min, once per window) and the throttle. Sinks: the JSON log, stdout
+  `##agastya-event|id|level|text` when `AGASTYA_EVENT_SINK=host`, and a test sink. Host (`packaging/host/AuditTools.cs`): parses those
+  lines (ids 4100-4199 only) and writes `EventLog.WriteEntry(source, text, type, id)` when the source exists; `AGASTYA_HOST_EVENTLOG=off`
+  keeps tests out of the real log; `--verify-audit`; doctor row; support bundle includes `agastya-server.jsonl`; the packager ships
+  `agastya-audit.js`.
+* **Structured logs** (`services/log.ts`): JSON lines on stdout in production (`AGASTYA_LOG_FORMAT`), always a rotated
+  `agastya-server.jsonl` (`AGASTYA_LOG_DIR`, `_MAX_MB` 10, `_KEEP` 5), redaction of passwords, argon2/scrypt/bcrypt hashes, session
+  cookies and Bearer/Basic values; an access line per request with the route template (`AGASTYA_ACCESS_LOG`).
+* Verified (backend `tsc` 0 errors; each file alone, `--test-concurrency=1`, `AGASTYA_CLIENT_DIST` = the main checkout's `frontend/dist`):
+  new `wp29-audit-trail` 11/11 (G-SEC-4: edited, deleted-middle, forged, unchained-insert rows each detected, CLI exit 1; newest 10 rows
+  cut detected against the backup-folder checkpoint with the database checkpoints deleted, and against an auditor's `--checkpoints` file;
+  forged checkpoint reported; wrong key, missing key (exit 2, no new key), damaged key stops the start; chain survives backup + restore into
+  a new folder and continues; retention anchor; G-REL-8: role change, sign-in, release approval and membership refused with 503 and rolled
+  back, ordinary sign-out goes ahead with counter, `audit-failures.log` and event 4100, chain still intact; 20 000-row JSONL and CSV export
+  with filters; events 4120/4110/4111, host line format, every id in OPERATIONS.md; waiver history, expiry, reasons; JSON log lines parse,
+  seeded secrets absent, rotation keeps 2), new `wp29-audit-coverage` 2/2, `wp10-storage-contract` 12/12 (new audit/anchor/waiver-event
+  case), `notifications` 6/6, `admin-ops` 8/8, `wp12-backup-restore` 7/7, `wp12-migrations` 10/10, `wp10-seams` 11/11, `authz-matrix` 6/6
+  (snapshot regenerated: exactly the 5 new requireAdmin audit routes added), `routes-guarded` 1/1, `auth-http` 10/10, `api` 17/17,
+  `publish-waivers` 2/2, `phase13` 12/12, `wp07-small-fixes` 4/4, `wp04-reset-admin` 1/1, `wp03-auth` 11/11, `auth-core` 11/11, `rbac` 7/7.
+  Host: both executables compile with the packager's `csc` flags without warnings; new `scripts/release/host-audit.test.mjs` 2/2 (event-line
+  parsing incl. refusals; `--verify-audit` 0/1/2 and the doctor OK/FAIL/WARN rows on a real data folder), `host.test.mjs` 6/6. Frontend:
+  `tsc --noEmit` clean; vitest `audit-viewer` 3/3, `publish-waivers-history` 3/3, `importRefusal` + `PlatformBackups` + `a11y` 15/15.
+  `scripts/ci/lint.mjs` green. Tests registered in `scripts/ci/test-plan.json` (security stage; host-audit in release-tools); readiness
+  G-SEC-5b now runs the coverage test and a G-SEC-4 row runs the trail test.
+* Not done / limits: someone holding both the database and the key can rebuild the chain, and a tail cut is only visible against a
+  checkpoint taken after the cut rows (documented, OPERATIONS.md section 13). Playwright, the full backend suite, the gate and full vitest
+  were not run (by instruction); `e2e/publish-waivers.spec.ts` was adapted to the new removal dialog but not executed. The host's event
+  writing to a real Application log was not exercised (tests use `AGASTYA_HOST_EVENTLOG=off`); registering the source stays an install-time
+  step. The frontend was not rebuilt. Migration number 023 must be checked at merge.

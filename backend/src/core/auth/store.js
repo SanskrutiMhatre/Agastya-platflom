@@ -368,7 +368,7 @@ class AuthStore {
     if (actor) { where.push('actor_username = ? COLLATE NOCASE'); args.push(String(actor)); }
     if (project) { where.push('project_id = ?'); args.push(String(project)); }
     if (from) { where.push('at >= ?'); args.push(String(from)); }
-    if (to) { where.push('at < ?'); args.push(String(to)); }
+    if (to) { where.push('at <= ?'); args.push(String(to)); }
     const sql = `SELECT * FROM audit_log${where.length ? ` WHERE ${where.join(' AND ')}` : ''} ORDER BY id DESC LIMIT ?`;
     return this.stmt(sql).all(...args, Number(limit));
   }
