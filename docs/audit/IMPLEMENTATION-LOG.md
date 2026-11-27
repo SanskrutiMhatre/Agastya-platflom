@@ -1959,3 +1959,122 @@ Scale assumption (addendum 17, Q1): 25 concurrent authors (100 named users), 100
   - No two-browser Playwright spec (presence is covered by the backend test over real sockets and the TeamChip component test).
   - DPAPI protection of the PFX passphrase file (ACL-protected file only).
   - Statement caching in the storage layer (found by the profile; not a WP-28 change).
+
+## Phase 3 (WP-14)
+
+### WP-14 Job service: validation, gate and publication in worker processes (PERF-001, PUB-027, PUB-003, PUB-004, PUB-005, PUB-006, DEP-028, PERF-008, PERF-012, PERF-015, PUB-031, PUB-019, FE-010, FE-028, PRD-001) - done in part (backend; see limits)
+
+Branch `wp-14-job-service`, merged with main b173829. Migration **026-jobs**, after WP-27's `024-directory-groups-permissions`
+and WP-29's `025-audit-chain`. While 024/025 were not yet on main, the branch carried two no-op placeholders so its gap check passed.
+They were deleted in the merge and appear in no shipped list. The G-REL-3 matrix harness (`wp12-migrations`) now runs a step's
+`postSql` after its columns, as `AuthStore.migrate` does. With 026 appended, its "stopped after the last but one step" case lands
+right after 025, whose indexes are in `postSql`.
+
+* Design (`backend/src/services/jobs/`):
+  - `index.ts`, the service, holds the queue and the job records:
+    - Two admission lanes. Validation (`validate`, `gate`) has 2 slots and builds (`publish`, `preview`, `configured`, `html`,
+      `jsg`) have 2. Each lane is capped by the pool size, `max(1, min(cores-1, slots))`.
+    - One job per project at a time, of any kind (PUB-021a: one build lock per project). Projects run in parallel.
+    - A job identical to one already queued joins it instead of queueing twice.
+    - Timeout: `AGASTYA_JOB_TIMEOUT_MINUTES`, default 30, answers 504 `JOB_TIMEOUT`.
+    - Cancel answers 409 `JOB_CANCELLED`. A worker that dies answers 500 `JOB_WORKER_CRASHED`, with a memory hint when its peak was
+      at least 80 % of the limit. An allocation the job object refuses answers 507 `JOB_MEMORY_LIMIT`.
+    - Shutdown or restart marks running jobs `interrupted` with 503 `JOB_INTERRUPTED`.
+    - Errors cross the process boundary serialised and are rebuilt as the same `HttpError` (status, code, message, extra), so every
+      route answers exactly as before.
+  - `pool.ts`, the supervisor:
+    - Workers are `fork`s of `dist/services/jobs/worker.js` with `--max-old-space-size` (`AGASTYA_WORKER_HEAP_MB`, default 4096)
+      and below-normal priority.
+    - A worker is recycled after `AGASTYA_JOBS_PER_WORKER` jobs (50; PERF-008, so the warm JVM cannot grow without end) and ended
+      after 10 idle minutes.
+    - A job that must stop is ended with its whole process tree (`taskkill /T /F`). A worker crash fails its job only.
+    - Under ts-node, with no compiled worker, jobs run inline; `AGASTYA_JOBS=inline` forces this.
+  - `jobObject.ts`, the Windows job object (PRD-001, addendum 17), with no native dependency:
+    - A PowerShell 5.1 helper compiles a small C# class (CreateJobObject, SetInformationJobObject extended and CPU-rate limits,
+      AssignProcessToJobObject, QueryInformationJobObject). It holds the job open, and every worker is assigned to it.
+    - Limits: per-process memory (`AGASTYA_JOB_PROCESS_MB`, half of RAM clamped to 1-8 GB), all-jobs memory (`AGASTYA_JOB_MEMORY_MB`,
+      75 % of RAM), active processes (workers x 8), and a CPU rate of (cores-1)/cores.
+    - `KILL_ON_JOB_CLOSE`: when the server dies by any means, the helper's stdin closes, the job closes, and the workers, their JVMs
+      and any xsltproc go with it.
+  - `worker.ts` runs one job at a time. It gives the warm FOP JVM `-Xmx` (`AGASTYA_FOP_HEAP_MB`, default 1536) through the vendored
+    `fopd.configure` and `FOP_ARGS`, and relays progress broadcasts to the server over IPC. Workers skip migrations and the
+    snapshot (`AGASTYA_JOB_WORKER=1`) and get a reduced environment: secrets and `NODE_OPTIONS`/`JAVA_*_OPTIONS` are dropped.
+  - Progress (PUB-019/FE-010):
+    - Worker broadcasts reach the existing WebSocket channel tagged with `jobId` and are kept in `job_log`.
+    - A new `{type:'job'}` message carries state changes.
+    - `GET /api/projects/:id/jobs/:jobId?after=n` replays the log, so a client that reconnects misses nothing.
+  - Restart-safe records (repository `jobRepository.ts`, tables `jobs` and `job_log`, migration 026):
+    - At start, unfinished records become `interrupted`.
+    - Finished records older than `AGASTYA_JOB_KEEP_DAYS` (30) are purged.
+    - Contract-test case added to `wp10-storage-contract`.
+* Moved into workers:
+  - validation (`POST /validation`, and `/findings` when it must run one);
+  - the publish gate (`assertPublishable`, at release submit and approve and before every build);
+  - PDF publication (`POST /publish`, `GET /publish/download` when stale, admin rebuild-pdfs);
+  - server preview, configuration PDFs, the HTML package, and JSG builds.
+* HTTP compatibility:
+  - Every route answers as before (same bodies, same errors).
+  - New: an `X-Job-Id` header; `?async=1` (or `async: true` in the body) on validation and publish answers 202 with the job.
+  - `POST /publish` adds `jobId` and `report`. The report holds the build's notes (image references, security, warm FOP
+    unavailable, building anyway) (PUB-031).
+  - New routes:
+    - `GET /api/projects/:id/jobs` (viewer)
+    - `GET /api/projects/:id/jobs/:jobId` (viewer)
+    - `POST .../jobs/:jobId/cancel` (reviewer with publish.build; audited as `job.cancelled`)
+    - `GET /api/admin/jobs` (admin)
+  - The authz snapshot was regenerated for these four routes, after review.
+* Validation cache (PERF-012):
+  - Validation records a fingerprint of its inputs in `.validation.json`:
+    - project files by path, size and mtime;
+    - the project configuration row, extensions, lifecycle, CIR links and the DM-type list;
+    - the options and the build version.
+  - An unchanged project answers the stored run with `cached: true`. `fresh: true` forces a run.
+  - The publish gate never uses the cache.
+* Vendored engine change: `vendor/engine/fopd.js` (exception "fopd bounds", recorded in S1000D_COMPLETE_IMPLEMENTATION.md
+  section 10, item 9):
+  - JVM arguments can be configured.
+  - The exit listener of each render is removed when its reply arrives (it leaked one listener per render).
+  - `pid()` was added.
+* Deleting a built project: each worker's warm JVM holds the pictures it embedded (as the in-process renderer did), so
+  `releaseRenderer()` now also ends the idle workers synchronously through a hook (`renderer.onReleaseRenderer`). A worker that
+  is running a job is left alone. Checked by `project-delete-after-build` and by `wp14-jobs`.
+* Measured:
+  - Event loop during a 210-module validation with BREX (`wp32-event-loop`, limit 100 ms, not loosened):
+    - Before (in-process, WP-16 log): 69-75 ms on a quiet machine; 82-148 ms under the parallel agents' load (failing).
+    - After, earlier today: 30.1 / 41.9 / 43.9 ms in three runs (validation 18-22 s, 435-532 health answers).
+    - After, with the machine at 100 % CPU (validation 62-79 s instead of 18-22 s): 210.8 ms and 146.1 ms, both failing.
+    - An idle Node process with no work at all, measured at the same time (scratch probe: an HTTP server answering every 40 ms):
+      176.4 ms and 76.8 ms. So the operating system alone causes stalls of this size under that load, and the in-process
+      validation that WP-32 measured is no longer on the server's thread.
+    - After the merge with main, machine at about 40 % CPU: **20.9 / 63.1 / 54.3 / 23.6 / 48.5 ms** in five runs, all passing (validation
+      16.3-17.9 s, 450-516 health answers, slowest answer 20.6-64.8 ms). The fifth ran right after publish-gate.
+    - The measured request now sends `fresh: true` and asserts it was not served from the cache. Otherwise the second run would
+      measure a cache hit.
+  - Cache: validation 8597 ms (21667 ms under load), then the unchanged project in 29 ms (28 ms under load).
+  - Job object: a 4 GB allocation under a 400 MB per-process limit is refused (`JOB_MEMORY_LIMIT`), and the next job on the same
+    service runs. After `taskkill /F` of the server process alone (not its tree), its workers and a child they spawned end within
+    the wait, and a restarted service shows the running job as `interrupted` (`wp14-job-limits`).
+* Tests:
+  - New: `wp14-jobs` (9) and `wp14-job-limits` (1), registered in `scripts/ci/test-plan.json`.
+  - Run on the merged build (2bfc37a), one file at a time:
+    - all passing: `wp14-jobs` 9/9, `wp14-job-limits` 1/1, `wp32-event-loop` 5/5 runs, `wp32-validation-scale` 8/8,
+      `wp32-validator-crash` 1/1, `wp16-validation-framework` 6/6, `wp22-problems` 4/4, `wp11-integrity` 16/16, `wp10-seams` 11/11,
+      `wp10-storage-contract` 15/15, `wp12-migrations` 10/10, `wp29-audit-coverage` 2/2, `wp29-audit-trail` 11/11,
+      `wp28-team-server` 6/6, `authz-matrix` 6/6, `routes-guarded` 1/1, `ws-broadcast` 5/5, `api` 17/17, `publish-gate` 24/24
+      (741 s), `pdf21` 8/8 (620 s).
+    - Before the merge, on 15010fd, all passing: `html-publish` 6/6, `applic-publish` 12/12, `jsg-engine` 7/7, `jss-authoring` 13/13,
+      `golden-xignal` 4/4, `pdf-reference` 2/2, `brex-gate` 3/3 (826 s), `project-delete-after-build` 3/3.
+  - Lint green; `any.backend` went from 279 to 278 and the baseline was lowered.
+* Not done, and why:
+  - Release archive (PUB-006) and a build-output cache: not built. A reused PDF must be proven byte-identical first, and that is
+    its own change.
+  - Frontend job flow (progress panel, cancel button, FE-028): the backend contract is ready (the `job` WebSocket message, the
+    log replay, cancel, `?async=1`). The screens belong to the frontend packages running in parallel, and the existing screens keep
+    working unchanged.
+  - `GET /publish/download` still builds when the PDF is stale (through a job), because the frontend relies on it.
+  - When PowerShell is unavailable or blocked, there is no job object. Status `unavailable` is shown in `/api/admin/jobs`, and the
+    workers still run with heap limits and tree-kill on cancel, timeout and shutdown. A hard kill of the server can then leave
+    orphaned workers.
+  - Not run: the T15 test (100 builds, JVM growth). Instead, recycling after 50 jobs and `-Xmx` bound the JVM. The `-Xmx` default
+    of 1536 MB is a judgement: the largest sample books built under it in `golden-xignal` and `pdf21`.
+  - Non-Windows: no job object. Kill uses SIGKILL of the worker only.
