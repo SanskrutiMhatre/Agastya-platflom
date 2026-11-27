@@ -16,7 +16,6 @@
 // Scope: the data modules the publication contains (full build, release request, release approval) or the one module being previewed.
 // Drafts that are not in the publication do not block it.
 import fs from 'fs';
-import crypto from 'crypto';
 import path from 'path';
 import { projectDirFor } from '../context';
 import { HttpError, conflict } from './http';
@@ -27,6 +26,7 @@ import { checkModuleBrex } from './brex';
 import { isS1000dProject } from './projects';
 import { isJssAuthored, assertJssPublishable } from './jss/service';
 import { waiverFor } from './publishWaivers';
+import { sha256FileOr as sha } from '../lib/hash';
 
 export interface GateFinding { file: string; kind: 'malformed' | 'schema' | 'unchecked' | 'brex' | 'brex-source' | 'applic' | 'revision'; title: string; detail: string; line: number }
 export interface GatePass { validatedAt: string; files: string[]; warnings: string[]; /** Modules that break a business rule but were built anyway because the author asked for it. */ ruleBreaks: string[]; verifyUnchanged: () => void }
@@ -37,7 +37,6 @@ export interface GatePass { validatedAt: string; files: string[]; warnings: stri
  */
 export interface GateOptions { allowRuleBreaks?: boolean; waivable?: boolean }
 
-const sha = (abs: string): string => { try { return crypto.createHash('sha256').update(fs.readFileSync(abs)).digest('hex'); } catch { return 'MISSING'; } };
 
 /** The data modules (project-relative paths) a scope covers. */
 export function gateTargets(projectId: string, scope: 'publication' | { file: string }): string[] {

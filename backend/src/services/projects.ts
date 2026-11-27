@@ -46,6 +46,7 @@ export {
   csdbRel, isS1000dProject, mediaRel, pmRel,
 } from './projectRecord';
 import { readProjectJson, updateProjectJson, pmRel, csdbRel, unsafeInputFields } from './projectRecord';
+import { escText as esc } from '../lib/xml';
 
 // ── Project cards ─────────────────────────────────────────────────────────
 
@@ -116,7 +117,6 @@ export function listProjectsFor(user: User): ProjectCard[] {
 
 const EMPTY_PM = (title: string, entries = ''): string => {
   const d = new Date();
-  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   return `<?xml version="1.0" encoding="UTF-8"?>
 <pm xmlns:xi="http://www.w3.org/2001/XInclude" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xlink="http://www.w3.org/1999/xlink">
   <identAndStatusSection>

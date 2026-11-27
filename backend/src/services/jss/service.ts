@@ -9,7 +9,6 @@
 // stencil's rules is a draft and is saved. A PDF is only built from a document that has just been checked (assertJssPublishable).
 import { assertNativeJssXml, nativeProblemOf } from './native';
 import fs from 'fs';
-import crypto from 'crypto';
 import path from 'path';
 import { config, vendor } from '../../config';
 import { projectDirFor, content } from '../../context';
@@ -22,6 +21,8 @@ import { wellFormedError } from '../wellFormed';
 import { readProjectJson, updateProjectJson, pmRel } from '../projectRecord';
 import { registerDocumentCreator } from '../documentCreators';
 import { jssTypeById, type JssDocType, type OutlineNode, type StartBlock, type TableTemplate } from './registry';
+import { escText as esc } from '../../lib/xml';
+import { sha256 as sha } from '../../lib/hash';
 
 const { validateXML } = require('xmllint-wasm');
 const { bookmetaXml } = vendor('engine/frontmatterInject');
@@ -35,9 +36,9 @@ export const COMPOSED_NAME = '_jss-book.xml';
 export interface JssFinding { severity: 'error' | 'warning'; rule: string; message: string; line: number; location: string }
 export interface JssReport { docType: string | null; valid: boolean; errors: number; warnings: number; findings: JssFinding[]; validatedAt: string }
 
-export const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+export { esc };
 const escAttr = (s: string): string => esc(s).replace(/"/g, '&quot;');
-export const sha = (text: string): string => crypto.createHash('sha256').update(text).digest('hex');
+export { sha };
 
 // ── Which projects are JSS-authored ─────────────────────────────────────────────────────────────────────────────────────────────
 

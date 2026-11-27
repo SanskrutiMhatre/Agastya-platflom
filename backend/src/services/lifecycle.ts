@@ -23,6 +23,7 @@ import { repos } from '../context';
 import { bad, conflict, notFound } from './http';
 import * as csdb from './csdb';
 import { findAll, norm, parseTree, setAttrs, walk, type MNode } from './miniXml';
+import { readAttrs as attrsOf } from './xmlHead';
 
 export const REV_RE = /_(\d{3,5})-(\d{2})(?=_|\.)/;
 const pad = (n: number, w: number) => String(n).padStart(w, '0');
@@ -215,7 +216,6 @@ export const supersede = (p: string, f: string, a: Actor, reason: string, by: st
 
 // ── publication references and revisions ─────────────────────────────────────
 
-const attrsOf = (src: string): Record<string, string> => { const o: Record<string, string> = {}; for (const m of src.matchAll(/([\w:.-]+)\s*=\s*"([^"]*)"/g)) o[m[1]] = m[2]; return o; };
 interface PmDmRef { raw: string; at: number; ref: RevisionRef & { pinned: boolean } }
 export function dmRefsOf(pmText: string): PmDmRef[] {
   const out: PmDmRef[] = [];

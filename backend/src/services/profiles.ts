@@ -3,6 +3,7 @@
 // Projects created without one are untouched, and every S1000D rule still applies to the
 // data modules, whichever profile the project began with.
 
+import { escText as esc } from '../lib/xml';
 export interface Profile {
   id: string;
   label: string;
@@ -52,7 +53,6 @@ export const PROFILES: Profile[] = [
 
 export const profileById = (id: unknown): Profile | undefined => PROFILES.find((p) => p.id === id);
 
-const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
 /** The `<pmEntry>` blocks for a profile's chapters, ready to sit inside `<content>`. */
 export function chapterEntries(profile: Profile): string {

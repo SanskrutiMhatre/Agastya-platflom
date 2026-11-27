@@ -11,6 +11,7 @@
 // validate; malformed input yields whatever tags can be recognised.
 // =============================================================================
 
+import { escText, escAttr } from '../../lib/xml';
 export interface Tag {
   kind: 'open' | 'close' | 'self';
   name: string;
@@ -120,12 +121,7 @@ export function decodeText(s: string): string {
     .replace(/&amp;/g, '&');
 }
 
-export function escapeText(s: string): string {
-  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-export function escapeAttr(s: string): string {
-  return escapeText(s).replace(/"/g, '&quot;');
-}
+export { escText as escapeText, escAttr as escapeAttr };
 
 /** The end-of-line sequence a file uses (a repair must not turn CRLF files into mixed-EOL files). */
 export const eolOf = (text: string): string => (text.includes('\r\n') ? '\r\n' : '\n');
