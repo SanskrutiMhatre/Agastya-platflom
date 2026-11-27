@@ -8,6 +8,7 @@
 //   build            backend tsc (dist/ is what the tests run)          frontend-build  tsc --noEmit + vite build (the e2e server serves it)
 //   typecheck        frontend tsc --noEmit (the backend build is its type check)
 //   lint             scripts/ci/lint.mjs: ratchets (`any`, lazy require, .only) against scripts/ci/lint-baseline.json
+//   theme            frontend token checks (WP-19/WP-20): tokens.css current, contrast pairs, token coverage, colour-literal lint
 //   tools            backend/test/tools-canary.test.js: every tool the tests need, by name; the gate stops here when one is missing
 //   security         the security matrix files (authorisation, routes, hostile input)
 //   backend          every other backend file except the heavy and PDF-smoke ones, N files at a time, each in its own process
@@ -16,11 +17,14 @@
 //   frontend         vitest, the everyday suite (vite.config.ts leaves the heavy verification out of it)
 //   frontend-verify  the heavy verification suites, one file at a time (frontend/scripts/run-verify.mjs)
 //   e2e              Playwright on the reference browser (Edge, D18), on E2E_PORT (default 4050), with a runner lock
+//   visual           the theme and accessibility suite (WP-20): per-theme screenshots, G-UX-1 checks on the ten named routes; its own port
+//                    (E2E_VISUAL_PORT, default 4060) and config (frontend/playwright.visual.config.ts)
+//   perf             performance probes (WP-20, QA-013): scripts/ci/perf.mjs against the runner's history; the release fails on +40 %
 //   package          npm run package:win, then verify:package
 //   readiness        scripts/ci/readiness.mjs (RES-011): the static release gates
 //
-// Profiles: pr = build, frontend-build, lint, tools, security, backend, pdf-smoke, frontend (about the PR budget of QA-001); nightly = everything up to e2e;
-// release = nightly + frontend-verify + package + readiness.
+// Profiles: pr = build, frontend-build, lint, theme, tools, security, backend, pdf-smoke, frontend (about the PR budget of QA-001); nightly = everything
+// up to e2e, then visual and perf; release = nightly + frontend-verify + package + readiness.
 //
 // Evidence (QA-017): DIR (default verification-results/ci/<UTC time>-<commit>) gets meta.json (commit, dirty tree, Node, OS, tool versions),
 // one TAP or log file per test file / stage, junit for vitest, skips.json, summary.json and summary.md. Test result files are written there too
@@ -47,9 +51,9 @@ const BUDGET_FILE = path.resolve(opt('skip-budget', path.join(ROOT, 'scripts', '
 const BUDGET = JSON.parse(fs.readFileSync(BUDGET_FILE, 'utf8'));
 const flag = (name) => argv.includes(`--${name}`);
 const PROFILES = {
-  pr: ['build', 'frontend-build', 'lint', 'tools', 'security', 'backend', 'pdf-smoke', 'frontend'],      // frontend-build: the security headers test reads the served client
-  nightly: ['build', 'frontend-build', 'typecheck', 'lint', 'tools', 'security', 'backend', 'pdf-smoke', 'backend-heavy', 'frontend', 'e2e'],
-  release: ['build', 'frontend-build', 'typecheck', 'lint', 'tools', 'security', 'backend', 'pdf-smoke', 'backend-heavy', 'frontend', 'frontend-verify', 'e2e', 'package', 'readiness'],
+  pr: ['build', 'frontend-build', 'lint', 'theme', 'tools', 'security', 'backend', 'pdf-smoke', 'frontend'],      // frontend-build: the security headers test reads the served client
+  nightly: ['build', 'frontend-build', 'typecheck', 'lint', 'theme', 'tools', 'security', 'backend', 'pdf-smoke', 'backend-heavy', 'frontend', 'e2e', 'visual', 'perf'],
+  release: ['build', 'frontend-build', 'typecheck', 'lint', 'theme', 'tools', 'security', 'backend', 'pdf-smoke', 'backend-heavy', 'frontend', 'frontend-verify', 'e2e', 'visual', 'perf', 'package', 'readiness'],
 };
 const profile = opt('profile', 'pr');
 if (!PROFILES[profile]) { console.error(`unknown profile ${profile} (pr, nightly, release)`); process.exit(2); }
@@ -179,6 +183,14 @@ const STAGES = {
   },
   typecheck: () => { const [n, a] = npmCli(FRONTEND, 'typescript', 'bin', 'tsc'); return simpleStage('typecheck', n, [...a, '--noEmit', '-p', '.'], { cwd: FRONTEND, limitMs: 10 * 60_000 }); },
   lint: () => simpleStage('lint', nodeBin, [path.join(ROOT, 'scripts', 'ci', 'lint.mjs')], { limitMs: 5 * 60_000 }),
+  // WP-20: the four token checks one after the other (seconds each); all of them run, so the evidence shows every failure at once
+  theme: async () => {
+    let ok = true;
+    for (const [name, script, ...args] of [['theme-build', 'build-tokens.mjs', '--check'], ['theme-contrast', 'check-contrast.mjs'], ['theme-coverage', 'check-coverage.mjs'], ['theme-literals', 'lint-colors.mjs']]) {
+      ok = (await simpleStage(name, nodeBin, [path.join(FRONTEND, 'scripts', 'tokens', script), ...args], { cwd: FRONTEND, limitMs: 5 * 60_000 })) && ok;
+    }
+    return ok;
+  },
   tools: async () => {
     const ok = await backendStage('tools', backendFiles.tools, 1);
     const tap = fs.readFileSync(path.join(EVIDENCE, 'tools', `${PLAN.tools}${RUNS > 1 ? '.run1' : ''}.tap`), 'utf8');
@@ -199,6 +211,13 @@ const STAGES = {
     const [n, a] = npmCli(FRONTEND, '@playwright', 'test', 'cli.js');
     return simpleStage('e2e', n, [...a, 'test'], { cwd: FRONTEND, limitMs: 90 * 60_000, env: { E2E_JUNIT: path.join(EVIDENCE, 'e2e-junit.xml'), E2E_CHANNEL: process.env.E2E_CHANNEL || 'msedge' } });
   },
+  // WP-20: needs frontend-build (the server serves dist) and the built backend; its own port, so it never meets the e2e run
+  visual: () => {
+    const [n, a] = npmCli(FRONTEND, '@playwright', 'test', 'cli.js');
+    return simpleStage('visual', n, [...a, 'test', '-c', 'playwright.visual.config.ts'], { cwd: FRONTEND, limitMs: 45 * 60_000, env: { E2E_PORT: process.env.E2E_VISUAL_PORT || '4060', E2E_JUNIT: path.join(EVIDENCE, 'visual-junit.xml'), E2E_CHANNEL: process.env.E2E_CHANNEL || 'msedge' } });
+  },
+  perf: async () => (await simpleStage('perf-rule', nodeBin, ['--test', path.join(ROOT, 'scripts', 'ci', 'perf-compare.test.mjs')], { limitMs: 2 * 60_000 }))
+    && simpleStage('perf', nodeBin, [path.join(ROOT, 'scripts', 'ci', 'perf.mjs'), '--profile', profile === 'release' ? 'release' : 'nightly', '--evidence', EVIDENCE], { limitMs: 120 * 60_000 }),
   package: async () => (await simpleStage('package', nodeBin, [path.join(ROOT, 'scripts', 'package-windows.mjs')], { limitMs: 60 * 60_000 }))
     && simpleStage('verify-package', nodeBin, [path.join(ROOT, 'scripts', 'verify-package-offline.mjs')], { limitMs: 30 * 60_000 }),
   readiness: () => simpleStage('readiness', nodeBin, [path.join(ROOT, 'scripts', 'ci', 'readiness.mjs'), '--evidence', EVIDENCE], { limitMs: 30 * 60_000 }),
