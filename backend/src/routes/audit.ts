@@ -4,7 +4,7 @@
 //   GET  /api/admin/audit/checkpoints   the newest signed checkpoints (database), and the backup folder's file name
 //   POST /api/admin/audit/checkpoint    take a checkpoint now (also raised as Application-log event 4102)
 //   GET  /api/admin/audit/export        every row matching the filters, streamed: ?format=csv|jsonl&action=&actor=&project=&from=&to=
-//   GET  /api/admin/audit/events        the security events with their stable Windows event ids (docs/OPERATIONS.md section 9)
+//   GET  /api/admin/audit/events        the security events with their stable Windows event ids (docs/OPERATIONS.md section 13)
 //
 // The viewer itself is GET /api/admin/audit (core/auth/routes.js), which now filters by action, actor, project and time as well.
 
@@ -56,8 +56,8 @@ export function registerAuditRoutes(app: Express): void {
     if (format !== 'csv' && format !== 'jsonl') throw bad('format must be csv or jsonl.', 'BAD_FORMAT');
     const filter = auditFilterOf(req.query as Record<string, unknown>);
     const stamp = new Date().toISOString().slice(0, 10);
+    res.attachment(`agastya-audit-log-${stamp}.${format}`);     // (sets a type from the extension; ours follows)
     res.setHeader('Content-Type', format === 'csv' ? 'text/csv; charset=utf-8' : 'application/x-ndjson; charset=utf-8');
-    res.attachment(`agastya-audit-log-${stamp}.${format}`);
     // the export is itself recorded (before it runs: the row count is what the filter matched at that moment)
     ctx.audit({ ...actor(req), action: 'audit.exported', targetType: 'audit', meta: { format, filter, rows: ctx.repos.audit.count(filter) } });
     try { await exportAudit(ctx, filter, format, res); } catch (e) { if (!res.headersSent) throw e; res.destroy(); return; }

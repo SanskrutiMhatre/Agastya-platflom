@@ -67,7 +67,7 @@ if (fs.existsSync(dbFile)) {
     if (!fs.existsSync(off)) row('Audit chain intact', false, 'backend/dist is missing: build first');
     else {
       const rep = require(off).verifyWorkspaceAudit({ workspaceDir: workspace, env: process.env });
-      row('Audit chain intact', rep.ok, rep.ok ? rep.summary : `${rep.summary} - see docs/OPERATIONS.md section 9`);
+      row('Audit chain intact', rep.ok, rep.ok ? rep.summary : `${rep.summary} - see docs/OPERATIONS.md section 13`);
     }
   } catch (e) { row('Audit chain intact', /no audit chain yet/.test(e.message), e.message); }
 }

@@ -370,6 +370,7 @@ export function registerProjectContentRoutes(app: Express): void {
   }));
   app.post(`${base}/review/comments/:cid/resolve`, view('reviewer', 'review.comment'), wrap((req, res) => {
     review.setResolved(req.project.id, Number(param(req, 'cid')), req.auth.user.id, req.body?.resolved !== false);
+    log(req, req.body?.resolved !== false ? 'review.comment.resolved' : 'review.comment.reopened', { id: Number(param(req, 'cid')) });   // WP-29 (G-SEC-5)
     res.json({ ok: true });
   }));
 

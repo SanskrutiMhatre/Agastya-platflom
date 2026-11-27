@@ -4,7 +4,7 @@
 // A small, documented set of events that a Windows administrator collects with Windows Event Forwarding, without an agent: the server
 // raises them (mostly from the audit writer, so every audited security action is covered by one table), and the Windows host
 // (packaging/host/AgastyaHost.cs) writes each one to the Application log under the "Agastya Platform" source with the id below. The ids are
-// part of the product's interface: never renumber one; add new ids at the end of their block. The list is in docs/OPERATIONS.md section 9.
+// part of the product's interface: never renumber one; add new ids at the end of their block. The list is in docs/OPERATIONS.md section 13.
 //
 // Sinks: the structured log (always, kind "security"), standard output as `##agastya-event|<id>|<level>|<text>` when the host asked for
 // it (config.log.eventSink = "host"), and a test sink (setSecurityEventSink).

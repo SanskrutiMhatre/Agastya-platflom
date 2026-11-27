@@ -11,7 +11,7 @@
 //
 // So an edited row, a deleted middle row and an inserted (forged) row are each detected by `verifyRows`, and deleting the newest rows
 // is detected against a checkpoint (seq + row_hash, signed with the same key) kept outside the database: in the backup folder and
-// in the Windows Application log. Two limits are inherent and documented (docs/OPERATIONS.md, section 9): someone who holds the key
+// in the Windows Application log. Two limits are inherent and documented (docs/OPERATIONS.md, section 13): someone who holds the key
 // can rebuild the whole chain, and a cut at the tail is only visible against a checkpoint taken after it (Schneier-Kelsey).
 //
 // Rows written before the chain existed keep seq NULL; they are counted as "before the chain" and never rewritten (additive migration).

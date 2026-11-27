@@ -25,7 +25,7 @@ export type Level = 'debug' | 'info' | 'warn' | 'error';
 interface LogSettings { format: 'json' | 'text'; dir: string | null; maxBytes: number; keep: number }
 
 const SECRETS: Array<[RegExp, string]> = [
-  [/\$(argon2(id|i|d)?|scrypt|2[aby]?)\$[^\s"',;]+/gi, '[redacted-hash]'],
+  [/\$(argon2(id|i|d)?|scrypt|2[aby]?)\$[^\s"';]+/gi, '[redacted-hash]'],          // argon2 parameters contain commas
   [/(agastya_session=)[^\s;"',]+/gi, '$1[redacted]'],
   [/\b(Bearer|Basic)\s+[A-Za-z0-9._~+/=-]{8,}/g, '$1 [redacted]'],
   [/\b((?:new|current|old|temp|initial_admin_)?password|passphrase|secret|token)(["']?\s*[:=]\s*["']?)[^\s"',;&}]+/gi, '$1$2[redacted]'],

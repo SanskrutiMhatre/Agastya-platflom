@@ -102,7 +102,7 @@ export interface Config {
    * (AGASTYA_LOG_MAX_MB, default 10) keeping `keep` old files (AGASTYA_LOG_KEEP, default 5). `access` (AGASTYA_ACCESS_LOG, default on with
    * JSON) adds one line per request: method, route, status, milliseconds, user id - never a body, a query string or a cookie.
    * `eventSink` (AGASTYA_EVENT_SINK) `host` = security events are also written to standard output as `##agastya-event|id|level|text` lines,
-   * which the Windows host turns into Application-log entries with stable ids (docs/OPERATIONS.md section 9).
+   * which the Windows host turns into Application-log entries with stable ids (docs/OPERATIONS.md section 13).
    */
   log: { format: 'json' | 'text'; dir: string | null; maxBytes: number; keep: number; access: boolean; eventSink: 'host' | 'none' };
 }
