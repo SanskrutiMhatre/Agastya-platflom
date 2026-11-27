@@ -115,6 +115,11 @@ test('Publication: a section is dragged into another chapter and dropped, saved,
   await page.reload(); await expect(page.getByTestId('pub-tree')).toBeVisible();
   const back = page.locator('[data-testid="pub-module"]', { hasText: moved.title }).first();
   const firstOfChapter = page.getByTestId('chapter').nth(chapters[0] - 1).locator('[data-testid="pub-module"]').first();
+  // Both rows in view before the drag: dragTo presses on the row, then scrolls the target into view before the first move, and Chromium / Edge
+  // start no drag when the page scrolls between the press and the move. The WP-22 project bar made the page taller, so the moved row (last in
+  // its chapter) is below the fold of the 950 px window; bring it to the bottom edge, which keeps the first chapter on screen.
+  await back.evaluate((el) => el.scrollIntoView({ block: 'end' }));
+  await expect(back).toBeInViewport({ ratio: 1 }); await expect(firstOfChapter).toBeInViewport({ ratio: 1 });
   await back.dragTo(firstOfChapter, { targetPosition: { x: 60, y: 3 } });
   await page.getByTestId('save-publication').click(); await expect(unsaved()).toHaveCount(0);
   const id2 = await identity(jssUhb); expect(id2.modules.find((m) => m.title === moved.title)?.chapter).toBe(chapters[0]);
