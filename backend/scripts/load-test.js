@@ -13,7 +13,7 @@
 // the server (two accepted saves made from the same version would be a lost update).
 //
 //   node scripts/load-test.js [--authors 50] [--projects 10] [--duration 120] [--warmup 15] [--think 1000-3000]
-//                             [--no-validate] [--drill] [--keep] [--out result.json]
+//                             [--no-validate] [--drill] [--keep] [--out result.json] [--profile <dir>]
 //        Starts its own server (dist/index.js) on a free loopback port with a NEW temporary data folder, seeds it, runs, stops it and
 //        removes the folder (unless --keep). --drill then times a restore drill on that data: platform backup, restore into a new folder,
 //        a server started on it, an author signed in and her module read (the RTO components of PRD-007 for this data size).
@@ -126,7 +126,9 @@ function startServer(workspace, port, logFile) {
   const env = { ...process.env, NODE_ENV: 'production', PORT: String(port), AGASTYA_HOST: '127.0.0.1', AGASTYA_WORKSPACE_DIR: workspace, AGASTYA_SHUTDOWN_ON_STDIN_CLOSE: '1' };
   for (const k of Object.keys(env)) if (/^AGASTYA_(TLS|DIRECTORY|MODE|BACKUP_COPY)/.test(k)) delete env[k];
   const out = fs.openSync(logFile, 'a');
-  const child = spawn(process.execPath, [path.join(ROOT, 'dist', 'index.js')], { cwd: ROOT, env, stdio: ['pipe', out, out], windowsHide: true });
+  // --profile <dir>: a V8 CPU profile of the server (written when it stops), to see where the time goes at the ceiling
+  const prof = opt('profile'); const nodeArgs = prof ? ['--cpu-prof', `--cpu-prof-dir=${path.resolve(prof)}`] : [];
+  const child = spawn(process.execPath, [...nodeArgs, path.join(ROOT, 'dist', 'index.js')], { cwd: ROOT, env, stdio: ['pipe', out, out], windowsHide: true });
   child.on('exit', (c) => { child.exited = c ?? -1; });
   return child;
 }

@@ -14,6 +14,9 @@ Port=@PORT@
 Bind=@BIND@
 ; Other names people use to reach this server, comma-separated (the names in the certificate are always accepted).
 ;ServerNames=docs.example.local
+; Team server (Mode B, OPERATIONS.md "Team server"): live connections at most (the next one gets 503), and how long a check-out lasts.
+;MaxConnections=1000
+;LeaseMinutes=30
 
 [tls]
 ; The server's certificate (Mode B). Either a PEM certificate and its key, or one .pfx file. A relative path is relative to this file's folder.
@@ -60,3 +63,36 @@ KeepFiles=5
 [service]
 ; The name of the Windows service when the service is installed.
 Name=@SERVICENAME@
+
+; ---- Team server only (Mode B). AgastyaCtl.exe --configure-server writes [server] and [tls]; the sections below are set by hand. ----
+
+[directory]
+; Sign-on with the organisation's directory (LDAP / Active Directory over LDAPS). Leave Url empty for the platform's own accounts.
+;Url=ldaps://dc1.example.local:636
+;BaseDn=DC=example,DC=local
+;BindDn=CN=svc-agastya,OU=Service,DC=example,DC=local
+; A file holding only the bind password, readable by the service account and the Administrators alone. A relative path is relative to this file.
+;BindPasswordFile=directory\bind-password.txt
+; The directory's CA certificate (PEM) when it is not in the Windows store.
+;CaFile=directory\ca.pem
+;GroupBaseDn=OU=Groups,DC=example,DC=local
+;LoginAttribute=sAMAccountName
+;UserClass=user
+;NestedGroups=true
+;TimeoutMs=8000
+;SyncHours=24
+
+[backup]
+; The scheduled platform backup (Admin > Data protection shows its state). Dir defaults to backups\ under the data folder.
+;Dir=D:\AgastyaBackups
+;IntervalHours=24
+;Keep=14
+; Warm standby: after each scheduled backup a copy goes to this folder - another disk, or a share the service account can write (absolute path).
+;CopyTo=\\standby-host\agastya-backups
+;RestoreTestDays=30
+
+[client]
+; This computer is a CLIENT of a team server: the shortcut opens that address and no server runs here.
+;Server=https://docs.example.local:4040/
+; Optional: the SHA-256 thumbprint of the server certificate, when this computer does not trust the issuing CA (AgastyaCtl.exe --check-server).
+;Thumbprint=

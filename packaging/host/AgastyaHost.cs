@@ -148,6 +148,8 @@ namespace Agastya
         public int KeepVersions = 2;
         public int HealthSeconds = 60;
         public string TrustedThumbprints = "";
+        // WP-28: [directory], [backup], [server] MaxConnections / LeaseMinutes and [client] (TeamServer.cs), by "section.key"
+        public Dictionary<string, string> Extra = new Dictionary<string, string>();
         public List<string> Problems = new List<string>();
 
         public bool TlsConfigured { get { return TlsCert.Length > 0 || TlsPfx.Length > 0; } }
@@ -230,7 +232,10 @@ namespace Agastya
                         int hs; if (int.TryParse(val, out hs) && hs >= 15 && hs <= 900) s.HealthSeconds = hs; else s.Problems.Add("line " + lineNo + ": HealthSeconds must be 15-900");
                         break;
                     case "update.trustedthumbprints": s.TrustedThumbprints = val; break;
-                    default: s.Problems.Add("line " + lineNo + ": unknown setting '" + key + "'"); break;
+                    default:
+                        if (TeamServer.Known(key)) s.Extra[key] = val;
+                        else s.Problems.Add("line " + lineNo + ": unknown setting '" + key + "'");
+                        break;
                 }
             }
             return s;
@@ -472,6 +477,8 @@ namespace Agastya
             if (cfg.TlsPfx.Length > 0) psi.EnvironmentVariables["AGASTYA_TLS_PFX"] = Settings.StatePath(cfg.TlsPfx);
             if (cfg.TlsPassphraseFile.Length > 0) psi.EnvironmentVariables["AGASTYA_TLS_PASSPHRASE_FILE"] = Settings.StatePath(cfg.TlsPassphraseFile);
             if (cfg.HstsMaxAge.Length > 0) psi.EnvironmentVariables["AGASTYA_HSTS_MAX_AGE"] = cfg.HstsMaxAge;
+            // WP-28: directory sign-on, central backup and warm-standby copy, connection limit, check-out length (agastya.ini -> AGASTYA_*)
+            TeamServer.AddEnvironment(cfg, psi.EnvironmentVariables);
             // WP-25 (PRD-005): GET /api/version reports the WebView2 runtime of this computer and where the interface opens
             string wv2 = Shell.WebView2Version();
             if (wv2 != null) psi.EnvironmentVariables["AGASTYA_WEBVIEW2_VERSION"] = wv2;
@@ -774,6 +781,12 @@ namespace Agastya
             }
             catch (Exception e) { Fail("the data folder " + cfg.WorkspaceDir + " is not writable: " + e.Message); }
 
+            // WP-28: a client installation checks the handshake with its team server
+            if (TeamServer.ClientServer(cfg).Length > 0)
+            {
+                TeamServer.CheckResult cr = TeamServer.Check(cfg, null);
+                for (int i = 0; i < cr.Lines.Count; i++) { if (cr.Good[i]) Pass("team server: " + cr.Lines[i]); else Fail("team server: " + cr.Lines[i]); }
+            }
             string st = ServiceTools.StateOf(cfg.ServiceName);
             if (st == "not installed") Pass("Windows service '" + cfg.ServiceName + "' is not installed (optional)"); else Pass("Windows service '" + cfg.ServiceName + "': " + st);
 
@@ -912,6 +925,9 @@ namespace Agastya
             "  AgastyaCtl.exe --rollback [--restore-db]        go back to the previous version (--restore-db: and to the database copy taken before the update)\r\n" +
             "  AgastyaCtl.exe --versions | --prune-versions | --repair-launcher\r\n" +
             "  AgastyaCtl.exe --first-admin <user> --password-file <file>  create the first administrator (temporary password, changed at first sign-in)\r\n" +
+            "  AgastyaCtl.exe --configure-server [--name <host> ...] [--bind lan|<address>] [--port <n>] (--make-cert | --pfx <f> [--passphrase-file <f>] | --cert <pem> --key <pem>) [--firewall]\r\n" +
+            "                                        make this installation a team server (Mode B, TLS); then --install-service and --start\r\n" +
+            "  AgastyaCtl.exe --check-server [<url>]  the client/server handshake from this computer ([client] Server= when no address is given)\r\n" +
             "  AgastyaCtl.exe --version\r\n\r\n" +
             "Options: --home <folder>  keep configuration, data and logs under <folder>\r\n" +
             "         --port <n> --lan  (with --install-service) written to agastya.ini\r\n" +
@@ -922,6 +938,7 @@ namespace Agastya
         {
             string home = null, mode = null, port = null, label = null, passwordFile = null, installDir = null;
             bool lan = false, deep = false, requireSigned = false, allowUnsigned = false, restoreDb = false, confirm = false;
+            TeamServer.Options team = new TeamServer.Options();
             for (int i = 0; i < args.Length; i++)
             {
                 string a = args[i];
@@ -935,7 +952,18 @@ namespace Agastya
                 else if (a == "--password-file" && i + 1 < args.Length) passwordFile = args[++i];
                 else if ((a == "--apply-update" || a == "--verify-update" || a == "--first-admin" || a == "--prepare-upgrade" || a == "--activate") && i + 1 < args.Length) { mode = a; label = args[++i]; }
                 else if (a == "--support-bundle") { mode = a; if (i + 1 < args.Length && !args[i + 1].StartsWith("--")) label = args[++i]; }
-                else if (a == "--port" && i + 1 < args.Length) port = args[++i];
+                else if (a == "--port" && i + 1 < args.Length) { port = args[++i]; team.Port = port; }
+                // WP-28: --configure-server's options
+                else if (a == "--name" && i + 1 < args.Length) team.Names.Add(args[++i]);
+                else if (a == "--bind" && i + 1 < args.Length) team.Bind = args[++i];
+                else if (a == "--pfx" && i + 1 < args.Length) team.Pfx = args[++i];
+                else if (a == "--passphrase-file" && i + 1 < args.Length) team.PassphraseFile = args[++i];
+                else if (a == "--cert" && i + 1 < args.Length) team.Cert = args[++i];
+                else if (a == "--key" && i + 1 < args.Length) team.Key = args[++i];
+                else if (a == "--days" && i + 1 < args.Length) team.Days = args[++i];
+                else if (a == "--make-cert") team.MakeCert = true;
+                else if (a == "--firewall") team.Firewall = true;
+                else if (a == "--check-server") { mode = a; if (i + 1 < args.Length && !args[i + 1].StartsWith("--")) label = args[++i]; }
                 else if (a == "--lan") lan = true;
                 else if (a == "--backup-db" && i + 1 < args.Length) { mode = a; label = args[++i]; }
                 else if (a == "--reset-admin" && i + 1 < args.Length) { mode = a; label = args[++i]; }
@@ -1003,6 +1031,8 @@ namespace Agastya
                         ServiceBase.Run(new AgastyaService(cfg));
                         return 0;
                     case "--console": return RunConsole(cfg);
+                    case "--configure-server": return TeamServer.Configure(cfg, team);
+                    case "--check-server": return TeamServer.CheckCommand(cfg, label);
                     case null:
 #if GUI
                         return RunTray(cfg);
@@ -1058,6 +1088,7 @@ namespace Agastya
 
         private static int RunConsole(Settings cfg)
         {
+            if (TeamServer.ClientServer(cfg).Length > 0) { Console.Error.WriteLine("This installation is a client of " + TeamServer.ClientServer(cfg) + " ([client] Server= in agastya.ini); it runs no server."); return 1; }
             if (!File.Exists(Layout.NodeExe)) { Console.Error.WriteLine("The Node.js runtime is missing: " + Layout.NodeExe); return 1; }
             if (Probe.Alive(cfg.Port)) { Console.Error.WriteLine("An Agastya Platform server is already answering on port " + cfg.Port + "."); return 1; }
             Supervisor sup = new Supervisor(cfg);
@@ -1080,6 +1111,9 @@ namespace Agastya
             using (Mutex single = new Mutex(true, mutexName, out created))
             {
                 if (!created) { if (cfg.OpenBrowser) Shell.Open(cfg, cfg.Url); return 0; }
+                // WP-28: a client of a team server opens the server's address and runs nothing of its own
+                string team = TeamServer.ClientServer(cfg);
+                if (team.Length > 0) { Host.Info("client of " + team); Shell.Open(cfg, team); return 0; }
                 if (!File.Exists(Layout.NodeExe)) { MessageBox.Show("The Node.js runtime is missing:\n" + Layout.NodeExe + "\n\nRepair the installation.", "Agastya Platform", MessageBoxButtons.OK, MessageBoxIcon.Error); return 1; }
                 // Another copy (the Windows service, or a console run) may already own the port: then just open it.
                 if (Probe.Alive(cfg.Port)) { if (cfg.OpenBrowser) Shell.Open(cfg, cfg.Url); return 0; }
