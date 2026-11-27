@@ -44,7 +44,7 @@ import { capabilityTableFrom, setCapabilityTable } from './services/permissions'
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { registerAuthRoutes } = require('./core/auth/routes');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { MIGRATIONS } = require('./core/auth/store');
+import { MIGRATIONS } from './core/auth/store';
 
 export function createApp(): express.Express {
   // S1000D reference catalogues, SNS presets, carry-over of the retired flat tables, and a configuration for every existing project (idempotent).

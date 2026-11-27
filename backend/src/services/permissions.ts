@@ -10,14 +10,16 @@
 // routes takes the highest of their minimum roles, so the client never offers an action some route of that capability would refuse.
 // =============================================================================
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { ROLE_RANK } = require('../core/auth/authz');
+import { ROLE_RANK } from '../core/auth/authz';
 
 const RANK: Record<string, number> = ROLE_RANK;
 let table: Record<string, string> = {};
 
+/** The part of Express's (undocumented) router a guard table is read from: each route's handlers, where a project guard carries cap and minRole. */
+interface RouterView { _router?: { stack?: Array<{ route?: { stack: Array<{ handle?: { cap?: unknown; minRole?: unknown } }> } }> } }
+
 /** Capability -> minimum project role, collected from the guards of the live Express router. */
-export function capabilityTableFrom(app: any): Record<string, string> {
+export function capabilityTableFrom(app: RouterView): Record<string, string> {
   const out: Record<string, string> = {};
   for (const layer of app?._router?.stack ?? []) {
     if (!layer.route) continue;

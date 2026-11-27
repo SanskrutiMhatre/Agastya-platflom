@@ -2,6 +2,6 @@
   "_comment": "Ratchet for scripts/ci/lint.mjs: a count may go down (then lower it here), never up.",
   "any.backend": 280,
   "any.frontend": 50,
-  "require.backend-ts": 48,
+  "require.backend-ts": 46,
   "require.frontend-ts": 4
 }

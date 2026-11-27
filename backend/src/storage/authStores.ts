@@ -11,7 +11,8 @@
 export interface SessionStore {
   /** Insert a session; with a policy of one session per person, end that person's others. */
   insertSessionDisplacing(args: Record<string, unknown>): { displaced: number };
-  resolveSession(tokenHash: string, nowIso: string): any;
+  /** The session row joined with its account, or null when the token is unknown, expired or revoked. */
+  resolveSession(tokenHash: string, nowIso: string): Record<string, unknown> | null;
   revokeSessionById(sessionId: string, reason: string, now: string): unknown;
   sessionEndReason(tokenHash: string, nowIso: string): string | null;
 }

@@ -15,7 +15,7 @@ import { startRenderer, stopRenderer, rendererStatus } from './services/publishe
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { ensureBootstrapAdmin } = require('./core/auth/bootstrap');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { assertPasswordHashing } = require('./core/auth/crypto');
+import { assertPasswordHashing } from './core/auth/crypto';
 
 let server: http.Server | null = null;
 

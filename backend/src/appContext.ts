@@ -43,10 +43,15 @@ const nowIso = (): string => new Date().toISOString();
 /** Who a person is (core/auth/provider.js). Roles, memberships and sessions stay in the platform. */
 export interface AuthProvider {
   readonly kind: string;
-  authenticate(c: { username: string; password: string }): Promise<{ ok: boolean; user?: any; viaMaster?: boolean; reason?: 'unknown-user' | 'bad-password' | 'disabled' }>;
-  resolveSession(cookieHeader: string): any;
-  provisionUser(external: unknown): any;
+  authenticate(c: { username: string; password: string }): Promise<{ ok: boolean; user?: AuthAccount; viaMaster?: boolean; reason?: 'unknown-user' | 'bad-password' | 'disabled' }>;
+  /** The signed-in session for a Cookie header, or null; its shape is the session service's (core/auth/sessions.js). */
+  resolveSession(cookieHeader: string): unknown;
+  /** Creates or finds the local account for an external identity (a directory provider); the local provider throws. */
+  provisionUser(external: unknown): unknown;
 }
+
+/** The account row the AuthStore returns (core/auth/store.js users table); the fields the login route reads, the rest passed through. */
+export interface AuthAccount { id: string; username: string; role: string; password_hash: string; disabled_at?: string | null; [column: string]: unknown }
 
 export interface AppContext {
   config: Config;
@@ -145,7 +150,7 @@ export function redactAuditMeta(meta: unknown): unknown {
   }));
 }
 
-function createAudit(store: any, workspaceDir: string): Pick<AppContext, 'audit' | 'auditHealth'> {
+function createAudit(store: { appendAudit(row: Record<string, unknown>): unknown }, workspaceDir: string): Pick<AppContext, 'audit' | 'auditHealth'> {
   const failures = { count: 0, last: null as null | { at: string; action: string; error: string } };
   return {
     auditHealth: () => ({ failures: failures.count, last: failures.last }),

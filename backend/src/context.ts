@@ -19,18 +19,18 @@ export const defaultContext = (): AppContext => ctx;
 
 export const workspaceDir = ctx.workspaceDir;
 export const projectDirFor = ctx.projectDirFor;
-export const store: any = ctx.store;
+export const store = ctx.store;
 export const repos = ctx.repos;
 export const content = ctx.content;
 export const authProvider = ctx.authProvider;
-export const securityPolicy: any = ctx.securityPolicy;
-export const sessionsSvc: any = ctx.sessionsSvc;
-export const limiter: any = ctx.limiter;
-export const authz: any = ctx.authz;
-export const docIndex: any = ctx.docIndex;
-export const revisions: any = ctx.revisions;
-export const registryDb: any = ctx.registryDb;
-export const workspace: any = ctx.workspace;
+export const securityPolicy = ctx.securityPolicy;
+export const sessionsSvc = ctx.sessionsSvc;
+export const limiter = ctx.limiter;
+export const authz = ctx.authz;
+export const docIndex = ctx.docIndex;
+export const revisions = ctx.revisions;
+export const registryDb = ctx.registryDb;
+export const workspace = ctx.workspace;
 
 export const { requireAuth, requireAdmin, requireRoles, requireProject, publicRoute } = ctx.authz as {
   requireAuth: (o?: any) => any; requireAdmin: () => any; requireRoles: (...roles: string[]) => any;

@@ -21,8 +21,11 @@ export const MIN_CLIENT_VERSION = '2.0.0';
 
 export interface BuildInfo { version: string; commit: string | null; builtAt: string | null; dirty: boolean | null; packaged: boolean }
 
-function readJson(file: string): any | null {
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
+/** The fields read from version.json (written by the packager) or package.json; each is checked before use. */
+interface VersionStamp { version?: unknown; commit?: string | null; builtAt?: string | null; dirty?: unknown }
+
+function readJson(file: string): VersionStamp | null {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')) as VersionStamp; } catch { return null; }
 }
 
 let cached: BuildInfo | null = null;
