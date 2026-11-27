@@ -1,6 +1,7 @@
 // Thin fetch wrapper. Everything is same-origin (the Vite proxy in dev, the Express
 // server in production), so the HttpOnly session cookie travels by itself.
 import { shared, invalidate } from './query';
+import { CLIENT_VERSION, CLIENT_VERSION_HEADER, reportClientTooOld } from '../lib/handshake';
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public code?: string, public body?: Record<string, unknown>) {
@@ -36,7 +37,8 @@ export async function request<T = unknown>(method: string, url: string, body?: u
 }
 
 async function send<T>(method: string, url: string, body: unknown, opts: { raw?: boolean; quiet401?: boolean; background?: boolean; replayed?: boolean; signal?: AbortSignal }): Promise<T> {
-  const headers: Record<string, string> = {};
+  // WP-26: the page says which version it is; a server that no longer accepts it answers 426 (lib/handshake.ts shows "reload").
+  const headers: Record<string, string> = { [CLIENT_VERSION_HEADER]: CLIENT_VERSION };
   // A timer's request (badge counts, status checks) is not the person working: it does not keep the session from going idle (WP-03).
   if (opts.background) headers['x-agastya-background'] = '1';
   let payload: BodyInit | undefined;
@@ -49,6 +51,7 @@ async function send<T>(method: string, url: string, body: unknown, opts: { raw?:
   const type = res.headers.get('content-type') ?? '';
   const data = type.includes('json') ? await res.json().catch(() => null) : null;
   if (!res.ok) {
+    if (res.status === 426 && data?.code === 'CLIENT_TOO_OLD') reportClientTooOld(typeof data.version === 'string' ? data.version : undefined);
     if (res.status === 401 && !opts.quiet401) {
       if (reauth && !opts.replayed && !isAuthUrl(url)) {
         if (await reauth()) return request<T>(method, url, body, { ...opts, replayed: true });
