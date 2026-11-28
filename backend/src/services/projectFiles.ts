@@ -36,11 +36,11 @@ async function documentOf(projectId: string, rel: string): Promise<{ id: string 
   return doc ?? null;
 }
 
-function record(projectId: string, rel: string, docId: string, previous: string | null, text: string, actor: RevisionActor, reason: string): void {
+function record(projectId: string, rel: string, docId: string, previous: string | null, text: string, actor: RevisionActor, reason: string, selfWritten = false): void {
   if (revisionFaults.beforeCut) revisionFaults.beforeCut(projectId, rel);
   const now = nowIso();
   const head = revisions.head(docId) as { hash: string } | null;
-  if (previous !== null && (!head || head.hash !== sha256(previous))) revisions.cut(docId, previous, { reason: 'on-disk', createdBy: null, now });
+  if (previous !== null && !selfWritten && (!head || head.hash !== sha256(previous))) revisions.cut(docId, previous, { reason: 'on-disk', createdBy: null, now });
   revisions.cut(docId, text, { reason, createdBy: actor.id, now });
 }
 
@@ -50,12 +50,16 @@ const sha256 = (s: string): string => crypto.createHash('sha256').update(Buffer.
  * Save a source document: its revision first, then an atomic write. `relOrAbs` is a path inside the project (or an absolute path in it).
  * Returns whether the file existed before. Throws REVISION_FAILED (and changes nothing) when the history cannot be written.
  */
-export async function saveRevisioned(projectId: string, relOrAbs: string, text: string, actor: RevisionActor, reason = 'save'): Promise<{ created: boolean }> {
+/**
+ * `opts.selfWritten` (Phase 3, live co-editing): the content on disk was written by the caller itself between revisions (a room writes the file
+ * every few seconds and cuts a revision every few minutes), so it is not recorded as a separate "on-disk" revision.
+ */
+export async function saveRevisioned(projectId: string, relOrAbs: string, text: string, actor: RevisionActor, reason = 'save', opts: { selfWritten?: boolean } = {}): Promise<{ created: boolean }> {
   const rel = posix(projectId, relOrAbs);
   if (content.exists(projectId, rel)) {
     const doc = docIndex.resolve(projectId, rel) ?? await documentOf(projectId, rel);
     const previous = content.readText(projectId, rel);
-    if (doc) { try { record(projectId, rel, doc.id, previous, text, actor, reason); } catch (e) { throw revisionFailed(e); } }
+    if (doc) { try { record(projectId, rel, doc.id, previous, text, actor, reason, !!opts.selfWritten); } catch (e) { throw revisionFailed(e); } }
     content.writeText(projectId, rel, text);
     return { created: false };
   }

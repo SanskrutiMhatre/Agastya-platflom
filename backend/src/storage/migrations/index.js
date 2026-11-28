@@ -31,6 +31,7 @@ const ORDER = [
   '024-directory-groups-permissions',
   '025-audit-chain',               // WP-29
   '026-jobs',                      // WP-14
+  '028-collab-documents',          // Phase 3 (P3-1): live co-editing rooms
 ];
 
 const MIGRATIONS = ORDER.map((name) => require(`./${name}`));
