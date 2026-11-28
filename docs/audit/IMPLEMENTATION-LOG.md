@@ -2628,7 +2628,7 @@ GitLab -> performance -> cleanup -> comprehensive verification. Only targeted ch
 | GitLab (intranet) | `docs/phase3/gitlab.md`, `docs/OPERATIONS.md` section 15 | c8a1b65 | 029-gitlab (renumbered from 030 at merge) |
 | Performance | `docs/phase3/performance.md` | 422528f | - |
 | Cleanup, backend | `docs/phase3/cleanup-backend.md` | 0a100f3 | - |
-| Cleanup, editors/collaboration | `docs/phase3/cleanup-collab.md` | in progress | - |
+| Cleanup, editors/collaboration | `docs/phase3/cleanup-collab.md` | 061f2ab | - (Yjs room schema 2, old rooms convert lazily) |
 
 Merge notes by the lead: GitLab's migration renumbered to 029 so main has no gap (`storage/schema.ts` refuses gaps); ProjectShell
 kept main's status bar (renderer status removed in step 1) plus the GitLab rail flag; `services/firstRun.ts` typed imports (lint

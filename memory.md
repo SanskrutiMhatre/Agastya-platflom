@@ -49,8 +49,8 @@ the navbar for all three editors, JSS/JSG themed sheets, consistency of every pa
   auditor/Auditor@123 once on a fresh data folder, forced change at first sign-in, credentials shown after install with "Save a
   copy". Server mode (default) unchanged. `docs/phase3/standalone.md`.
 * **Small UI:** status text, Wi-Fi icon and sidebar Settings removed (Settings in the account menu; version under "About Agastya").
-* **Phase 8 cleanup:** backend part merged (0a100f3); the editors/collaboration part (moved block keeps concurrent typing, spec
-  updates for live editing, JSG opening in slices) is finishing on its branch.
+* **Phase 8 cleanup: done** (0a100f3 backend, 061f2ab editors/collaboration: moved block keeps concurrent typing, live-editing spec
+  rewrites with classic coverage, JSG opening in slices). Not built: per-chapter live lock (a chapter check-out locks the whole book).
 * **Next: Phase 9, the comprehensive final verification** (full gate, all e2e and visual suites, collab load, security, offline,
   build and installer) run in parallel shards on separate ports; fix and re-run until it passes. Testing policy until then: targeted
   checks only (owner, P3-7).

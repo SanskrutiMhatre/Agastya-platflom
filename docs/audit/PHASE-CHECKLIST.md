@@ -125,14 +125,14 @@ Testing policy (P3-7): targeted checks only while implementing; one comprehensiv
 - ✅ 5. Standalone default accounts + forced password change (a3d9a8b, migration 027; fix-ups 2ac4fb2)
 - ✅ 6. GitLab integration for an offline intranet instance (c8a1b65, migration 029)
 - ✅ 7. Performance optimisations (422528f)
-- 🔄 8. Cleanup: backend part merged (0a100f3: batched fsync, PM append, incremental BREX, tailwind removed, any typed, docs);
-  editors/collaboration part finishing (moved block keeps concurrent typing, live-editing spec updates, JSG opening in slices,
-  lint exports, one shared XML escaper)
-- ⬜ Owner pushes `main`
+- ✅ 8. Cleanup: backend (0a100f3: batched fsync, PM append, incremental BREX, tailwind removed, any typed, docs); editors/collaboration
+  (061f2ab: moved block keeps concurrent typing, selection re-map, kept undo, JSG opening in slices 263 -> <200 ms, one XML escaper,
+  live-editing spec rewrites with classic coverage). Not built: per-chapter live lock (a chapter check-out locks the whole live book)
+- ✅ Owner pushed `main` up to 0137b2c; ⬜ owner pushes the cleanup merge 061f2ab
 - ⬜ 9. Comprehensive final verification, in parallel shards on separate ports (fix and re-run only what fails):
   - ⬜ Full gate (excluding the package/readiness stages: they write HKCU and need a real certificate)
   - ⬜ Backend suite, frontend vitest, all e2e specs (sharded), visual suite (alone, one ordered run, baselines re-captured once
-    then verified by a second run)
+    then verified by a second run; the Studio, JSS and JSG editor baselines change by design with live editing)
   - ⬜ All three editors; collaboration concurrency, sync, conflicts (collab-load 120+ clients across S1000D/JSS/JSG)
   - ⬜ Author and reviewer workflows; PDF annotations; GitLab, repositories, MRs (mock GitLab)
   - ⬜ Standalone and server installs; auth, authz, security scans
