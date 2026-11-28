@@ -28,6 +28,7 @@ import * as release from '../services/release';
 import * as lifecycle from '../services/lifecycle';
 import { publicationSources } from '../services/pm';
 import * as review from '../services/review';
+import * as pdfReview from '../services/pdfReview';
 import { createProjectBrex, missingBrex } from '../services/projectBrex';
 import { isS1000dProject } from '../services/projects';
 import { assertS1000dPublication } from '../services/projectRecord';
@@ -359,11 +360,13 @@ export function registerProjectContentRoutes(app: Express): void {
       canApprove: canApprove(req.auth.user, req.project.role) && !securityPolicy.approverConflict(store.pendingRelease(req.project.id)?.requested_by, req.auth.user.id),
       approveBlocked: canApprove(req.auth.user, req.project.role) ? securityPolicy.approverConflict(store.pendingRelease(req.project.id)?.requested_by, req.auth.user.id) : null,
       review: { ...rs, comments: review.listComments(req.project.id), open: review.openComments(req.project.id), canComment: canComment(req.project.role) || req.auth.user.role === 'admin' },
+      pdfReview: pdfReview.counts(req.project.id),     // Phase 3 (P3-4): open / required PDF review threads and the block-release setting
     });
   }));
   app.post(`${base}/release`, view('editor', 'release.submit'), wrap(async (req, res) => {
     assertNotCir(req.project.id, 'release');
-    await gate(req);                                                 // a release is a publication: its modules must be valid right now
+    pdfReview.assertReleasable(req.project.id);                      // P3-4: the project may block a release while required PDF comments are open
+    await gate(req);                                                // a release is a publication: its modules must be valid right now
     const again = review.reviewState(req.project.id).state === 'changes_requested';
     publisher.syncFrontMatter(req.project.id);                       // the fingerprint that is approved must be the one every build reproduces
     const out = release.requestRelease(req.project.id, req.auth.user.id, req.body ?? {});
@@ -385,6 +388,7 @@ export function registerProjectContentRoutes(app: Express): void {
     if (!canApprove(req.auth.user, req.project.role)) throw forbidden('Only the Project Manager of this project, or an administrator, can decide a release.', 'APPROVER_ONLY');
     const requester = store.getRelease(param(req, 'relId'))?.requested_by;
     if (approve) { const sod = securityPolicy.approverConflict(requester, req.auth.user.id); if (sod) throw forbidden(sod, 'SEPARATION_OF_DUTIES'); }   // before any side effect (D7)
+    if (approve) pdfReview.assertReleasable(req.project.id);        // P3-4: the same rule at approval
     if (approve) await gate(req);                                    // never approve a release whose content is not valid now
     // Approval turns every in-work revision of the publication into the next ISSUE (in-work 00, issueType "changed"); the release then covers that content.
     // The issuing happens BEFORE the decision is recorded (and only for a request that is still pending), so a failure leaves the release undecided and the
