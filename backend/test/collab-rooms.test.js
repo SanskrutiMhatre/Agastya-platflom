@@ -176,6 +176,42 @@ test('an external change to the file (a save by version) reaches the live room a
   a.close();
 });
 
+test('a writer that is not an editor (a GitLab pull) announces its files: the live room merges them, says who, and a deletion closes it', async () => {
+  const { saveRevisioned } = require('../dist/services/projectFiles');
+  const { emitFilesChangedExternally } = require('../dist/services/externalChanges');
+  const { sha256 } = require('../dist/services/collab/xml');
+  const a = await client(alice);
+  const ja = await a.join(roomOf(DM2));
+  assert.ok(!ja.error, JSON.stringify(ja.error));
+  await a.flush(roomOf(DM2), false);
+  const room = rooms.roomNamed(roomOf(DM2));
+  assert.ok(room, 'the room is loaded');
+  const t = paraText(ja.room); t.insert(0, 'TYPEDBEFOREPULL ');
+  assert.ok(await a.settled(roomOf(DM2)));
+  // the pull: the file is written with a revision (as services/gitlab/repo.ts does), then announced
+  const base = await fileXml(DM2);
+  const pulled = base.xml.replace(/(<para>)([^<]*)(<\/para>)(?![\s\S]*<para>)/, '$1$2 FROMGITLAB$3');
+  assert.notEqual(pulled, base.xml);
+  await saveRevisioned(pid, room.rel, pulled, { id: bob.id }, 'gitlab');
+  emitFilesChangedExternally({ projectId: pid, source: 'gitlab', actor: { id: bob.id, username: 'bobcol' }, files: [{ path: room.rel, change: 'modified', before: base.hash, after: sha256(pulled) }], detail: { operation: 'pull' }, at: new Date().toISOString() });
+  assert.ok(await until(() => textOf(ja.room.doc.getXmlFragment('xml')).includes('FROMGITLAB'), 6000), 'the room got the pulled change');
+  assert.ok(textOf(ja.room.doc.getXmlFragment('xml')).includes('TYPEDBEFOREPULL'), 'the unwritten edit is kept, not clobbered');
+  assert.ok(await until(() => ja.room.errors.some((e) => e.code === 'EXTERNAL_CHANGE' && /GitLab \(bobcol\)/.test(e.message)), 4000), 'the members are told who changed it');
+  const fl = await a.flush(roomOf(DM2), true);
+  const now = await fileXml(DM2);
+  assert.equal(now.hash, fl.info.hash);
+  assert.match(now.xml, /TYPEDBEFOREPULL /); assert.match(now.xml, / FROMGITLAB/);
+  const rows = (await admin.get('/api/admin/audit?action=collab.external-change')).json.entries;
+  assert.ok(rows.some((e) => e.meta && e.meta.source === 'gitlab' && e.actor === 'bobcol'), 'the merge is audited as the pull of its actor: ' + JSON.stringify(rows.slice(0, 3)));
+  // a deletion announced by the writer closes the room for its members (read-only, with the reason)
+  emitFilesChangedExternally({ projectId: pid, source: 'gitlab', actor: { id: bob.id, username: 'bobcol' }, files: [{ path: room.rel, change: 'deleted', before: now.hash, after: null }], at: new Date().toISOString() });
+  assert.ok(await until(() => ja.room.state && ja.room.state.code === 'GONE', 4000), 'the room is closed: ' + JSON.stringify(ja.room.state));
+  assert.match(ja.room.state.reason, /deleted by gitlab \(bobcol\)/);
+  a.close();
+  // the file itself was not deleted here: a fresh room can be opened again once this one is gone
+  await until(() => !rooms.roomNamed(roomOf(DM2)), 8000);
+});
+
 test('the log is the source until written back: a stop with unwritten changes loses nothing, the next start replays them', async () => {
   const a = await client(alice);
   const ja = await a.join(roomOf(DM));

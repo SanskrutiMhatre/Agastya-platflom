@@ -17,7 +17,7 @@ export function TopbarActions({ children }: { children: ReactNode }) {
   return el ? createPortal(children, el) : null;
 }
 
-/** The page's status items replace the shell's default ones (renderer state, workspace, offline) while the page is shown. */
+/** The page's status items replace the shell's default ones (format, data module count) while the page is shown. */
 export function StatusItems({ children }: { children: ReactNode }) {
   const el = useContext(ShellSlotsContext).status;
   return el ? createPortal(children, el) : null;

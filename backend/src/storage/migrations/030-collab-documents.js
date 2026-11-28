@@ -1,9 +1,9 @@
 'use strict';
-// Migration 029-collab-documents (Phase 3, P3-1: live co-editing). One body per database engine (WP-10); additive only.
+// Migration 030-collab-documents (Phase 3, P3-1: live co-editing). One body per database engine (WP-10); additive only.
 
 const step = {
     /*
-      029 - the live co-editing rooms (services/collab).
+      030 - the live co-editing rooms (services/collab).
       collab_docs: one row per document that has been edited live (room = "<projectId>/<kind>/<path>"). It holds the room's identity
       (epoch: a client holding state of another epoch drops it), the last compacted Yjs state (snapshot, up to snapshot_seq), the hash of
       the XML last read from or written to the project file (base_hash) and the last update whose effect is in that file (written_seq).
@@ -11,7 +11,7 @@ const step = {
       change on the server, so a crash loses nothing: the next start replays the updates after written_seq and writes the file.
       Additive: two new tables.
     */
-    name: '029-collab-documents',
+    name: '030-collab-documents',
     sql: `CREATE TABLE IF NOT EXISTS collab_docs (
             room          TEXT PRIMARY KEY,
             project_id    TEXT NOT NULL,

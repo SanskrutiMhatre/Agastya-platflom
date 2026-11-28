@@ -34,6 +34,7 @@ import { documentIdOf } from '../projectFiles';
 import { onContentWrite } from '../../storage/contentStore';
 import { setCollabHooks } from '../broadcast';
 import { releaseSources, onReleaseChange } from '../release';
+import { onFilesChangedExternally, type FilesChangedExternally } from '../externalChanges';
 
 // ---------------------------------------------------------------- connections and members
 
@@ -138,6 +139,8 @@ export class Room {
   private writing: Promise<void> | null = null;
   /** the hash of the text this room is writing right now (its own write, not an external change) */
   selfWrite: string | null = null;
+  /** who changed the file from outside (services/externalChanges: a GitLab pull...), for the merge of exactly that content (its hash) */
+  externalBy: { source: string; actor: { id: string; username: string }; hash: string } | null = null;
   updatesSinceCompact = 0;
   bytesSinceCompact = 0;
 
@@ -240,11 +243,11 @@ export class Room {
   }
 
   /** Has the file changed since the room last read or wrote it? Then merge the change (called before a write-back and by the poll). */
-  checkFile(): void {
+  checkFile(force = false): void {
     if (this.closed) return;
     const st = statOf(this.abs);
     if (!st) { this.close('GONE', 'This document was deleted or moved.'); return; }
-    if (this.stat && st.size === this.stat.size && st.mtimeMs === this.stat.mtimeMs) return;
+    if (!force && this.stat && st.size === this.stat.size && st.mtimeMs === this.stat.mtimeMs) return;
     let text: string;
     try { text = fs.readFileSync(this.abs, 'utf8'); } catch { return; }
     const hash = sha256(text);
@@ -267,7 +270,9 @@ export class Room {
       this.baseState = newBase;
       this.baseHash = hash;
       counters.externalMerges++;
-      audit({ actorId: null, actorUsername: 'system', action: 'collab.external-change', projectId: this.projectId, targetType: 'project', targetId: this.projectId, meta: { file: this.docPath, kind: this.format.kind, hash } });
+      const by = this.externalBy && this.externalBy.hash === hash ? this.externalBy : null;
+      if (by) this.externalBy = null;
+      audit({ actorId: by?.actor.id ?? null, actorUsername: by?.actor.username ?? 'system', action: 'collab.external-change', projectId: this.projectId, targetType: 'project', targetId: this.projectId, meta: { file: this.docPath, kind: this.format.kind, hash, ...(by ? { source: by.source } : {}) } });
       // the people in the room had unwritten edits on top: the merged result goes to the file at the next write-back
       if (Y.encodeStateVector(this.doc).length && this.format.fromY(this.doc) !== text) { this.dirtySince = this.dirtySince || Date.now(); this.scheduleWriteBack(); }
     } catch (e) {
@@ -671,6 +676,31 @@ function renewLease(m: Member): void {
 let sweepTimer: NodeJS.Timeout | null = null;
 let unlistenWrites: (() => void) | null = null;
 let unlistenRelease: (() => void) | null = null;
+let unlistenExternal: (() => void) | null = null;
+
+/** A writer that is not an editor session changed project files (services/externalChanges: the GitLab pull, branch switch, MR merge).
+ *  The files are already on disk: every live room of one of them merges the new content now (as one remote change, a minimal diff on top
+ *  of the people's unwritten edits, never a reload that drops them), and its members are told who changed it. A deleted file closes its
+ *  room. The content-write hook may already have merged the same bytes; then only the notice goes. */
+export function onExternalFiles(ev: FilesChangedExternally): void {
+  const byPath = new Map(ev.files.map((f) => [f.path.replace(/\\/g, '/').toLowerCase(), f]));
+  for (const r of rooms.values()) {
+    if (r.projectId !== ev.projectId || r.closed) continue;
+    const f = byPath.get(r.rel.replace(/\\/g, '/').toLowerCase());
+    if (!f) continue;
+    if (f.change === 'deleted' || !f.after) { r.close('GONE', `This document was deleted by ${ev.source} (${ev.actor.username}).`); try { repos.collab.remove(r.name); } catch { /* best effort */ } continue; }
+    r.externalBy = { source: ev.source, actor: ev.actor, hash: f.after };
+    const after = f.after;
+    setImmediate(() => {
+      void withDocumentLock(`${r.projectId}:${r.rel}`, () => {
+        r.checkFile(true);
+        if (r.closed) return;
+        if (r.baseHash === after) r.broadcastError({ code: 'EXTERNAL_CHANGE', message: `${ev.source === 'gitlab' ? 'GitLab' : ev.source} (${ev.actor.username}) changed this document; the change is merged into what you see.` });
+        if (r.externalBy?.hash === after) r.externalBy = null;
+      });
+    });
+  }
+}
 
 /** Start the room service: the file watch, the sweep, and the replay of updates a stop or crash left unwritten. */
 export function start(): void {
@@ -687,6 +717,7 @@ export function start(): void {
       }
     });
   }
+  if (!unlistenExternal) unlistenExternal = onFilesChangedExternally(onExternalFiles);
   if (!unlistenRelease) {
 
     unlistenRelease = onReleaseChange((projectId) => refreshDocument(projectId, null));
@@ -728,6 +759,7 @@ export async function stop(): Promise<void> {
   if (sweepTimer) { clearInterval(sweepTimer); sweepTimer = null; }
   if (unlistenWrites) { unlistenWrites(); unlistenWrites = null; }
   if (unlistenRelease) { unlistenRelease(); unlistenRelease = null; }
+  if (unlistenExternal) { unlistenExternal(); unlistenExternal = null; }
   persistNow();
   for (const r of [...rooms.values()]) {
     if (!r.closed && (r.dirty || r.contributors.size)) await r.writeBack({ revision: true, reason: 'server stop' }).catch(() => undefined);
@@ -742,6 +774,7 @@ export function stopSync(): void {
   if (sweepTimer) { clearInterval(sweepTimer); sweepTimer = null; }
   if (unlistenWrites) { unlistenWrites(); unlistenWrites = null; }
   if (unlistenRelease) { unlistenRelease(); unlistenRelease = null; }
+  if (unlistenExternal) { unlistenExternal(); unlistenExternal = null; }
   persistNow();
   for (const r of rooms.values()) r.destroy();
   rooms.clear(); conns.clear();

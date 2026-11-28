@@ -8,7 +8,9 @@ export interface RailItem { to: string; label: string; icon: IconName; badge?: {
 
 export type RailSummary = { project: Pick<Summary['project'], 'type' | 'authoring' | 'format'>; validation: Summary['validation']; release: Summary['release'] };
 
-export function projectRailItems(id: string, summary: RailSummary): RailItem[] {
+/** Phase 3 (P3-5): `opts.gitlab` adds the Repository page, only when an administrator switched GitLab on (off by default, so the parity
+ *  baseline, which calls this without options, is unchanged). */
+export function projectRailItems(id: string, summary: RailSummary, opts: { gitlab?: boolean } = {}): RailItem[] {
   const v = summary.validation;
   const rel = summary.release;
   const isCir = summary.project.type === 'CIR';
@@ -30,6 +32,7 @@ export function projectRailItems(id: string, summary: RailSummary): RailItem[] {
       { to: `/projects/${id}/validation`, label: 'Validation', icon: 'shield' as const, badge: v && v.error > 0 ? { text: String(v.error), tone: 'bad' as const } : null },
     ] : []),
     { to: `/projects/${id}/release`, label: 'Release', icon: 'rocket', badge: rel?.pending ? { text: '!', tone: 'warn' } : rel?.released ? { text: `R${rel.number}`, tone: 'ok' } : null },
+    ...(opts.gitlab ? [{ to: `/projects/${id}/repository`, label: 'Repository', icon: 'branch' as const }] : []),
     { to: `/projects/${id}/settings`, label: 'Settings', icon: 'settings' },
   ];
 }

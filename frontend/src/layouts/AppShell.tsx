@@ -1,10 +1,13 @@
 // The main dashboard frame, drawn as the owner-approved mockups' global shell (docs/audit/mockups/workspace.html, admin.html; UI redesign
-// step 1): a full-width top bar (brand, breadcrumb, search/command trigger, offline mark, notifications, theme switch, account) over a left
+// step 1): a full-width top bar (brand, breadcrumb, search/command trigger, notifications, theme switch, account) over a left
 // navigation in groups, with the page beside it. The navigation depends on the role:
-//   administrator    Overview, Projects, Graphics, CIR, Activity, Backup, Administrator, Settings   (oversees; creates people, not projects)
-//   project manager  Overview, Workspace, Projects, Graphics, CIR, Activity, Backup, Settings
-//   author           Overview, Workspace, Projects, Graphics, CIR, Backup, Settings
+//   administrator    Overview, Projects, Graphics, CIR, Activity, Backup, Administrator   (oversees; creates people, not projects)
+//   project manager  Overview, Workspace, Projects, Graphics, CIR, Activity, Backup
+//   author           Overview, Workspace, Projects, Graphics, CIR, Backup
 // Notifications and the account menu sit at the right of the top bar, icons only; the account menu names the role, never the person.
+// Phase 3 (owner: no redundant options): Settings is reached from the account menu only (it was also a sidebar item), and the bars carry no
+// "Offline · on-premises" / version / "Server connected" text and no offline icon; the version is in the account menu's "About Agastya".
+// A server that stops answering still shows the connection banner (SessionDialogs.tsx, data-testid server-unreachable).
 
 import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
@@ -31,26 +34,13 @@ const NAV: Item[] = [
   { to: '/activity', label: 'Activity', icon: 'activity', roles: ['admin', 'project_manager'], group: 'operations' },
   { to: '/backup', label: 'Backup', icon: 'archive', group: 'operations' },
   { to: '/administrator', label: 'Administrator', icon: 'shield', roles: ['admin'], group: 'platform' },
-  { to: '/settings', label: 'Settings', icon: 'settings', group: 'platform' },
 ];
 const GROUP_HEAD: Record<Group, string | null> = { work: null, library: 'Library', operations: 'Operations', platform: 'Platform' };
-// Notifications is not in the sidebar: the bell in the top bar opens it.
-const TITLES: Record<string, string> = { '/notifications': 'Notifications' };
+// Notifications is not in the sidebar: the bell in the top bar opens it. Settings is in the account menu.
+const TITLES: Record<string, string> = { '/notifications': 'Notifications', '/settings': 'Settings' };
 // The breadcrumb names the area the way the mockups do (admin.html: "Platform / Administration"); the navigation keeps its own label.
 const CRUMB: Record<string, string> = { '/administrator': 'Administration' };
 const NAV_REUSE_MS = 30_000;
-const VERSION = typeof __AGASTYA_CLIENT_VERSION__ === 'string' ? __AGASTYA_CLIENT_VERSION__ : '';
-
-/** The offline / server mark of the top bars: the product works without a network; it shows a warning while the server does not answer. */
-export function NetState() {
-  const unreachable = useSession((s) => s.unreachable);
-  const text = unreachable ? 'The server is not answering' : 'Offline, on-premises';
-  return (
-    <span className={`icon-btn net-state${unreachable ? ' is-down' : ''}`} role="img" tabIndex={0} data-testid="net-state" aria-label={text} title={unreachable ? text : 'Offline · on-premises'}>
-      <Icon name={unreachable ? 'warn' : 'offline'} />
-    </span>
-  );
-}
 
 export function AppShell() {
   const { user, pendingInvitations, adminQueues, load } = useSession();
@@ -63,7 +53,6 @@ export function AppShell() {
   // the mockup's count beside Projects: how many projects this person can open (a one-row page in the background, reused for 30 s)
   const [projectCount, setProjectCount] = useState<number | null>(null);
   useEffect(() => { let live = true; workspaceApi.projectCount().then((n) => { if (live) setProjectCount(n); }).catch(() => undefined); return () => { live = false; }; }, [loc.pathname]);
-  const unreachable = useSession((s) => s.unreachable);
 
   // Keep the badges (invitations, queues, unread notifications) fresh as the user moves around, and every half minute.
   // WP-18 (FE-020): an answer from the last 30 s is enough here, so moving around does not ask who is signed in each time; any write the
@@ -75,7 +64,7 @@ export function AppShell() {
   const queued = adminQueues ? adminQueues.resets + adminQueues.releases : 0;
   const items = NAV.filter((n) => !n.roles || (user && n.roles.includes(user.role)));
   const current = items.find((n) => loc.pathname.startsWith(n.to));
-  const title = current?.label ?? TITLES[loc.pathname] ?? appName;
+  const title = current?.label ?? TITLES[Object.keys(TITLES).find((k) => loc.pathname === k || loc.pathname.startsWith(`${k}/`)) ?? ''] ?? appName;
   const groupHead = current ? GROUP_HEAD[current.group] : null;
   const crumb = (current && CRUMB[current.to]) ?? title;
   useDocumentTitle(title, appName);
@@ -92,13 +81,12 @@ export function AppShell() {
         </nav>
         <span className="grow" />
         <JumpButton onClick={() => switcher.setOpen(true)} />
-        <NetState />
         <NavLink to="/notifications" className="icon-btn v2-bell" aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'} title="Notifications" data-testid="bell">
           <Icon name="bell" />
           {unread > 0 ? <span className="v2-bell-count" data-testid="unread-count">{unread > 99 ? '99+' : unread}</span> : null}
         </NavLink>
         <ThemeToggle />
-        <AccountMenu />
+        <AccountMenu waiting={queued} />
       </header>
 
       <nav className="sidenav" aria-label="Main navigation">
@@ -108,16 +96,14 @@ export function AppShell() {
             <Icon name={n.icon} /><span className="nav-label">{n.label}</span>
             {n.to === '/overview' && pendingInvitations > 0 ? <span className="count" title="Pending project invitations">{pendingInvitations}</span> : null}
             {n.to === '/projects' && projectCount !== null ? <span className="count" aria-hidden="true" title="Projects you can open" data-testid="nav-project-count">{projectCount}</span> : null}
-            {n.to === '/settings' && queued > 0 ? <span className="count" title="Items waiting for an administrator">{queued}</span> : null}
           </NavLink>,
         ])}
-        <div className="sidenav-foot faint">Offline · on-premises<br />{VERSION ? <>v{VERSION} · </> : null}{unreachable ? 'Server not answering' : 'Server connected'}</div>
       </nav>
 
       <main id={MAIN_ID} className="main v2-main-region" tabIndex={-1}>
         <HeadingLevel level={2}><ErrorBoundary resetKey={loc.pathname} where="platform page"><Outlet /></ErrorBoundary></HeadingLevel>
       </main>
-      {switcher.open ? <QuickSwitcher pages={[...items.map((n) => ({ to: n.to, label: n.label })), { to: '/notifications', label: 'Notifications' }]} onClose={() => switcher.setOpen(false)} /> : null}
+      {switcher.open ? <QuickSwitcher pages={[...items.map((n) => ({ to: n.to, label: n.label })), { to: '/notifications', label: 'Notifications' }, { to: '/settings', label: 'Settings' }]} onClose={() => switcher.setOpen(false)} /> : null}
     </div>
   );
 }

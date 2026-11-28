@@ -79,7 +79,7 @@ export class LiveDocument {
       this.binding.takeBack(e.message);
       return;
     }
-    this.events.toast(e.message, e.code === 'WRITE_BACK_REFUSED' ? 'warning' : 'error');
+    this.events.toast(e.message, e.code === 'EXTERNAL_CHANGE' ? 'info' : e.code === 'WRITE_BACK_REFUSED' ? 'warning' : 'error');
   }
 
   private publishSoon(): void {

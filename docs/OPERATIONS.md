@@ -687,3 +687,47 @@ cd <program folder>\app\backend
 and `ACCEPTANCE: PASS/FAIL` (no errors, no silent overwrite, every check-out notice within 5 s), and exits 0, 1 or 2 (could not run). Without
 `--base` it starts its own server in a temporary folder. `--drill` adds the backup / restore / start timing; `--no-validate` leaves project
 validation out; `--profile <dir>` writes a CPU profile of its own server.
+
+
+## 15. GitLab (intranet) - administrator how-to
+
+Agastya can keep project sources, released PDFs and reviews in a self-managed GitLab on the intranet. Nobody but the administrator sees
+anything of GitLab until a configuration has been saved, and a configuration can only be saved after its connection test passed.
+Design and limits: `docs/phase3/gitlab.md`.
+
+**1. In GitLab** (Admin area > Applications > New application): name `Agastya`; redirect URI = the value shown on
+Administration > System > GitLab (`<Agastya address>/api/gitlab/oauth/callback`); tick **Confidential**; scopes **api** and **read_user**.
+Copy the Application ID and Secret. Optionally create a service account with a personal access token (scope `api`, or `read_api` for
+reading only): it is used for the connection test and, read-only, for members who have not connected.
+
+**2. In Agastya** (Administration > System > GitLab):
+
+* GitLab address: `https://gitlab.corp.local` (https only; the platform never calls any other host).
+* Internal CA certificate: upload the PEM of the CA that signed GitLab's certificate (the whole chain if GitLab serves only its own
+  certificate). It is used only for GitLab requests; nothing is installed on the machine. A file holding a private key is refused.
+* Agastya address: the address people open Agastya with (it makes the redirect URI). Application ID and secret from step 1.
+* Personal access tokens: leave on to let people connect with their own token (scope `api`) instead of the GitLab sign-in.
+* Timeout and retries (reads only are retried).
+* **Test connection**, then **Save** (Save runs the test again and saves nothing if a required check fails). The table names each check:
+  address, CA, TLS, version API, OAuth application, service token.
+
+**3. People** connect on Account (top right) > GitLab: "Connect with GitLab" (GitLab sign-in) or a personal access token. Project managers then
+link the project on its **Repository** page (create a repository in a group, or pick an existing one) and choose what counts: "GitLab
+approvals count" (an approval of the review merge request by the Project Manager approves the Agastya release) and "Store every release in
+GitLab".
+
+**Secrets and backup.** The application secret, service token and every person's token are encrypted with the key file
+`<workspace>\keys\secrets.key` (or `AGASTYA_SECRETS_KEY_FILE`). Back the key file up with the database and keep it as private as the database:
+a database restored without its key keeps working, but GitLab shows "The saved secrets cannot be read" until the administrator types the
+secret and service token again and people reconnect.
+
+**Revoking.** Administration > System > GitLab > Connected people > Disconnect removes one person's token (an OAuth token is also revoked in
+GitLab). **Switch off** removes the configuration and every token; projects keep their link and resume when GitLab is set up again. Nothing in
+GitLab is deleted by either. Every change is in the audit log (`gitlab.*`).
+
+**Limits.** A single file above 50 MB is not pushed (Git LFS is not driven through the API; keep such files out of the project or add them to
+LFS by hand). Pushes larger than 16 MB are split into several commits. Plain http is refused unless `AGASTYA_GITLAB_ALLOW_HTTP=1` (labs only).
+
+**When it does not connect:** TLS failed = wrong or missing CA (or an intermediate missing from the bundle); version failed with 401 = the
+service/test token is wrong; OAuth "invalid_client" = wrong application ID or secret; "redirect URI" errors at sign-in = the URI in GitLab
+does not match the one shown on the GitLab page exactly.

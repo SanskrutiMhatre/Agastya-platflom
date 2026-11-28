@@ -9,9 +9,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { JumpButton, QuickSwitcher, useQuickSwitcher } from '../components/QuickSwitcher';
-import { contentApi, workspaceApi, type ProjectRole, type Summary } from '../api';
+import { workspaceApi, type ProjectRole, type Summary } from '../api';
 import { Icon } from '../components/Icon';
 import { projectRailItems } from './projectRail';
+import { gitlabApi } from '../api/gitlab';
 import { Alert, Loading, errText } from '../components/ui';
 import { MissingBrex } from '../components/MissingBrex';
 import { may, type Can } from '../lib/roles';
@@ -55,10 +56,13 @@ function ProjectShellFor({ id }: { id: string }) {
   const switcher = useQuickSwitcher();
   const [actionsEl, setActionsEl] = useState<HTMLElement | null>(null);
   const [statusEl, setStatusEl] = useState<HTMLElement | null>(null);
+  // Phase 3 (owner): the status bar no longer starts with "Renderer ready" / "Offline · on-premises" (information only, and a request per
+  // project open to feed it); it shows the project's format and size, and "Server not answering" while the connection is lost.
   const unreachable = useSession((s) => s.unreachable);
-  // the mockup's status bar starts with the PDF renderer's state ("Renderer ready")
-  const [renderer, setRenderer] = useState<boolean | null>(null);
-  useEffect(() => { let live = true; contentApi.rendererStatus(id).then((r) => { if (live) setRenderer(r.warm); }).catch(() => undefined); return () => { live = false; }; }, [id]);
+  const adminQueues = useSession((s) => s.adminQueues);
+  // Phase 3 (P3-5): the Repository page is in the rail only while an administrator has GitLab switched on
+  const [gitlab, setGitlab] = useState(false);
+  useEffect(() => { let live = true; void gitlabApi.enabled().then((on) => { if (live) setGitlab(on); }); return () => { live = false; }; }, [id]);
 
   const load = useCallback(() => {
     // A reply for another project (the shell was replaced meanwhile) is ignored by the unmount; one for an older request of this one is
@@ -72,7 +76,7 @@ function ProjectShellFor({ id }: { id: string }) {
   // WP-23 (UX-005, WCAG 2.4.2): "Publication · Project name · Agastya Platform"
   const loc = useLocation();
   const appName = useApp((st) => st.settings.appName);
-  const section = summary ? projectRailItems(id, summary).find((i) => loc.pathname.startsWith(i.to))?.label : null;
+  const section = summary ? projectRailItems(id, summary, { gitlab }).find((i) => loc.pathname.startsWith(i.to))?.label : null;
   useDocumentTitle(section, summary?.project.name, appName);
 
   if (error) {
@@ -82,7 +86,7 @@ function ProjectShellFor({ id }: { id: string }) {
 
   const isCir = summary.project.type === 'CIR';
   const s1000d = (summary.project.format ?? 's1000d') === 's1000d';           // validation (schemas, BREX) belongs to S1000D only
-  const items = projectRailItems(id, summary);                                // WP-34: the rail per project kind lives in projectRail.ts
+  const items = projectRailItems(id, summary, { gitlab });                              // WP-34: the rail per project kind lives in projectRail.ts
   const settings = items.find((i) => i.to.endsWith('/settings'));
   const areas = items.filter((i) => i !== settings);
 
@@ -121,7 +125,7 @@ function ProjectShellFor({ id }: { id: string }) {
             <JumpButton compact onClick={() => switcher.setOpen(true)} />
             <span className="topbar-actions row" ref={setActionsEl} />
             <ThemeToggle />
-            <AccountMenu railPin={{ pinned, toggle: togglePin }} />
+            <AccountMenu railPin={{ pinned, toggle: togglePin }} waiting={adminQueues ? adminQueues.resets + adminQueues.releases : 0} />
           </header>
         )}
         <aside className={`activity v2-rail${pinned ? ' is-pinned' : ''}`} aria-label="Project navigation">
@@ -143,11 +147,9 @@ function ProjectShellFor({ id }: { id: string }) {
           <footer className="statusbar" data-testid="project-status-bar">
             <span className="page-status" ref={setStatusEl} />
             <span className="default-status">
-              <span className="item"><span className={`dot ${unreachable ? 'danger' : renderer === false ? 'warning' : 'success'}`} />{unreachable ? 'Server not answering' : renderer === false ? 'Renderer starts with the first build' : 'Renderer ready'}</span>
+              {unreachable ? <span className="item"><span className="dot danger" />Server not answering</span> : null}
               <span className="item">{formatLabel(summary.project)}</span>
               <span className="item">{summary.dataModules.total} data module{summary.dataModules.total === 1 ? '' : 's'}</span>
-              <span className="grow" />
-              <span className="item">Offline · on-premises</span>
             </span>
           </footer>
         )}

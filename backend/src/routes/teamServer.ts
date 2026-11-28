@@ -6,6 +6,10 @@
 //   GET  /api/admin/metrics             administrators: event-loop delay, statement time and slow statements, request p50/p95/p99,
 //                                       WebSocket connections, presence entries, and the deployment facts an operator checks first
 //   POST /api/admin/metrics/reset       administrators: start a new measuring window (audited)
+//   GET  /api/admin/perf                administrators (Phase 3): event-loop delay histogram, process memory, WebSocket clients, job queue depth,
+//                                       the FOP JVMs' working set, the slowest recent routes (services/perfReport.ts). `?os=0` skips the
+//                                       process list (renderer memory), `?fresh=1` reads it again now, `?top=N` (1-100)
+//                                       the length of the route lists. Read-only.
 // =============================================================================
 
 import type { Express, Request } from 'express';
@@ -15,6 +19,7 @@ import { wrap } from '../services/http';
 import { listProject, PRESENCE_HEARTBEAT_MS, PRESENCE_TTL_MS } from '../services/presence';
 import { projectLeases } from '../services/leases';
 import { reset, snapshot } from '../services/metrics';
+import { perfReport } from '../services/perfReport';
 import { MAX_SOCKETS_PER_SESSION } from '../services/broadcast';
 import { buildInfo } from '../services/version';
 
@@ -33,6 +38,11 @@ export function registerTeamServerRoutes(app: Express): void {
         backup: { intervalHours: config.backup.intervalHours, copyTo: config.backup.copyTo !== null },
       },
     });
+  }));
+
+  app.get('/api/admin/perf', requireAdmin(), wrap(async (req: Request, res) => {
+    const top = Number(req.query.top ?? 20);
+    res.json(await perfReport({ os: req.query.os !== '0', fresh: req.query.fresh === '1', top: Number.isFinite(top) ? top : 20 }));
   }));
 
   app.post('/api/admin/metrics/reset', requireAdmin(), wrap((req: Request, res) => {

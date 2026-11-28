@@ -26,8 +26,6 @@
 .topbar .search-trigger.compact { min-width: 220px; }
 .topbar .search-trigger .v2-jump-label { flex: 1; }
 .topbar .theme-switch, .topbar > .v2-pop-anchor, .topbar > .icon-btn { flex: none; }
-.net-state { cursor: default; }
-.net-state.is-down { color: var(--warning); }
 .v2-bell { position: relative; text-decoration: none; }
 .v2-bell[aria-current="page"], .v2-bell.active { background: var(--surface-selected); color: var(--text-link); }
 .v2-bell .v2-bell-count { position: absolute; top: 1px; right: 0; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--danger-solid); color: var(--text-on-accent);
@@ -39,18 +37,20 @@
 .v2-acct-menu .item .icon { color: var(--text-tertiary); }
 .v2-acct-who { display: flex; flex-direction: column; gap: 2px; padding: var(--space-2) var(--space-3); margin-bottom: var(--space-1); border-bottom: 1px solid var(--border-subtle); font-size: var(--fs-xs); }
 .v2-acct-who strong { font-size: var(--fs-sm); color: var(--text-primary); }
+.v2-acct-menu .item .count { margin-left: auto; }
+.v2-acct-badge { position: absolute; top: 1px; right: 0; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--danger-solid); color: var(--text-on-accent);
+  font-size: 10px; font-weight: var(--fw-semibold); line-height: 16px; text-align: center; box-shadow: 0 0 0 2px var(--surface-panel); pointer-events: none; }
 
 /* ---------------------------------------------------------------- global shell: the side navigation */
 .sidenav .nav-item[aria-current="page"] { background: var(--surface-selected); color: var(--text-link); }
 .sidenav .nav-item .count { min-width: 18px; text-align: right; }
 .sidenav .nav-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.sidenav-foot { margin-top: auto; padding: var(--space-3); font-size: var(--fs-xs); line-height: var(--lh-ui); }
 /* phone width: the navigation becomes an icon column so the page keeps the width (the labels stay for screen readers) */
 @media (max-width: 760px) {
   .app:not(.project) { grid-template-columns: 56px minmax(0, 1fr); }
   .app .sidenav { padding: var(--space-2) var(--space-1); align-items: stretch; }
   .app .sidenav .nav-item { justify-content: center; padding: 0; gap: 0; }
-  .app .sidenav .nav-label, .app .sidenav .nav-group, .app .sidenav-foot { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .app .sidenav .nav-label, .app .sidenav .nav-group { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .app .sidenav .nav-item .count { position: absolute; top: 0; right: 2px; font-size: 10px; }
   .topbar .brand-name, .topbar .crumb-group, .topbar .crumb-group + .sep, .topbar .search-trigger .v2-jump-label, .topbar .search-trigger .kbd-group { display: none; }
   .topbar .search-trigger, .topbar .search-trigger.compact { width: auto; min-width: 0; padding: 0 var(--space-2); }
