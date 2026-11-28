@@ -17,7 +17,7 @@ import { contentApi, problemsApi, type ReviewMark, type ValidationIssue, type Va
 import { forgetLegacyReviewed, issueKey, legacyReviewedKeys, severityLabel } from '../../lib/problems';
 import { Icon } from '../../components/Icon';
 import { PageHeader } from '../../components/PageHeader';
-import { Alert, Badge, Empty, Loading, Spinner, ago, errText, fmtDate, useAsync } from '../../components/ui';
+import { Callout, EmptyState, Loading, Pill, Spinner, ago, errText, fmtDate, useAsync, type Tone } from '../../components/ui';
 import { useProject } from '../../layouts/ProjectShell';
 import { may } from '../../lib/roles';
 import { useUi } from '../../store/ui';
@@ -32,8 +32,8 @@ const SOURCE_LABEL: Record<string, string> = {
 const SOURCE_SHORT: Record<string, string> = { xml: 'XML', xsd: 'XSD', brex: 'BREX', graphics: 'Graphics', ids: 'IDs', icn: 'ICN', pm: 'Publication' };
 const label = (s: string) => SOURCE_LABEL[s] ?? s;
 const short = (s: string) => SOURCE_SHORT[s] ?? s;
-const sevTone = (s: ValidationIssue['sev']) => (s === 'error' ? 'bad' : s === 'warn' ? 'warn' : undefined);
-const SEV_ICON = { error: 'alert', warn: 'warn', info: 'info' } as const;
+const sevTone = (s: ValidationIssue['sev']): Tone => (s === 'error' ? 'danger' : s === 'warn' ? 'warning' : 'info');
+const SEV_ICON = { error: 'xcircle', warn: 'warn', info: 'info' } as const;
 const SEV_CLASS = { error: 'danger', warn: 'warning', info: 'info' } as const;
 
 /**
@@ -155,20 +155,20 @@ export function ValidationPage() {
     <div className="v2-page val-page">
       <PageHeader icon="shield" title="Validation report"
         sub={run ? `Last run ${ago(run.ranAt)} · ${run.checked} files read, ${run.schemaChecked} checked against a schema${run.brexChecked ? `, ${run.brexChecked} against BREX` : ''}.` : 'Check the project against the S1000D schemas and your business rules, then review every finding.'}
-        actions={<div className="v2-row wrap row">
-          <select className="v2-select select v2-val-issue-sel" value={issue} onChange={(e) => void chooseIssue(e.target.value)} aria-label="S1000D issue" data-testid="validation-issue" title="Which S1000D issue the checks use: the schema and the default business rules (BREX). Saved with the project; the build and release checks use it too.">
+        actions={<div className="row wrap">
+          <select className="select v2-val-issue-sel" value={issue} onChange={(e) => void chooseIssue(e.target.value)} aria-label="S1000D issue" data-testid="validation-issue" title="Which S1000D issue the checks use: the schema and the default business rules (BREX). Saved with the project; the build and release checks use it too.">
             <option value="auto">S1000D issue: as declared</option>
             {(last.data?.schemaIssues ?? []).map((i) => <option key={i} value={i}>S1000D issue {i}</option>)}
           </select>
           <label className="check v2-val-check"><input type="checkbox" checked={brex} onChange={(e) => setBrex(e.target.checked)} />Include BREX</label>
           {run ? <button className="btn" onClick={exportCsv} title="The findings shown, as a CSV file"><Icon name="download" size={14} />Export CSV</button> : null}
-          <button className="btn btn-primary primary" onClick={start} disabled={busy || !may(can, 'validate.run')} data-testid="run-validation">{busy ? <Spinner /> : <Icon name="refresh" size={14} />}Run validation</button>
+          <button className="btn primary" onClick={start} disabled={busy || !may(can, 'validate.run')} data-testid="run-validation">{busy ? <Spinner /> : <Icon name="refresh" size={14} />}Run validation</button>
         </div>} />
-      {!may(can, 'validate.run') ? <div className="v2-val-notes"><Alert tone="warn">Viewers can review the last run but cannot start a new one.</Alert></div> : null}
+      {!may(can, 'validate.run') ? <div className="v2-val-notes"><Callout tone="warning">Viewers can review the last run but cannot start a new one.</Callout></div> : null}
 
-      {!run ? <div className="v2-card card"><Empty title="Not validated yet">{may(can, 'validate.run') ? 'Press “Run validation” to check every data module and the publication.' : 'Nobody has run validation on this project yet.'}</Empty></div> : (
+      {!run ? <div className="card"><EmptyState icon="shield" title="Not validated yet">{may(can, 'validate.run') ? 'Press “Run validation” to check every data module and the publication.' : 'Nobody has run validation on this project yet.'}</EmptyState></div> : (
         <>
-          {run.notes.length ? <div className="v2-val-notes"><Alert>{run.notes.slice(0, 3).join(' · ')}</Alert></div> : null}
+          {run.notes.length ? <div className="v2-val-notes"><Callout>{run.notes.slice(0, 3).join(' · ')}</Callout></div> : null}
 
           {/* the severity summary: each card is the filter of its severity (mockup .sum); the fourth counts the team's reviewed marks */}
           <section className="sum val-sum" aria-label="Severity summary">
@@ -183,12 +183,12 @@ export function ValidationPage() {
           </section>
 
           <div className="val-layout">
-            <section className="card v2-card val-issues" aria-labelledby="val-iss-h">
+            <section className="card val-issues" aria-labelledby="val-iss-h">
               <div className="card-head">
                 <h3 id="val-iss-h"><Icon name="tree" size={16} />Issues <span className="faint val-count" aria-live="polite">{shown.length} of {all.length} shown</span></h3>
               </div>
               <div className="val-bar" role="group" aria-label="Filter findings">
-                <input className="input search v2-input" placeholder="Search findings…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search findings" />
+                <input className="input search" placeholder="Search findings…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search findings" />
                 <div className="seg val-seg" role="group" aria-label="Filter by check">
                   <button type="button" aria-pressed={source === 'all'} onClick={() => setSource('all')}>All</button>
                   {sources.map((s) => <button key={s} type="button" aria-pressed={source === s} onClick={() => setSource(s)} title={label(s)}>{short(s)}</button>)}
@@ -197,12 +197,12 @@ export function ValidationPage() {
                 <label className="check v2-val-check"><input type="checkbox" checked={grouped} onChange={(e) => setGrouped(e.target.checked)} />Group by module</label>
               </div>
               <div className="table-wrap" data-testid="issue-list">
-                {shown.length === 0 ? <Empty title={all.length ? 'Nothing matches these filters' : 'No problems found'}>{all.length ? 'Adjust the filters above.' : 'Every check passed.'}</Empty> : (
+                {shown.length === 0 ? <EmptyState icon={all.length ? 'filter' : 'ok'} title={all.length ? 'Nothing matches these filters' : 'No problems found'}>{all.length ? 'Adjust the filters above.' : 'Every check passed.'}</EmptyState> : (
                   <table className="table issues val-table" aria-label="Issues">
                     <thead><tr><th className="val-sevcol"><span className="sr">Severity</span></th><th>Message and location</th><th>Check</th><th className="num">Line</th><th>Module</th></tr></thead>
                     <tbody>
                       {groups.map(([file, list, count]) => [
-                        grouped ? <tr key={`g:${file}`} className="val-group"><td colSpan={5}><Icon name="xml" size={14} /><span className="trunc mono" title={file}>{file}</span><Badge tone={list.some((x) => x.sev === 'error') ? 'bad' : 'warn'}>{count}</Badge></td></tr> : null,
+                        grouped ? <tr key={`g:${file}`} className="val-group"><td colSpan={5}><Icon name="xml" size={14} /><span className="trunc mono" title={file}>{file}</span><Pill tone={list.some((x) => x.sev === 'error') ? 'danger' : 'warning'}>{count}</Pill></td></tr> : null,
                         ...list.map((i) => {
                           const done = reviewed.has(issueKey(i));
                           return (
@@ -210,10 +210,10 @@ export function ValidationPage() {
                               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose(i); } }}>
                               <td className="val-sevcol"><span className={`sevic ${SEV_CLASS[i.sev]}`}><Icon name={SEV_ICON[i.sev]} size={14} /><span className="sr">{i.sev}</span></span></td>
                               <td className="val-msg">
-                                <div className="trunc val-title">{i.title}{done ? <> <Badge tone="ok">Reviewed</Badge></> : null}</div>
+                                <div className="trunc val-title">{i.title}{done ? <> <Pill tone="success">Reviewed</Pill></> : null}</div>
                                 <div className="faint mono val-loc">{i.loc || (i.detail.length > 120 ? `${i.detail.slice(0, 120)}…` : i.detail)}</div>
                               </td>
-                              <td><Badge>{short(i.source)}</Badge></td>
+                              <td><Pill>{short(i.source)}</Pill></td>
                               <td className="num mono">{i.line}</td>
                               <td className="mono faint val-file"><span className="trunc" title={i.rel}>{i.file || i.rel}</span></td>
                             </tr>
@@ -228,14 +228,14 @@ export function ValidationPage() {
             </section>
 
             <aside className="stack val-side" aria-label="Finding">
-              <section className="card v2-card detail val-detail" aria-labelledby="val-d-h">
+              <section className="card detail val-detail" aria-labelledby="val-d-h">
                 {selected ? (
                   <>
-                    <div className="card-head"><h3 id="val-d-h"><span className={`sevic ${SEV_CLASS[selected.sev]}`}><Icon name={SEV_ICON[selected.sev]} size={16} /></span>{selected.title}</h3><Badge>{short(selected.source)}</Badge></div>
+                    <div className="card-head"><h3 id="val-d-h"><span className={`sevic ${SEV_CLASS[selected.sev]}`}><Icon name={SEV_ICON[selected.sev]} size={16} /></span>{selected.title}</h3><Pill>{short(selected.source)}</Pill></div>
                     <div className="card-body" data-testid="issue-detail">
-                      <div className="row v2-row"><Badge tone={sevTone(selected.sev)}>{severityLabel(selected.sev)}</Badge><Badge>{label(selected.source)}</Badge></div>
+                      <div className="row"><Pill tone={sevTone(selected.sev)}>{severityLabel(selected.sev)}</Pill><Pill>{label(selected.source)}</Pill></div>
                       <p className="v2-val-text">{selected.detail}</p>
-                      <dl className="kv val-kv">
+                      <dl className="kv">
                         <dt>File</dt><dd className="mono">{selected.rel}</dd>
                         <dt>Line</dt><dd>{selected.line}</dd>
                         {selected.loc ? <><dt>Where</dt><dd className="mono">{selected.loc}</dd></> : null}
@@ -243,9 +243,9 @@ export function ValidationPage() {
                         {reviewed.get(issueKey(selected)) ? <><dt>Reviewed</dt><dd data-testid="issue-reviewed-by">{reviewed.get(issueKey(selected))!.byName ?? reviewed.get(issueKey(selected))!.by} · {fmtDate(reviewed.get(issueKey(selected))!.at)}</dd></> : null}
                       </dl>
                       {editable ? <SourceExcerpt projectId={id} file={selected.file} line={selected.line} /> : null}
-                      <div className="row v2-row wrap">
-                        {editable ? <button className="btn btn-primary primary sm" onClick={() => nav(`../editor?file=${encodeURIComponent(selected.file)}&line=${selected.line}`)}><Icon name="editor" size={14} />Open at line {selected.line}</button>
-                          : selected.source === 'pm' ? <button className="btn btn-primary primary sm" onClick={() => nav('../publication')}><Icon name="book" size={14} />Open Publication</button> : null}
+                      <div className="row wrap">
+                        {editable ? <button className="btn primary sm" onClick={() => nav(`../editor?file=${encodeURIComponent(selected.file)}&line=${selected.line}`)}><Icon name="editor" size={14} />Open at line {selected.line}</button>
+                          : selected.source === 'pm' ? <button className="btn primary sm" onClick={() => nav('../publication')}><Icon name="book" size={14} />Open Publication</button> : null}
                         {selected.loc ? <button className="btn sm" onClick={() => void copyWhere(selected.loc)}><Icon name="copy" size={14} />Copy location</button> : null}
                       </div>
                       <div className="field val-review">
@@ -256,11 +256,11 @@ export function ValidationPage() {
                       </div>
                     </div>
                   </>
-                ) : <div className="card-body"><Empty title="Select a finding">Its explanation, the source lines and a link to the exact line appear here.</Empty></div>}
+                ) : <div className="card-body"><EmptyState icon="info" title="Select a finding">Its explanation, the source lines and a link to the exact line appear here.</EmptyState></div>}
               </section>
               {byRule.length ? (
-                <section className="card v2-card" aria-labelledby="val-br-h">
-                  <div className="card-head"><h3 id="val-br-h"><Icon name="alert" size={16} />Errors by check</h3></div>
+                <section className="card" aria-labelledby="val-br-h">
+                  <div className="card-head"><h3 id="val-br-h"><Icon name="listOrdered" size={16} />Errors by check</h3></div>
                   <ul className="byrule">
                     {byRule.map((r) => <li key={r.label}><span className="trunc" title={r.label}>{r.label}</span><span className="progress" aria-hidden="true"><i style={{ width: `${Math.round((r.n / byRule[0].n) * 100)}%` }} /></span><span className="num faint">{r.n}</span></li>)}
                   </ul>
