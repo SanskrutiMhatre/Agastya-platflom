@@ -1,39 +1,70 @@
 /* =========================================================================
-   WP-35 second pass: the Validation report on the design system (mockup docs/audit/mockups/validation.html): a filter bar on a card,
-   the finding list beside a sticky detail panel, file groups with their counts, a reviewed badge on each reviewed finding and the detail
-   as a term/description list. Loaded only with ValidationPage's chunk. Colours are tokens only.
+   UI redesign screen 5, the Validation report (owner approved mockup docs/audit/mockups/validation.html): the severity summary whose
+   cards are the filters, the issue table, the selected finding with its source excerpt, the errors counted by check.
+   The shared components (.card, .stat, .seg, .table, .badge, .kv, .progress, .field, .check, .btn, .sr, .trunc, .faint) come from
+   styles/components.css; this file holds only the page's own rules from the mockup's <style> block. Tokens only.
    ========================================================================= */
-.v2-val-notes { margin-bottom: 12px; }
-.v2-val-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 12px; margin-bottom: 12px;
-  background: var(--bg-elev); border: 1px solid var(--border); border-radius: 10px; }
-.v2-val-sev { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 999px;
-  font-size: 12.5px; color: var(--text-muted); cursor: pointer; user-select: none; }
-.v2-val-sev:has(input:checked) { background: var(--accent-soft); border-color: var(--accent); color: var(--text); }
-.v2-val-sev input { margin: 0; }
-.v2-val-sev .v2-sev { margin-top: 0; }
-.v2-val-sev .n { font-variant-numeric: tabular-nums; color: var(--text-faint); }
-.v2-val-sev:has(input:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
-.v2-val-bar .v2-select { width: 200px; height: 30px; }
-.v2-val-bar .v2-input { width: 220px; height: 30px; }
-.v2-val-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; }
+.v2-val-notes { margin-bottom: var(--space-3); }
 .v2-val-issue-sel { width: 210px; }
 
-.v2-val-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: 16px; align-items: start; }
-@media (max-width: 1100px) { .v2-val-layout { grid-template-columns: minmax(0, 1fr); } }
-.v2-val-list { overflow: hidden; }
-.v2-val-group { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--border); font-weight: 600; }
-.v2-val-group .v2-trunc { flex: 1; }
-.v2-issue.sel { box-shadow: inset 3px 0 0 var(--accent); }
-.v2-issue:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
-.v2-issue-body { min-width: 0; flex: 1; }
-.v2-issue-body.done { opacity: .55; }
-.v2-issue-title { font-weight: 600; }
-.v2-issue-detail { white-space: normal; }
-.v2-issue-tags { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: none; }
+/* severity icons */
+.val-page .sevic { display: inline-flex; vertical-align: middle; }
+.val-page .sevic.danger { color: var(--danger); } .val-page .sevic.warning { color: var(--warning); } .val-page .sevic.info { color: var(--info); }
 
-.v2-val-detail { position: sticky; top: 0; }
-.v2-val-detail h3 { margin: 0; }
+/* the severity summary (mockup .sum): each card is a label holding its filter checkbox */
+.val-sum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); margin-bottom: var(--space-4); }
+.val-stat { display: flex; flex-direction: column; cursor: pointer; user-select: none;
+  background: var(--surface-panel); border: 1px solid var(--border-default); border-left: 3px solid var(--border-default); border-radius: var(--radius-lg); }
+.val-stat:hover { background: var(--surface-hover); }
+.val-stat[data-on="true"] { background: var(--surface-selected); }
+.val-stat.e { border-left-color: var(--danger); } .val-stat.w { border-left-color: var(--warning); } .val-stat.i { border-left-color: var(--info); } .val-stat.s { border-left-color: var(--success); }
+.val-stat:has(input:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.val-stat-top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-2); }
+.val-stat-top input { margin: var(--space-1) 0 0; }
+
+/* the report: issues beside the selected finding */
+.val-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: var(--space-4); align-items: start; }
+@media (max-width: 1280px) { .val-layout { grid-template-columns: minmax(0, 1fr); } .val-sum { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.val-page .card-head h3 { min-width: 0; }
+.val-issues { overflow: hidden; }
+.val-count { font-weight: var(--fw-regular); font-size: var(--fs-xs); }
+.val-bar { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border-subtle); }
+.val-bar .input { width: 240px; }
+.val-seg { flex-wrap: wrap; }
+
+/* the issue table (mockup .table.issues) */
+.val-table tbody tr[data-testid="issue"] { cursor: pointer; }
+.val-table tbody tr[aria-selected="true"]:hover td { background: var(--surface-selected); }
+.val-table tbody tr[aria-selected="true"] td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+.val-table tbody tr[data-testid="issue"]:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.val-table td { padding-top: var(--space-1h); padding-bottom: var(--space-1h); }
+.val-table tr.done .val-msg { opacity: .55; }
+.val-sevcol { width: 32px; }
+.val-msg { max-width: 0; width: 60%; }
+.val-title { font-weight: var(--fw-medium); }
+.val-loc { font-size: var(--fs-2xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.val-file { max-width: 180px; }
+.val-file .trunc { display: block; }
+.val-group td { background: var(--surface-inset); font-weight: var(--fw-semibold); }
+.val-group td > * { vertical-align: middle; }
+.val-group .trunc { display: inline-block; max-width: calc(100% - 80px); margin: 0 var(--space-2); }
+
+/* the selected finding */
+.val-side { gap: var(--space-4); position: sticky; top: 0; }
+.val-detail .card-body { display: flex; flex-direction: column; gap: var(--space-3); }
+.val-detail .card-head h3 { overflow-wrap: anywhere; }
 .v2-val-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.v2-kv { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 6px 12px; margin: 0; font-size: 12.5px; }
-.v2-kv dt { color: var(--text-faint); }
-.v2-kv dd { margin: 0; overflow-wrap: anywhere; }
+.val-src { margin: 0; padding: var(--space-3); background: var(--surface-inset); border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  font-family: var(--font-mono); font-size: var(--fs-xs); line-height: 1.6; overflow: auto; white-space: pre; }
+.val-src .ln { display: inline-block; width: 36px; color: var(--text-tertiary); user-select: none; }
+.val-src .hit { display: block; background: var(--danger-subtle); box-shadow: inset 2px 0 0 var(--danger); }
+.val-src .t { color: var(--syntax-tag); } .val-src .a { color: var(--syntax-attr); } .val-src .v { color: var(--syntax-value); }
+.val-src .b { color: var(--syntax-bracket); } .val-src .c { color: var(--syntax-comment); }
+.val-src-note { margin: 0; font-size: var(--fs-xs); }
+.val-review { border-top: 1px solid var(--border-subtle); padding-top: var(--space-3); align-items: flex-start; }
+
+/* errors by check (mockup .byrule) */
+.val-page .byrule { list-style: none; margin: 0; padding: 0; }
+.val-page .byrule li { display: grid; grid-template-columns: minmax(0, 1fr) 120px 28px; gap: var(--space-3); align-items: center; padding: var(--space-2) var(--space-4); font-size: var(--fs-xs); }
+.val-page .byrule li + li { border-top: 1px solid var(--border-subtle); }
+.val-page .byrule .progress > i { background: var(--danger-solid); }

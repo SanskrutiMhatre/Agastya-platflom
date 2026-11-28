@@ -1,9 +1,45 @@
 # agastya-platform — project memory
 
-> Living document for future Claude sessions. **Read this first**, then the per-project files named below.
+> Living document for future Claude sessions. **Read section 0 first** (current state), then `CLAUDE.md` (rules) and `SETUP.md` (machine setup).
 > Keep it current whenever architecture, behaviour, known issues or decisions change.
 > Created 2026-11-15 after a full study of the three codebases and the two PDFs in `docs/`.
 > Deeper notes live in Claude's auto-memory directory (`~/.claude/projects/c--Users-Deepraj-Mhatre/memory/`, indexed by `MEMORY.md`); this file is the repo-local summary.
+
+## 0. Current state (2026-11-28) - read this first
+
+Sections 1-8 below are the history up to 2026-11-23 and describe the parent folder; this section is what is true now for
+`Agastya-platform-v2`. Working rules for Claude are in `CLAUDE.md`; machine setup is in `SETUP.md`.
+
+**Audit and roadmap (2026-11-27/28).** A full software audit is in `docs/audit/` (01-17: functional, architecture, performance,
+security, UI/UX, design system, themes, deployment, database, testing, enterprise readiness; 329 findings, 37 work packages,
+decisions D1-D23). The owner told us to implement the whole roadmap end to end, taking the audit's recommendation for every
+decision. **Done and merged on `main`: 35 work packages, all except the two parked ones** (WP-01..30, 32..36): data-loss fixes, auth hardening, migrations and
+backups, document check-out (leases), groups and per-project permissions, a tamper-evident audit trail, background jobs, the
+editor host and command palette, project home, problems model, accessibility, performance work, team mode, packaging and release
+tooling, chaos / air-gap / soak / PDF regression QA. **Parked by decision:** WP-31 (built only on customer demand) and WP-37
+(PostgreSQL, conditional on D21). Every package's detail and limits: `docs/audit/IMPLEMENTATION-LOG.md`.
+
+**Release state:** `docs/audit/RELEASE-EVIDENCE.md`: 47 gates, 11 PASS, 10 FAIL (measured shortfalls such as temporary-password
+entropy and P0/P1 test coverage), 26 EXTERNAL (clean VMs, a real code-signing certificate, Active Directory, penetration test,
+24 h soak, screen-reader users, separate client machines). Open defects: FOP does not embed the base-14 fonts (QA-006a, a
+ratchet in the PDF regression baselines); server RSS grew 121 -> 195 MB over a 30-minute soak then levelled (24 h run needed).
+
+**UI redesign, in progress (2026-11-28).** The owner found that the earlier UI work kept the old look, and approved all six
+mockups in `docs/audit/mockups/` as the specification. Merged so far: the design system from the mockups
+(`frontend/src/styles/components.css`, tokens with the mockup names, `components/ui.tsx` pieces), the project dashboard
+(`ProjectHomePage`), the validation report and the administration pages. Being built: the global and project shells and the main
+dashboard, the editor workspace (IDE layout around the existing canvases), publication and PDF preview. When those land, the full
+release gate is re-run.
+
+**Database.** `workspace/publisher.db` (node:sqlite) is the owner's real data and the source of truth. Migrations are additive only;
+022-026 were added by the roadmap (audit index, document leases, directory groups and permissions, audit chain, jobs). The server
+takes a verified safety copy before it migrates. A new machine starts empty or restores a platform backup (`SETUP.md`).
+
+**Owner decisions still standing:** Arial is the house font; JSS is best effort against the stencils; owner-removed screens stay
+removed (CSDB page, System 2 SNS, Brand pack, applicability UI, editor Codes strip and button, PMC/ICN/contents switches); the
+bundled samples are dummy data (d87dc48); S1000D projects start on the Xignal reference layout.
+
+**Remote.** `origin` = GitHub; local `main` is ahead of it (the roadmap and the redesign are not pushed yet).
 
 ## 1. What is in this folder
 
@@ -440,3 +476,4 @@ Tests now: backend 16, vitest 9, Playwright 18 (adds wizard-uniqueness and resiz
 - **2026-11-23** - Phase 21 (JSS track, built in parallel; the database restoration above is a different Phase 21) follow-up: approved vendor exception `cover.inbr.show` (one parameter + one `xsl:if` in the SHARED `jsstofo/frontmatter.xsl`, default = old behaviour; set to 0 only by the JSS-authored build for types whose stencil cover has no INBR No.: UHB, MM, ORM; UHB2 keeps it). `s1000dtofo/*` untouched. S1000D direct, S1000D via JSS and the old JSS UHB path proved unchanged by before/after XSL-FO fingerprints and PDF text (`docs/JSS_VENDOR_EXCEPTIONS.md`, `backend/test/jss-cover-isolation.test.js`, fixtures `cover-baseline.json`, `s1000dtofo.manifest.json`). Remaining stencil gaps are listed in `docs/JSS_STENCIL_ANALYSIS.md` section 7. Nothing committed (owner wants to review first).
 - **2026-11-23** - Phase 21 (JSS track, built in parallel; the database restoration above is a different Phase 21), second round of stencil corrections for JSS-authored UHB/MM/ORM (paragraph spacing, Arial Narrow headings, 7 mm level-1 body indent with the heading text kept at 8 mm, two-line cover title, Sl. No./Code No. handbooks table, page set per type (System Name / Cautions), front-matter wording from the stencils, table cell merging, content-before-sub-sections order enforced in schema + validation + editor). All new stylesheet behaviour is a parameter defaulting to the old behaviour (`docs/JSS_VENDOR_EXCEPTIONS.md`); S1000D direct, S1000D via JSS and the old JSS UHB path proved unchanged (FO identical, PDF text identical, same page counts). Full backend run: 458 tests, 18 failing, the SAME 18 that fail on the last commit (api 3, applic-publish 2, brex-gate 3, pdf-furniture 2, pdf21 8); frontend 183/183; Playwright JSS 11/11. Bug found by a test and fixed: seeding templates crashed on restart (const used before init). Arial Narrow files copied from Windows fonts (proprietary, git-ignored). Nothing committed.
 - **2026-11-23** - Merge of the JSS authoring line (parallel copy) into the S1000D line; see the block above and docs/JSS_MERGE_2026-11-23.md.
+- **2026-11-27/28** - Software audit (docs/audit/), then the whole roadmap implemented (35 of 37 work packages merged, WP-31 and WP-37 parked; see section 0 and docs/audit/IMPLEMENTATION-LOG.md); owner commit d87dc48 (dummy-data samples) merged; UI redesign to the approved mockups started; CLAUDE.md and SETUP.md added.

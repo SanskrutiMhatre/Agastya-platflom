@@ -4,26 +4,37 @@
 // line) and which check found it; the author can filter, mark findings as
 // reviewed (for the whole team, on the server, with who and when: WP-22), jump to the offending line in
 // the editor, or export the list.
+//
+// UI redesign screen 5 (owner approved mockups 2026-11-28, docs/audit/mockups/validation.html): a severity summary whose cards are the
+// severity filters, the findings as a table (grouped by module, or flat), the selected finding beside it with its source excerpt (the
+// module's own lines, read from the server) and the errors counted by check.
 
 import { useEffect, useMemo, useState } from 'react';
 import '../../styles/pages/structure.css';   // WP-35: this page's styles load with its chunk
-import '../../styles/pages/validation.css';  // WP-35 second pass: the report layout (mockup validation.html)
+import '../../styles/pages/validation.css';  // the report layout (mockup validation.html)
 import { useNavigate } from 'react-router-dom';
 import { contentApi, problemsApi, type ReviewMark, type ValidationIssue, type ValidationRun } from '../../api';
 import { forgetLegacyReviewed, issueKey, legacyReviewedKeys, severityLabel } from '../../lib/problems';
 import { Icon } from '../../components/Icon';
 import { PageHeader } from '../../components/PageHeader';
-import { Alert, Badge, Empty, Loading, Spinner, ago, errText, fmtDate, useAsync } from '../../components/ui';
+import { Callout, EmptyState, Loading, Pill, Spinner, ago, errText, fmtDate, useAsync, type Tone } from '../../components/ui';
 import { useProject } from '../../layouts/ProjectShell';
 import { may } from '../../lib/roles';
 import { useUi } from '../../store/ui';
 import { csvRow } from '../../lib/csv';
 import { MoreRows, useProgressive } from '../../components/windowing';
+import { SourceExcerpt } from './ValidationSource';
 
-const SOURCE_LABEL: Record<ValidationIssue['source'], string> = {
+const SOURCE_LABEL: Record<string, string> = {
   xml: 'Well-formedness', xsd: 'S1000D schema', brex: 'Business rules (BREX)', graphics: 'Graphics', ids: 'Identifiers', icn: 'ICN entities', pm: 'Publication',
 };
-const sevTone = (s: ValidationIssue['sev']) => (s === 'error' ? 'bad' : s === 'warn' ? 'warn' : undefined);
+// the short names of the source filter and the summary cards (mockup: XSD · BREX · Link)
+const SOURCE_SHORT: Record<string, string> = { xml: 'XML', xsd: 'XSD', brex: 'BREX', graphics: 'Graphics', ids: 'IDs', icn: 'ICN', pm: 'Publication' };
+const label = (s: string) => SOURCE_LABEL[s] ?? s;
+const short = (s: string) => SOURCE_SHORT[s] ?? s;
+const sevTone = (s: ValidationIssue['sev']): Tone => (s === 'error' ? 'danger' : s === 'warn' ? 'warning' : 'info');
+const SEV_ICON = { error: 'xcircle', warn: 'warn', info: 'info' } as const;
+const SEV_CLASS = { error: 'danger', warn: 'warning', info: 'info' } as const;
 
 /**
  * WP-22 (UX-008, FE-015): the "reviewed" marks are the team's, on the server (who and when), not this browser's. Marks an earlier version kept
@@ -54,11 +65,18 @@ function useReviewed(projectId: string, canMark: boolean) {
 
 function toCsv(issues: ValidationIssue[]): string {
   // WP-07 (ARC-020): one cell writer; a title or detail beginning with = is written as text
-  return ['severity,check,file,line,title,detail', ...issues.map((i) => csvRow([i.sev, SOURCE_LABEL[i.source], i.rel, i.line, i.title, i.detail]))].join('\r\n');
+  return ['severity,check,file,line,title,detail', ...issues.map((i) => csvRow([i.sev, label(i.source), i.rel, i.line, i.title, i.detail]))].join('\r\n');
+}
+
+/** "3 XSD · 11 BREX": how the findings of one severity split over the checks (the line under each summary card). */
+function split(issues: ValidationIssue[]): string {
+  const m = new Map<string, number>();
+  for (const i of issues) m.set(i.source, (m.get(i.source) ?? 0) + 1);
+  return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([s, n]) => `${n} ${short(s)}`).join(' · ');
 }
 
 export function ValidationPage() {
-  const { id, role, can, reload } = useProject();
+  const { id, can, reload } = useProject();
   const nav = useNavigate();
   const toast = useUi((s) => s.toast);
   const last = useAsync(() => contentApi.validation(id), [id]);
@@ -70,6 +88,7 @@ export function ValidationPage() {
   const [source, setSource] = useState('all');
   const [q, setQ] = useState('');
   const [hideReviewed, setHideReviewed] = useState(false);
+  const [grouped, setGrouped] = useState(true);
   const [selId, setSelId] = useState<string | null>(null);
   const { reviewed, toggle } = useReviewed(id, may(can, 'problems.review'));
 
@@ -90,103 +109,163 @@ export function ValidationPage() {
     catch (e) { toast(errText(e), 'error'); } finally { setBusy(false); }
   };
 
-  const shown = useMemo(() => (run?.issues ?? []).filter((i) =>
+  const all = run?.issues ?? [];
+  const shown = useMemo(() => all.filter((i) =>
     sev[i.sev] && (source === 'all' || i.source === source) && (!hideReviewed || !reviewed.has(issueKey(i)))
-    && (!q || `${i.title} ${i.detail} ${i.rel} ${i.loc}`.toLowerCase().includes(q.toLowerCase()))), [run, sev, source, q, hideReviewed, reviewed]);
+    && (!q || `${i.title} ${i.detail} ${i.rel} ${i.loc}`.toLowerCase().includes(q.toLowerCase()))), [all, sev, source, q, hideReviewed, reviewed]);
   const byFile = useMemo(() => {
+    if (!grouped) return [['', shown]] as Array<[string, ValidationIssue[]]>;
     const m = new Map<string, ValidationIssue[]>();
     for (const i of shown) { const k = i.rel || '(project)'; if (!m.has(k)) m.set(k, []); m.get(k)!.push(i); }
     return [...m.entries()].sort((a, b) => b[1].filter((x) => x.sev === 'error').length - a[1].filter((x) => x.sev === 'error').length || a[0].localeCompare(b[0]));
-  }, [shown]);
+  }, [shown, grouped]);
   // WP-18 (FE-030): thousands of findings draw their first rows, more as the end comes into view (groups keep their order and headings)
-  const drawn = useProgressive(shown.length, `${run?.ranAt ?? ''}|${q}|${source}|${hideReviewed}|${sev.error}${sev.warn}${sev.info}`);
+  const drawn = useProgressive(shown.length, `${run?.ranAt ?? ''}|${q}|${source}|${hideReviewed}|${grouped}|${sev.error}${sev.warn}${sev.info}`);
   const groups = useMemo(() => {
     let left = drawn.limit; const out: Array<[string, ValidationIssue[], number]> = [];
     for (const [file, list] of byFile) { if (left <= 0) break; out.push([file, list.slice(0, left), list.length]); left -= list.length; }
     return out;
   }, [byFile, drawn.limit]);
-  const selected = run?.issues.find((i) => i.id === selId) ?? null;
-  const sources = [...new Set((run?.issues ?? []).map((i) => i.source))];
+  const selected = all.find((i) => i.id === selId) ?? null;
+  const sources = [...new Set(all.map((i) => i.source))];
+  const reviewedCount = useMemo(() => all.filter((i) => reviewed.has(issueKey(i))).length, [all, reviewed]);
+  // the errors counted by check title (mockup "Errors by rule"): the run's own findings, the most frequent first
+  const byRule = useMemo(() => {
+    const m = new Map<string, { label: string; n: number }>();
+    for (const i of all) if (i.sev === 'error') { const k = `${i.source}|${i.title}`; const e = m.get(k) ?? { label: `${short(i.source)} · ${i.title}`, n: 0 }; e.n++; m.set(k, e); }
+    return [...m.values()].sort((a, b) => b.n - a.n).slice(0, 6);
+  }, [all]);
 
   if (last.loading && !last.data) return <Loading />;
   const editable = selected && /^csdb\/.*\.xml$/i.test(selected.rel);
+  const exportCsv = () => { const url = URL.createObjectURL(new Blob([toCsv(shown)], { type: 'text/csv' })); const a = document.createElement('a'); a.href = url; a.download = 'validation.csv'; a.click(); URL.revokeObjectURL(url); };
+  const copyWhere = async (text: string) => {
+    try { await navigator.clipboard.writeText(text); toast('Location copied', 'success'); } catch { toast('The browser did not allow copying', 'error'); }
+  };
+  const choose = (i: ValidationIssue) => setSelId(i.id);
+  const sevCard = (s: 'error' | 'warn' | 'info', cls: string, color: string, name: string) => (
+    <label key={s} className={`stat val-stat ${cls}`} data-on={sev[s]}>
+      <span className="val-stat-top"><span className="v" style={{ color: `var(${color})` }}>{run!.summary[s]}</span><input type="checkbox" checked={sev[s]} onChange={(e) => setSev({ ...sev, [s]: e.target.checked })} /></span>
+      <span className="l">{name}</span>
+      <span className="d faint">{split(all.filter((i) => i.sev === s)) || 'None'}</span>
+    </label>
+  );
 
   return (
-    <div className="v2-page">
-      <PageHeader icon="shield" title="Validation"
+    <div className="v2-page val-page">
+      <PageHeader icon="shield" title="Validation report"
         sub={run ? `Last run ${ago(run.ranAt)} · ${run.checked} files read, ${run.schemaChecked} checked against a schema${run.brexChecked ? `, ${run.brexChecked} against BREX` : ''}.` : 'Check the project against the S1000D schemas and your business rules, then review every finding.'}
-        stats={run ? [{ label: 'Errors', value: run.summary.error, tone: run.summary.error ? 'bad' : 'ok' }, { label: 'Warnings', value: run.summary.warn, tone: run.summary.warn ? 'warn' : undefined }, { label: 'Notes', value: run.summary.info }] : undefined}
-        actions={<div className="v2-row wrap">
-          <select className="v2-select v2-val-issue-sel" value={issue} onChange={(e) => void chooseIssue(e.target.value)} aria-label="S1000D issue" data-testid="validation-issue" title="Which S1000D issue the checks use: the schema and the default business rules (BREX). Saved with the project; the build and release checks use it too.">
+        actions={<div className="row wrap">
+          <select className="select v2-val-issue-sel" value={issue} onChange={(e) => void chooseIssue(e.target.value)} aria-label="S1000D issue" data-testid="validation-issue" title="Which S1000D issue the checks use: the schema and the default business rules (BREX). Saved with the project; the build and release checks use it too.">
             <option value="auto">S1000D issue: as declared</option>
             {(last.data?.schemaIssues ?? []).map((i) => <option key={i} value={i}>S1000D issue {i}</option>)}
           </select>
-          <label className="v2-val-check"><input type="checkbox" checked={brex} onChange={(e) => setBrex(e.target.checked)} />Include BREX</label>
-          <button className="btn btn-primary" onClick={start} disabled={busy || !may(can, 'validate.run')} data-testid="run-validation">{busy ? <Spinner /> : <Icon name="play" />}Run validation</button>
+          <label className="check v2-val-check"><input type="checkbox" checked={brex} onChange={(e) => setBrex(e.target.checked)} />Include BREX</label>
+          {run ? <button className="btn" onClick={exportCsv} title="The findings shown, as a CSV file"><Icon name="download" size={14} />Export CSV</button> : null}
+          <button className="btn primary" onClick={start} disabled={busy || !may(can, 'validate.run')} data-testid="run-validation">{busy ? <Spinner /> : <Icon name="refresh" size={14} />}Run validation</button>
         </div>} />
-      {!may(can, 'validate.run') ? <div className="v2-val-notes"><Alert tone="warn">Viewers can review the last run but cannot start a new one.</Alert></div> : null}
+      {!may(can, 'validate.run') ? <div className="v2-val-notes"><Callout tone="warning">Viewers can review the last run but cannot start a new one.</Callout></div> : null}
 
-      {!run ? <div className="v2-card"><Empty title="Not validated yet">{may(can, 'validate.run') ? 'Press “Run validation” to check every data module and the publication.' : 'Nobody has run validation on this project yet.'}</Empty></div> : (
+      {!run ? <div className="card"><EmptyState icon="shield" title="Not validated yet">{may(can, 'validate.run') ? 'Press “Run validation” to check every data module and the publication.' : 'Nobody has run validation on this project yet.'}</EmptyState></div> : (
         <>
-          {run.notes.length ? <div className="v2-val-notes"><Alert>{run.notes.slice(0, 3).join(' · ')}</Alert></div> : null}
+          {run.notes.length ? <div className="v2-val-notes"><Callout>{run.notes.slice(0, 3).join(' · ')}</Callout></div> : null}
 
-          {/* WP-35 second pass: the filters on one bar (mockup validation.html); each severity chip shows how many findings it holds */}
-          <div className="v2-val-bar" role="group" aria-label="Filter findings">
-            {(['error', 'warn', 'info'] as const).map((s) => <label key={s} className="v2-val-sev"><input type="checkbox" checked={sev[s]} onChange={(e) => setSev({ ...sev, [s]: e.target.checked })} /><span className={`v2-sev ${s}`} />{s === 'warn' ? 'Warnings' : s === 'error' ? 'Errors' : 'Notes'}<span className="n">{run.summary[s]}</span></label>)}
-            <select className="v2-select" value={source} onChange={(e) => setSource(e.target.value)} aria-label="Filter by check"><option value="all">All checks</option>{sources.map((s) => <option key={s} value={s}>{SOURCE_LABEL[s]}</option>)}</select>
-            <input className="v2-input" placeholder="Search findings…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search findings" />
-            <label className="v2-val-check"><input type="checkbox" checked={hideReviewed} onChange={(e) => setHideReviewed(e.target.checked)} />Hide reviewed</label>
-            <span className="spacer" />
-            <span className="v2-hint" aria-live="polite">{shown.length} of {run.issues.length} shown</span>
-            <button className="btn btn-sm" onClick={() => { const url = URL.createObjectURL(new Blob([toCsv(shown)], { type: 'text/csv' })); const a = document.createElement('a'); a.href = url; a.download = 'validation.csv'; a.click(); URL.revokeObjectURL(url); }}><Icon name="download" size={13} />Export CSV</button>
-          </div>
+          {/* the severity summary: each card is the filter of its severity (mockup .sum); the fourth counts the team's reviewed marks */}
+          <section className="sum val-sum" aria-label="Severity summary">
+            {sevCard('error', 'e', '--danger', 'Errors')}
+            {sevCard('warn', 'w', '--warning', 'Warnings')}
+            {sevCard('info', 'i', '--info', 'Notes')}
+            <label className="stat val-stat s" data-on={hideReviewed}>
+              <span className="val-stat-top"><span className="v" style={{ color: 'var(--success)' }}>{reviewedCount}</span><input type="checkbox" checked={hideReviewed} onChange={(e) => setHideReviewed(e.target.checked)} /></span>
+              <span className="l">Reviewed · Hide reviewed</span>
+              <span className="d faint">Marked for the whole team</span>
+            </label>
+          </section>
 
-          <div className="v2-val-layout">
-            <div className="v2-card v2-val-list" data-testid="issue-list">
-              {shown.length === 0 ? <Empty title={run.issues.length ? 'Nothing matches these filters' : 'No problems found'}>{run.issues.length ? 'Adjust the filters above.' : 'Every check passed.'}</Empty> : groups.map(([file, list, count]) => (
-                <div key={file}>
-                  <div className="v2-val-group">
-                    <Icon name="xml" size={14} /><span className="v2-trunc v2-mono" title={file}>{file}</span><Badge tone={list.some((x) => x.sev === 'error') ? 'bad' : 'warn'}>{count}</Badge>
-                  </div>
-                  {list.map((i) => {
-                    const done = reviewed.has(issueKey(i));
-                    return (
-                      <div key={i.id} className={`v2-issue ${selId === i.id ? 'sel' : ''}`} onClick={() => setSelId(i.id)} role="button" tabIndex={0} aria-pressed={selId === i.id} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelId(i.id); } }} data-testid="issue">
-                        <span className={`v2-sev ${i.sev}`} aria-label={i.sev} />
-                        <div className={`v2-issue-body${done ? ' done' : ''}`}>
-                          <div className="v2-issue-title">{i.title}{i.line > 1 ? <span className="v2-hint"> · line {i.line}</span> : null}</div>
-                          <div className="v2-hint v2-issue-detail">{i.detail.length > 140 ? `${i.detail.slice(0, 140)}…` : i.detail}</div>
-                        </div>
-                        <span className="v2-issue-tags"><Badge>{SOURCE_LABEL[i.source]}</Badge>{done ? <Badge tone="ok">Reviewed</Badge> : null}</span>
-                      </div>
-                    );
-                  })}
+          <div className="val-layout">
+            <section className="card val-issues" aria-labelledby="val-iss-h">
+              <div className="card-head">
+                <h3 id="val-iss-h"><Icon name="tree" size={16} />Issues <span className="faint val-count" aria-live="polite">{shown.length} of {all.length} shown</span></h3>
+              </div>
+              <div className="val-bar" role="group" aria-label="Filter findings">
+                <input className="input search" placeholder="Search findings…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search findings" />
+                <div className="seg val-seg" role="group" aria-label="Filter by check">
+                  <button type="button" aria-pressed={source === 'all'} onClick={() => setSource('all')}>All</button>
+                  {sources.map((s) => <button key={s} type="button" aria-pressed={source === s} onClick={() => setSource(s)} title={label(s)}>{short(s)}</button>)}
                 </div>
-              ))}
+                <span className="grow" />
+                <label className="check v2-val-check"><input type="checkbox" checked={grouped} onChange={(e) => setGrouped(e.target.checked)} />Group by module</label>
+              </div>
+              <div className="table-wrap" data-testid="issue-list">
+                {shown.length === 0 ? <EmptyState icon={all.length ? 'filter' : 'ok'} title={all.length ? 'Nothing matches these filters' : 'No problems found'}>{all.length ? 'Adjust the filters above.' : 'Every check passed.'}</EmptyState> : (
+                  <table className="table issues val-table" aria-label="Issues">
+                    <thead><tr><th className="val-sevcol"><span className="sr">Severity</span></th><th>Message and location</th><th>Check</th><th className="num">Line</th><th>Module</th></tr></thead>
+                    <tbody>
+                      {groups.map(([file, list, count]) => [
+                        grouped ? <tr key={`g:${file}`} className="val-group"><td colSpan={5}><Icon name="xml" size={14} /><span className="trunc mono" title={file}>{file}</span><Pill tone={list.some((x) => x.sev === 'error') ? 'danger' : 'warning'}>{count}</Pill></td></tr> : null,
+                        ...list.map((i) => {
+                          const done = reviewed.has(issueKey(i));
+                          return (
+                            <tr key={i.id} aria-selected={selId === i.id} tabIndex={0} onClick={() => choose(i)} data-testid="issue" className={done ? 'done' : undefined}
+                              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); choose(i); } }}>
+                              <td className="val-sevcol"><span className={`sevic ${SEV_CLASS[i.sev]}`}><Icon name={SEV_ICON[i.sev]} size={14} /><span className="sr">{i.sev}</span></span></td>
+                              <td className="val-msg">
+                                <div className="trunc val-title">{i.title}{done ? <> <Pill tone="success">Reviewed</Pill></> : null}</div>
+                                <div className="faint mono val-loc">{i.loc || (i.detail.length > 120 ? `${i.detail.slice(0, 120)}…` : i.detail)}</div>
+                              </td>
+                              <td><Pill>{short(i.source)}</Pill></td>
+                              <td className="num mono">{i.line}</td>
+                              <td className="mono faint val-file"><span className="trunc" title={i.rel}>{i.file || i.rel}</span></td>
+                            </tr>
+                          );
+                        }),
+                      ])}
+                    </tbody>
+                  </table>
+                )}
+              </div>
               {shown.length ? <MoreRows shown={drawn.limit} total={shown.length} onMore={drawn.more} onAll={drawn.all} /> : null}
-            </div>
+            </section>
 
-            <aside className="v2-card v2-card-pad v2-val-detail" aria-label="Finding">
-              {selected ? (
-                <div className="v2-stack" data-testid="issue-detail">
-                  <div className="v2-row"><Badge tone={sevTone(selected.sev)}>{severityLabel(selected.sev)}</Badge><Badge>{SOURCE_LABEL[selected.source]}</Badge></div>
-                  <h3>{selected.title}</h3>
-                  <p className="v2-val-text">{selected.detail}</p>
-                  <dl className="v2-kv">
-                    <dt>File</dt><dd className="v2-mono">{selected.rel}</dd>
-                    <dt>Line</dt><dd>{selected.line}</dd>
-                    {selected.loc ? <><dt>Where</dt><dd className="v2-mono">{selected.loc}</dd></> : null}
-                    <dt>Run</dt><dd>{fmtDate(run.ranAt)}</dd>
-                    {reviewed.get(issueKey(selected)) ? <><dt>Reviewed</dt><dd data-testid="issue-reviewed-by">{reviewed.get(issueKey(selected))!.byName ?? reviewed.get(issueKey(selected))!.by} · {fmtDate(reviewed.get(issueKey(selected))!.at)}</dd></> : null}
-                  </dl>
-                  <div className="v2-row wrap">
-                    {editable ? <button className="btn btn-primary" onClick={() => nav(`../editor?file=${encodeURIComponent(selected.file)}&line=${selected.line}`)}><Icon name="editor" />Open at line {selected.line}</button>
-                      : selected.source === 'pm' ? <button className="btn btn-primary" onClick={() => nav('../publication')}><Icon name="book" />Open Publication</button> : null}
-                    <button className="btn" onClick={() => void toggle(issueKey(selected))} data-testid="issue-mark-reviewed" disabled={!may(can, 'problems.review')}
-                      title={may(can, 'problems.review') ? 'Marks the finding reviewed for everyone on the project (your name and the time are kept)' : 'Reviewers, editors, managers and owners mark findings reviewed'}><Icon name="check" />{reviewed.has(issueKey(selected)) ? 'Unmark reviewed' : 'Mark reviewed'}</button>
-                  </div>
-                </div>
-              ) : <Empty title="Select a finding">Its explanation and a link to the exact line appear here.</Empty>}
+            <aside className="stack val-side" aria-label="Finding">
+              <section className="card detail val-detail" aria-labelledby="val-d-h">
+                {selected ? (
+                  <>
+                    <div className="card-head"><h3 id="val-d-h"><span className={`sevic ${SEV_CLASS[selected.sev]}`}><Icon name={SEV_ICON[selected.sev]} size={16} /></span>{selected.title}</h3><Pill>{short(selected.source)}</Pill></div>
+                    <div className="card-body" data-testid="issue-detail">
+                      <div className="row"><Pill tone={sevTone(selected.sev)}>{severityLabel(selected.sev)}</Pill><Pill>{label(selected.source)}</Pill></div>
+                      <p className="v2-val-text">{selected.detail}</p>
+                      <dl className="kv">
+                        <dt>File</dt><dd className="mono">{selected.rel}</dd>
+                        <dt>Line</dt><dd>{selected.line}</dd>
+                        {selected.loc ? <><dt>Where</dt><dd className="mono">{selected.loc}</dd></> : null}
+                        <dt>Run</dt><dd>{fmtDate(run.ranAt)}</dd>
+                        {reviewed.get(issueKey(selected)) ? <><dt>Reviewed</dt><dd data-testid="issue-reviewed-by">{reviewed.get(issueKey(selected))!.byName ?? reviewed.get(issueKey(selected))!.by} · {fmtDate(reviewed.get(issueKey(selected))!.at)}</dd></> : null}
+                      </dl>
+                      {editable ? <SourceExcerpt projectId={id} file={selected.file} line={selected.line} /> : null}
+                      <div className="row wrap">
+                        {editable ? <button className="btn primary sm" onClick={() => nav(`../editor?file=${encodeURIComponent(selected.file)}&line=${selected.line}`)}><Icon name="editor" size={14} />Open at line {selected.line}</button>
+                          : selected.source === 'pm' ? <button className="btn primary sm" onClick={() => nav('../publication')}><Icon name="book" size={14} />Open Publication</button> : null}
+                        {selected.loc ? <button className="btn sm" onClick={() => void copyWhere(selected.loc)}><Icon name="copy" size={14} />Copy location</button> : null}
+                      </div>
+                      <div className="field val-review">
+                        <button className="btn sm" onClick={() => void toggle(issueKey(selected))} data-testid="issue-mark-reviewed" disabled={!may(can, 'problems.review')}
+                          title={may(can, 'problems.review') ? 'Marks the finding reviewed for everyone on the project (your name and the time are kept)' : 'Reviewers, editors, managers and owners mark findings reviewed'}><Icon name="check" size={14} />{reviewed.has(issueKey(selected)) ? 'Unmark reviewed' : 'Mark reviewed'}</button>
+                        {!may(can, 'problems.review') ? <span className="error"><Icon name="alert" size={13} />Reviewers, editors, managers and owners mark findings reviewed.</span>
+                          : <span className="hint">The mark is the team's: your name and the time are kept.</span>}
+                      </div>
+                    </div>
+                  </>
+                ) : <div className="card-body"><EmptyState icon="info" title="Select a finding">Its explanation, the source lines and a link to the exact line appear here.</EmptyState></div>}
+              </section>
+              {byRule.length ? (
+                <section className="card" aria-labelledby="val-br-h">
+                  <div className="card-head"><h3 id="val-br-h"><Icon name="listOrdered" size={16} />Errors by check</h3></div>
+                  <ul className="byrule">
+                    {byRule.map((r) => <li key={r.label}><span className="trunc" title={r.label}>{r.label}</span><span className="progress" aria-hidden="true"><i style={{ width: `${Math.round((r.n / byRule[0].n) * 100)}%` }} /></span><span className="num faint">{r.n}</span></li>)}
+                  </ul>
+                </section>
+              ) : null}
             </aside>
           </div>
         </>

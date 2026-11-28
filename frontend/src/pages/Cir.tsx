@@ -7,7 +7,8 @@ import { useNavigate } from 'react-router-dom';
 import { ApiError } from '../api/client';
 import { cirApi, workspaceApi, type CirModule } from '../api';
 import { Icon } from '../components/Icon';
-import { PageHeader } from '../components/PageHeader';
+import '../styles/pages/admin.css';   // UI redesign screen 6: the administration look of the global pages
+import { AdmHead } from './adminParts';
 import { Alert, Badge, ConfirmModal, Empty, Loading, Modal, ago, errText, fmtDate, useAsync } from '../components/ui';
 import { useSession } from '../store/session';
 import { useUi } from '../store/ui';
@@ -34,16 +35,16 @@ export function CirPage() {
   const mayDelete = me?.role !== 'author';                                  // only a Project Manager or an administrator deletes
 
   return (
-    <div className="v2-page">
-      <PageHeader icon="library" title="Common information repository" sub="Data modules shared by everyone. Add one for others to reuse, or copy one into your project."
+    <div className="v2-page adm">
+      <AdmHead icon="library" title="Common information repository" sub={<>Data modules shared by everyone. Add one for others to reuse, or copy one into your project. <span className="faint" data-testid="cir-count">{modules.length} module{modules.length === 1 ? '' : 's'}</span></>}
         actions={<>
           <button className="btn" onClick={() => setAdding(true)} data-testid="cir-add"><Icon name="upload" />Upload data modules</button>
           <button className="btn btn-primary" disabled={!workspace} onClick={() => nav(`/projects/${workspace}/editor?create=1`)} data-testid="cir-create"><Icon name="plus" />Create data module</button>
-        </>}
-        stats={[{ label: 'Modules', value: modules.length }]} />
-      <div className="v2-row"><input className="v2-input" style={{ maxWidth: 320 }} placeholder="Filter…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Filter common data modules" /></div>
+        </>} />
       {list.error ? <Alert tone="bad">{list.error}</Alert> : null}
-      <div className="v2-card" data-testid="cir-list">
+      <section className="card" data-testid="cir-list" aria-labelledby="cir-h">
+        <div className="card-head"><h3 id="cir-h"><Icon name="library" />Common data modules <span className="count">{rows.length}</span></h3>
+          <input className="v2-input v2-w-280" type="search" placeholder="Filter…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Filter common data modules" /></div>
         {list.loading && !list.data ? <Loading /> : rows.length === 0 ? <Empty title={q ? 'No module matches' : 'The repository is empty'}>{q ? undefined : 'Create a data module here, or upload one, for other people to reuse.'}</Empty> : (
           <div className="v2-scroll-x"><table className="v2-table">
             <thead><tr><th>Data module</th><th>Kind</th><th>Note</th><th>Added by</th><th /></tr></thead>
@@ -53,7 +54,7 @@ export function CirPage() {
                 <td><Badge>{m.kind ?? 'Common module'}</Badge></td>
                 <td className="v2-hint">{m.note ?? ''}</td>
                 <td title={fmtDate(m.addedAt)}>{m.addedByName ?? '—'}<div className="v2-hint">{ago(m.addedAt)}</div></td>
-                <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                <td className="v2-td-end">
                   <button className="btn btn-sm" onClick={async () => { try { setLook(await cirApi.read(m.id)); } catch (e) { toast(errText(e), 'error'); } }}><Icon name="eye" size={13} />View</button>{' '}
                   <button className="btn btn-sm" disabled={!workspace} onClick={() => nav(`/projects/${workspace}/editor?file=${encodeURIComponent(m.file)}`)} data-testid="cir-edit"><Icon name="edit" size={13} />Edit</button>{' '}
                   <button className="btn btn-sm btn-primary" onClick={() => setUse(m)} data-testid="cir-use"><Icon name="copy" size={13} />Add to project</button>
@@ -62,7 +63,7 @@ export function CirPage() {
               </tr>))}</tbody>
           </table></div>
         )}
-      </div>
+      </section>
 
       {adding ? <AddModal onClose={() => setAdding(false)} onDone={() => { setAdding(false); list.reload(); }} /> : null}
       {use ? (
