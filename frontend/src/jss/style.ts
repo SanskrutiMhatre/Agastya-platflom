@@ -12,7 +12,7 @@ export const JSS_CSS = `
 .jss-quick { display: inline-flex; gap: 1px; margin: 0 10px 3px 0; padding-right: 10px; border-right: 1px solid var(--border); }
 .jss-tab { height: 30px; padding: 0 14px; border: 1px solid transparent; border-bottom: 0; border-radius: 6px 6px 0 0; background: none; color: var(--text-muted); font: inherit; font-size: 12.5px; cursor: pointer; margin-bottom: -1px; }
 .jss-tab:hover { color: var(--text); background: var(--bg-hover); }
-.jss-tab.on { background: var(--bg); color: var(--accent); font-weight: 600; border-color: var(--border); border-bottom: 1px solid var(--bg); }
+.jss-tab.on { background: var(--bg); color: var(--text-link); font-weight: 600; border-color: var(--border); border-bottom: 1px solid var(--bg); }
 .jss-panels { background: var(--bg); }
 .jss-panel { display: flex; flex-wrap: wrap; align-items: stretch; gap: 2px 0; padding: 6px 10px 4px; min-height: 60px; }
 .jss-panel[hidden] { display: none; }
@@ -25,8 +25,8 @@ export const JSS_CSS = `
 .jss-tb { min-width: 28px; height: 28px; padding: 0 7px; border: 1px solid transparent; border-radius: 6px; background: none; color: var(--text); cursor: pointer; font: inherit; font-size: 12.5px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; }
 .jss-tb:hover:not(:disabled) { background: var(--bg-hover); }
 .jss-tb:disabled { color: var(--text-faint); cursor: default; opacity: .55; }
-.jss-tb.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
-.jss-tb:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.jss-tb.on { background: var(--accent-soft); color: var(--text-link); border-color: var(--accent); }
+.jss-tb:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 .jss-tb b, .jss-tb i, .jss-tb u { font-size: 14px; }
 .jss-menu { position: absolute; z-index: 40; min-width: 200px; background: var(--bg-elev); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: var(--shadow-menu); padding: 4px; }
 .jss-menu button { display: flex; width: 100%; align-items: center; gap: 8px; padding: 7px 10px; border: 0; background: none; border-radius: 5px; color: var(--text); font: inherit; cursor: pointer; text-align: left; }
@@ -39,7 +39,7 @@ export const JSS_CSS = `
 .jss-outline h3 { margin: 4px 12px 6px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); font-weight: 600; }
 .jss-ol { display: flex; gap: 6px; align-items: baseline; min-height: 24px; padding: 3px 12px; cursor: pointer; color: var(--text-muted); border-left: 3px solid transparent; line-height: 1.3; }
 .jss-ol:hover { background: var(--bg-hover); color: var(--text); }
-.jss-ol.cur { background: var(--accent-soft); color: var(--accent); border-left-color: var(--accent); }
+.jss-ol.cur { background: var(--accent-soft); color: var(--text-link); border-left-color: var(--accent); }
 .jss-ol .n { flex: none; font-variant-numeric: tabular-nums; color: var(--text-faint); min-width: 30px; }
 .jss-ol.ch { font-weight: 600; color: var(--text); margin-top: 4px; }
 .jss-ol.bad::after, .jss-ol.warn::after { content: '●'; margin-left: auto; font-size: 9px; }
@@ -164,7 +164,7 @@ export const JSS_CSS = `
 .jss-dialog .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .jss-dialog .pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; max-height: 280px; overflow: auto; }
 .jss-dialog .pick button { border: 1px solid var(--border-strong); background: var(--bg); border-radius: 8px; padding: 6px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; align-items: center; color: var(--text); font: inherit; font-size: 11.5px; }
-.jss-dialog .pick button.sel { outline: 2px solid var(--accent); }
+.jss-dialog .pick button.sel { outline: 2px solid var(--focus-ring); }
 .jss-dialog .pick img { width: 100%; height: 70px; object-fit: contain; background: var(--image-backdrop); }
 .jss-dialog .list { max-height: 300px; overflow: auto; border: 1px solid var(--border); border-radius: 6px; }
 .jss-dialog .list button { display: flex; width: 100%; gap: 10px; padding: 7px 10px; border: 0; border-bottom: 1px solid var(--border); background: none; color: var(--text); font: inherit; cursor: pointer; text-align: left; }

@@ -16,8 +16,8 @@
 .v2-filter .v2-input { border-color: transparent; }
 
 /* the destructive solid button of ConfirmModal (it was a class no stylesheet defined, patched with an inline style) */
-.btn-danger-solid { background: var(--danger); border-color: var(--danger); color: var(--text-on-accent); }
-.btn-danger-solid:hover:not(:disabled) { background: var(--danger); filter: brightness(0.92); }
+.btn-danger-solid { background: var(--danger-solid); border-color: var(--danger-solid); color: var(--text-on-accent); }
+.btn-danger-solid:hover:not(:disabled) { background: var(--danger-solid); filter: brightness(0.92); }
 
 /* ---------------------------------------------------------------- disabled */
 .btn:disabled, .btn[aria-disabled='true'], .x-btn:disabled, .x-btn[aria-disabled='true'],
@@ -61,7 +61,7 @@ input[type='checkbox']:disabled, input[type='radio']:disabled { cursor: not-allo
 .input[aria-invalid='true'], .v2-input[aria-invalid='true'], .v2-select[aria-invalid='true'], .v2-textarea[aria-invalid='true'], .x-input[aria-invalid='true'] { border-color: var(--danger); }
 .v2-input[aria-invalid='true']:focus, .v2-select[aria-invalid='true']:focus, .v2-textarea[aria-invalid='true']:focus { outline-color: var(--danger); }
 .v2-field > .v2-error { display: flex; gap: 4px; align-items: baseline; }
-.v2-field > .v2-error::before { content: '!'; flex: none; display: inline-grid; place-items: center; width: 14px; height: 14px; border-radius: 50%; background: var(--danger); color: var(--text-on-accent); font-size: 10px; font-weight: 700; }
+.v2-field > .v2-error::before { content: '!'; flex: none; display: inline-grid; place-items: center; width: 14px; height: 14px; border-radius: 50%; background: var(--danger-solid); color: var(--text-on-accent); font-size: 10px; font-weight: 700; }
 
 /* ---------------------------------------------------------------- toasts (DS-005): a dismiss button */
 .v2-toast { display: flex; align-items: flex-start; gap: 10px; }

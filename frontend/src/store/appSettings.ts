@@ -6,7 +6,7 @@ import { platformApi, type AppSettings } from '../api';
 import { applyTheme, useUi } from './ui';
 import { deriveAccent } from '../lib/accent';
 
-const ACCENT_TOKENS = { accent: 'accent', 'accent-hover': 'hover', 'surface-selected': 'soft', 'text-on-accent': 'onAccent' } as const;
+const ACCENT_TOKENS = { accent: 'accent', 'accent-hover': 'hover', 'surface-selected': 'soft', 'text-on-accent': 'onAccent', 'text-link': 'accent', 'focus-ring': 'accent' } as const;
 
 /** WP-19 (TH-003): the accent is derived per theme (lib/accent.ts) and handed to the token layer as --admin-<token>-light / -dark; tokens.css falls back to the theme default when they are absent. */
 export function applyAccent(hex: string): void {

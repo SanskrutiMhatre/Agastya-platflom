@@ -13,6 +13,12 @@
     "export-canvas": "the area behind the printed pages in the export view; the pages are paper",
     "viewer-highlight": "pdf.js search highlight over the canvas-drawn page: the visible text is pixels, the text layer is transparent",
     "viewer-text-select": "pdf.js selection over the canvas-drawn page (same as viewer-highlight)",
+    "danger": "the severity dot of an error finding (.v2-sev.error, .jss-pr .sev.error), a non-text mark; text on a red fill uses danger-solid",
+    "warning": "the severity dot of a warning finding (.v2-sev.warn, .jss-pr .sev.warning) and the unsaved dot, non-text marks; text on an amber fill uses warning-solid",
+    "border-control": "the neutral .dot, the off track of .switch and the empty .stackbar segment (components.css): non-text marks",
+    "success": "the .dot.success status mark beside its label (components.css)",
+    "text-link": "the .dot.accent status mark beside its label (components.css)",
+    "border-subtle": "1px separators (.menu .sep) drawn as a background",
     "info": "the severity dot of an info finding (.v2-sev.info), a non-text mark; info/surface-panel is paired as text"
   },
   "themeMechanism": {

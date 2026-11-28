@@ -23,7 +23,7 @@ describe('design tokens', () => {
 
   it('the contrast check fails when a token is weakened (text-tertiary set to a pale grey)', () => {
     const src = JSON.parse(fs.readFileSync(path.join(FRONTEND, 'src', 'styles', 'tokens', 'tokens.json'), 'utf8'));
-    src.primitive['gray-600'] = '#999999';
+    src.primitive[src.semantic['text-tertiary'][0].slice(1, -1)] = '#999999';
     const tmp = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tok-')), 'tokens.json');
     fs.writeFileSync(tmp, JSON.stringify(src));
     const r = run('check-contrast.mjs', { TOKENS_SOURCE: tmp });

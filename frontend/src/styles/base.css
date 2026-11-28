@@ -25,14 +25,14 @@ button, input, select, textarea { font: inherit; color: inherit; }
   background: transparent; color: var(--text-muted); cursor: pointer;
 }
 .icon-btn:hover:not(:disabled) { background: var(--bg-hover); color: var(--text); }
-.icon-btn.pressed { background: var(--bg-active); color: var(--accent); }
+.icon-btn.pressed { background: var(--bg-active); color: var(--text-link); }
 .icon { flex: none; }
 
 /* ---------------------------------------------------------------- buttons, forms */
 .btn { display: inline-flex; align-items: center; gap: 6px; height: var(--btn-h); padding: 0 var(--btn-pad-x); border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--bg-elev); cursor: pointer; font-weight: 500; white-space: nowrap; }
 .btn:hover { background: var(--bg-hover); }
-:where(button, [tabindex], select, input, textarea, a, summary):focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.btn:focus-visible, .rb:focus-visible, .icon-btn:focus-visible, .vs-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+:where(button, [tabindex], select, input, textarea, a, summary):focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.btn:focus-visible, .rb:focus-visible, .icon-btn:focus-visible, .vs-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 .btn-sm { height: var(--btn-h-sm); padding: 0 9px; font-size: 12px; }
 .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
 .btn-primary:hover { background: var(--accent-strong); }
