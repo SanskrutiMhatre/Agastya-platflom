@@ -207,9 +207,9 @@ html[data-editor-focus] .v2-pshell > .v2-rail { visibility: hidden; overflow: hi
 
 /* ---------------------------------------------------------------- S1000D: the explorer (data modules) beside the Studio */
 .ed-s1000d { background: var(--surface-panel); }
-.ed-s1000d > .v2-divider.panel-resize { width: 1px; background: var(--border-default); position: relative; }
-.ed-s1000d > .v2-divider.panel-resize::after { content: ""; position: absolute; inset: 0 -3px; cursor: col-resize; }
-.ed-s1000d > .v2-divider.panel-resize:hover, .ed-s1000d > .v2-divider.panel-resize.drag { background: var(--accent); }
+.ed-s1000d > .v2-divider.panel-resize { width: 7px; margin: 0 -3px; z-index: 2; position: relative; cursor: col-resize; background: linear-gradient(var(--border-default), var(--border-default)) center / 1px 100% no-repeat; }
+.ed-s1000d > .v2-divider.panel-resize::after { content: none; }
+.ed-s1000d > .v2-divider.panel-resize:hover, .ed-s1000d > .v2-divider.panel-resize.drag { background: linear-gradient(var(--accent), var(--accent)) center / 3px 100% no-repeat; }
 .v2-dmpanel.tree-pane { background: var(--surface-panel); border-right: 0; }
 .tree-pane .ed-explorer { flex: 1; min-height: 120px; border-top: 0; }
 .tree-pane .ed-explorer-tools { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1); row-gap: var(--space-1h); padding: 0 var(--space-2) var(--space-2); text-transform: none; letter-spacing: 0; font-weight: var(--fw-regular); }
