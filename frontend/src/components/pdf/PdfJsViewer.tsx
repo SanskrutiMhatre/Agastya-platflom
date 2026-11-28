@@ -22,6 +22,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import workerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
 import type { PDFDocumentProxy } from 'pdfjs-dist';
+import { Icon } from '../Icon';
 import '../../styles/pdf.css';   // WP-35 second pass: the pdf.js text layer styles load with the viewer chunk, not the entry
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
@@ -152,7 +153,7 @@ const PageSlot: React.FC<PageSlotProps> = ({ pdf, pageNum, scale, active, regist
       ref={wrapRef}
       data-page={pageNum}
       style={{
-        position: 'relative', margin: '12px auto', background: 'var(--viewer-page)',
+        position: 'relative', margin: '20px auto', background: 'var(--viewer-page)',
         boxShadow: 'var(--viewer-page-shadow)',
         ...(size ? { width: size.width, height: size.height } : { width: '80%', aspectRatio: '210 / 297' }),
       }}
@@ -441,61 +442,58 @@ export const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ src, downloadName = 'o
     goPage(matches[next].page);
   };
 
-  const btn: React.CSSProperties = {
-    padding: '3px 9px', fontSize: 12, borderRadius: 4,
-    border: '1px solid var(--x-line)', background: 'var(--x-white)', color: 'var(--text)', cursor: 'pointer',
-  };
-
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--viewer-canvas)' }}>
-      {/* Toolbar */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: autoFit ? 4 : 6, padding: autoFit ? '5px 6px' : '6px 10px', flexShrink: 0,
-        background: 'var(--x-white)', borderBottom: '1px solid var(--x-line)', flexWrap: 'wrap',
-      }}>
-        <button style={btn} onClick={() => setTocOpen(o => !o)} title="Table of contents" aria-label="Table of contents">☰</button>
+    <div className={`pdfv${autoFit ? ' compact' : ''}`}>
+      {/* Toolbar: the mockup's viewer bar (contents, page, zoom, find); the paper below stays white in both themes */}
+      <div className="vbar" role="toolbar" aria-label="PDF viewer">
+        <button className="icon-btn" onClick={() => setTocOpen(o => !o)} title="Table of contents" aria-label="Table of contents" aria-pressed={tocOpen}><Icon name="panel" size={15} /></button>
+        <span className="vsep" />
+        <button className="icon-btn" onClick={() => goPage(page - 1)} disabled={page <= 1} title="Previous page" aria-label="Previous page"><Icon name="up" size={15} /></button>
+        <span className="pg">
+          <input
+            className="input"
+            value={pageInput}
+            onChange={e => setPageInput(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') goPage(Number(pageInput) || 1); }}
+            onBlur={() => setPageInput(String(page))}
+            aria-label="Page number"
+          />
+          <span className="faint">/ {numPages || '—'}</span>
+        </span>
+        <button className="icon-btn" onClick={() => goPage(page + 1)} disabled={page >= numPages} title="Next page" aria-label="Next page"><Icon name="down" size={15} /></button>
 
-        <button style={btn} onClick={() => goPage(page - 1)} disabled={page <= 1} title="Previous page" aria-label="Previous page">‹</button>
-        <input
-          value={pageInput}
-          onChange={e => setPageInput(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') goPage(Number(pageInput) || 1); }}
-          onBlur={() => setPageInput(String(page))}
-          style={{ width: 42, textAlign: 'center', fontSize: 12, padding: '3px 4px', border: '1px solid var(--x-line)', borderRadius: 4 }}
-          aria-label="Page number"
-        />
-        <span style={{ fontSize: 12, color: 'var(--x-text-muted)' }}>/ {numPages || '—'}</span>
-        <button style={btn} onClick={() => goPage(page + 1)} disabled={page >= numPages} title="Next page" aria-label="Next page">›</button>
+        <span className="vsep" />
+        <button className="icon-btn" onClick={() => setScale(s => Math.max(0.4, s - 0.15))} title="Zoom out" aria-label="Zoom out">−</button>
+        <span className="zoom">{Math.round(scale * 100)} %</span>
+        <button className="icon-btn" onClick={() => setScale(s => Math.min(3, s + 0.15))} title="Zoom in" aria-label="Zoom in">+</button>
+        <button className="btn btn-sm subtle" onClick={fitWidth}>Fit width</button>
 
-        <span style={{ width: autoFit ? 0 : 8 }} />
-        <button style={btn} onClick={() => setScale(s => Math.max(0.4, s - 0.15))} title="Zoom out" aria-label="Zoom out">−</button>
-        <span style={{ fontSize: 12, minWidth: 40, textAlign: 'center' }}>{Math.round(scale * 100)}%</span>
-        <button style={btn} onClick={() => setScale(s => Math.min(3, s + 0.15))} title="Zoom in" aria-label="Zoom in">+</button>
-        <button style={btn} onClick={fitWidth}>Fit</button>
-
-        <span style={{ width: 8 }} />
-        <input
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') runSearch(); }}
-          placeholder="Find…"
-          style={{ width: autoFit ? 72 : 130, minWidth: 0, fontSize: 12, padding: '3px 6px', border: '1px solid var(--x-line)', borderRadius: 4 }}
-        />
+        <span className="grow" />
+        <span className="find">
+          <Icon name="search" size={13} />
+          <input
+            className="input"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') runSearch(); }}
+            placeholder="Find…"
+            aria-label="Search in document"
+          />
+        </span>
         {matches.length > 0 && (
           <>
-            <button style={btn} onClick={() => stepMatch(-1)} title="Previous match" aria-label="Previous match">‹</button>
-            <span style={{ fontSize: 11, color: 'var(--x-text-muted)' }}>{matchIndex + 1}/{matches.length}</span>
-            <button style={btn} onClick={() => stepMatch(1)} title="Next match" aria-label="Next match">›</button>
+            <button className="icon-btn" onClick={() => stepMatch(-1)} title="Previous match" aria-label="Previous match"><Icon name="up" size={14} /></button>
+            <span className="faint">{matchIndex + 1}/{matches.length}</span>
+            <button className="icon-btn" onClick={() => stepMatch(1)} title="Next match" aria-label="Next match"><Icon name="down" size={14} /></button>
           </>
         )}
-        {searching && <span style={{ fontSize: 11, color: 'var(--x-text-muted)' }}>searching…</span>}
+        {searching && <span className="faint">searching…</span>}
         {!searching && query && matches.length === 0 && (
-          <span style={{ fontSize: 11, color: 'var(--x-text-muted)' }}>no matches</span>
+          <span className="faint">no matches</span>
         )}
 
-        <div style={{ flex: 1 }} />
         {toolbarExtra}
-        {src && !autoFit && <a style={{ ...btn, textDecoration: 'none' }} href={src} download={downloadName}>Download</a>}
+        {src && !autoFit && <a className="btn btn-sm" href={src} download={downloadName}><Icon name="download" size={13} />Download</a>}
       </div>
 
       {/* Body */}

@@ -17,7 +17,7 @@ import { jssApi } from '../../api/jss';
 import { xengineApi, type DocCodes, type DocCodesPatch } from '../../api/xengine';
 import { ConvertButton, ExportProjectButton } from '../../components/DocCodes';
 import { Icon } from '../../components/Icon';
-import { PageHeader } from '../../components/PageHeader';
+import { LazyPdfViewer } from '../../components/pdf/LazyPdfViewer';
 import { Alert, Badge, ConfirmModal, Empty, Loading, PromptModal, Spinner, ago, errText, useAsync } from '../../components/ui';
 import { canBuild, canWrite, useProject } from '../../layouts/ProjectShell';
 import { JsgParseError, parseJsg } from '../../jsg/xml';
@@ -66,6 +66,7 @@ export function DocPublicationPage() {
   const [form, setForm] = useState<DocCodesPatch>({});
   const [builtAt, setBuiltAt] = useState<string | null>(null);   // a build made on this page (a JSG project has no build record of its own)
   const [hasPdf, setHasPdf] = useState(false);
+  const [side, setSide] = useState<'build' | 'history'>('build');
   const dirty = edits.length > 0;
   const saveRef = useRef<() => Promise<boolean>>();
   const guard = useLeaveGuard(dirty, { what: 'changes to the arrangement of the document', save: () => saveRef.current?.() ?? Promise.resolve(false) });
@@ -252,67 +253,92 @@ export function DocPublicationPage() {
   };
 
   const sections = view.chapters.reduce((n, ch) => n + ch.modules.length, 0);
+  const hasBuild = !!(build_ || builtAt || hasPdf);
+  const stamp = build_ ? Date.parse(build_.builtAt) || 0 : builtAt ? Date.parse(builtAt) || 0 : 0;
+  const viewSrc = hasBuild ? `${jss ? contentApi.pdfUrl(id) : jsgApi.pdfUrl(id)}?t=${stamp}` : null;
+  const released = summary.review?.state === 'approved';
+  // UI redesign 2026-11-28 (mockup 4): structure on the left, the built PDF on a themed canvas in the middle, build settings and history on the right
   return (
-    <div className="v2-page">
-      <PageHeader icon="book" title="Publication" sub={`“${c.pmc.title || summary.project.name}”: arrange the chapters, then build the ${jss ? 'publication' : 'document'}.`}
-        actions={<>
-          {chaptersFree ? <button className="btn" onClick={() => setNaming(true)} data-testid="add-chapter"><Icon name="plus" />Add chapter</button> : null}
-          {writable ? <button className="btn" onClick={undo} disabled={!dirty} data-testid="undo-arrangement">Undo</button> : null}
-          {writable ? <button className="btn" onClick={redo} disabled={!undone.length} data-testid="redo-arrangement">Redo</button> : null}
-          <button className="btn btn-primary" onClick={() => void build()} disabled={busy !== null || !canBuild(can)} data-testid="build-publication" title={canBuild(can) ? 'Save the arrangement, then build the PDF' : 'Reviewers, editors and owners can build the PDF'}>{busy === 'build' ? <Spinner /> : <Icon name="rocket" />}Build publication</button>
-        </>}
-        stats={[
-          { label: 'Chapters', value: view.chapters.length },
-          { label: 'Data modules', value: total, tone: 'accent' },
-          { label: 'Pictures', value: c.counts.pictures },
-          { label: 'Codes from import', value: c.counts.imported, tone: c.counts.imported ? 'ok' : undefined },
-          { label: 'Last build', value: build_ ? ago(build_.builtAt) : builtAt ? ago(builtAt) : hasPdf ? 'yes' : 'never', tone: build_ || builtAt || hasPdf ? 'ok' : undefined },
-        ]} />
-
-      {dirty ? (
-        <div className="v2-savebar" role="status" data-testid="unsaved-bar">
-          <span><Icon name="alert" size={15} /> You have unsaved changes to the arrangement of the document.</span>
-          <span className="spacer" />
-          <button className="btn btn-sm" onClick={() => setEdits([])}>Discard</button>
-          <button className="btn btn-sm btn-primary" onClick={() => void save()} disabled={busy !== null} data-testid="save-publication">{busy === 'save' ? <Spinner /> : null}Save changes</button>
+    <div className="pub" data-testid="pub-layout">
+      <h1 className="pub-sr">Publication</h1>
+      <aside className="pane" aria-label="Publication structure">
+        <div className="pane-head">
+          <span className="trunc">Structure</span>
+          <span className="pane-count">{view.chapters.length} ch · {total} DM</span>
+          <span className="grow" />
+          {chaptersFree ? <button className="icon-btn" onClick={() => setNaming(true)} data-testid="add-chapter" aria-label="Add chapter" title="Add chapter"><Icon name="plus" size={15} /></button> : null}
+          {writable ? <button className="icon-btn" onClick={undo} disabled={!dirty} data-testid="undo-arrangement" aria-label="Undo" title="Undo"><Icon name="undo" size={15} /></button> : null}
+          {writable ? <button className="icon-btn" onClick={redo} disabled={!undone.length} data-testid="redo-arrangement" aria-label="Redo" title="Redo"><Icon name="undo" size={15} className="pub-flip" /></button> : null}
         </div>
-      ) : null}
-      {error ? <div style={{ marginBottom: 12 }}><Alert tone="bad">{error}</Alert></div> : null}
-      {!writable ? <div style={{ marginBottom: 12 }}><Alert tone="warn">You have {role} access: you can look at the publication, but only editors, managers and owners can change it.</Alert></div> : null}
-      {locked ? <div style={{ marginBottom: 12 }} data-testid="pub-locked"><Alert>{jss ? `The stencil of this document type fixes ${!chaptersFree && !sectionsFree ? 'the chapters and the sections' : !chaptersFree ? 'the chapters' : 'the sections'}, so ${!chaptersFree && !sectionsFree ? 'they' : 'these'} cannot be moved or renamed here.` : 'A parts list is arranged by its plate references, not here.'}</Alert></div> : null}
-
-      <div className="v2-pub-grid">
-        <div className="v2-pub-main" data-testid="pub-tree">
-          {view.chapters.length === 0 && view.appendices.length === 0 && view.plates.length === 0 ? (
-            <div className="v2-card"><Empty title="The document has no chapters yet">{chaptersFree ? <>Add a chapter to start the publication.<div style={{ marginTop: 12 }}><button className="btn btn-primary" onClick={() => setNaming(true)}><Icon name="plus" size={15} />Add the first chapter</button></div></> : 'Open the editor to start writing.'}</Empty></div>
-          ) : view.chapters.map(chapterCard)}
-          {view.appendices.length || (appendicesFree && view.chapters.length) ? (
-            <section className="v2-chapter" data-testid="appendices" aria-label="Appendices">
-              <header className="v2-chapter-head" style={{ cursor: 'default' }}><h3>Appendices</h3><Badge>{view.appendices.length}</Badge><span className="spacer" />
-                {appendicesFree ? <button className="btn btn-sm" onClick={() => setAdding({ kind: 'appendix' })} data-testid="add-appendix"><Icon name="plus" size={13} />Add appendix</button> : null}
-              </header>
-              <div className="v2-chapter-body">{view.appendices.length ? view.appendices.map(appendixRow) : <div className="v2-chapter-empty">No appendices.</div>}</div>
-            </section>
-          ) : null}
-          {view.plates.length ? (
-            <section className="v2-chapter" data-testid="plates" aria-label="Plates">
-              <header className="v2-chapter-head" style={{ cursor: 'default' }}><h3>Plates</h3><Badge>{view.plates.length}</Badge></header>
-              <div className="v2-chapter-body">{view.plates.map((m) => (
-                <div key={m.key} className="v2-mod" data-testid="pub-plate"><span className="v2-mod-no">{m.label}</span><div className="v2-mod-main"><div className="v2-mod-title">{m.title}</div><div className="v2-hint v2-trunc">{detail(m)}</div></div>{code(m)}</div>
-              ))}</div>
-            </section>
-          ) : null}
-          {chaptersFree && view.chapters.length > 0 ? <button className="v2-add-chapter" onClick={() => setNaming(true)}><Icon name="plus" size={15} />Add chapter</button> : null}
+        {dirty ? (
+          <div className="v2-savebar" role="status" data-testid="unsaved-bar">
+            <span><Icon name="alert" size={14} /> Unsaved changes to the arrangement</span>
+            <span className="spacer" />
+            <button className="btn btn-sm" onClick={() => setEdits([])}>Discard</button>
+            <button className="btn btn-sm btn-primary" onClick={() => void save()} disabled={busy !== null} data-testid="save-publication">{busy === 'save' ? <Spinner /> : null}Save changes</button>
+          </div>
+        ) : null}
+        {locked ? <div className="pub-note" data-testid="pub-locked"><Alert>{jss ? `The stencil of this document type fixes ${!chaptersFree && !sectionsFree ? 'the chapters and the sections' : !chaptersFree ? 'the chapters' : 'the sections'}, so ${!chaptersFree && !sectionsFree ? 'they' : 'these'} cannot be moved or renamed here.` : 'A parts list is arranged by its plate references, not here.'}</Alert></div> : null}
+        <div className="scroll">
+          <div className="v2-pub-main" data-testid="pub-tree">
+            {view.chapters.length === 0 && view.appendices.length === 0 && view.plates.length === 0 ? (
+              <Empty title="The document has no chapters yet">{chaptersFree ? <>Add a chapter to start the publication.<div style={{ marginTop: 12 }}><button className="btn btn-primary btn-sm" onClick={() => setNaming(true)}><Icon name="plus" size={15} />Add the first chapter</button></div></> : 'Open the editor to start writing.'}</Empty>
+            ) : view.chapters.map(chapterCard)}
+            {view.appendices.length || (appendicesFree && view.chapters.length) ? (
+              <section className="v2-chapter" data-testid="appendices" aria-label="Appendices">
+                <header className="v2-chapter-head" style={{ cursor: 'default' }}><h3>Appendices</h3><Badge>{view.appendices.length}</Badge><span className="spacer" />
+                  {appendicesFree ? <button className="btn btn-sm" onClick={() => setAdding({ kind: 'appendix' })} data-testid="add-appendix"><Icon name="plus" size={13} />Add appendix</button> : null}
+                </header>
+                <div className="v2-chapter-body">{view.appendices.length ? view.appendices.map(appendixRow) : <div className="v2-chapter-empty">No appendices.</div>}</div>
+              </section>
+            ) : null}
+            {view.plates.length ? (
+              <section className="v2-chapter" data-testid="plates" aria-label="Plates">
+                <header className="v2-chapter-head" style={{ cursor: 'default' }}><h3>Plates</h3><Badge>{view.plates.length}</Badge></header>
+                <div className="v2-chapter-body">{view.plates.map((m) => (
+                  <div key={m.key} className="v2-mod" data-testid="pub-plate"><span className="v2-mod-no">{m.label}</span><div className="v2-mod-main"><div className="v2-mod-title">{m.title}</div><div className="v2-hint v2-trunc">{detail(m)}</div></div>{code(m)}</div>
+                ))}</div>
+              </section>
+            ) : null}
+            {chaptersFree && view.chapters.length > 0 ? <button className="v2-add-chapter" onClick={() => setNaming(true)}><Icon name="plus" size={14} />Add chapter</button> : null}
+          </div>
         </div>
+        {!writable ? <div className="pub-note"><Alert tone="warn">You have {role} access: you can look at the publication, but only editors, managers and owners can change it.</Alert></div> : null}
+      </aside>
 
-        <aside className="v2-pub-side">
-          <div className="v2-card" data-testid="pub-identity">
-            <div className="v2-card-head"><span>Publication code</span></div>
-            <div className="v2-stack" style={{ padding: '10px 14px 14px' }}>
+      <section className="pane viewer" aria-label="PDF preview" data-testid="pub-preview">
+        <LazyPdfViewer src={viewSrc} downloadName={jss ? 'publication.pdf' : 'document.pdf'}
+          placeholder={<div className="pub-empty"><Icon name="pdf" size={30} /><p>{canBuild(can) ? 'Not built yet. Press Build publication to make the PDF.' : 'Not built yet.'}</p></div>} />
+      </section>
+
+      <aside className="pane" aria-label="Build settings">
+        <div className="tabs" role="tablist" aria-label="Build">
+          <button className="tab" role="tab" aria-selected={side === 'build'} onClick={() => setSide('build')}>Build</button>
+          <button className="tab" role="tab" aria-selected={side === 'history'} onClick={() => setSide('history')}>History</button>
+        </div>
+        <div className="scroll">
+          {side === 'build' ? <>
+            <div className="opt">
+              {error ? <Alert tone="bad">{error}</Alert> : null}
+              <div className="field"><span className="field-label">Publication</span><div className="pub-value">{c.pmc.title || summary.project.name}</div></div>
+              <div className="field"><span className="field-label">Watermark</span><div className="pub-value">{released ? 'Release settings (project released)' : 'NOT RELEASED (project not released)'}</div><span className="hint">{released ? 'Set on Review and release.' : 'Added automatically until the project is released.'}</span></div>
+              <div className="field"><span className="field-label">Output</span>
+                <div className="v2-row wrap">
+                  {hasBuild ? <a className="btn btn-sm" href={pdfHref} data-testid="download-pdf"><Icon name="download" size={13} />Download PDF</a> : null}
+                  <button className="btn btn-sm" onClick={() => openInEditor()}><Icon name="editor" size={13} />View in editor</button>
+                  <ExportProjectButton id={id} dirty={dirty} saveFirst={save} label="Export project" />
+                  <ConvertButton id={id} from={jss ? 'jss' : 'jsg'} name={summary.project.name} dirty={dirty} saveFirst={save} />
+                </div>
+                <span className="hint">{sections} section{sections === 1 ? '' : 's'} in {view.chapters.length} chapter{view.chapters.length === 1 ? '' : 's'} · {c.counts.pictures} picture{c.counts.pictures === 1 ? '' : 's'}{c.counts.imported ? ` · ${c.counts.imported} code${c.counts.imported === 1 ? '' : 's'} from import` : ''}</span>
+              </div>
+            </div>
+
+            <div className="card-head"><h3>Publication code</h3></div>
+            <div className="opt" data-testid="pub-identity">
               <div><code className="v2-mono" data-testid="doc-codes-pmc" style={{ wordBreak: 'break-all' }}>{c.pmc.code}</code><div className="v2-hint">{c.pmc.issue} · {c.pmc.language} · {c.pmc.origin === 'imported' ? 'kept from the imported package' : 'made by the platform'}</div></div>
-              <div className="v2-row wrap" style={{ gap: 8 }}>
-                {([['modelIdentCode', 'Model code', 110], ['pmIssuer', 'Issuer', 90], ['pmNumber', 'Number', 90], ['pmVolume', 'Volume', 64]] as const).map(([k, label, w]) => (
-                  <label key={k} className="v2-field" style={{ width: w }}><span>{label}</span><input className="v2-input" value={form[k] ?? ''} disabled={!writable} data-testid={`identity-${k}`} onChange={(e) => setForm({ ...form, [k]: e.target.value.toUpperCase() })} /></label>
+              <div className="pub-idgrid">
+                {([['modelIdentCode', 'Model code'], ['pmIssuer', 'Issuer'], ['pmNumber', 'Number'], ['pmVolume', 'Volume']] as const).map(([k, label]) => (
+                  <label key={k} className="v2-field"><span>{label}</span><input className="v2-input" value={form[k] ?? ''} disabled={!writable} data-testid={`identity-${k}`} onChange={(e) => setForm({ ...form, [k]: e.target.value.toUpperCase() })} /></label>
                 ))}
               </div>
               {writable ? <div><button className="btn btn-sm" onClick={() => void saveIdentity()} disabled={busy !== null} data-testid="identity-save">{busy === 'identity' ? <Spinner /> : null}Save identity</button></div> : null}
@@ -321,32 +347,34 @@ export function DocPublicationPage() {
                 <span><strong>Show the code in the editor</strong><br /><span className="v2-hint">Writes each section's document code beside its heading. It is not part of the document.</span></span>
               </label>
             </div>
-          </div>
 
-          <div className="v2-card" data-testid="pub-pictures">
-            <div className="v2-card-head"><span>Picture names (ICN) <Badge>{c.pictures.length}</Badge></span></div>
-            <div style={{ padding: '10px 12px 4px' }}><input className="v2-input" placeholder="Search pictures…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search pictures" /></div>
-            <div className="v2-pool">
-              {pics.length === 0 ? <div className="v2-hint" style={{ padding: 14 }}>{c.pictures.length === 0 ? 'No pictures in this document.' : 'No picture matches.'}</div> : pics.map((p) => (
-                <div key={p.file} className="v2-pool-item" data-testid="pub-picture"><div style={{ minWidth: 0, flex: 1 }}><div className="v2-mod-title">{p.file}</div><div className="v2-mono v2-hint" style={{ wordBreak: 'break-all' }}>{p.icn}</div><div className="v2-hint v2-trunc">{titleOf(p.module)}</div></div></div>
-              ))}
+            <div data-testid="pub-pictures">
+              <div className="card-head"><h3>Picture names (ICN)</h3><Badge>{c.pictures.length}</Badge></div>
+              <div className="pub-pool-search"><input className="v2-input" placeholder="Search pictures…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search pictures" /></div>
+              <div className="v2-pool">
+                {pics.length === 0 ? <div className="v2-hint" style={{ padding: 12 }}>{c.pictures.length === 0 ? 'No pictures in this document.' : 'No picture matches.'}</div> : pics.map((p) => (
+                  <div key={p.file} className="v2-pool-item" data-testid="pub-picture"><div style={{ minWidth: 0, flex: 1 }}><div className="v2-mod-title">{p.file}</div><div className="v2-mono v2-hint" style={{ wordBreak: 'break-all' }}>{p.icn}</div><div className="v2-hint v2-trunc">{titleOf(p.module)}</div></div></div>
+                ))}
+              </div>
             </div>
-          </div>
-
-          <div className="v2-card v2-card-pad v2-stack">
-            <strong>Output</strong>
-            <div className="v2-hint">{builtText}</div>
-            <div className="v2-row wrap">
-              {build_ || builtAt || hasPdf ? <a className="btn btn-sm" href={pdfHref} data-testid="download-pdf"><Icon name="download" size={13} />Download PDF</a> : null}
-              <button className="btn btn-sm" onClick={() => openInEditor()}><Icon name="editor" size={13} />View in editor</button>
-              <ExportProjectButton id={id} dirty={dirty} saveFirst={save} label="Export project" />
-              <ConvertButton id={id} from={jss ? 'jss' : 'jsg'} name={summary.project.name} dirty={dirty} saveFirst={save} />
+          </> : (
+            <div data-testid="pub-history">
+              <div className="card-head"><h3>Builds</h3>{hasBuild ? <span className="badge success"><Icon name="ok" size={12} />Built</span> : <span className="badge">Never</span>}</div>
+              <ul className="hist">
+                {hasBuild ? <li><Icon name="ok" size={14} /><div><strong>Last build</strong><div className="faint">{builtText}</div></div><span /></li>
+                  : <li><Icon name="clock" size={14} /><div><strong>Not built yet</strong></div><span /></li>}
+              </ul>
             </div>
-            {busy === 'build' && progress.lines.length ? <div className="v2-log" style={{ borderRadius: 8, border: '1px solid var(--border)' }}>{progress.lines.slice(-5).map((l, i) => <div key={i}>{l}</div>)}</div> : null}
-            <div className="v2-hint">{sections} section{sections === 1 ? '' : 's'} in {view.chapters.length} chapter{view.chapters.length === 1 ? '' : 's'}.</div>
-          </div>
-        </aside>
-      </div>
+          )}
+        </div>
+        <div className="build">
+          <div className={`progress${busy === 'build' ? ' busy' : ''}`} role="progressbar" aria-label="Build progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={busy === 'build' ? undefined : hasBuild ? 100 : 0}><i style={{ width: busy === 'build' ? '40%' : hasBuild ? '100%' : '0%' }} /></div>
+          {busy === 'build' && progress.lines.length ? <div className="v2-log">{progress.lines.slice(-5).map((l, i) => <div key={i}>{l}</div>)}</div> : null}
+          <div className="faint">{builtText}</div>
+          <button className="btn btn-primary" onClick={() => void build()} disabled={busy !== null || !canBuild(can)} data-testid="build-publication" title={canBuild(can) ? 'Save the arrangement, then build the PDF' : 'Reviewers, editors and owners can build the PDF'}>{busy === 'build' ? <Spinner /> : <Icon name="play" />}Build publication</button>
+          <button className="btn" onClick={() => nav('../release')}><Icon name="external" size={14} />Review and release</button>
+        </div>
+      </aside>
 
       {naming ? <PromptModal title="New chapter" label="Chapter title" confirmLabel="Add chapter" onClose={() => setNaming(false)} onSubmit={async (t) => { push({ op: 'addChapter', title: t, sections: jss ? starterSections(rules.data?.chapterStarter) : ['New section'] }); }} /> : null}
       {del ? <ConfirmModal title={del.at === null ? 'Delete this chapter?' : 'Delete this section?'} danger confirmLabel="Delete" onClose={() => setDel(null)}

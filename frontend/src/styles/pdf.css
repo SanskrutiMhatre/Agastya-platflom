@@ -64,3 +64,27 @@
 .textLayer .endOfContent.active {
   top: 0;
 }
+
+/* =============================================================================
+   UI redesign 2026-11-28 (mockup 4 "Publication and PDF preview"): the viewer chrome.
+   A themed canvas with a panel-coloured toolbar; the pages themselves stay white
+   paper in both themes (--viewer-page). Tokens only; the space fallbacks are the
+   mockup's values until the shared scale lands.
+   ============================================================================= */
+.pdfv { height: 100%; display: flex; flex-direction: column; min-height: 0; background: var(--viewer-canvas); }
+.pdfv .vbar { display: flex; align-items: center; gap: 4px; min-height: 40px; padding: 0 12px; background: var(--surface-panel); border-bottom: 1px solid var(--border-default); flex: none; flex-wrap: wrap; }
+.pdfv.compact .vbar { padding: 0 8px; gap: 2px; }
+.pdfv .vbar .icon-btn { width: 28px; height: 28px; font-size: 15px; }
+.pdfv .vbar .icon-btn[aria-pressed="true"] { background: var(--surface-selected); color: var(--accent); }
+.pdfv .vbar .pg { display: inline-flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; font-size: var(--fs-xs); }
+.pdfv .vbar .pg .input { width: 48px; height: 28px; text-align: center; padding: 0 4px; }
+.pdfv .vbar .vsep { width: 1px; height: 18px; background: var(--border-default); margin: 0 8px; flex: none; }
+.pdfv.compact .vbar .vsep { margin: 0 2px; }
+.pdfv .vbar .zoom { min-width: 48px; text-align: center; color: var(--text-secondary); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.pdfv .vbar .grow { flex: 1; }
+.pdfv .vbar .faint { color: var(--text-tertiary); font-size: var(--fs-xs); white-space: nowrap; }
+.pdfv .vbar .btn.subtle { background: none; border-color: transparent; color: var(--text-secondary); }
+.pdfv .vbar .btn.subtle:hover { background: var(--surface-hover); color: var(--text-primary); }
+.pdfv .vbar .find { display: inline-flex; align-items: center; gap: 4px; color: var(--text-tertiary); }
+.pdfv .vbar .find .input { width: 140px; height: 28px; font-size: var(--fs-xs); }
+.pdfv.compact .vbar .find .input { width: 80px; }
