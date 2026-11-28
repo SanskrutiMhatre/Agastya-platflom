@@ -1,0 +1,63 @@
+/* Phase 3 (P3-4): PDF review - the viewer with its highlight layer, the selection popover, the area tool and the Comments panel.
+   Tokens only (tokens.json); the paper stays white in both themes (the highlights are translucent fixed tokens over it). */
+
+.prv { display: grid; grid-template-columns: minmax(0, 1fr) 380px; min-height: 0; height: 100%; border: 1px solid var(--border-default); border-radius: var(--radius-lg); overflow: hidden; background: var(--surface-panel); }
+.prv.no-panel { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 1000px) { .prv { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(420px, 1fr) auto; } }
+.prv-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; position: relative; }
+.prv-bar { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border-default); background: var(--surface-chrome); flex-wrap: wrap; }
+.prv-bar .select { max-width: 320px; }
+.prv-bar .grow { flex: 1; }
+.prv-view { flex: 1; min-height: 0; position: relative; }
+.prv-tool-area .textLayer { pointer-events: none; }
+
+/* highlights over the page */
+.prv-layer { position: absolute; inset: 0; z-index: 6; pointer-events: none; }
+.prv-hl { position: absolute; border-radius: 2px; pointer-events: auto; cursor: pointer; mix-blend-mode: multiply; background: var(--pdf-annot-comment); border: 0; padding: 0; }
+.prv-hl.suggestion { background: var(--pdf-annot-suggestion); }
+.prv-hl.remark { background: var(--pdf-annot-remark); }
+.prv-hl.closed { background: var(--pdf-annot-closed); }
+.prv-hl.area { background: transparent; border: 2px solid var(--pdf-annot-focus); mix-blend-mode: normal; pointer-events: none; }
+.prv-hl.area.comment { border-color: var(--pdf-annot-comment); } .prv-hl.area.suggestion { border-color: var(--pdf-annot-suggestion); } .prv-hl.area.remark { border-color: var(--pdf-annot-remark); }
+.prv-hl.focus { outline: 2px solid var(--pdf-annot-focus); outline-offset: 1px; }
+.prv-hl:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.prv-pin { position: absolute; transform: translate(-50%, -100%); pointer-events: auto; min-width: 20px; height: 20px; padding: 0 var(--space-1); border-radius: var(--radius-pill); border: 1px solid var(--border-strong); background: var(--surface-raised); color: var(--text-primary); font-size: var(--fs-2xs); font-weight: var(--fw-semibold); display: inline-flex; align-items: center; justify-content: center; gap: 2px; cursor: pointer; box-shadow: var(--shadow-1); }
+.prv-pin.focus { border-color: var(--pdf-annot-focus); }
+.prv-draft { position: absolute; background: var(--pdf-annot-draft); border: 1px dashed var(--pdf-annot-focus); pointer-events: none; }
+.prv-draw { position: absolute; inset: 0; z-index: 7; cursor: crosshair; }
+
+/* the hover preview and the selection popover */
+.prv-hover { position: absolute; z-index: 20; max-width: 300px; padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); background: var(--surface-raised); color: var(--text-primary); border: 1px solid var(--border-default); box-shadow: var(--shadow-menu); font-size: var(--fs-xs); pointer-events: none; }
+.prv-hover .who { color: var(--text-secondary); font-weight: var(--fw-semibold); display: block; margin-bottom: 2px; }
+.prv-pop { position: absolute; z-index: 25; display: flex; gap: var(--space-1); padding: var(--space-1); border-radius: var(--radius-md); background: var(--surface-raised); border: 1px solid var(--border-default); box-shadow: var(--shadow-menu); }
+.prv-composer { position: absolute; z-index: 26; width: 340px; max-width: calc(100% - 16px); padding: var(--space-3); border-radius: var(--radius-lg); background: var(--surface-raised); border: 1px solid var(--border-default); box-shadow: var(--shadow-dialog); display: flex; flex-direction: column; gap: var(--space-2); }
+.prv-composer .quote, .prv-thread .quote { margin: 0; padding: var(--space-1) var(--space-2); border-left: 3px solid var(--border-strong); color: var(--text-secondary); font-size: var(--fs-xs); background: var(--surface-inset); border-radius: var(--radius-sm); overflow-wrap: anywhere; }
+.prv-composer .row, .prv-thread .row { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; }
+.prv-composer .row .grow, .prv-thread .row .grow { flex: 1; }
+
+/* the Comments panel */
+.prv-panel { display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--border-default); background: var(--surface-panel); }
+@media (max-width: 1000px) { .prv-panel { border-left: 0; border-top: 1px solid var(--border-default); max-height: 60vh; } }
+.prv-panel-head { padding: var(--space-3); border-bottom: 1px solid var(--border-subtle); display: flex; flex-direction: column; gap: var(--space-2); }
+.prv-panel-head h3 { margin: 0; font-size: var(--fs-md); display: flex; align-items: center; gap: var(--space-2); }
+.prv-counts { display: flex; gap: var(--space-1); flex-wrap: wrap; }
+.prv-filters { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+.prv-filters .wide { grid-column: 1 / -1; }
+.prv-list { flex: 1; overflow: auto; padding: var(--space-2); display: flex; flex-direction: column; gap: var(--space-2); }
+.prv-item { text-align: left; width: 100%; border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); background: var(--surface-raised); color: var(--text-primary); cursor: pointer; display: flex; flex-direction: column; gap: var(--space-1); }
+.prv-item:hover { background: var(--surface-hover); }
+.prv-item[aria-current="true"] { border-color: var(--accent); background: var(--surface-selected); }
+.prv-item:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.prv-item .head { display: flex; gap: var(--space-2); align-items: center; font-size: var(--fs-xs); color: var(--text-secondary); flex-wrap: wrap; }
+.prv-item .head strong { color: var(--text-primary); }
+.prv-item .body { font-size: var(--fs-sm); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.prv-item .q { font-size: var(--fs-xs); color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prv-kind { width: 10px; height: 10px; border-radius: 2px; flex: none; background: var(--pdf-annot-comment); border: 1px solid var(--border-strong); }
+.prv-kind.suggestion { background: var(--pdf-annot-suggestion); } .prv-kind.remark { background: var(--pdf-annot-remark); }
+.prv-thread { border-top: 1px solid var(--border-subtle); padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); max-height: 55%; overflow: auto; background: var(--surface-panel); }
+.prv-thread .reply { padding-left: var(--space-3); border-left: 2px solid var(--border-subtle); font-size: var(--fs-sm); }
+.prv-thread .reply .who, .prv-thread .meta { font-size: var(--fs-xs); color: var(--text-secondary); }
+.prv-thread .body { margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.prv-thread .replace { margin: 0; padding: var(--space-1) var(--space-2); border-left: 3px solid var(--success-border); background: var(--success-subtle); color: var(--text-primary); border-radius: var(--radius-sm); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.prv-orphan { font-size: var(--fs-xs); color: var(--warning); }
+.prv-readonly { position: absolute; right: var(--space-2); bottom: var(--space-2); z-index: 8; }

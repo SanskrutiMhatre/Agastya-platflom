@@ -29,6 +29,7 @@ const ExploreRoute = page(() => import('./pages/project/ExploreRoute'), 'Explore
 const PublicationRoute = page(() => import('./pages/project/PublicationRoute'), 'PublicationRoute');
 const ValidationPage = page(() => import('./pages/project/ValidationPage'), 'ValidationPage');
 const ReleasePage = page(() => import('./pages/project/ReleasePage'), 'ReleasePage');
+const PdfReviewPage = page(() => import('./pages/project/PdfReviewPage'), 'PdfReviewPage');   // Phase 3 (P3-4): the full-page PDF review
 const AncillaryRoute = page(() => import('./pages/project/AncillaryRoute'), 'AncillaryRoute');
 const ProjectSettingsPage = page(() => import('./pages/project/ProjectSettingsPage'), 'ProjectSettingsPage');
 const ProjectHomePage = page(() => import('./pages/project/ProjectHomePage'), 'ProjectHomePage');
@@ -104,6 +105,7 @@ export function App() {
         <Route path="graphics" element={lazyEl(<ProjectGraphicsPage />)} />
         <Route path="ancillary" element={lazyEl(<AncillaryRoute />)} />
         <Route path="release" element={lazyEl(<ReleasePage />)} />
+        <Route path="review-pdf" element={lazyEl(<PdfReviewPage />)} />
         <Route path="csdb" element={<Navigate to="../editor" replace />} />   {/* the Files (CSDB) page was removed; an old link lands in the editor */}
         <Route path="settings/*" element={lazyEl(<ProjectSettingsPage />)} />
       </Route>

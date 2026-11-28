@@ -68,6 +68,8 @@ export interface ReleaseOverview {
   history: Array<{ id: string; releaseNumber: number | null; scheduledAt: string; status: string; note: string | null; requestedAt: string; requestedBy: string | null; decidedAt: string | null }>;
   watermark: { enabled: boolean; text: string; style: string }; watermarkStyles: string[]; canSubmit: boolean; canApprove: boolean; approveBlocked?: string | null;
   review: Review;
+  /** Phase 3 (P3-4): the comments on the generated PDF (blockRelease = release waits for the open required ones) */
+  pdfReview?: { open: number; openRequired: number; total: number; blockRelease: boolean };
 }
 
 export type ReviewState = 'draft' | 'in_review' | 'changes_requested' | 'approved';

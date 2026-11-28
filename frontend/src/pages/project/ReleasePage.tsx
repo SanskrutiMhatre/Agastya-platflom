@@ -15,6 +15,7 @@ import { Icon } from '../../components/Icon';
 import { PageHeader } from '../../components/PageHeader';
 import { ReviewReader } from '../../components/ReviewReader';
 import { PublishRefusal } from '../../components/PublishRefusal';
+import { PdfReviewCard } from '../../components/pdfreview/PdfReviewCard';
 import { canWrite, useProject } from '../../layouts/ProjectShell';
 import { refusalOf, type Refusal } from '../../lib/waivers';
 import { useUi } from '../../store/ui';
@@ -97,6 +98,7 @@ export function ReleasePage() {
           { label: 'Status', value: r.staleRelease && rv.state === 'draft' ? 'Changed since release' : st.label, tone: st.tone ?? (r.staleRelease ? 'warn' : undefined) },
           { label: 'Review round', value: rv.round || '—' },
           { label: 'Open comments', value: rv.open, tone: rv.open ? 'warn' : undefined },
+          ...(r.pdfReview ? [{ label: 'Open PDF comments', value: r.pdfReview.open, tone: (r.pdfReview.openRequired && r.pdfReview.blockRelease ? 'bad' : r.pdfReview.open ? 'warn' : undefined) as 'bad' | 'warn' | undefined }] : []),
           { label: 'Releases', value: r.history.filter((h) => h.status === 'approved').length },
         ]} />
 
@@ -183,6 +185,9 @@ export function ReleasePage() {
               {reading ? <ReviewReader projectId={id} file={reading} comments={rv.comments} canComment={rv.canComment} canResolve={rv.canComment} onChanged={() => { rel.reload(); reload(); }} /> : null}
             </div>
           </section>
+
+          {/* Phase 3 (P3-4): comments on the generated PDF itself */}
+          <PdfReviewCard projectId={id} onChanged={() => rel.reload()} />
 
           <section className="card" aria-labelledby="rel-hist-h">
             <div className="card-head"><h3 id="rel-hist-h"><Icon name="history" />History</h3><span className="faint">{r.history.length} submission{r.history.length === 1 ? '' : 's'}</span></div>

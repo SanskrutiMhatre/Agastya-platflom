@@ -121,6 +121,6 @@ export function JssEditorPage() {
         <ExportProjectButton id={id} dirty={dirty} saveFirst={host.save} label="Export project" />
       </>}
       pdf={<DocPdfPane kind="jss" src={host.src} downloadHref={contentApi.pdfUrl(id, true)} downloadName={`${summary.project.name}.pdf`} builtBy="the server" what="the publication"
-        note={host.note} building={building} progressLines={host.progress.lines} shown={host.shown} />} />
+        note={host.note} building={building} progressLines={host.progress.lines} shown={host.shown} projectId={id} />} />
   );
 }
