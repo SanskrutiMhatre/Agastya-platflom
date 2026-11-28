@@ -39,7 +39,14 @@ export default defineConfig({
     rollupOptions: {
       output: {
         // The Studio (CodeMirror, pdfmake) is large and only the editor route needs it.
-        manualChunks: { react: ['react', 'react-dom', 'react-router-dom'] },
+        // Phase 7 (docs/phase3/performance.md, item 9): CodeMirror and its parser (about half of the Studio chunk) are a chunk of their own.
+        // Only the editor route loads it, in parallel with the Studio chunk, and it does not change between product releases, so a browser
+        // keeps it cached across updates while only the much smaller Studio chunk is fetched again.
+        manualChunks(id: string): string | undefined {
+          if (/[\\/]node_modules[\\/](react|react-dom|react-router-dom|react-router|scheduler)[\\/]/.test(id)) return 'react';
+          if (/[\\/]node_modules[\\/](@codemirror|@lezer|style-mod|w3c-keyname|crelt|@marijn)[\\/]/.test(id)) return 'codemirror';
+          return undefined;
+        },
       },
     },
   },
