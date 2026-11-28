@@ -213,8 +213,6 @@ table.table { width: 100%; border-collapse: separate; border-spacing: 0; }
 .dialog header .ico-wrap.info { background: var(--info-subtle); color: var(--info); } .dialog header .ico-wrap.warning { background: var(--warning-subtle); color: var(--warning); }
 .btn .ico, .icon-btn .ico { pointer-events: none; }
 .btn kbd { margin-left: var(--space-1); }
-.card-head h3 .ico { color: var(--text-tertiary); }
-.card-head > a, .card-head .link { font-size: var(--fs-xs); font-weight: var(--fw-medium); }
 .card-foot { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-top: 1px solid var(--border-subtle); }
 .alert .title { font-weight: var(--fw-semibold); color: var(--text-primary); } .alert > div { min-width: 0; flex: 1; } .alert .actions { display: flex; gap: var(--space-2); align-items: center; flex: none; }
 .chip { display: inline-flex; align-items: center; gap: var(--space-1); height: 22px; padding: 0 var(--space-2); border: 1px solid var(--border-default); background: var(--surface-inset); color: var(--text-secondary); border-radius: var(--radius-pill); font-size: var(--fs-xs); white-space: nowrap; }

@@ -37,7 +37,7 @@ export function WorkingNow({ projectId, format, canBreak }: { projectId: string;
     <section className="now" aria-labelledby="home-team-h" data-testid="home-team">
       <h4 id="home-team-h" className="now-h">Working now</h4>
       {others.length ? (
-        <ul className="now-list v2-team-list" aria-label="People in this project now" data-testid="home-team-people">
+        <ul className="now-list" aria-label="People in this project now" data-testid="home-team-people">
           {others.map((p) => (
             <li key={`${p.userId}-${p.doc?.path ?? ''}`}><span className={`avatar sm${p.mode === 'editing' ? ' here' : ''}`} aria-hidden="true">{initials(p.name)}</span>
               <span className="trunc grow"><b>{p.name}</b> <span className="faint">{activityText(p)}</span></span></li>
@@ -45,7 +45,7 @@ export function WorkingNow({ projectId, format, canBreak }: { projectId: string;
         </ul>
       ) : <span className="faint" data-testid="home-team-alone">Nobody else is in this project right now.</span>}
       {team.leases.length ? (
-        <ul className="now-list v2-team-list" aria-label="Checked-out documents" data-testid="home-team-leases">
+        <ul className="now-list" aria-label="Checked-out documents" data-testid="home-team-leases">
           {team.leases.map((l) => (
             <li key={l.documentId + l.part}>
               <span className="trunc grow" title={l.path ?? ''}>{docName(l)}</span>

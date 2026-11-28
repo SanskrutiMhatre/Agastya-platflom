@@ -9,7 +9,6 @@
 .dash .page-head .row { flex-wrap: wrap; justify-content: flex-end; }
 .dash .kpis { margin-bottom: var(--space-4); }
 .dash .card-head h3 { margin: 0; }
-.dash .card-head h3 .icon { color: var(--text-tertiary); }
 .dash .card-head a { font-size: var(--fs-sm); }
 .dash .card > .alert { margin: var(--space-3) var(--space-4); }
 

@@ -4,11 +4,7 @@
    .stat, .seg, .table, .badge, .progress, .field, .check, .btn, .sr, .trunc, .faint) come from styles/components.css. Tokens only.
    ========================================================================= */
 
-/* the page box of the mockup: .page is --content-max wide INCLUDING its --space-8 side padding (platform.css .v2-page leaves the padding
-   out above --content-max, so the report would be 64 px wider than drawn) */
-.val-page { padding-left: max(var(--space-8), calc((100% - var(--content-max)) / 2 + var(--space-8)));
-  padding-right: max(var(--space-8), calc((100% - var(--content-max)) / 2 + var(--space-8))); }
-@media (max-width: 1180px) { .val-page { padding-left: var(--space-5); padding-right: var(--space-5); } }
+/* the page box of the mockup (.page, --content-max wide including its side padding) comes from platform.css .v2-page */
 
 .val-notes { margin-bottom: var(--space-3); }
 .val-head-tools .select { width: 210px; }
