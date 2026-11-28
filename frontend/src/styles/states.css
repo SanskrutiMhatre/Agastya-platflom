@@ -74,8 +74,9 @@ input[type='checkbox']:disabled, input[type='radio']:disabled { cursor: not-allo
 .v2-toast-x:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
 
 /* ---------------------------------------------------------------- keyboard tooltip (UID-003): the title of the focused control, themed */
-.v2-ktip { position: fixed; z-index: var(--z-tooltip); max-width: 320px; padding: 5px 9px; border-radius: 6px; background: var(--text); color: var(--bg-elev);
-  font-size: 12px; font-weight: 500; line-height: 1.35; box-shadow: var(--shadow-2); pointer-events: none; white-space: normal; }
+/* the mockups' tooltip ([data-tip] in components.css): tooltip tokens, a hairline border, the medium radius */
+.v2-ktip { position: fixed; z-index: var(--z-tooltip); max-width: 320px; padding: 4px 8px; border-radius: var(--radius-md); background: var(--tooltip-bg); color: var(--tooltip-text); border: 1px solid var(--border-default);
+  font-size: var(--fs-xs); font-weight: var(--fw-medium); line-height: 1.35; box-shadow: var(--shadow-2); pointer-events: none; white-space: normal; }
 
 
 /* ---------------------------------------------------------------- Windows High Contrast (TH-006) */

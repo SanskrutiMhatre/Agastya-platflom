@@ -53,13 +53,23 @@ input[type='file'].input { padding: 4px; height: auto; }
 .form-errors ul { margin: 6px 0 0; padding-left: 18px; }
 .check { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 
-/* ---------------------------------------------------------------- modal */
-.modal-backdrop { position: fixed; inset: 0; background: var(--scrim); display: grid; place-items: center; z-index: 100; animation: fade 0.12s ease-out; }
-.modal { background: var(--bg-elev); border-radius: 10px; box-shadow: var(--shadow-2); max-width: calc(100vw - 32px); max-height: calc(100vh - 48px); width: 560px; display: flex; flex-direction: column; border: 1px solid var(--border); animation: pop 0.14s ease-out; }
-.modal-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px 10px 18px; border-bottom: 1px solid var(--border); }
-.modal-title { font-size: 15px; font-weight: 600; margin: 0; }
-.modal-body { padding: 16px 18px; overflow: auto; }
-.modal-buttons { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--border); background: var(--bg-sunken); border-radius: 0 0 10px 10px; }
+/* ---------------------------------------------------------------- modal: the mockups' dialog (docs/audit/mockups/components.css .dialog)
+   Every Modal (forms, wizards, the Studio's own dialogs) is the mockup dialog: raised surface, xl radius, the deep shadow, a heading with no
+   rule under it, the buttons on an inset footer. A confirmation (components/ui.tsx ConfirmModal, `.modal-confirm`) adds the round tinted icon
+   before the title and indents its text under the title, as admin.html draws it (these rules were in pages/admin.css, which loads only with
+   the administration pages, so a confirmation opened elsewhere first had no icon circle). */
+.modal-backdrop { position: fixed; inset: 0; background: var(--scrim); display: grid; place-items: center; z-index: 100; padding: var(--space-4); animation: fade 0.12s ease-out; }
+.modal { background: var(--surface-raised); color: var(--text-primary); border-radius: var(--radius-xl); box-shadow: var(--shadow-3); max-width: calc(100vw - 32px); max-height: calc(100vh - 48px); width: 560px; display: flex; flex-direction: column; border: 1px solid var(--border-default); animation: pop 0.14s ease-out; line-height: var(--lh-ui); }
+.modal-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-4) var(--space-3) var(--space-2) var(--space-4); flex: none; }
+.modal-title { font-size: var(--fs-lg); font-weight: var(--fw-semibold); line-height: var(--lh-tight); margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.modal-body { padding: var(--space-2) var(--space-4) var(--space-4); overflow: auto; }
+.modal-buttons { display: flex; justify-content: flex-end; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-top: 1px solid var(--border-subtle); background: var(--surface-inset); border-radius: 0 0 var(--radius-xl) var(--radius-xl); flex: none; }
+.modal.modal-confirm .modal-head { justify-content: flex-start; align-items: flex-start; padding: var(--space-4) var(--space-4) 0; }
+.modal.modal-confirm .modal-title { line-height: 36px; }
+.modal.modal-confirm .ico-wrap { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--danger-subtle); color: var(--danger); }
+.modal.modal-confirm .ico-wrap.warning { background: var(--warning-subtle); color: var(--warning); } .modal.modal-confirm .ico-wrap.info { background: var(--info-subtle); color: var(--info); }
+.modal.modal-confirm .modal-body { padding: var(--space-2) var(--space-4) var(--space-4) calc(var(--space-4) + 48px); color: var(--text-secondary); }
+.modal.modal-confirm .modal-body p { margin: 0; }
 .confirm-text { margin: 0; line-height: 1.55; }
 @keyframes fade { from { opacity: 0; } }
 @keyframes pop { from { transform: translateY(6px) scale(0.99); opacity: 0; } }

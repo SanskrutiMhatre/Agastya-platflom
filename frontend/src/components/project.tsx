@@ -191,7 +191,7 @@ export function CreateProjectModal({ folders, defaultFolder = '', startWith, onC
       <Field label={way === 'import' ? 'Import it as' : 'Manual type'} hint={way === 'import' ? 'The kind of project to make from the file. Choose a different kind from the file\'s own to convert it.' : 'What kind of publication this project makes.'}>
         <div className="v2-row wrap" role="radiogroup" aria-label="Format">
           {(formats.data ?? []).map((f) => (
-            <button key={f.id} type="button" role="radio" aria-checked={fmt === f.id} disabled={!f.ready && f.id !== 'jss'} data-testid={`wiz-format-${f.id}`} className={`btn ${fmt === f.id ? 'btn-primary' : ''}`} title={f.ready ? f.description : `${f.description} Coming soon.`} onClick={() => pickFormat(f.id)}>{f.label}{f.ready ? '' : ' (coming soon)'}</button>
+            <button key={f.id} type="button" role="radio" aria-checked={fmt === f.id} disabled={!f.ready && f.id !== 'jss'} data-testid={`wiz-format-${f.id}`} className={`btn v2-choice-btn${fmt === f.id ? ' on' : ''}`} title={f.ready ? f.description : `${f.description} Coming soon.`} onClick={() => pickFormat(f.id)}>{f.label}{f.ready ? '' : ' (coming soon)'}</button>
           ))}
         </div>
       </Field>
@@ -224,9 +224,10 @@ export function CreateProjectModal({ folders, defaultFolder = '', startWith, onC
     </>}>
       <div className="v2-stack" data-testid={`wiz-step-${stepId}`}>
         {stepId === 'start' ? (
-          <div className="v2-grid cols-2">
-            <button type="button" className="v2-card" style={{ textAlign: 'left', cursor: 'pointer' }} onClick={() => choose('create')} data-testid="wiz-start-create"><h3 style={{ marginTop: 0 }}>Create a new project</h3><p className="v2-hint" style={{ margin: 0 }}>Start empty and write the manual here.</p></button>
-            <button type="button" className="v2-card" style={{ textAlign: 'left', cursor: 'pointer' }} onClick={() => choose('import')} data-testid="wiz-start-import"><h3 style={{ marginTop: 0 }}>Import a package (.zip)</h3><p className="v2-hint" style={{ margin: 0 }}>Bring in an existing manual. Its model code, issue and structure are read from the package, so nothing can disagree later.</p></button>
+          // global UI pass: the two ways in as the mockups' link cards (an icon tile, a title, one line), side by side
+          <div className="v2-choice-tiles">
+            <button type="button" className="card link v2-choice" onClick={() => choose('create')} data-testid="wiz-start-create"><span className="tile-ic" aria-hidden="true"><Icon name="plus" size={20} /></span><span className="v2-choice-text"><h3>Create a new project</h3><span className="faint">Start empty and write the manual here.</span></span></button>
+            <button type="button" className="card link v2-choice" onClick={() => choose('import')} data-testid="wiz-start-import"><span className="tile-ic" aria-hidden="true"><Icon name="upload" size={20} /></span><span className="v2-choice-text"><h3>Import a package (.zip)</h3><span className="faint">Bring in an existing manual. Its model code, issue and structure are read from the package, so nothing can disagree later.</span></span></button>
           </div>
         ) : null}
         {stepId === 'project' ? (<>{nameAndFolder}{formatPicker}</>) : null}
@@ -246,7 +247,7 @@ export function CreateProjectModal({ folders, defaultFolder = '', startWith, onC
                 <p style={{ margin: '4px 0 8px' }} data-testid="wiz-detected">{guess ? 'The first look found: ' : 'The first look could not tell. '}{detectionSentence(found)} <span className="v2-muted">That is only a guess: check it, and choose again if it is wrong.</span></p>
                 <div className="v2-row wrap" role="radiogroup" aria-label="This file is">
                   {SOURCE_CHOICES.map((c) => (
-                    <button key={c.id} type="button" role="radio" aria-checked={source === c.id} className={`btn ${source === c.id ? 'btn-primary' : ''}`} title={c.hint} data-testid={`wiz-source-${c.id}`}
+                    <button key={c.id} type="button" role="radio" aria-checked={source === c.id} className={`btn v2-choice-btn${source === c.id ? ' on' : ''}`} title={c.hint} data-testid={`wiz-source-${c.id}`}
                       onClick={() => { setSource(c.id); setConfirmed(false); setErr(''); }}>{c.label}{guess === c.id ? ' (detected)' : ''}</button>
                   ))}
                 </div>

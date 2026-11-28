@@ -22,7 +22,7 @@
 .v2-gfx-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 .v2-gfx-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .v2-gfx-tools .v2-input { width: 200px; height: 30px; }
-.v2-gfx-bar .v2-select, .v2-gfx-pager .v2-select, .v2-drop .v2-select { height: 30px; }
+.v2-gfx-bar .v2-select, .v2-gfx-pager .v2-select, .v2-drop .v2-select { height: 30px; width: auto; }   /* global UI pass: a select keeps its own width in the bar (.v2-select is 100% wide, which stacked the bar into a column) */
 .v2-gfx-pager { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 .v2-gfx-pager > div { display: flex; align-items: center; gap: 6px; }
 

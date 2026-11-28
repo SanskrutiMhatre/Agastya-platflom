@@ -6,13 +6,9 @@
    their chunks only. Colours are tokens only.
    ========================================================================= */
 
-/* ------------------------------------------------------------ section heading: title, one line of purpose, actions on the right */
-.v2-admin-head h3, .v2-admin-head h4 { margin: 0; font-size: 16px; font-weight: 650; }
-.v2-admin-head .v2-sub { margin: 2px 0 0; max-width: 72ch; }
 
 /* ------------------------------------------------------------ layout helpers (replacing inline styles) */
 .v2-m0, .v2-sub.v2-m0, .v2-hint.v2-m0 { margin: 0; }
-.v2-mt8 { margin-top: 8px; }
 .v2-gap-4, .v2-row.v2-gap-4 { gap: 4px; }
 .v2-gap-6, .v2-row.v2-gap-6 { gap: 6px; }
 .v2-gap-8, .v2-row.v2-gap-8 { gap: 8px; }
@@ -21,7 +17,7 @@
 .v2-scroll-520 { max-height: 520px; overflow: auto; }
 .v2-maxw-900 { max-width: 900px; }
 .v2-w-90 { width: 90px; } .v2-w-150 { width: 150px; } .v2-w-160 { width: 160px; }
-.v2-w-180 { width: 180px; } .v2-w-200 { width: 200px; } .v2-w-220 { width: 220px; }
+.v2-w-180 { width: 180px; }
 .v2-w-230 { width: 230px; } .v2-w-280 { width: 280px; }
 
 
@@ -130,26 +126,31 @@
 /* the older v2 cards and tables still on these pages (Access, S1000D sections) in the mockup's table language */
 .adm .v2-card { background: var(--surface-panel); border-color: var(--border-default); border-radius: var(--radius-lg); }
 .adm .v2-card-head { padding: var(--space-3) var(--space-4); border-bottom-color: var(--border-subtle); flex-wrap: wrap; }
-.adm .v2-scroll-x { overflow: auto; }
 .adm .v2-table th { padding: 0 var(--space-3); height: var(--row-h); background: var(--surface-inset); color: var(--text-secondary); font-size: var(--fs-xs); font-weight: var(--fw-semibold); text-transform: none; letter-spacing: 0; border-bottom: 1px solid var(--border-default); }
 .adm .v2-table td { padding: var(--space-1h) var(--space-3); height: var(--table-row-h); border-bottom: 1px solid var(--border-subtle); }
 .adm .v2-table tbody tr:last-child td { border-bottom: 0; }
 .adm .v2-table tbody tr:hover td { background: var(--surface-hover); }
-.adm .v2-card > .v2-table thead tr:first-child th:first-child, .adm .v2-card > .v2-scroll-x .v2-table thead tr:first-child th:first-child { border-top-left-radius: var(--radius-lg); }
-.adm .v2-card > .v2-table thead tr:first-child th:last-child, .adm .v2-card > .v2-scroll-x .v2-table thead tr:first-child th:last-child { border-top-right-radius: var(--radius-lg); }
-.adm .v2-admin-head h3 { font-size: var(--fs-md); font-weight: var(--fw-semibold); }
-.adm .v2-admin-head .v2-sub { color: var(--text-tertiary); font-size: var(--fs-xs); }
+.adm .v2-card > .v2-table thead tr:first-child th:first-child { border-top-left-radius: var(--radius-lg); }
+.adm .v2-card > .v2-table thead tr:first-child th:last-child { border-top-right-radius: var(--radius-lg); }
 
-/* the mockup's confirm dialog (components/ui.tsx Modal with an icon): the icon in a tinted circle before the title, the body indented under
-   the title, the buttons on an inset footer */
-.modal.modal-confirm { border-radius: var(--radius-xl); background: var(--surface-raised); border-color: var(--border-default); box-shadow: var(--shadow-3); }
-.modal.modal-confirm .modal-head { display: flex; justify-content: flex-start; gap: var(--space-3); align-items: flex-start; padding: var(--space-4) var(--space-4) 0; border-bottom: 0; }
-.modal.modal-confirm .modal-title { font-size: var(--fs-lg); font-weight: var(--fw-semibold); line-height: 36px; margin: 0; }
-.modal.modal-confirm .ico-wrap { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--danger-subtle); color: var(--danger); }
-.modal.modal-confirm .ico-wrap.warning { background: var(--warning-subtle); color: var(--warning); } .modal.modal-confirm .ico-wrap.info { background: var(--info-subtle); color: var(--info); }
-.modal.modal-confirm .modal-body { padding: var(--space-2) var(--space-4) var(--space-4) calc(var(--space-4) + 48px); color: var(--text-secondary); }
-.modal.modal-confirm .modal-body p { margin: 0; }
-.modal.modal-confirm .modal-buttons { display: flex; justify-content: flex-end; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-top: 1px solid var(--border-subtle); background: var(--surface-inset); border-radius: 0 0 var(--radius-xl) var(--radius-xl); }
+/* the mockup's confirm dialog (.modal.modal-confirm) moved to styles/base.css with the other dialog rules, so it looks the same on every page */
+
+/* global UI pass (2026-11-28): the S1000D sections (information codes, numbering, extension profiles, standards coverage) as cards */
+.adm .adm-filters .select { height: 30px; }
+.adm .adm-filters .tabs.adm-inline-tabs { border-bottom: 0; gap: 0; }
+.adm .adm-filters .adm-inline-tabs .tab { height: 30px; }
+.adm .adm-filters .adm-inline-tabs .tab[aria-selected="true"]::after { bottom: -3px; }
+.adm .adm-filters .adm-search { height: 30px; }
+.adm details.adm-details > summary { display: flex; align-items: center; gap: var(--space-2); min-height: var(--row-h); padding: var(--space-2) var(--space-4); cursor: pointer; color: var(--text-primary); border-radius: var(--radius-lg); }
+.adm details.adm-details > summary:hover { background: var(--surface-hover); }
+.adm details.adm-details > summary:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.adm details.adm-details > summary svg { color: var(--text-tertiary); }
+.adm details.adm-details[open] > summary { border-bottom: 1px solid var(--border-subtle); border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+.adm details.adm-details > p { margin: var(--space-3) var(--space-4); }
+.adm details.adm-details > .v2-table { margin: 0 0 var(--space-2); }
+.adm .card-foot.adm-foot-end { justify-content: flex-end; }
+.adm .adm-band { border-top: 1px solid var(--border-subtle); }
+.adm .table tr.is-open td { background: var(--surface-selected); }
 
 /* the platform backup card: the storage meters as a band under the head; the schedule as the card's foot note */
 .adm .adm-disk-band { border-bottom: 1px solid var(--border-subtle); }
