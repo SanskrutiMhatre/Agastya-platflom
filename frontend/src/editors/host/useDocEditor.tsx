@@ -9,8 +9,6 @@
 //   check     the server's check of the text in the editor, without saving
 //   build     save, then the server's PDF; the PDF pane opens to show it
 //   goto      ?goto=<module key> from the Publication and Explore pages; a key that no longer matches says so (GAP-004) instead of landing at the top
-//   live      Phase 3 (P3-1): when the page binds its document to a live room (liveRef), Save asks the room to write the file now (and record a
-//             revision), the save state is the room's (Saved / Syncing… / Offline - changes kept locally) and no local draft is kept
 // The page keeps what is its own: how to build its editor, its header actions, how a draft is put back.
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
@@ -41,12 +39,6 @@ export interface DocEditorHandle {
   goToModule?(key: string): boolean;
 }
 
-/** Phase 3 (P3-1): what a page bound to a live room gives the host (optional: a page without it saves by version as before). */
-export interface DocLiveHooks {
-  /** write the file now and record a revision (the room's FLUSH); rejects when it cannot (offline) */
-  save(): Promise<void>;
-}
-
 export interface DocAdapter<L extends DocLoaded> {
   kind: 'jss' | 'jsg';
   read(id: string): Promise<L>;
@@ -69,15 +61,19 @@ export interface DocAdapter<L extends DocLoaded> {
   reloadProject: boolean;
 }
 
+/**
+ * Phase 3 (P3-1): a document the page opened LIVE (co-edited in its room, collab/client.ts). Saving is continuous; Save asks the server to
+ * write the file and record a revision now. The page sets `host.liveRef.current` and reports the room's state with `host.setLive`.
+ */
+export interface LiveDocHandle { flush(revision: boolean): Promise<{ hash: string | null }> }
+export type LiveSaveState = 'saved' | 'syncing' | 'offline';
+
 export function useDocEditor<L extends DocLoaded>(ctx: ProjectCtx, adapter: DocAdapter<L>, layout: EditorLayout) {
   const { id, role, can, summary } = ctx;
   const toast = useUi((s) => s.toast);
   const progress = useProgress(id);
   const writable = canWrite(can);
   const editorRef = useRef<DocEditorHandle | null>(null);
-  /** Phase 3: the live room of the document, when the page bound it to one */
-  const liveRef = useRef<DocLiveHooks | null>(null);
-  const [live, setLive] = useState<'saved' | 'syncing' | 'offline' | undefined>(undefined);
   const hashRef = useRef('');
   /** the text both the author and a later save started from: the loaded document, then each saved one (the base of a merge) */
   const baseRef = useRef('');
@@ -93,6 +89,8 @@ export function useDocEditor<L extends DocLoaded>(ctx: ProjectCtx, adapter: DocA
   const [src, setSrc] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [gotoMissing, setGotoMissing] = useState('');
+  const liveRef = useRef<LiveDocHandle | null>(null);
+  const [live, setLive] = useState<LiveSaveState | null>(null);
 
   const load = useCallback(async () => {
     setError(''); setLoaded(null);
@@ -107,15 +105,15 @@ export function useDocEditor<L extends DocLoaded>(ctx: ProjectCtx, adapter: DocA
   useEffect(() => { setFindings(loaded?.report.findings ?? []); }, [loaded]);
   const applyFindings = (list: DocFinding[]) => { setFindings(list); editorRef.current?.setFindings(list as never[]); };
 
+  // (a live document keeps no draft: its unacknowledged changes are in IndexedDB until the server has them, collab/pending.ts)
   const draft = useLocalDraft(id, adapter.kind, () => { const ed = editorRef.current; return ed && !liveRef.current && ed.isDirty() ? ed.getXml() : null; }, dirty, () => hashRef.current, loaded?.xml ?? null);
 
   const save = useCallback(async (): Promise<boolean> => {
     const ed = editorRef.current; if (!ed || !writable) return true;
-    const lv = liveRef.current;
-    if (lv) {
-      // a live document is saved continuously; Save writes the file now and records a revision; the check runs on the merged text
+    if (liveRef.current) {
+      // P3-1: live: everything is sent; the server writes the file now (and a revision), so a build or a preview reads the merged document
       setSaving(true);
-      try { await lv.save(); setSavedAt(new Date()); setFailed(false); void adapter.validate(id, ed.getXml()).then((r) => applyFindings(r.findings), () => undefined); return true; }
+      try { await liveRef.current.flush(true); setSavedAt(new Date()); setFailed(false); if (adapter.reloadProject) ctx.reload(); return true; }
       catch (e) { setFailed(true); toast(errText(e), 'error'); return false; }
       finally { setSaving(false); }
     }

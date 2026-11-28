@@ -144,7 +144,7 @@ export function JsgEditorPage() {
         writable: (w) => setRoomWritable(w),
       });
       binding.current = bound;
-      host.liveRef.current = { save: async () => { await bound!.save(); } };
+      host.liveRef.current = { flush: (revision) => room.flush(revision) };
       follow();
     } else if (recovered.current) { recovered.current = false; editor.markDirty(); } else host.setDirty(editor.isDirty());
     return () => {
@@ -157,7 +157,7 @@ export function JsgEditorPage() {
   // leaving the page (or the project) leaves the room; its unacknowledged changes stay in this browser for the next visit
   useEffect(() => {
     if (!live) return;
-    return () => { live.room.close(); host.setLive(undefined); };
+    return () => { live.room.close(); host.setLive(null); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [live]);
   const roomState = live?.room.state ?? null;
@@ -200,7 +200,8 @@ export function JsgEditorPage() {
     <DocEditorShell kind="jsg" projectId={id} can={can} role={ctx.role} shortcuts={loaded && parseKind(loaded.xml) === 'ispl' ? 'jsg-ispl' : 'jsg'} layout={layout} title={summary.project.name} hostRef={hostRef} loaded={!!loaded} find={false} readOnly={!writableNow}
       crumb={loaded ? <span className="v2-badge accent" title={`JSG document type ${loaded.docType}, from the stencil ${loaded.stencil}`}>JSG · {loaded.label}</span> : null}
       saveState={host.saveState} guard={host.guard} banners={<>{lockBanner}{host.banners(recover)}</>}
-      live={live ? { file: live.mod.JSG_FILE, pinning: { anchor: () => binding.current?.commentAnchor() ?? null, reveal: (_f, a) => binding.current?.reveal(a) ?? false } } : null}
+      live={!!live} commentsFile={live ? live.mod.JSG_COMMENTS_FILE : undefined}
+      pinning={live ? { anchor: () => binding.current?.commentAnchor() ?? null, reveal: (_f, a) => binding.current?.reveal(a) ?? false } : undefined}
       docName={loaded?.label ?? undefined} findings={host.findings}
       inspect={() => (host.editorRef.current as Readable | null)?.inspect?.() ?? null}
       identity={() => { const m = (host.editorRef.current as Readable | null)?.getDoc().meta ?? {}; return META_FIELDS.filter((f) => m[f.key]).map((f) => [f.label, m[f.key]] as [string, string]); }}

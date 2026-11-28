@@ -28,6 +28,8 @@ import { LiveRoom, ORIGIN_LOCAL, type LiveStatus } from './client';
 import { colorFor, PRESENCE_COLORS } from './cursors';
 
 export { JSG_FILE };
+/** The name comments give the document (review.ts accepts "jsg/<file>"; the comments panel calls it "This document"). */
+export const JSG_COMMENTS_FILE = `jsg/${JSG_FILE}`;
 export interface LiveUser { id: string; name: string }
 
 export interface JsgLiveEvents {
@@ -639,8 +641,6 @@ export class JsgLive {
 
   // ------------------------------------------------------------- saving and comments
 
-  /** Save = the server writes the file now and records a revision. */
-  async save(): Promise<string | null> { return (await this.room.flush(true)).hash; }
 
   /** The comment anchor of the selection: the room's positions of its two ends (they follow the words), and its place and words. */
   commentAnchor(): { file: string; anchor: { path: string; tag: string; text: string; y?: { start: string; end: string } } } | null {
@@ -652,7 +652,7 @@ export class JsgLive {
     let y: { start: string; end: string } | undefined;
     if (s.a.slot.kind === 'rich') { const a = this.encode(s.a); const b = this.encode(s.b); if (a && b) y = { start: a, end: b }; }
     else { const a = this.encode(s.a); const b64 = a?.split('|')[4]; if (b64) y = { start: b64, end: b64 }; }
-    return { file: JSG_FILE, anchor: { path: path.join('/'), tag: el.nodeName, text: picked.replace(/\s+/g, ' ').slice(0, 200), ...(y ? { y } : {}) } };
+    return { file: JSG_COMMENTS_FILE, anchor: { path: path.join('/'), tag: el.nodeName, text: picked.replace(/\s+/g, ' ').slice(0, 200), ...(y ? { y } : {}) } };
   }
 
   /** Show a comment's words (followed through everyone's edits) and select them. */
