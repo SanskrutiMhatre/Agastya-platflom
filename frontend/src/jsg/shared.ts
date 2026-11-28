@@ -51,7 +51,7 @@ export function button(label: string, onClick: () => void, cls = ''): HTMLButton
 
 /** The look both editors share: the outline on the left, a toolbar, and a white sheet (Times New Roman, as the stencils set it). */
 export const BASE_CSS = `
-/* WP-19 (TH-001): one tokenised sheet. The chrome (outline, toolbar, status, find, menu) follows the theme; the sheet is paper and prints white in both themes. */
+/* WP-19 (TH-001): one tokenised sheet. The chrome (outline, toolbar, status, find, menu) follows the theme; the sheet uses the themed --sheet-* tokens, like the S1000D Studio page (--doc-*): white with black ink in light, the dark page with light ink in dark (the PDF stays white). */
 .jsg-ed{display:flex;height:100%;min-height:0;background:var(--bg);color:var(--text);font-size:13px}
 .jsg-nav{flex:0 0 232px;overflow:auto;border-right:1px solid var(--border);background:var(--bg-elev);color:var(--text);padding:8px 6px;font-size:12px}
 .jsg-nav h4{margin:8px 4px 4px;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-faint)}
@@ -66,33 +66,34 @@ export const BASE_CSS = `
 .jsg-bar:not(.jsg-tabbed) button:disabled{background:var(--surface-disabled);color:var(--text-disabled);cursor:not-allowed}
 .jsg-bar .sep{width:1px;height:18px;background:var(--border);margin:0 4px}
 .jsg-scroll{flex:1;overflow:auto;padding:18px}
-.jsg-sheet{margin:0 auto;max-width:794px;background:var(--paper);color:var(--paper-ink);padding:56px 56px 72px 94px;box-shadow:var(--paper-sheet-shadow);font:12pt/1.15 var(--font-paper-serif)}
-.jsg-sheet [contenteditable]{outline:none}.jsg-sheet [contenteditable]:focus{background:var(--paper-jsg-focus)}
-.jsg-sheet [contenteditable]:empty:before{content:attr(data-ph);color:var(--paper-jsg-placeholder)}
-.jsg-card{border:1px dashed var(--paper-jsg-card-border);border-radius:4px;margin:14px -18px 18px;padding:10px 14px;background:var(--paper-jsg-card-bg);font:13px/1.35 system-ui,sans-serif}
-.jsg-card h3{margin:0 0 8px;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--paper-jsg-card-head)}
+.jsg-sheet{margin:0 auto;max-width:794px;background:var(--sheet);color:var(--sheet-ink);padding:56px 56px 72px 94px;box-shadow:var(--paper-sheet-shadow);font:12pt/1.15 var(--font-paper-serif);caret-color:var(--sel)}
+.jsg-sheet ::selection,.jsg-isplsheet ::selection{background:color-mix(in srgb,var(--sel) 25%,transparent)}
+.jsg-sheet [contenteditable]{outline:none}.jsg-sheet [contenteditable]:focus{background:var(--sheet-jsg-focus)}
+.jsg-sheet [contenteditable]:empty:before{content:attr(data-ph);color:var(--sheet-jsg-placeholder)}
+.jsg-card{border:1px dashed var(--sheet-jsg-card-border);border-radius:4px;margin:14px -18px 18px;padding:10px 14px;background:var(--sheet-jsg-card-bg);font:13px/1.35 system-ui,sans-serif}
+.jsg-card h3{margin:0 0 8px;font-size:12px;letter-spacing:.05em;text-transform:uppercase;color:var(--sheet-jsg-card-head)}
 .jsg-card label{display:grid;grid-template-columns:170px 1fr;gap:8px;align-items:center;margin:3px 0}
-.jsg-card input{font:13px system-ui,sans-serif;padding:3px 6px;border:1px solid var(--paper-jsg-line);border-radius:3px;width:100%;box-sizing:border-box;background:var(--paper);color:var(--paper-ink)}
-.jsg-card .jsg-row{display:flex;gap:6px;margin:3px 0;align-items:flex-start}.jsg-card .jsg-row>span{flex:0 0 22px;color:var(--paper-jsg-muted)}
-.jsg-card .jsg-row>[contenteditable],.jsg-card .jsg-row>input{flex:1;border:1px solid var(--paper-jsg-line);border-radius:3px;padding:3px 6px;background:var(--paper);min-height:20px}
-.jsg-card button{border:1px solid var(--paper-jsg-line);background:var(--paper);color:var(--paper-ink);border-radius:3px;padding:1px 7px;cursor:pointer;font-size:12px}
-.jsg-chapter{color:var(--paper-heading);font-weight:bold;text-transform:uppercase;font-size:22pt;line-height:1.15;text-align:center;margin:60px 0 6px}
-.jsg-sectionh{color:var(--paper-heading);font-weight:bold;text-transform:uppercase;font-size:22pt;text-align:center;margin:36px 0 12px}
+.jsg-card input{font:13px system-ui,sans-serif;padding:3px 6px;border:1px solid var(--sheet-jsg-line);border-radius:3px;width:100%;box-sizing:border-box;background:var(--sheet);color:var(--sheet-ink)}
+.jsg-card .jsg-row{display:flex;gap:6px;margin:3px 0;align-items:flex-start}.jsg-card .jsg-row>span{flex:0 0 22px;color:var(--sheet-jsg-muted)}
+.jsg-card .jsg-row>[contenteditable],.jsg-card .jsg-row>input{flex:1;border:1px solid var(--sheet-jsg-line);border-radius:3px;padding:3px 6px;background:var(--sheet);min-height:20px}
+.jsg-card button{border:1px solid var(--sheet-jsg-line);background:var(--sheet);color:var(--sheet-ink);border-radius:3px;padding:1px 7px;cursor:pointer;font-size:12px}
+.jsg-chapter{color:var(--sheet-heading);font-weight:bold;text-transform:uppercase;font-size:22pt;line-height:1.15;text-align:center;margin:60px 0 6px}
+.jsg-sectionh{color:var(--sheet-heading);font-weight:bold;text-transform:uppercase;font-size:22pt;text-align:center;margin:36px 0 12px}
 .jsg-num{display:block;font-size:22pt}
-.jsg-code{display:block;width:fit-content;margin:4px auto 0;padding:0 6px;border:1px solid var(--paper-code-border);border-radius:3px;background:var(--paper-code-bg);color:var(--paper-code-text);font:400 9pt/1.5 ui-monospace,Consolas,monospace;text-transform:none;user-select:none}
-.jsg-flash{animation:jsg-flash 1.6s ease-out}@keyframes jsg-flash{0%{background:var(--paper-flash)}100%{background:transparent}}
-.jsg-clause{color:var(--paper-heading);font-weight:bold;text-transform:uppercase;margin:12pt 0 6pt;display:flex;gap:10px}
+.jsg-code{display:block;width:fit-content;margin:4px auto 0;padding:0 6px;border:1px solid var(--sheet-code-border);border-radius:3px;background:var(--sheet-code-bg);color:var(--sheet-code-text);font:400 9pt/1.5 ui-monospace,Consolas,monospace;text-transform:none;user-select:none}
+.jsg-flash{animation:jsg-flash 1.6s ease-out}@keyframes jsg-flash{0%{background:var(--sheet-flash)}100%{background:transparent}}
+.jsg-clause{color:var(--sheet-heading);font-weight:bold;text-transform:uppercase;margin:12pt 0 6pt;display:flex;gap:10px}
 .jsg-clause .n{flex:0 0 auto;min-width:34px}.jsg-clause .t{flex:1}
 .jsg-p{text-align:justify;margin:3pt 0}
 .jsg-list{margin:3pt 0}.jsg-li{display:flex;gap:8px;margin:3pt 0;text-align:justify}.jsg-li .m{flex:0 0 40px}.jsg-li .b{flex:1}
 .jsg-cap{font-weight:bold;text-align:center;margin:6pt 0}
 .jsg-fig{text-align:center;margin:6pt 0}.jsg-fig img{max-width:100%;max-height:340px}
-.jsg-fig .empty{border:1px dashed var(--paper-jsg-placeholder);color:var(--paper-jsg-muted);padding:26px;font:12px system-ui,sans-serif}
+.jsg-fig .empty{border:1px dashed var(--sheet-jsg-placeholder);color:var(--sheet-jsg-muted);padding:26px;font:12px system-ui,sans-serif}
 .jsg-table{border-collapse:collapse;width:100%;font-size:10pt;margin:4pt 0}
-.jsg-table td,.jsg-table th{border:1px solid var(--paper-rule-strong);padding:2px 4px;vertical-align:middle}.jsg-table th{font-weight:bold;text-align:center}
-.jsg-notice{border:1px solid var(--paper-ink);padding:4px 8px;margin:6pt 0}.jsg-notice b{display:block;text-transform:uppercase}
-.jsg-break{border-top:1px dashed var(--paper-jsg-placeholder);color:var(--paper-jsg-placeholder);font:10px system-ui,sans-serif;text-align:center;margin:8px 0}
-.jsg-tag{font:10px system-ui,sans-serif;color:var(--paper-jsg-muted);margin:10px 0 0;text-transform:uppercase}
+.jsg-table td,.jsg-table th{border:1px solid var(--sheet-rule-strong);padding:2px 4px;vertical-align:middle}.jsg-table th{font-weight:bold;text-align:center}
+.jsg-notice{border:1px solid var(--sheet-ink);padding:4px 8px;margin:6pt 0}.jsg-notice b{display:block;text-transform:uppercase}
+.jsg-break{border-top:1px dashed var(--sheet-jsg-placeholder);color:var(--sheet-jsg-placeholder);font:10px system-ui,sans-serif;text-align:center;margin:8px 0}
+.jsg-tag{font:10px system-ui,sans-serif;color:var(--sheet-jsg-muted);margin:10px 0 0;text-transform:uppercase}
 .jsg-ro .jsg-bar button.edit{display:none}
 .jsg-app{text-align:center;font-weight:bold;font-size:14pt;margin:34px 0 10px}
 
@@ -131,11 +132,11 @@ export const BASE_CSS = `
 .jsg-find.open{display:flex}.jsg-find input[type=text]{height:26px;padding:0 8px;border:1px solid var(--border-control);border-radius:5px;background:var(--bg);color:inherit;min-width:150px}
 .jsg-find button{height:26px;border:1px solid var(--border-strong);border-radius:5px;background:var(--bg-elev);color:inherit;padding:0 9px;cursor:pointer;font:inherit}.jsg-find button:hover:not(:disabled){background:var(--bg-hover)}.jsg-find button:disabled{background:var(--surface-disabled);color:var(--text-disabled);border-color:var(--border);cursor:not-allowed}
 .jsg-find .cnt{color:var(--text-faint);min-width:70px}
-::highlight(jsg-hit){background:var(--paper-find);color:var(--paper-ink)}::highlight(jsg-cur){background:var(--paper-find-current);color:var(--paper-ink)}
-.jsg-orient{font:10px system-ui,sans-serif;color:var(--paper-hint);text-align:center;margin:6px 0;border-top:1px dashed var(--paper-jsg-placeholder);padding-top:2px}
+::highlight(jsg-hit){background:var(--find-match);color:inherit}::highlight(jsg-cur){background:var(--find-current);color:var(--find-current-text)}
+.jsg-orient{font:10px system-ui,sans-serif;color:var(--sheet-hint);text-align:center;margin:6px 0;border-top:1px dashed var(--sheet-jsg-placeholder);padding-top:2px}
 .jsg-picker{max-width:560px;width:90%;border:1px solid var(--border-strong);border-radius:6px;padding:12px;font:13px system-ui,sans-serif;background:var(--bg-elev);color:var(--text)}
 .jsg-picker::backdrop{background:var(--scrim)}
-.jsg-picker .jsg-pick{border:1px solid var(--border);background:var(--image-backdrop);color:var(--paper-ink);padding:4px;cursor:pointer}
+.jsg-picker .jsg-pick{border:1px solid var(--border);background:var(--image-backdrop);color:var(--sheet-ink);padding:4px;cursor:pointer}
 `;
 
 // ── The toolbar in tabs ─────────────────────────────────────────────────────────────────────────────────────────────────────────

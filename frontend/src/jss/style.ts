@@ -1,7 +1,8 @@
 // The editor's stylesheet. The page is drawn with the stencil's own measurements (JSS-0251 UHB/MM/ORM): A4, 25 mm inner and 15 mm outer margin, Arial 12 pt,
 // chapter titles 18 pt, section headings 14 pt capitals then 12 pt, with the heading numbers and text in the stencil's hanging columns (8, 12.7, 17 and 20 mm)
-// and body text indented to where the heading text starts (8, 20.7, 25 and 28 mm). The surroundings use the application's theme tokens; the sheet itself is
-// always paper-white with black text, as it prints.
+// and body text indented to where the heading text starts (8, 20.7, 25 and 28 mm). The surroundings use the application's theme tokens; the sheet uses the
+// themed --sheet-* tokens, the same treatment as the S1000D Studio page (--doc-*): white with black ink in light, the dark page with light ink in dark.
+// The PDF and the print preview stay paper-white (--paper).
 
 export const JSS_CSS = `
 .jss-root { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--bg); color: var(--text); font-size: 13px; }
@@ -48,17 +49,18 @@ export const JSS_CSS = `
 .jss-sheetnote { max-width: 210mm; margin: 0 0 10px; font-size: 12px; color: var(--text-faint); }
 
 /* ---- the sheet ---- */
-.jss-paper { width: 210mm; max-width: none; margin: 0 0 0 max(0px, calc((100% - 210mm) / 2)); background: var(--paper); color: var(--paper-ink); padding: 20mm 15mm 20mm 25mm; box-shadow: var(--paper-shadow); min-height: 297mm; font-family: var(--font-paper); font-size: 12pt; line-height: 1.15; text-align: justify; }
+.jss-paper { width: 210mm; max-width: none; margin: 0 0 0 max(0px, calc((100% - 210mm) / 2)); background: var(--sheet); color: var(--sheet-ink); padding: 20mm 15mm 20mm 25mm; box-shadow: var(--paper-shadow); min-height: 297mm; font-family: var(--font-paper); font-size: 12pt; line-height: 1.15; text-align: justify; caret-color: var(--sel); }
+.jss-paper ::selection { background: color-mix(in srgb, var(--sel) 25%, transparent); }
 .jss-paper [contenteditable="true"] { outline: none; min-height: 1.15em; }
-.jss-paper [contenteditable="true"]:empty::before { content: attr(data-ph); color: var(--paper-placeholder); pointer-events: none; }
-.jss-paper [contenteditable="true"]:focus { background: var(--paper-focus-fill); box-shadow: -3px 0 0 var(--paper-focus-edge); }
+.jss-paper [contenteditable="true"]:empty::before { content: attr(data-ph); color: var(--sheet-placeholder); pointer-events: none; }
+.jss-paper [contenteditable="true"]:focus { background: var(--sheet-focus-fill); box-shadow: -3px 0 0 var(--sheet-focus-edge); }
 .jss-ro .jss-paper [contenteditable] { cursor: default; }
 
 .jss-chapter { margin: 0 0 8mm; }
-.jss-chapter + .jss-chapter { margin-top: 14mm; border-top: 1px dashed var(--paper-guide); padding-top: 10mm; }
+.jss-chapter + .jss-chapter { margin-top: 14mm; border-top: 1px dashed var(--sheet-guide); padding-top: 10mm; }
 .jss-ch-no { font-size: 18pt; font-weight: 700; margin-bottom: 1mm; text-align: left; }
-.jss-ch-title { font-size: 18pt; font-weight: 700; border-bottom: 1pt solid var(--paper-ink); padding-bottom: 2mm; margin-bottom: 6mm; text-align: left; }
-.jss-ch-lock { font-size: 9pt; font-weight: 400; color: var(--paper-hint); margin-left: 8px; font-family: system-ui, sans-serif; }
+.jss-ch-title { font-size: 18pt; font-weight: 700; border-bottom: 1pt solid var(--sheet-ink); padding-bottom: 2mm; margin-bottom: 6mm; text-align: left; }
+.jss-ch-lock { font-size: 9pt; font-weight: 400; color: var(--sheet-hint); margin-left: 8px; font-family: system-ui, sans-serif; }
 .jss-chapter { position: relative; }
 .jss-chapter:hover > .jss-ch-tools, .jss-chapter:focus-within > .jss-ch-tools { display: inline-flex; }
 .jss-addch { display: block; margin: 10mm 0 0; padding: 6px 14px; border: 1px dashed var(--border-strong); border-radius: 6px; background: none; color: var(--text, inherit); font: 13px system-ui, sans-serif; cursor: pointer; }
@@ -68,7 +70,7 @@ export const JSS_CSS = `
 .jss-sec-head { display: flex; align-items: baseline; margin-top: 4.2mm; margin-bottom: 2.1mm; font-weight: 700; text-align: left; break-after: avoid; }
 .jss-sec-no { flex: none; }
 .jss-sec-title { flex: 1; min-width: 0; }
-.jss-sec-code { flex: none; margin-left: 3mm; padding: 0 1.5mm; border: 1px solid var(--paper-code-border); border-radius: 3px; background: var(--paper-code-bg); color: var(--paper-code-text); font: 400 7pt/1.5 ui-monospace, Consolas, monospace; text-transform: none; user-select: none; }
+.jss-sec-code { flex: none; margin-left: 3mm; padding: 0 1.5mm; border: 1px solid var(--sheet-code-border); border-radius: 3px; background: var(--sheet-code-bg); color: var(--sheet-code-text); font: 400 7pt/1.5 ui-monospace, Consolas, monospace; text-transform: none; user-select: none; }
 .jss-sec.d1 > .jss-sec-head { font-size: 14pt; text-transform: uppercase; }
 .jss-sec.d1 > .jss-sec-head .jss-sec-no { width: 8mm; }
 .jss-sec.d2 > .jss-sec-head { margin-left: 8mm; font-size: 12pt; } .jss-sec.d2 > .jss-sec-head .jss-sec-no { width: 12.7mm; }
@@ -83,12 +85,12 @@ export const JSS_CSS = `
 .jss-sec-tools select { font: inherit; font-size: 12px; border: 0; background: none; color: var(--text); }
 
 .jss-block { position: relative; margin: 0 0 3mm; }
-.jss-block.jss-sel { box-shadow: -4px 0 0 var(--paper-sel-edge); }
+.jss-block.jss-sel { box-shadow: -4px 0 0 var(--sheet-sel-edge); }
 .jss-para { text-align: justify; }
 .jss-para[data-align="left"] { text-align: left; } .jss-para[data-align="center"] { text-align: center; } .jss-para[data-align="right"] { text-align: right; }
-.jss-xref { color: var(--paper-focus-edge); text-decoration: underline; cursor: default; white-space: nowrap; }
-.jss-xref.missing { color: var(--paper-error); text-decoration: underline wavy; }
-.jss-ph-xref { font-size: 11px; background: var(--paper-xref-bg); border-radius: 3px; padding: 0 3px; }
+.jss-xref { color: var(--sheet-focus-edge); text-decoration: underline; cursor: default; white-space: nowrap; }
+.jss-xref.missing { color: var(--sheet-error); text-decoration: underline wavy; }
+.jss-ph-xref { font-size: 11px; background: var(--sheet-xref-bg); border-radius: 3px; padding: 0 3px; }
 
 .jss-list { margin: 0 0 3mm; }
 .jss-li { display: flex; align-items: flex-start; margin-bottom: 1.5mm; }
@@ -103,20 +105,20 @@ export const JSS_CSS = `
 .jss-cap { text-align: center; font-weight: 700; font-size: 10pt; margin: 0 0 2mm; }
 .jss-cap .no { white-space: nowrap; } .jss-cap [contenteditable] { display: inline-block; min-width: 40mm; text-align: left; }
 .jss-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 10pt; }
-.jss-table th, .jss-table td { border: 0.6pt solid var(--paper-ink); padding: 1.5mm; vertical-align: top; text-align: left; }
+.jss-table th, .jss-table td { border: 0.6pt solid var(--sheet-table-rule); padding: 1.5mm; vertical-align: top; text-align: left; }
 .jss-table thead td { font-weight: 700; text-align: center; }
-.jss-table td:focus-within { background: var(--paper-focus-fill); }
+.jss-table td:focus-within { background: var(--sheet-focus-fill); }
 .jss-table .jss-cellpart { min-height: 1.15em; }
 .jss-ttools { display: none; gap: 4px; flex-wrap: wrap; margin-bottom: 2mm; font-family: system-ui, sans-serif; font-size: 12px; text-align: left; }
 .jss-block:focus-within > .jss-tablewrap > .jss-ttools, .jss-tablewrap:hover > .jss-ttools { display: flex; }
 .jss-ttools button { border: 1px solid var(--border-strong); background: var(--bg-elev); color: var(--text); border-radius: 5px; padding: 2px 7px; cursor: pointer; font: inherit; }
 .jss-ttools button:disabled { color: var(--text-faint); cursor: default; opacity: .6; }
-.jss-ttools .hint { color: var(--paper-hint); align-self: center; }
+.jss-ttools .hint { color: var(--sheet-hint); align-self: center; }
 
 .jss-figure { text-align: center; margin: 4mm 0 5mm; }
 .jss-figure img { max-width: 100%; max-height: 170mm; display: inline-block; }
-.jss-figure .jss-imgbox { border: 1px dashed var(--paper-guide); padding: 3mm; display: inline-block; max-width: 100%; }
-.jss-figure .jss-missing { color: var(--paper-error); font-size: 10pt; padding: 8mm; }
+.jss-figure .jss-imgbox { border: 1px dashed var(--sheet-guide); padding: 3mm; display: inline-block; max-width: 100%; }
+.jss-figure .jss-missing { color: var(--sheet-error); font-size: 10pt; padding: 8mm; }
 .jss-legend { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 8mm; text-align: left; font-size: 10pt; margin-top: 2mm; }
 .jss-legend .row { display: flex; gap: 2mm; align-items: baseline; }
 .jss-legend .row b { min-width: 7mm; }
@@ -131,16 +133,16 @@ export const JSS_CSS = `
 .jss-sec.d2 > .jss-sec-body > .jss-wide { margin-left: -20.7mm; }
 .jss-sec.d3 > .jss-sec-body > .jss-wide { margin-left: -25mm; }
 .jss-sec.d4 > .jss-sec-body > .jss-wide, .jss-sec.d5 > .jss-sec-body > .jss-wide { margin-left: -28mm; }
-.jss-notice .band { color: var(--paper); font-weight: 700; font-size: 9pt; padding: 1mm 2mm; text-align: left; font-family: var(--font-paper); }
-.jss-notice.note .band { background: var(--paper-band-note); font-style: italic; } .jss-notice.warning .band, .jss-notice.caution .band { background: var(--paper-band-warning); }
-.jss-notice .txt { padding: 1mm 2mm; border-bottom: 0.8pt solid var(--paper-ink); font-weight: 700; text-transform: uppercase; text-align: left; }
+.jss-notice .band { color: var(--sheet-on-band); font-weight: 700; font-size: 9pt; padding: 1mm 2mm; text-align: left; font-family: var(--font-paper); }
+.jss-notice.note .band { background: var(--sheet-band-note); font-style: italic; } .jss-notice.warning .band, .jss-notice.caution .band { background: var(--sheet-band-warning); }
+.jss-notice .txt { padding: 1mm 2mm; border-bottom: 0.8pt solid var(--sheet-ink); font-weight: 700; text-transform: uppercase; text-align: left; }
 .jss-notice .txt > .jss-para { margin: 0 0 1.5mm; }
-.jss-pb { border-top: 1px dashed var(--paper-placeholder); margin: 5mm 0; text-align: center; font: 10px system-ui, sans-serif; color: var(--paper-hint); line-height: 0; }
-.jss-pb span { background: var(--paper); padding: 0 8px; }
-.jss-problem-mark { position: absolute; left: -9mm; top: 0; font: 700 11px system-ui, sans-serif; width: 6mm; text-align: center; border-radius: 3px; color: var(--paper); }
-.jss-has-error > .jss-problem-mark.e { background: var(--paper-mark-error); } .jss-has-warn > .jss-problem-mark.w { background: var(--paper-mark-warning); }
+.jss-pb { border-top: 1px dashed var(--sheet-placeholder); margin: 5mm 0; text-align: center; font: 10px system-ui, sans-serif; color: var(--sheet-hint); line-height: 0; }
+.jss-pb span { background: var(--sheet); padding: 0 8px; }
+.jss-problem-mark { position: absolute; left: -9mm; top: 0; font: 700 11px system-ui, sans-serif; width: 6mm; text-align: center; border-radius: 3px; color: var(--sheet-on-band); }
+.jss-has-error > .jss-problem-mark.e { background: var(--sheet-mark-error); } .jss-has-warn > .jss-problem-mark.w { background: var(--sheet-mark-warning); }
 .jss-flash { animation: jss-flash 1.6s ease-out; }
-@keyframes jss-flash { 0% { background: var(--paper-flash); } 100% { background: transparent; } }
+@keyframes jss-flash { 0% { background: var(--sheet-flash); } 100% { background: transparent; } }
 
 .jss-problems { flex: none; border-top: 1px solid var(--border); background: var(--bg-elev); max-height: min(190px, 25vh); overflow: auto; }   /* WP-22: a drawer of at most 25% height; Escape closes it */
 .jss-problems summary { padding: 6px 12px; cursor: pointer; font-weight: 600; user-select: none; position: sticky; top: 0; background: var(--bg-elev); }
@@ -173,7 +175,7 @@ export const JSS_CSS = `
 .jss-btn { height: 32px; padding: 0 14px; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--bg-elev); color: var(--text); cursor: pointer; font: inherit; }
 .jss-btn.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
 .jss-btn:disabled { opacity: .55; cursor: default; }
-@media print { .jss-toolbar, .jss-outline, .jss-problems { display: none; } }
+@media print { .jss-toolbar, .jss-outline, .jss-problems { display: none; } .jss-paper { --sheet: var(--paper); --sheet-ink: var(--paper-ink); --sheet-table-rule: var(--paper-ink); } }
 `;
 
 let injected = false;

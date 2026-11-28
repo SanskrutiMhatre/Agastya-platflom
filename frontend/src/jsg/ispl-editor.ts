@@ -15,29 +15,30 @@ import { serializeJsg } from './xml';
 import { confirmDialog, promptDialog } from '../lib/dialogs';
 
 const CSS = `
-.jsg-isplsheet{margin:0 auto;max-width:1180px;padding:18px 24px 60px;background:var(--paper);color:var(--paper-ink);box-shadow:var(--paper-sheet-shadow);font:12pt/1.2 var(--font-paper-serif)}
+.jsg-isplsheet{margin:0 auto;max-width:1180px;padding:18px 24px 60px;background:var(--sheet);color:var(--sheet-ink);box-shadow:var(--paper-sheet-shadow);font:12pt/1.2 var(--font-paper-serif);caret-color:var(--sel)}
 .jsg-isplsheet .jsg-card{margin:12px 0}
 .jsg-isplsheet .jsg-card h3{font-size:13px}
-.jsg-plate{border:1px solid var(--paper-jsg-placeholder);border-radius:5px;margin:16px 0;background:var(--paper)}
-.jsg-plate>header{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 10px;background:var(--paper-jsg-plate-head);border-bottom:1px solid var(--paper-jsg-line);font:12px system-ui,sans-serif}
-.jsg-plate>header input[type=text]{font:13px system-ui;padding:3px 6px;border:1px solid var(--paper-jsg-line);border-radius:3px;background:var(--paper);color:var(--paper-ink)}
+.jsg-plate{border:1px solid var(--sheet-jsg-placeholder);border-radius:5px;margin:16px 0;background:var(--sheet)}
+.jsg-plate>header{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:8px 10px;background:var(--sheet-jsg-plate-head);border-bottom:1px solid var(--sheet-jsg-line);font:12px system-ui,sans-serif}
+.jsg-plate>header input[type=text]{font:13px system-ui;padding:3px 6px;border:1px solid var(--sheet-jsg-line);border-radius:3px;background:var(--sheet);color:var(--sheet-ink)}
 .jsg-plate>header .ref{width:90px;font-weight:bold}.jsg-plate>header .ttl{width:220px}.jsg-plate>header .cap{width:260px}
-.jsg-plate.sel>header{background:var(--paper-jsg-plate-sel)}
-.jsg-view{margin:10px;padding:8px;border:1px dashed var(--paper-jsg-card-border);border-radius:4px;font:12px system-ui,sans-serif}
+.jsg-plate.sel>header{background:var(--sheet-jsg-plate-sel)}
+.jsg-view{margin:10px;padding:8px;border:1px dashed var(--sheet-jsg-card-border);border-radius:4px;font:12px system-ui,sans-serif}
 .jsg-view .pics{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}
-.jsg-view .pic{width:150px;border:1px solid var(--paper-jsg-line);border-radius:3px;padding:4px;text-align:center;background:var(--paper-jsg-card-bg)}
+.jsg-view .pic{width:150px;border:1px solid var(--sheet-jsg-line);border-radius:3px;padding:4px;text-align:center;background:var(--sheet-jsg-card-bg)}
 .jsg-view .pic img{max-width:100%;max-height:90px;display:block;margin:0 auto 4px}
-.jsg-view .pic input{width:100%;box-sizing:border-box;font:11px system-ui;padding:2px 4px;border:1px solid var(--paper-jsg-line);border-radius:3px;background:var(--paper);color:var(--paper-ink)}
+.jsg-view .pic input{width:100%;box-sizing:border-box;font:11px system-ui;padding:2px 4px;border:1px solid var(--sheet-jsg-line);border-radius:3px;background:var(--sheet);color:var(--sheet-ink)}
+.jsg-view .pic button{margin-top:4px;font:11px system-ui;padding:1px 7px;border:1px solid var(--sheet-jsg-line);border-radius:3px;background:var(--sheet);color:var(--sheet-ink);cursor:pointer}
 .jsg-grid{overflow:auto;margin-top:6px}
 .jsg-grid table{border-collapse:collapse;font:12px "Times New Roman",serif}
-.jsg-grid th,.jsg-grid td{border:1px solid var(--paper-grid-rule);padding:0}
-.jsg-grid th{background:var(--paper-jsg-grid-head);font-weight:bold;padding:3px 4px;text-align:center}
-.jsg-grid td input{border:0;width:100%;box-sizing:border-box;padding:3px 4px;font:12px "Times New Roman",serif;background:transparent}
-.jsg-grid td input:focus{outline:2px solid var(--paper-jsg-grid-focus);background:var(--paper-jsg-focus)}
+.jsg-grid th,.jsg-grid td{border:1px solid var(--sheet-grid-rule);padding:0}
+.jsg-grid th{background:var(--sheet-jsg-grid-head);font-weight:bold;padding:3px 4px;text-align:center}
+.jsg-grid td input{border:0;width:100%;box-sizing:border-box;padding:3px 4px;font:12px "Times New Roman",serif;background:transparent;color:inherit}
+.jsg-grid td input:focus{outline:2px solid var(--sheet-jsg-grid-focus);background:var(--sheet-jsg-focus)}
 .jsg-grid td.act{width:24px;text-align:center}
-.jsg-note{font:11px system-ui;color:var(--paper-jsg-muted);margin:4px 0}
-.jsg-rich{border:1px solid var(--paper-jsg-line);border-radius:3px;padding:4px 6px;background:var(--paper);min-height:20px;font:12pt/1.25 "Times New Roman",serif;outline:none;text-align:justify}
-.jsg-rich:focus{background:var(--paper-jsg-focus)}
+.jsg-note{font:11px system-ui;color:var(--sheet-jsg-muted);margin:4px 0}
+.jsg-rich{border:1px solid var(--sheet-jsg-line);border-radius:3px;padding:4px 6px;background:var(--sheet);min-height:20px;font:12pt/1.25 "Times New Roman",serif;outline:none;text-align:justify}
+.jsg-rich:focus{background:var(--sheet-jsg-focus)}
 .jsg-isplbody{flex:1;display:flex;min-height:0}
 .jsg-isplbody>.jsg-scroll{flex:1 1 0;min-width:0}
 .jsg-pvpane{flex:0 0 44%;min-width:320px;max-width:60%;overflow-y:auto;overflow-x:hidden;border-left:1px solid var(--preview-edge);background:var(--preview-canvas)}
@@ -252,7 +253,7 @@ export class IsplEditor implements JsgEditorLike {
 
   private viewCard(p: Plate, v: PlateView, vi: number): HTMLElement {
     const box = mk('div', 'jsg-view'); box.append(mk('b', '', `View ${vi + 1}`));
-    const cap = document.createElement('input'); cap.type = 'text'; cap.placeholder = 'Red caption under the picture (e.g. 100M INFANTRY FOOT BRIDGE FLOATING (ISOMETRIC VIEW 1))'; cap.value = v.caption; cap.disabled = this.readOnly; cap.style.cssText = 'width:100%;box-sizing:border-box;margin:4px 0;font:13px system-ui;padding:3px 6px;border:1px solid var(--paper-jsg-line);border-radius:3px';
+    const cap = document.createElement('input'); cap.type = 'text'; cap.placeholder = 'Red caption under the picture (e.g. 100M INFANTRY FOOT BRIDGE FLOATING (ISOMETRIC VIEW 1))'; cap.value = v.caption; cap.disabled = this.readOnly; cap.style.cssText = 'width:100%;box-sizing:border-box;margin:4px 0;font:13px system-ui;padding:3px 6px;border:1px solid var(--sheet-jsg-line);border-radius:3px;background:var(--sheet);color:var(--sheet-ink)';
     cap.addEventListener('input', () => { v.caption = cap.value; this.touch(); }); box.appendChild(cap);
     const pics = mk('div', 'pics'); box.appendChild(pics);
     v.graphics.forEach((g, gi) => {
