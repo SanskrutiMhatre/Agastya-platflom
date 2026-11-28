@@ -32,7 +32,7 @@ const ORDER = [
   '025-audit-chain',               // WP-29
   '026-jobs',                      // WP-14
   '027-default-accounts',          // Phase 3 P3-6 (standalone default accounts)
-  '028-collab-documents',          // Phase 3 (P3-1): live co-editing rooms
+  '029-collab-documents',          // Phase 3 (P3-1): live co-editing rooms
 ];
 
 const MIGRATIONS = ORDER.map((name) => require(`./${name}`));
