@@ -157,14 +157,14 @@ re-checked, no new package, tailwindcss removed.
 Backend: `phase8-cleanup` 6/6 (new), `wp11-integrity` 16/16, `packages` 10/10, `api` 17/17, `csdb-objects` 4/4, `pm-multi-ref` 5/5,
 `pm-multiref` 3/3, `import` 5/5, `importer-http` 12/12, `phase7-perf` 5/5, `phase3-perf` 3/3, `wp17-perf` 9/9, `wp17-brex-fast` 5/5,
 `brex-gate` 3/3, `wp32-validation-scale` 8/8, `wp32-event-loop` 1/1, `wp32-validator-crash` 1/1, `applic-publish` 12/12, `pdf-review` 10/10,
-`project-archive` 5/5, `gitlab` 13/13, guards `authz-matrix` 6/6, `wp29-audit-coverage` 2/2, `wp10-seams` 11/11, `routes-guarded` 1/1.
+`project-archive` 5/5, `gitlab` 13/13, `publish-gate` 24/24, `wp30-pdf-regression` 10/10 (2 skipped, JSS-0251 package absent), guards `authz-matrix` 6/6, `wp29-audit-coverage` 2/2, `wp10-seams` 11/11, `routes-guarded` 1/1.
 `wp16-validation-framework` 5/6: the failing check names `backend/src/shared/jss/xml.ts` and `shared/jsg/xml.ts` (an XML escaper outside
 `lib/xml.ts`), files of the other agent's area, not changed here. Scripts: `perf-budgets.test.mjs` 4/4. Both `tsc`, frontend build, `node
 scripts/ci/lint.mjs` (fails only on the other agent's exports and `lib0`), `check:parity` PASS, `lint:theme` 0 literals. E2E (msedge, each alone): `gitlab.spec` 7/7 on 4392 (mock 4394; new: the Home tile and the "Jump to" entry), `pdf-review.spec` 5/5 on 4393 (new: XFDF import through the UI). The first try of `pdf-review.spec` failed because a labelled "Import XFDF" button wrapped the PDF toolbar to two rows and page 3 was not rendered in the smaller view; the button is now icon-only (named by `aria-label` and title) and the toolbar stays one row.
 
 ## Checks owed (final verification phase)
 
-* `wp30-pdf-regression` and the full `npm run gate` after both phase 8 branches are merged (no PDF path changed here, but the merge decides).
+* `wp30-pdf-regression` ran here 10/10 (2 skipped: the JSS-0251 customer package is not in this checkout); the full `npm run gate` after both phase 8 branches are merged.
 * `wp16-validation-framework` duplicate scan: the JSS/JSG `xml.ts` escapers (other agent).
 * A quiet-host re-run of the bench (three runs, median) for the create and loop numbers; the targets for create under concurrency, the
   event-loop stall at 1,000 modules and validation after one edit are not met yet (items 3 and 5 say what is left).
