@@ -11,10 +11,11 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
-import { configApi, platformApi, workspaceApi, type AppSettings, type ConfigItem, type ConfigSpec, type SecurityPolicy } from '../api';
+import { adminApi, backupApi, configApi, platformApi, workspaceApi, type AppSettings, type ConfigItem, type ConfigSpec, type SecurityPolicy } from '../api';
 import { Icon } from '../components/Icon';
-import { PageHeader } from '../components/PageHeader';
-import { Alert, Badge, ConfirmModal, Empty, Field, Loading, Modal, errText, fmtDate, useAsync } from '../components/ui';
+import { Alert, Badge, ConfirmModal, Empty, Field, Loading, Modal, errText, fmtDate, fmtSize, useAsync } from '../components/ui';
+import { AdmHead, Meter, StatTile } from './adminParts';
+import tokens from '../styles/tokens/tokens.json';
 import '../styles/pages/admin.css';   // WP-35 second pass: the administrator screens' styles load with this chunk
 import { useApp } from '../store/appSettings';
 import { DEFAULT_ACCENT, deriveAccent } from '../lib/accent';
@@ -63,10 +64,39 @@ function FormatSection({ format }: { format: 'jss' | 'jsg' }) {
   );
 }
 
+/** The health tiles of the mockup (Service / Last backup / Licence): the audit log's state, the newest platform backup with the kept
+ *  backups as a meter, and the accounts. Each tile reads what this administrator may read; a refused read shows a dash, not an error. */
+function HealthTiles() {
+  const h = useAsync(() => Promise.allSettled([platformApi.health(), backupApi.status(), adminApi.users()]), []);
+  const [health, backups, users] = h.data ?? [];
+  const audit = health?.status === 'fulfilled' ? health.value.audit : undefined;
+  const b = backups?.status === 'fulfilled' ? backups.value : undefined;
+  const u = users?.status === 'fulfilled' ? users.value : undefined;
+  const auditTone = !audit ? undefined : audit.failures > 0 || audit.lastVerification?.ok === false ? 'danger' : 'success';
+  const slots = b ? b.keep.daily + b.keep.weekly + b.keep.monthly : 0;
+  const active = u ? u.filter((x) => !x.disabled).length : 0;
+  return (
+    <section className="hh" aria-label="Health" data-testid="admin-health">
+      <StatTile label="Audit log" tone={auditTone} testId="health-audit"
+        value={!audit ? '—' : audit.failures > 0 ? `${audit.failures} not recorded` : 'Recording'}
+        line={audit?.lastVerification ? `Chain checked ${fmtDate(audit.lastVerification.at)}: ${audit.lastVerification.ok ? 'intact' : 'problems found'}` : 'Every action is chained and signed'} />
+      <StatTile label="Last backup" tone={!b ? undefined : b.stale || b.state.lastBackup?.ok === false ? 'warning' : 'success'} testId="health-backup"
+        value={!b ? '—' : b.latest ? (b.latest.ageDays === 0 ? 'Today' : `${b.latest.ageDays} day${b.latest.ageDays === 1 ? '' : 's'} ago`) : 'None yet'}
+        line={b ? (b.latest ? `${fmtSize(b.latest.bytes)} · ${b.backups.length} kept${b.intervalHours > 0 ? ` · every ${b.intervalHours} h` : ' · no schedule'}` : 'Back up now under Maintenance') : undefined}>
+        {b && slots > 0 ? <div className="mt8"><Meter value={b.backups.length} max={slots} label="Backups kept of the retention slots" tone={b.stale ? 'warning' : 'success'} /></div> : null}
+      </StatTile>
+      <StatTile label="People" tone={u ? 'success' : undefined} testId="health-people"
+        value={u ? `${active} active` : '—'} line={u ? `${u.length} account${u.length === 1 ? '' : 's'} · offline, on-premises · no licence key required` : undefined} />
+    </section>
+  );
+}
+
 export function AdministratorPage() {
   return (
-    <div className="v2-page">
-      <PageHeader icon="shield" title="Administrator" sub="People, reference data and the system itself." />
+    <div className="v2-page adm">
+      <AdmHead title="Administration" sub="People, reference data, backups and the audit log of this installation · offline, on-premises."
+        actions={<a className="btn" href={platformApi.AUDIT_CSV} download><Icon name="download" />Audit log (CSV)</a>} />
+      <HealthTiles />
       <div className="v2-admin">
         <nav className="v2-admin-nav" aria-label="Administrator sections">
           {GROUPS.map((g) => (
@@ -328,26 +358,51 @@ function SettingsSection() {
   );
 }
 
+/** Ready-made accents (mockup swatches), taken from the design tokens' own palette so none is a colour literal; a missing one is skipped. */
+const PRIMITIVE = tokens.primitive as Record<string, string>;
+const SWATCHES: Array<[string, string]> = ([['Blue', ''], ['Green', PRIMITIVE['green-700']], ['Amber', PRIMITIVE['amber-700']], ['Red', PRIMITIVE['red-700']]] as Array<[string, string | undefined]>)
+  .filter((s): s is [string, string] => s[1] !== undefined);
+
 function VisualSection() {
   const { form, setForm, save, busy, err } = useSettingsForm();
+  const derived = form.accent ? deriveAccent(form.accent) : null;
+  const blocked = !!derived && !derived.ok;                 // the server refuses it too (TH-003); saving waits for a readable colour
   return (
-    <div className="v2-stack v2-maxw-520" data-testid="visual-settings">
-      <div className="v2-admin-head"><h3>Visual settings</h3><p className="v2-sub">How the application looks for everyone.</p></div>
-      <Field label="Accent colour" hint="Buttons, links and highlights. Clear it to use the default."><div className="v2-row">
-        <input type="color" value={form.accent || DEFAULT_ACCENT} onChange={(e) => setForm({ ...form, accent: e.target.value })} aria-label="Accent colour" className="v2-color-input" />
-        <span className="v2-mono">{form.accent || 'default'}</span>{form.accent ? <button className="btn btn-sm" onClick={() => setForm({ ...form, accent: '' })}>Use default</button> : null}
-      </div></Field>
-      {form.accent ? <AccentPreview hex={form.accent} /> : null}
-      <Field label="Default theme" hint="Used until a person picks their own with the theme button."><select className="v2-select" value={form.theme} onChange={(e) => setForm({ ...form, theme: e.target.value as AppSettings['theme'] })}>
-        <option value="system">Follow the device</option><option value="light">Light</option><option value="dark">Dark</option></select></Field>
-      <label className="v2-row v2-gap-6"><input type="checkbox" checked={form.compact} onChange={(e) => setForm({ ...form, compact: e.target.checked })} />Compact layout (tighter spacing)</label>
-      {err ? <Alert tone="bad">{err}</Alert> : null}
-      <div><button className="btn btn-primary" disabled={busy} onClick={() => void save({ accent: form.accent, theme: form.theme, compact: form.compact })} data-testid="visual-save">Save</button></div>
+    <div className="v2-stack" data-testid="visual-settings">
+      <div className="v2-admin-head"><h3>Visual settings</h3><p className="v2-sub">How the application looks for everyone. Each person can still choose light, dark or the system theme for themselves.</p></div>
+      <section className="card narrow" aria-labelledby="ap-h">
+        <div className="card-head"><h3 id="ap-h"><Icon name="sliders" />Appearance defaults</h3><span className="faint">For everyone on this installation</span></div>
+        <div className="card-body stack">
+          <Field label="Default theme for new users" hint="Used until a person picks their own with the theme button; the choice is kept per person."><select className="v2-select" value={form.theme} onChange={(e) => setForm({ ...form, theme: e.target.value as AppSettings['theme'] })}>
+            <option value="system">Follow the device</option><option value="light">Light</option><option value="dark">Dark</option></select></Field>
+          <Field label="Accent colour" hint="Buttons, links and highlights. Clear it to use the default."><div className="v2-row wrap">
+            <div className="swatches" role="radiogroup" aria-label="Ready-made accents">
+              {SWATCHES.map(([name, hex]) => (
+                <button key={name} type="button" className="sw" role="radio" aria-checked={(form.accent || '') === hex} aria-label={name} title={name}
+                  style={{ background: hex || DEFAULT_ACCENT }} onClick={() => setForm({ ...form, accent: hex })} />
+              ))}
+            </div>
+            <input type="color" value={form.accent || DEFAULT_ACCENT} onChange={(e) => setForm({ ...form, accent: e.target.value })} aria-label="Accent colour" className="v2-color-input" />
+            <span className="v2-mono">{form.accent || 'default'}</span>{form.accent ? <button className="btn btn-sm" onClick={() => setForm({ ...form, accent: '' })}>Use default</button> : null}
+          </div></Field>
+          {form.accent ? <AccentPreview hex={form.accent} /> : <p className="v2-hint v2-m0">The default accent is part of the design system and passes the contrast checks in both themes.</p>}
+          <div>
+            <div className="toggle"><span><div className="t">Compact layout</div><div className="d">Tighter spacing in lists and tables</div></span>
+              <input type="checkbox" className="switch" role="switch" checked={form.compact} onChange={(e) => setForm({ ...form, compact: e.target.checked })} aria-label="Compact layout (tighter spacing)" /></div>
+          </div>
+          {err ? <Alert tone="bad">{err}</Alert> : null}
+          <div className="row end">
+            <button className="btn" onClick={() => setForm({ ...form, accent: '', theme: 'system', compact: false })}>Reset</button>
+            <button className="btn btn-primary" disabled={busy || blocked} title={blocked ? 'A check fails in one theme: choose another colour' : undefined} onClick={() => void save({ accent: form.accent, theme: form.theme, compact: form.compact })} data-testid="visual-save">Save defaults</button>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
 
-/** TH-003: what the accent becomes in each theme, with the measured contrast; the server refuses a colour that has no readable shade. */
+/** TH-003: what the accent becomes in each theme, with the measured contrast as the mockup's two-theme check table; the server refuses a
+ *  colour that has no readable shade. */
 function AccentPreview({ hex }: { hex: string }) {
   const d = deriveAccent(hex);
   if (!d.ok) return <Alert tone="bad">{d.reason}</Alert>;
@@ -361,9 +416,18 @@ function AccentPreview({ hex }: { hex: string }) {
       </div>
     );
   };
+  const cell = (ratio: number, min: number) => <td className={`num ${ratio >= min ? 'pass' : 'fail'}`}>{ratio.toFixed(2)} {ratio >= min ? <Icon name="ok" size={13} /> : <Icon name="alert" size={13} />}</td>;
   return (
     <div className="v2-stack v2-gap-6" data-testid="accent-preview">
       <div className="v2-row wrap">{swatch('light')}{swatch('dark')}</div>
+      <div className="card"><table className="v2-table contrast" aria-label="Contrast check" data-testid="accent-contrast">
+        <thead><tr><th>Check</th><th className="num">Light</th><th className="num">Dark</th></tr></thead>
+        <tbody>
+          <tr><td>Button text on the accent (4.5 : 1)</td>{cell(d.light.ratios.onAccent, 4.5)}{cell(d.dark.ratios.onAccent, 4.5)}</tr>
+          <tr><td>Accent as text and control edge on every surface (4.5 : 1)</td>{cell(d.light.ratios.worstSurface, 4.5)}{cell(d.dark.ratios.worstSurface, 4.5)}</tr>
+        </tbody>
+      </table></div>
+      <span className="v2-hint">Saving is blocked when a check fails in either theme. The shade shown for each theme is what people will see.</span>
       {d.adjusted ? <span className="v2-hint" data-testid="accent-adjusted">{hex} is adjusted so text on it stays readable (at least 4.5:1) in each theme.</span> : null}
     </div>
   );

@@ -11,6 +11,7 @@ import { Icon } from '../components/Icon';
 import { Alert, Badge, ConfirmModal, Empty, Loading, Modal, PromptModal, errText, fmtDate, fmtSize, useAsync } from '../components/ui';
 import '../styles/pages/admin.css';   // WP-35 second pass
 import { useUi } from '../store/ui';
+import { Meter } from './adminParts';
 
 const KIND: Record<BackupItem['kind'], string> = { manual: 'Made here', scheduled: 'Scheduled', 'pre-update': 'Before an update', cli: 'Command line' };
 
@@ -65,6 +66,17 @@ export function PlatformBackups() {
             {s.intervalHours > 0 ? `Scheduled every ${s.intervalHours} hours, keeping ${s.keep.daily} daily, ${s.keep.weekly} weekly and ${s.keep.monthly} monthly backups.` : 'No scheduled backup (AGASTYA_BACKUP_INTERVAL_HOURS is 0).'}
             {' '}{s.state.lastRestoreTest?.ok ? `Last restore test: ${fmtDate(s.state.lastRestoreTest.at)}, passed.` : ''} Folder: <span className="v2-mono">{s.dir}</span>
           </p>
+          {/* the mockup's storage meters: what the backups hold against what the retention keeps */}
+          {s.backups.length ? (() => {
+            const slots = s.keep.daily + s.keep.weekly + s.keep.monthly;
+            const total = s.backups.reduce((n, b) => n + b.bytes, 0);
+            return (
+              <ul className="disk card" aria-label="Backup storage" data-testid="backup-storage">
+                <li><span>Backups kept</span><span className="faint">{s.backups.length}{slots ? ` of ${slots} retention slots` : ''}</span>{slots ? <Meter value={s.backups.length} max={slots} label="Backups kept of the retention slots" tone={s.stale ? 'warning' : 'success'} /> : null}</li>
+                <li><span>Space used by backups</span><span className="faint">{fmtSize(total)}{s.latest ? ` · newest ${fmtSize(s.latest.bytes)}` : ''}</span></li>
+              </ul>
+            );
+          })() : null}
           {s.backups.length === 0 ? <Empty title="No backups yet" /> : (
             <table className="v2-table" data-testid="backup-list">
               <thead><tr><th>Made</th><th>Kind</th><th>Size</th><th /></tr></thead>
