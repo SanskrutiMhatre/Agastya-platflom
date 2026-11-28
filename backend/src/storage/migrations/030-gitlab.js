@@ -1,11 +1,11 @@
 'use strict';
-// Migration 028-gitlab (Phase 3, decision P3-5: the intranet GitLab integration). One body per database engine (WP-10); additive only.
-// Number: written as 027, renumbered 028 at the merge with main (P3-6 took 027-default-accounts); never shipped as 027. Its content does
+// Migration 030-gitlab (Phase 3, decision P3-5: the intranet GitLab integration). One body per database engine (WP-10); additive only.
+// Number: written as 027, renumbered 030 at the merges with main (027-default-accounts, 028-pdf-annotations; 029 reserved for collaboration); never shipped as 027. Its content does
 // not depend on any other migration's tables.
 
 const step = {
     /*
-      028 - GitLab.
+      030 - GitLab.
       gitlab_settings        one row: the administrator's configuration (address, CA, OAuth application id, timeouts; JSON) and the
                              secrets (OAuth application secret, service token) encrypted with the secrets key (services/secretBox.ts).
                              `verified_at` is the last successful connection test: the feature is visible only while it is set.
@@ -18,7 +18,7 @@ const step = {
       gitlab_merge_requests  reviews started as merge requests: the MR, its last known state and approvals, and the GitLab notes already
                              brought in as review comments (so a sync never adds one twice).
     */
-    name: '028-gitlab',
+    name: '030-gitlab',
     sql: `CREATE TABLE IF NOT EXISTS gitlab_settings (
             id                INTEGER PRIMARY KEY CHECK (id = 1),
             config            TEXT NOT NULL,

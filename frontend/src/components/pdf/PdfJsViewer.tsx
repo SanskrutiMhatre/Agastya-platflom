@@ -44,15 +44,18 @@ interface PageSlotProps {
   /** the full viewer (Publication page, pop-out): the page number is printed under the sheet ("Page 3 of 20"), as the mockup draws it */
   full: boolean;
   total: number;
+  /** Phase 3 (P3-4): drawn over the page (the review highlights, the area tool), with the page's viewport */
+  overlay?: (p: PageOverlayInfo) => React.ReactNode;
 }
 
-const PageSlot: React.FC<PageSlotProps> = ({ pdf, pageNum, scale, active, registerEl, matches, currentMatchKey, onGoPage, full, total }) => {
+const PageSlot: React.FC<PageSlotProps> = ({ pdf, pageNum, scale, active, registerEl, matches, currentMatchKey, onGoPage, full, total, overlay }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const textLayerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   const [overlays, setOverlays] = useState<LinkBox[]>([]);
   const [links, setLinks] = useState<LinkBox[]>([]);
+  const [vp, setVp] = useState<PageOverlayInfo['viewport'] | null>(null);
 
   useEffect(() => {
     registerEl(pageNum, wrapRef.current);
@@ -75,6 +78,7 @@ const PageSlot: React.FC<PageSlotProps> = ({ pdf, pageNum, scale, active, regist
 
         const viewport = page.getViewport({ scale });
         setSize({ width: viewport.width, height: viewport.height });
+        setVp(viewport as unknown as PageOverlayInfo['viewport']);
         if (!active) return;
 
         const canvas = canvasRef.current;
@@ -170,6 +174,8 @@ const PageSlot: React.FC<PageSlotProps> = ({ pdf, pageNum, scale, active, regist
       ) : (
         <button key={l.key} onClick={() => l.destPage && onGoPage(l.destPage)} title={`Go to page ${l.destPage}`} style={box(l)} />
       ))}
+
+      {overlay && vp ? overlay({ page: pageNum, viewport: vp, active }) : null}
 
       {overlays.map(o => (
         <div key={o.key} style={{
@@ -271,7 +277,22 @@ export interface PdfJsViewerProps {
   onView?: (v: PdfView) => void;
   /** The document's bookmarks with the page each one starts on, once they are resolved. */
   onOutline?: (items: OutlinePage[]) => void;
+  /** Phase 3 (P3-4, PDF review): drawn over every page; see PageOverlayInfo. */
+  pageOverlay?: (p: PageOverlayInfo) => React.ReactNode;
+  /** Go to this place whenever `seq` changes. */
+  jumpTo?: PdfJump | null;
+  /** The loaded document (null when none), for a caller that reads its text. */
+  onDocument?: (pdf: PDFDocumentProxy | null) => void;
+  /** Mouse up over the pages (a text selection ends here). */
+  onPagesMouseUp?: (e: React.MouseEvent<HTMLDivElement>) => void;
+  /** Extra class on the scrolling pages box (the area tool's cursor). */
+  pagesClass?: string;
 }
+
+/** What a page overlay is given: the page number, its pdf.js viewport (PDF user space <-> pixels at the current zoom) and whether it is drawn. */
+export interface PageOverlayInfo { page: number; viewport: { width: number; height: number; scale: number; convertToViewportPoint: (x: number, y: number) => number[]; convertToPdfPoint: (x: number, y: number) => number[] }; active: boolean }
+/** Scroll to a place: the page, and optionally a point in PDF user space (brought to the upper third of the view). `seq` makes a repeat jump happen. */
+export interface PdfJump { page: number; x?: number; y?: number; seq: number }
 
 export interface PdfView { page: number; first: number; last: number; numPages: number; widthMm: number; heightMm: number }
 export interface OutlinePage { title: string; page: number | null; items: OutlinePage[] }
@@ -289,7 +310,7 @@ async function resolveOutline(pdf: PDFDocumentProxy, items: TocItem[]): Promise<
   return out;
 }
 
-export const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ src, downloadName = 'output.pdf', toolbarExtra, placeholder, autoFit, compact = !!autoFit, download = true, startWidth, onView, onOutline }) => {
+export const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ src, downloadName = 'output.pdf', toolbarExtra, placeholder, autoFit, compact = !!autoFit, download = true, startWidth, onView, onOutline, pageOverlay, jumpTo, onDocument, onPagesMouseUp, pagesClass }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const pageEls = useRef(new Map<number, HTMLDivElement>());
   const pendingScrollPage = useRef<number | null>(null);
@@ -311,6 +332,7 @@ export const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ src, downloadName = 'o
   const startedRef = useRef(false);
   const onViewRef = useRef(onView); onViewRef.current = onView;
   const onOutlineRef = useRef(onOutline); onOutlineRef.current = onOutline;
+  const onDocumentRef = useRef(onDocument); onDocumentRef.current = onDocument;
 
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
@@ -366,6 +388,8 @@ export const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ src, downloadName = 'o
       if (!adopted) { try { task.destroy(); } catch { /* ignore */ } }
     };
   }, [src]);
+
+  useEffect(() => { onDocumentRef.current?.(pdf); }, [pdf]);
 
   // Destroy the last document on unmount, or its worker outlives the view.
   useEffect(() => () => { if (pdf) { try { pdf.destroy(); } catch { /* ignore */ } } }, [pdf]);
@@ -443,6 +467,28 @@ export const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ src, downloadName = 'o
     }
     setPage(target);
   }, [numPages, compact]);
+
+  // Phase 3 (P3-4): jump to a place (a review thread): the page, then the point brought to the upper third of the view
+  const jumpSeq = useRef(-1);
+  useEffect(() => {
+    if (!jumpTo || !pdf || !numPages || jumpTo.seq === jumpSeq.current) return undefined;
+    const target = Math.min(Math.max(1, jumpTo.page), numPages);
+    const box = containerRef.current; const el = pageEls.current.get(target);
+    if (!box || !el) return undefined;
+    jumpSeq.current = jumpTo.seq;
+    setPage(target);
+    let cancelled = false;
+    (async () => {
+      let dy = 0;
+      if (jumpTo.y !== undefined) { try { const p = await pdf.getPage(target); const v = p.getViewport({ scale }); dy = v.convertToViewportPoint(jumpTo.x ?? 0, jumpTo.y)[1]; } catch { dy = 0; } }
+      if (cancelled) return;
+      box.scrollTo({ top: Math.max(0, el.offsetTop + dy - box.clientHeight / 3), behavior: 'auto' });
+      window.setTimeout(() => recomputeRef.current(), 50);
+      // the pages around take their real size once drawn: place it once more after that
+      window.setTimeout(() => { if (!cancelled) { const e2 = pageEls.current.get(target); if (e2) box.scrollTo({ top: Math.max(0, e2.offsetTop + dy - box.clientHeight / 3), behavior: 'auto' }); } }, 450);
+    })();
+    return () => { cancelled = true; };
+  }, [jumpTo, pdf, numPages, scale]);
 
   // Restore position after a reload, once the new pages have laid out.
   useEffect(() => {
@@ -590,7 +636,7 @@ export const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ src, downloadName = 'o
           </div>
         )}
 
-        <div ref={containerRef} className={numPages && src && !error ? 'pdfv-pages' : undefined} style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
+        <div ref={containerRef} className={[numPages && src && !error ? 'pdfv-pages' : '', pagesClass ?? ''].filter(Boolean).join(' ') || undefined} style={{ flex: 1, overflow: 'auto', position: 'relative' }} onMouseUp={onPagesMouseUp}>
           {error ? (
             <div style={{ padding: 24, color: 'var(--danger)', fontSize: 13 }}>⚠ {error}</div>
           ) : !src ? (
@@ -615,6 +661,7 @@ export const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ src, downloadName = 'o
                 onGoPage={goPage}
                 full={!compact}
                 total={numPages}
+                overlay={pageOverlay}
               />
             ))
           )}

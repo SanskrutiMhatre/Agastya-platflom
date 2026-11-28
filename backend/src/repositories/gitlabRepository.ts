@@ -1,5 +1,5 @@
 // =============================================================================
-// GitLab integration records (Phase 3, P3-5; migration 028-gitlab). Behind an interface like every repository (WP-10, PRD-002).
+// GitLab integration records (Phase 3, P3-5; migration 030-gitlab). Behind an interface like every repository (WP-10, PRD-002).
 // Secrets arrive here already sealed (services/secretBox.ts); this file never sees a plain token.
 // =============================================================================
 

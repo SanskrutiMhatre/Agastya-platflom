@@ -22,9 +22,10 @@ import { SqliteAuditRepository, type AuditRepository } from './auditRepository';
 import { SqliteLeaseRepository, type LeaseRepository, type LeaseRow } from './leaseRepository';
 import { SqliteAccessRepository, type AccessRepository } from './accessRepository';
 import { SqliteJobRepository, type JobRepository, type JobRow, type JobLogRow, type JobState } from './jobRepository';
+import { SqlitePdfAnnotationRepository, type PdfAnnotationRepository } from './pdfAnnotationRepository';
 import { SqliteGitlabRepository, type GitlabRepository } from './gitlabRepository';
 
-export type { ProjectRegistry, SnsRepository, ProjectConfigRepository, ReferenceRepository, ActivityRepository, CirLinkRepository, ExtensionRepository, LifecycleRepository, RetentionRepository, AuditRepository, AccessRepository, UnitOfWork, LeaseRepository, LeaseRow, JobRepository, JobRow, JobLogRow, JobState, GitlabRepository };
+export type { ProjectRegistry, SnsRepository, ProjectConfigRepository, ReferenceRepository, ActivityRepository, CirLinkRepository, ExtensionRepository, LifecycleRepository, RetentionRepository, AuditRepository, AccessRepository, UnitOfWork, LeaseRepository, LeaseRow, JobRepository, JobRow, JobLogRow, JobState, PdfAnnotationRepository, GitlabRepository };
 
 export interface Repositories extends UnitOfWork {
   /** The engine behind these repositories ('sqlite'); a contract test and the migration runner use it to pick a dialect. */
@@ -51,6 +52,8 @@ export interface Repositories extends UnitOfWork {
   access: AccessRepository;
   /** WP-14 (PUB-004): job records and their progress lines. */
   jobs: JobRepository;
+  /** Phase 3 (P3-4): PDF review annotations, replies, reviewed PDF versions and the release setting (migration 027). */
+  pdfAnnotations: PdfAnnotationRepository;
   /** Phase 3 (P3-5): the GitLab integration's configuration, accounts, links, sync base, releases and merge requests. */
   gitlab: GitlabRepository;
 }
@@ -76,6 +79,7 @@ export function createSqliteRepositories(db: SqlDatabase): Repositories {
     audit: new SqliteAuditRepository(db),
     access: new SqliteAccessRepository(db),
     jobs: new SqliteJobRepository(db),
+    pdfAnnotations: new SqlitePdfAnnotationRepository(db),
     gitlab: new SqliteGitlabRepository(db),
   };
 }
