@@ -5,6 +5,7 @@ import './styles/tokens/tokens.css';
 // The Studio shell and document sheets (studio/styles/app.css, document.css) load with the Studio editor chunk, linked
 // ahead of these (studio/styles/load.ts); base.css is the app-wide part they used to carry.
 import './styles/base.css';
+import './styles/components.css';      // UI redesign step 1: the mockup components (docs/audit/mockups/components.css)
 import './styles/platform.css';
 import './styles/states.css';
 import { App } from './App';

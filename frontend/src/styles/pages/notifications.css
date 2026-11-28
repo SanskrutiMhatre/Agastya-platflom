@@ -7,7 +7,7 @@
 .v2-note { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
 .v2-note:last-child { border-bottom: 0; }
 .v2-note.unread { background: var(--accent-soft); }
-.v2-note-icon { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--bg-active); color: var(--accent); }
+.v2-note-icon { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--bg-active); color: var(--text-link); }
 .v2-note-icon.ok { color: var(--success); }
 .v2-note-icon.warn { color: var(--warning); }
 .v2-note-icon.bad { color: var(--danger); }
