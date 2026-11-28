@@ -44,7 +44,8 @@ export interface ChangeEvent {
   doctypeChanged: boolean;
   /** Elements whose content/attributes changed (deduplicated, still attached). */
   touched: Set<Node>;
-  kind: 'edit' | 'undo' | 'redo' | 'load';
+  /** 'remote': another person's change in a live document (Phase 3), applied by the binding; never an undo step of this person */
+  kind: 'edit' | 'undo' | 'redo' | 'load' | 'remote';
 }
 
 export interface TransactOptions {
@@ -52,6 +53,19 @@ export interface TransactOptions {
   merge?: string;
   selectionBefore?: ModelSelection | null;
   selectionAfter?: ModelSelection | null;
+}
+
+/**
+ * Phase 3 (P3-1): a live document (frontend/src/collab/binding.ts) keeps its history and its saved state in the shared Y document: undo and
+ * redo are per person (Y.UndoManager: only this person's own changes), and "unsaved" means changes the server has not acknowledged yet.
+ */
+export interface DocumentCollab {
+  undo(): boolean;
+  redo(): boolean;
+  readonly canUndo: boolean;
+  readonly canRedo: boolean;
+  /** changes not yet acknowledged by the server */
+  readonly dirty: boolean;
 }
 
 export class EditorDocument extends EventTarget {
@@ -74,6 +88,8 @@ export class EditorDocument extends EventTarget {
   version = 0;
   selection: ModelSelection | null = null;
   maxHistory = 500;
+  /** Set while the document is bound to a live co-editing room (null: the classic, file-versioned document). */
+  collab: DocumentCollab | null = null;
 
   constructor(parsed: ParsedXml, fileName = 'untitled.xml') {
     super();
@@ -133,7 +149,7 @@ export class EditorDocument extends EventTarget {
 
   get root(): Element { return this.xml.documentElement; }
   private get topSeq(): number { return this.undoStack[this.undoStack.length - 1]?.seq ?? 0; }
-  get dirty(): boolean { return this.topSeq !== this.savedMarker; }
+  get dirty(): boolean { return this.collab ? this.collab.dirty : this.topSeq !== this.savedMarker; }
   markSaved() {
     this.breakMerge();
     this.savedMarker = this.topSeq;
@@ -196,6 +212,13 @@ export class EditorDocument extends EventTarget {
   private commit(label: string, recs: MutationRecord[], dt: Change[], selBefore: ModelSelection | null, selAfter: ModelSelection | null, source: string, merge?: string) {
     const changes: Change[] = recs.map((r) => ({ type: 'mutation', record: r }));
     changes.push(...dt);
+    if (this.collab) {
+      // a live document's history is the room's (per person, Y.UndoManager): the change is reported, the binding sends it
+      this.selection = selAfter;
+      this.version++;
+      this.emit(label, source, recs, dt.length > 0, 'edit');
+      return;
+    }
     const now = Date.now();
     const top = this.undoStack[this.undoStack.length - 1];
     if (merge && top && top.merge === merge && now - top.time < 2000 && this.redoStack.length === 0) {
@@ -291,13 +314,38 @@ export class EditorDocument extends EventTarget {
     drain();
   }
 
-  get canUndo() { return this.undoStack.length > 0; }
-  get canRedo() { return this.redoStack.length > 0; }
-  get undoLabel() { return this.undoStack[this.undoStack.length - 1]?.label ?? ''; }
-  get redoLabel() { return this.redoStack[this.redoStack.length - 1]?.label ?? ''; }
+  get canUndo() { return this.collab ? this.collab.canUndo : this.undoStack.length > 0; }
+  get canRedo() { return this.collab ? this.collab.canRedo : this.redoStack.length > 0; }
+  get undoLabel() { return this.collab ? (this.collab.canUndo ? 'your last change' : '') : this.undoStack[this.undoStack.length - 1]?.label ?? ''; }
+  get redoLabel() { return this.collab ? (this.collab.canRedo ? 'your last undone change' : '') : this.redoStack[this.redoStack.length - 1]?.label ?? ''; }
 
-  undo(): boolean { return this.step(this.undoStack, this.redoStack, 'undo'); }
-  redo(): boolean { return this.step(this.redoStack, this.undoStack, 'redo'); }
+  undo(): boolean { return this.collab ? this.collab.undo() : this.step(this.undoStack, this.redoStack, 'undo'); }
+  redo(): boolean { return this.collab ? this.collab.redo() : this.step(this.redoStack, this.undoStack, 'redo'); }
+
+  /**
+   * Phase 3: apply changes that did not start in this editor (another person's, or this person's undo in a live room) to the document,
+   * and report them like an edit so the views re-render only what changed and validation runs on the merged document. Not an undo step.
+   */
+  applyRemote(label: string, fn: () => void, kind: 'remote' | 'undo' | 'redo' = 'remote', doctypeChanged = false): void {
+    const stray = this.observer.takeRecords();
+    if (stray.length) this.commit('Edit', stray, [], null, null, 'external', undefined);
+    this.depth++;
+    try { fn(); } finally { this.depth--; }
+    const recs = this.observer.takeRecords();
+    if (!recs.length && !doctypeChanged) return;
+    this.version++;
+    this.emit(label, kind === 'remote' ? 'remote' : kind, recs, doctypeChanged, kind);
+  }
+
+  /** Phase 3: the document's history is handed to (or taken back from) a live room; the local stacks start empty either way. */
+  setCollab(c: DocumentCollab | null): void {
+    this.collab = c;
+    this.undoStack = [];
+    this.redoStack = [];
+    this.savedMarker = 0;
+    this.seqCounter++;
+    this.savedMarker = this.topSeq;
+  }
 
   private step(from: HistoryEntry[], to: HistoryEntry[], kind: 'undo' | 'redo'): boolean {
     const entry = from.pop();

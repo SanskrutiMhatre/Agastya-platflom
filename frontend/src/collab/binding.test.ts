@@ -1,0 +1,138 @@
+// Phase 3 (P3-1): the Studio <-> Yjs binding without a server. Two editors (EditorDocument + DomBinding) on two Y documents that exchange
+// updates the way the room does (held back to simulate "at the same time", then delivered). Concurrent typing in one paragraph merges;
+// a paragraph added by one and a paragraph edited by the other keep their identity; undo is per person; a read-only person's change is
+// taken back; the serialised result is the same on both sides.
+import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import * as Y from 'yjs';
+import { EditorDocument } from '../studio/core/document';
+import { parseXml } from '../studio/core/xml';
+import * as ydom from '../../../backend/src/shared/collab/ydom';
+import { DomBinding } from './binding';
+
+const SAMPLE = fs.readFileSync(path.resolve(__dirname, '../../public/samples/DMC-S1KSTUDIO-A-29-10-00-00A-040A-D_001-00_EN-US.XML'), 'utf8');
+const NET = Symbol('net');
+
+interface Side { doc: EditorDocument; y: Y.Doc; b: DomBinding; held: Uint8Array[]; writable: boolean; refused: number }
+
+function pair(): [Side, Side, () => void] {
+  const base = new Y.Doc();
+  const p = parseXml(SAMPLE);
+  ydom.loadInto(base, { doc: p.doc as unknown as ydom.XBuildParent, doctype: p.doctype, xmlDecl: p.xmlDecl });
+  const make = (): Side => {
+    const y = new Y.Doc();
+    Y.applyUpdate(y, Y.encodeStateAsUpdate(base), NET);
+    const doc = new EditorDocument(parseXml(SAMPLE), 'x.xml');
+    const s = { doc, y, held: [] as Uint8Array[], writable: true, refused: 0 } as Side;
+    s.b = new DomBinding(doc, y, { canWrite: () => s.writable, onRefused: () => { s.refused++; } });
+    doc.setCollab({ undo: () => s.b.undoLocal(), redo: () => s.b.redoLocal(), get canUndo() { return s.b.undo.undoStack.length > 0; }, get canRedo() { return s.b.undo.redoStack.length > 0; }, dirty: false });
+    y.on('update', (u: Uint8Array, origin: unknown) => { if (origin !== NET) s.held.push(u); });
+    return s;
+  };
+  const a = make(); const b = make();
+  const sync = (): void => {
+    for (let i = 0; i < 4 && (a.held.length || b.held.length); i++) {
+      const ua = a.held.splice(0); const ub = b.held.splice(0);
+      for (const u of ua) Y.applyUpdate(b.y, u, NET);
+      for (const u of ub) Y.applyUpdate(a.y, u, NET);
+    }
+  };
+  return [a, b, sync];
+}
+
+const paras = (d: EditorDocument): Element[] => Array.from(d.xml.getElementsByTagName('para'));
+const textNode = (el: Element): Text => Array.from(el.childNodes).find((n) => n.nodeType === 3) as Text;
+const text = (d: EditorDocument): string => d.toString();
+
+describe('live co-editing binding', () => {
+  it('two people typing in the same paragraph at the same time: both changes, the same document on both sides', () => {
+    const [a, b, sync] = pair();
+    const ta = textNode(paras(a.doc)[0]); const tb = textNode(paras(b.doc)[0]);
+    const original = ta.data;
+    a.doc.transact('Typing', () => ta.insertData(0, 'ALPHA '));
+    b.doc.transact('Typing', () => tb.appendData(' OMEGA'));
+    sync();
+    expect(textNode(paras(a.doc)[0]).data).toBe(`ALPHA ${original} OMEGA`);
+    expect(text(a.doc)).toBe(text(b.doc));
+  });
+
+  it('a paragraph added by one and another paragraph edited by the other keep their identity', () => {
+    const [a, b, sync] = pair();
+    const first = paras(a.doc)[0];
+    a.doc.transact('New paragraph', () => {
+      const np = a.doc.xml.createElement('para'); np.appendChild(a.doc.xml.createTextNode('INSERTED'));
+      first.parentNode!.insertBefore(np, first.nextSibling);
+    });
+    const secondB = paras(b.doc)[1];
+    b.doc.transact('Typing', () => textNode(secondB).insertData(0, 'EDITED '));
+    sync();
+    expect(text(a.doc)).toBe(text(b.doc));
+    const pa = paras(a.doc);
+    expect(textNode(pa[1]).data).toBe('INSERTED');
+    expect(textNode(pa[2]).data.startsWith('EDITED ')).toBe(true);
+    // B's node is still the same DOM node (re-rendered in place, not rebuilt)
+    expect(paras(b.doc)[2]).toBe(secondB);
+  });
+
+  it('undo is per person: it takes back only my change, not the other author\'s', () => {
+    const [a, b, sync] = pair();
+    const ta = textNode(paras(a.doc)[0]);
+    a.doc.transact('Typing', () => ta.insertData(0, 'MINE '));
+    sync();
+    b.doc.transact('Typing', () => textNode(paras(b.doc)[0]).appendData(' THEIRS'));
+    sync();
+    expect(a.doc.canUndo).toBe(true);
+    expect(a.doc.undo()).toBe(true);
+    sync();
+    const now = textNode(paras(b.doc)[0]).data;
+    expect(now.startsWith('MINE ')).toBe(false);
+    expect(now.endsWith(' THEIRS')).toBe(true);
+    expect(text(a.doc)).toBe(text(b.doc));
+    expect(a.doc.redo()).toBe(true);
+    sync();
+    expect(textNode(paras(b.doc)[0]).data.startsWith('MINE ')).toBe(true);
+  });
+
+  it('attributes, removals and structural moves converge', () => {
+    const [a, b, sync] = pair();
+    a.doc.transact('Attr', () => paras(a.doc)[0].setAttribute('id', 'par-0001'));
+    b.doc.transact('Delete', () => { const p = paras(b.doc)[1]; p.parentNode!.removeChild(p); });
+    sync();
+    expect(text(a.doc)).toBe(text(b.doc));
+    expect(paras(b.doc)[0].getAttribute('id')).toBe('par-0001');
+  });
+
+  it('a read-only person\'s change is taken back from the room\'s version and never sent', () => {
+    const [a, b, sync] = pair();
+    b.writable = false;
+    const before = text(b.doc);
+    b.doc.transact('Typing', () => textNode(paras(b.doc)[0]).insertData(0, 'NOPE '));
+    expect(b.refused).toBe(1);
+    expect(text(b.doc)).toBe(before);
+    expect(b.held.length).toBe(0);
+    a.doc.transact('Typing', () => textNode(paras(a.doc)[0]).insertData(0, 'LIVE '));
+    sync();
+    expect(textNode(paras(b.doc)[0]).data.startsWith('LIVE ')).toBe(true);
+  });
+
+  it('a remote change before the caret keeps the caret on the same character', () => {
+    const [a, b, sync] = pair();
+    const tb = textNode(paras(b.doc)[0]);
+    b.doc.selection = { anchor: { node: tb, offset: 5 }, focus: { node: tb, offset: 5 } };
+    a.doc.transact('Typing', () => textNode(paras(a.doc)[0]).insertData(0, 'XYZ'));
+    sync();
+    expect(b.doc.selection!.focus.offset).toBe(8);
+  });
+
+  it('a relative position (comment anchor, cursor) follows the text', () => {
+    const [a, b, sync] = pair();
+    const tb = textNode(paras(b.doc)[0]);
+    const rel = b.b.relOf({ node: tb, offset: 3 })!;
+    a.doc.transact('Typing', () => textNode(paras(a.doc)[0]).insertData(0, 'AB'));
+    sync();
+    const pos = b.b.posOf(rel)!;
+    expect(pos.node).toBe(textNode(paras(b.doc)[0]));
+    expect(pos.offset).toBe(5);
+  });
+});
