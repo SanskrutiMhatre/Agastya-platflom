@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { adminApi, assign, newPerson, type Person } from './support/session';
+import { classicOnly } from './support/live';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -166,20 +167,27 @@ test('a review comment is shown in the editor; Done there is what the Release pa
   } finally { await page.context().close(); }
 });
 
-test('JSS: Esc takes the focus off the paper, and Ctrl+S still saves', async ({ browser, baseURL }) => {
-  const page = await fresh(browser, baseURL);
-  try {
-    await page.goto(`/projects/${ids.jss}/editor`);
-    await expect(page.getByTestId('jss-editor')).toBeVisible({ timeout: 30_000 });
-    const purpose = page.getByTestId('jss-paper').locator('.jss-sec').filter({ has: page.locator('.jss-sec-title', { hasText: 'Purpose' }) });
-    await purpose.locator('.jss-para, .jss-empty').first().click(); await page.keyboard.press('End'); await page.keyboard.type('WP22 save ');
-    await expect(page.getByTestId('jss-state')).toHaveText(/Unsaved changes/);
-    await page.keyboard.press('Escape');
-    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-    await page.keyboard.press('Control+s');
-    await expect(page.getByTestId('jss-state')).toHaveText(/Saved/, { timeout: 15_000 });
-  } finally { await page.context().close(); }
-});
+// live (the default): the typing is sent as it is made (never "Unsaved changes"), Ctrl+S writes the file through the room; classic (the fallback
+// when the room cannot be joined, C24; this browser's joins are answered DISABLED, support/live.ts): unsaved, then saved by Ctrl+S
+for (const mode of ['live', 'classic'] as const) {
+  test(`JSS: Esc takes the focus off the paper, and Ctrl+S still saves (${mode})`, async ({ browser, baseURL }) => {
+    const page = await fresh(browser, baseURL);
+    if (mode === 'classic') await classicOnly(page.context());
+    const mark = `WP22 save ${mode} `;
+    try {
+      await page.goto(`/projects/${ids.jss}/editor`);
+      await expect(page.getByTestId('jss-editor')).toBeVisible({ timeout: 30_000 });
+      const purpose = page.getByTestId('jss-paper').locator('.jss-sec').filter({ has: page.locator('.jss-sec-title', { hasText: 'Purpose' }) });
+      await purpose.locator('.jss-para, .jss-empty').first().click(); await page.keyboard.press('End'); await page.keyboard.type(mark);
+      await expect(page.getByTestId('jss-state')).toHaveText(mode === 'live' ? /^(Saved|Syncing)/ : /Unsaved changes/);
+      await page.keyboard.press('Escape');
+      await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+      await page.keyboard.press('Control+s');
+      await expect(page.getByTestId('jss-state')).toHaveText(/Saved/, { timeout: 15_000 });
+      await expect.poll(async () => ((await (await page.request.get(`/api/projects/${ids.jss}/jss`)).json()).xml as string), { timeout: 15_000 }).toContain(mark.trim());
+    } finally { await page.context().close(); }
+  });
+}
 
 test('Publication: add a section and an appendix, delete an appendix, undo and redo, save; the document holds it', async ({ browser, baseURL }) => {
   const page = await fresh(browser, baseURL);
