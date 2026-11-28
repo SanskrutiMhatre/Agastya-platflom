@@ -1,0 +1,43 @@
+{
+ "book": "jss-0251",
+ "takenAt": "2026-11-27",
+ "arial": true,
+ "scale": 0.5,
+ "pageCount": 142,
+ "pages": [
+  1,
+  15,
+  87
+ ],
+ "masks": {
+  "1": [
+   [
+    33,
+    377,
+    82,
+    391
+   ]
+  ],
+  "15": [],
+  "87": [
+   [
+    109,
+    159,
+    141,
+    173
+   ]
+  ]
+ },
+ "fonts": [
+  "Arial-BoldItalicMT",
+  "Arial-BoldMT",
+  "ArialMT",
+  "ArialNarrow-Bold",
+  "DejaVuSans",
+  "Helvetica-Bold"
+ ],
+ "knownNotEmbedded": ["Helvetica-Bold"],
+ "internalLinks": 315,
+ "externalLinks": 0,
+ "bookmarks": 40
+}

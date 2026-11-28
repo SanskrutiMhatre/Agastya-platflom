@@ -2393,3 +2393,104 @@ machine: Node 22.23.2, i7-6820HQ, Windows Server 2025, **shared with other agent
     wall time (worker start, XSD, the other checks, and a shared machine).
   - The `cached` field of the bench script's validation section always reads false; the timings are right.
   - The load harness was not run.
+
+## Phase 9 (WP-30)
+
+### WP-30 Final QA, benchmarking and release (QA-006, QA-008; gates G-REL-2, G-REL-7, G-OFF-1/2/4, G-Q-4, G-Q-6) - done, with the limits listed
+
+The status of every gate is in `docs/audit/RELEASE-EVIDENCE.md` (PASS / FAIL / EXTERNAL, with evidence or procedure).
+
+* **PDF regression (QA-006)**: `backend/test/wp30-pdf-regression.test.js` with `backend/test/pdfregress.js`.
+  * Renderer: pdf.js 4.10 on @napi-rs/canvas, both already in `frontend/node_modules`.
+  * Five books: S1000D plain and Xignal, JSS UHB, JSS-0251 (RWI package) and the JSG UHB.
+  * Baselines:
+    * 3 pages per book, chosen by text density, rendered at 0.5 scale; at most 0.2 % of pixels may differ, with dates and times masked.
+    * The manifest also records the page count, fonts, internal links, bookmarks and the unembedded base-14 faces.
+    * Re-take only with `node scripts/pdf-baseline.js --update [books]`.
+  * Customer material:
+    * The JSS-0251 page images are git-ignored (renders of the customer's material); without them the raster test skips with the reason.
+    * The other checks still run.
+  * Proofs:
+    * Sensitivity: a changed document gives 0.312 %, so the test fails as it should.
+    * Specificity: only the issue month changed gives 0.000 %.
+  * Wiring: `test-plan.json` `pdfSmoke`, skip budget 7 (RWI package or Arial absent).
+  * Found during the work (QA-006a, open): FOP does not embed the base-14 faces. The JSG body text is Times.
+    * The first font check missed this, because pdf.js with its standard font data reports such a face as having a file.
+    * The fonts are now read from a document opened without that data.
+    * The unembedded faces are recorded per book as a ratchet (may only shrink).
+* **Chaos (QA-008)**: `backend/test/wp30-chaos.test.js` (`heavy`). It runs the real server on a temp workspace and a free port, and kills the
+  whole tree (`taskkill /T /F`, own PIDs only) at fractions of the measured duration of:
+  * a publication (async job),
+  * a package import,
+  * a platform backup (160 MB of media),
+  * a migration (a 240 MB database at user_version 21).
+
+  After every restart it checks:
+  * `quick_check` and `foreign_key_check`;
+  * no torn file (XML parses, a PDF has its header and `%%EOF`, every `.db` passes `quick_check`; temporary names only as debris);
+  * the committed module and its history;
+  * the job is shown `interrupted`, no half-made project remains, and a cut-off backup is not listed;
+  * a retry succeeds, and a later start or backup sweeps the debris.
+
+  Defects found and fixed:
+  * `atomicWrite.commitFile/copyFileAtomic/discardTemp`: PDF builds (S1000D full and preview, configured builds, JSS, JSG) render to a
+    temporary name and are committed by fsync and rename.
+  * `schema.ts`: the pre-migration safety copy goes VACUUM INTO a temporary name, is verified, then renamed; stale copies and their `-journal`
+    are swept at start.
+  * `platformBackup.ts`: `.zip.partial` files and `.staging-` folders idle for 10 minutes are swept.
+* **Air gap**: `backend/test/wp30-airgap.test.js` (`heavy`) and `test/fixtures/airgap-hook.js`.
+  * The hook is preloaded into the server and every forked worker. It refuses and logs non-loopback TCP/TLS/HTTP/fetch, non-local DNS and
+    off-machine UDP.
+  * The TCP table of the process tree (JVMs included) is polled from outside.
+  * A control case proves the hook works.
+  * A static scan of `frontend/dist` checks for foreign hosts.
+  * `readiness.mjs` row G-OFF-2 now runs that scan (it was NOT RUN).
+  * The machine's network configuration was observed only; it was not changed.
+* **Soak**: `backend/scripts/soak.js`.
+  * It runs its own server with the WP-28 harness for the whole run, a publication every 5 min and a backup every 15 min.
+  * It samples the server's metrics and the process tree's private bytes, handles and threads, and reports slopes per hour after a
+    10-minute warm-up.
+  * It fails only on a crash, a 5xx answer, a failed publication or backup, or a failed load acceptance.
+  * A 401 from session policy is answered by signing in again and counted. No security setting is changed.
+  * `load-test.js --base` got the same re-login, for its administrator client only (`adminRelogins` in its result). The soak shares that
+    account, and the single-session default ends one of the two sessions.
+* **Measured.**
+  * PDF regression: 12/12, about 57 s.
+  * Chaos at N=3: 4/4 (12 kill points, 200 s). Release figure `CHAOS_KILLS=25`: 4/4, **100 kill points** in 23.8 min, 0 corrupt databases, 0 torn files, every retry ok. G-REL-4 load cases: 5 clients 1,069 and 10 clients 1,184 accepted saves, 0 silent overwrites.
+  * Air gap: 3/3, with 0 outbound attempts, 0 non-loopback connections in 67 polls, and the hook in the server and 1 worker.
+  * Soak, 30 min:
+    * 0 crashes and 0 failures; 37,460 requests, 0 errors, 0 silent overwrites.
+    * **RSS 121 to 195 MB with a flat heap** (open finding for the 24 h soak).
+    * A first 60-minute attempt was cut off at 10 minutes by a session interruption.
+* **Tests re-run alone after the product changes, all passing:**
+  * Storage and migrations: `wp12-migrations` 10, `wp11-integrity` 16, `db-snapshot` 4, `s1000d-migration` 2, `wp12-backup-restore` 7.
+  * Builds and jobs: `jsg-engine` 7, `pdf-furniture` 2, `applic-publish` 12, `wp14-jobs` 9, `project-delete-after-build` 3, `api` 17,
+    `wp15-jsg-release` 4.
+  * For the evidence:
+    * Access and audit: `routes-guarded` 1, `rbac` 7, `authz-matrix` 6, `wp03-auth` 11, `auth-core` 11, `auth-http` 10, `wp26-network` 9,
+      `wp29-audit-trail` 11, `wp29-audit-coverage` 2.
+    * Other backend: `settings-hostile-input` 6, `tools-canary` 6, `uploads-config` 4, `wp28-team-server` 6, `wp13-version` 4,
+      `wp17-perf` 9.
+    * Golden and reference outputs: `golden-xignal` 4, `pdf-reference` 2, `s1000d-reference` 18, `jss-cover-isolation` 6,
+      `jss-reference-layout` 2.
+  * Release tools: `release.test.mjs` 8, `host-audit.test.mjs` 2, `teamserver.test.mjs` 4, `update.test.mjs` 6.
+  * Playwright, on port 4111 with Edge: the visual config's `a11y.spec` and `keyboard.spec` gave 33 passed and 7 skipped (keyboard in dark,
+    by design); `wp05-dataloss.spec` 10/10.
+  * Build and hygiene: backend `tsc` and frontend `tsc --noEmit` clean; `vite build` twice gave byte-identical output (262 files); lint exit 0,
+    parity PASS, `check:cleanup` PASS.
+* **Not done, and why.**
+  * `readiness.mjs` was not run as a whole, and `host.test.mjs` and `installer.test.mjs` were not run. They write HKCU keys or a Start-menu
+    folder, and this run was told to make no registry or system change. The test-backed readiness rows were run as single files instead.
+  * The full gate was not run, by instruction (the lead runs `gate:release`).
+  * The 24 h soak, and the VM, no-NIC, certificate and screen-reader gates, are documented as EXTERNAL with procedures.
+  * Gate FAILs left open, with their reasons in RELEASE-EVIDENCE:
+    * G-SEC-2: temporary-password entropy is about 39.6 bits against the gate's 60.
+    * G-SEC-3: the injected-clock points are not scripted.
+    * G-SEC-7: there is no single canary run through every flow.
+    * G-SEC-8 and G-OFF-2: CSP violations are not collected in a browser.
+    * G-DEP-4: 5 of 8 doctor faults are seeded.
+    * G-UX-2: 2 of 5 tasks are scripted keyboard-only.
+    * G-UX-5: 10 cases of the 20 asked.
+    * G-Q-2: 76 of 94 P0/P1 ids are named in tests.
+    * QA-006a: the base-14 fonts are not embedded.
+    * G-REL-2: no kill case during release approval (the other sites reach n = 100).

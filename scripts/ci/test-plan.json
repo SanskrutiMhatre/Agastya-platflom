@@ -13,13 +13,14 @@
   "pdfSmoke": [
     "pdf-furniture.test.js", "jss-change-notice.test.js", "jss-cover-foot.test.js", "jss-cover-isolation.test.js", "jsg-engine.test.js",
     "pdf-multi-ipd.test.js", "pdf-long-doctype.test.js", "object-docs.test.js", "applic-publish.test.js",
-    "wp33-fo-equivalence.test.js", "wp15-jsg-release.test.js"
+    "wp33-fo-equivalence.test.js", "wp15-jsg-release.test.js", "wp30-pdf-regression.test.js"
   ],
   "heavy": [
     "pdf21.test.js", "brex-gate.test.js", "publish-gate.test.js", "dmtypes.test.js", "golden-xignal.test.js", "jss-naval.test.js",
     "jss-stencil-corrections.test.js", "pdf-reference.test.js", "wp32-validation-scale.test.js", "jsg-word.test.js", "jss-authoring.test.js",
     "wp33-fo-scaling.test.js", "wp11-integrity.test.js", "wp14-jobs.test.js", "wp14-job-limits.test.js",
-    "wp15-conversion-fidelity.test.js", "wp17-brex-fast.test.js", "wp17-perf.test.js"
+    "wp15-conversion-fidelity.test.js", "wp17-brex-fast.test.js", "wp17-perf.test.js",
+    "wp30-chaos.test.js", "wp30-airgap.test.js"
   ],
   "scriptTests": {
     "_comment": "node:test files outside backend/test, by gate stage, paths from the repository root. release-tools (WP-24) runs first in the package stage and on its own with --stages release-tools.",

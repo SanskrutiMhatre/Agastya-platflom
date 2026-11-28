@@ -83,9 +83,24 @@ const harnessLoop = monitorEventLoopDelay({ resolution: 10 }); harnessLoop.enabl
 
 // ── HTTP client per author ───────────────────────────────────────────────────────────────────────────────────────────────────────────
 let BASE = BASE_ARG ? BASE_ARG.replace(/\/$/, '') : '';
+// --base only: the administrator account given may be in use elsewhere at the same time (scripts/soak.js signs in as it too); under the
+// default single-session policy each sign-in ends the other session. The admin client then signs in again once on a 401 and repeats the
+// request; the number of such sign-ins is reported (adminRelogins). The authors' clients never do this: a 401 there is an error.
+let adminRelogins = 0;
 class Client {
-  constructor(name) { this.name = name; this.cookie = ''; }
+  constructor(name) { this.name = name; this.cookie = ''; this.creds = null; }
   async req(action, method, url, body, expect = [200]) {
+    const r = await this.once(action, method, url, body, this.creds ? [...expect, 401] : expect);
+    if (r.status !== 401 || !this.creds || url.startsWith('/api/auth/')) {
+      if (r.status === 401 && this.creds && measuring && !expect.includes(401)) errors.push({ action, status: 401, message: 'signed out' });
+      return r;
+    }
+    const l = await this.once('seed', 'POST', '/api/auth/login', this.creds, [200]);
+    if (l.status !== 200) { if (measuring) errors.push({ action, status: 401, message: `sign-in again failed: ${l.status}` }); return r; }
+    adminRelogins++;
+    return this.once(action, method, url, body, expect);
+  }
+  async once(action, method, url, body, expect) {
     const headers = { 'x-agastya-client': CLIENT_VERSION, origin: BASE };
     if (this.cookie) headers.cookie = this.cookie;
     if (body !== undefined) headers['content-type'] = 'application/json';
@@ -375,6 +390,7 @@ async function main() {
     if (!u || !f) { console.error('--base needs --admin and --admin-password-file'); process.exit(2); }
     const l = await admin.req('seed', 'POST', '/api/auth/login', { username: u, password: fs.readFileSync(f, 'utf8').trim() });
     if (l.status !== 200) { console.error(`admin sign-in failed: ${l.status}`); process.exit(2); }
+    admin.creds = { username: u, password: fs.readFileSync(f, 'utf8').trim() };
   }
   let result;
   try {
@@ -410,7 +426,7 @@ async function main() {
         writeP95: pct(writes, 0.95), contendedSaves: { accepted: cont[200] ?? 0, refused409: cont[409] ?? 0, refused423: cont[423] ?? 0 } },
       notices: { n: notices.length, p50: pct(notices, 0.5), p95: pct(notices, 0.95), max: pct(notices, 1), over5s: notices.filter((x) => x > NOTICE_LIMIT_MS).length },
       websocket: { messages: wsMessages, drops: wsDrops },
-      actions, integrity, server, serverSamples: samples,
+      actions, integrity, server, serverSamples: samples, adminRelogins,
       harnessEventLoop: { p99: Math.round(harnessLoop.percentile(99) / 1e5) / 10, max: Math.round(harnessLoop.max / 1e5) / 10 },
       errorSample: errors.slice(0, 20),
     };

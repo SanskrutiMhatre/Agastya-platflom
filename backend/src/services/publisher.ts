@@ -41,6 +41,7 @@ import { dropConsumedModules } from './jssdm/prune';
 import { unwrapChapterFolders } from './jssdm/unwrap';
 import { injectPdfInfo, firstText, firstAttr, type PdfInfo } from './pdfInfo';
 import { ownEngineFormatOf } from './ownEngines';
+import { tempNameFor, commitFile, copyFileAtomic, discardTemp } from '../storage/atomicWrite';
 
 export const PDF_NAME = 'jss-output.pdf';
 export const PREVIEW_NAME = 'jss-preview.pdf';
@@ -404,9 +405,12 @@ async function renderFull(projectId: string, gate: GatePass, log: (m: string) =>
     const classification = effective.publication?.securityClassification ?? '';
     gate.verifyUnchanged();                       // what is rendered is what was validated
 
+    // WP-30 (QA-008, found by the chaos suite): FOP writes a temporary sibling that becomes the PDF only when it is complete (commitFile), so a
+    // server killed mid-build never leaves a torn jss-output.pdf for the download to serve
+    const pdfTmp = tempNameFor(path.join(dir, PDF_NAME));
     const common = {
       workDir: dir, xsltproc: paths.XSLTPROC, fop: paths.FOP_BAT, inputXml: input, resourceRoots: resourceRootsFor(projectId),
-      foOut: 'jss-output.fo', pdfOut: PDF_NAME, classification,
+      foOut: 'jss-output.fo', pdfOut: path.basename(pdfTmp), classification,
       // Code No. / Rev No. belong to the JSS book's cover; the direct S1000D engine never prints them.
       layoutParams: useDirect
         ? furnitureFor(projectId, project, effective, !!releaseLabel, dir, engineConfig.stage2Params(effective).filter(([n]: [string, string]) => !/^cover\.(codeNo|revNo)$/.test(n)), log)
@@ -435,11 +439,12 @@ async function renderFull(projectId: string, gate: GatePass, log: (m: string) =>
             stage1Params: engineConfig.stage1Params(effective),
             frontMatter: effective.frontMatter, branding: effective.branding,
             systemImage: effective.frontMatter?.systemImage ?? '' });
+      commitFile(pdfTmp, path.join(dir, PDF_NAME));
       if (!opts.workDir) writeBuildState(projectId, { fingerprint: renderedState.fingerprint, released: renderedState.released });
       broadcast(projectId, { type: 'progress', message: result?.totalMs != null ? `Done in ${(result.totalMs / 1000).toFixed(1)}s` : 'Done', done: true });
       if (!opts.workDir) broadcast(projectId, { type: 'reload', kind: 'pdf' });
       return { pdf: path.join(dir, PDF_NAME), totalMs: result?.totalMs, releaseLabel };
-    } catch (e) { return failure(projectId, e); }
+    } catch (e) { discardTemp(pdfTmp); return failure(projectId, e); }
   }
 }
 
@@ -489,9 +494,10 @@ export function buildPreview(projectId: string, dmFile: string): Promise<BuildRe
     const { wm, releaseLabel } = resolveMarks(projectId, effective, project.pipeline, log);
 
     gate.verifyUnchanged();
+    const pdfTmp = tempNameFor(path.join(dir, PREVIEW_NAME));     // WP-30 (QA-008): the preview is complete or absent, never torn
     const common = {
       workDir: dir, xsltproc: paths.XSLTPROC, fop: paths.FOP_BAT, inputXml: '_preview-pm.xml', resourceRoots: resourceRootsFor(projectId),
-      foOut: 'jss-preview.fo', pdfOut: PREVIEW_NAME, classification: cls,
+      foOut: 'jss-preview.fo', pdfOut: path.basename(pdfTmp), classification: cls,
       layoutParams: project.pipeline === 's1000dtofo'
         ? furnitureFor(projectId, project, effective, !!releaseLabel, dir, engineConfig.stage2Params(effective), () => undefined)
         : engineConfig.stage2Params(effective), compression: 0,
@@ -509,8 +515,9 @@ export function buildPreview(projectId: string, dmFile: string): Promise<BuildRe
             stage2Xsl: relFromProject(projectId, path.join(config.pipelineDir, 'jsstofo', 'jsstofo.xsl')),
             stage1Out: '_preview-book.xml', isS1000D: true,
             stage1Params: [...engineConfig.stage1Params(effective), ['frontmatter.order', '_preview-order.xml']] });
+      commitFile(pdfTmp, path.join(dir, PREVIEW_NAME));
       return { pdf: path.join(dir, PREVIEW_NAME), totalMs: result?.totalMs, releaseLabel };
-    } catch (e) { return failure(projectId, e); }
+    } catch (e) { discardTemp(pdfTmp); return failure(projectId, e); }
   });
 }
 
@@ -584,7 +591,7 @@ export function buildConfiguredPublication(projectId: string, input: ConfigInput
     const name = `${slugOf2(pmCodeOf(pmText, readProjectJson(projectId).name || projectId))}_${sel.slug}.pdf`;
     fs.mkdirSync(path.join(dir, CONFIG_DIR), { recursive: true });
     const dest = path.join(dir, CONFIG_DIR, name);
-    fs.copyFileSync(out.pdf, dest);
+    copyFileAtomic(out.pdf, dest);                    // WP-30 (QA-008): never a torn configuration PDF
     fs.rmSync(work, { recursive: true, force: true });
     broadcast(projectId, { type: 'progress', message: `Configuration PDF: ${name}`, done: true });
     return {

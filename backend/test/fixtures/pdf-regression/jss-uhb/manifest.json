@@ -1,0 +1,35 @@
+{
+ "book": "jss-uhb",
+ "takenAt": "2026-11-27",
+ "arial": true,
+ "scale": 0.5,
+ "pageCount": 60,
+ "pages": [
+  1,
+  15,
+  23
+ ],
+ "masks": {
+  "1": [
+   [
+    33,
+    377,
+    82,
+    391
+   ]
+  ],
+  "15": [],
+  "23": []
+ },
+ "fonts": [
+  "Arial-BoldItalicMT",
+  "Arial-BoldMT",
+  "ArialMT",
+  "ArialNarrow-Bold",
+  "Helvetica-Bold"
+ ],
+ "knownNotEmbedded": ["Helvetica-Bold"],
+ "internalLinks": 85,
+ "externalLinks": 0,
+ "bookmarks": 42
+}

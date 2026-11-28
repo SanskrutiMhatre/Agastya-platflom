@@ -59,3 +59,7 @@ npm-debug.log*
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# The pictures of the JSS-0251 PDF regression baseline are renders of the customer RWI package above, so they stay on the machine that holds it
+# (node backend/scripts/pdf-baseline.js --update jss-0251); only its manifest (page count, fonts, link counts) is committed. WP-30.
+/backend/test/fixtures/pdf-regression/jss-0251/*.png

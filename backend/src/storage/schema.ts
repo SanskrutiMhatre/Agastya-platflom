@@ -25,6 +25,7 @@ import fs from 'fs';
 import path from 'path';
 import { DatabaseSync } from 'node:sqlite';
 import type { SqlDatabase } from './sqlite';
+import { tempNameFor, commitFile, discardTemp } from './atomicWrite';
 
 /** `postSql` (WP-29) runs after `columns`, so a step can index a column it adds; every part of a step is re-runnable (IF NOT EXISTS). */
 export interface MigrationStep { name: string; sql?: string; columns?: unknown; fkOff?: boolean; postSql?: string }
@@ -147,6 +148,7 @@ export const SNAPSHOT_PATTERN = /^publisher-before-\d{3}-[a-z0-9-]+?(-\d{8}-\d{6
  * Then only the newest `keep` pre-migration copies stay. Throws SchemaError SNAPSHOT_FAILED: the caller must not migrate without it.
  */
 export function snapshotBeforePendingMigrations(db: SqlDatabase, workspaceDir: string, state: SchemaState, nowIso: string, keep = 5): string | null {
+  sweepStaleCopies(path.join(workspaceDir, 'backups'));      // WP-30: every start, pending steps or not (see below)
   if (state.fresh || !state.pending.length) return null;
   const first = state.pending[0];
   let file = '';
@@ -155,14 +157,28 @@ export function snapshotBeforePendingMigrations(db: SqlDatabase, workspaceDir: s
     fs.mkdirSync(dir, { recursive: true });
     file = path.join(dir, `publisher-before-${first}.db`);
     for (let n = 0; fs.existsSync(file); n++) file = path.join(dir, `publisher-before-${first}-${stamp(nowIso)}${n ? `-${n}` : ''}.db`);
-    db.exec(`VACUUM INTO '${file.replace(/'/g, "''")}'`);
-    verifyCopy(file);
+    // WP-30 (QA-008, found by the chaos suite): the copy is made under a temporary name and gets its real name only once it passed its check. A
+    // start killed during VACUUM INTO used to leave a torn `publisher-before-<step>.db` - the very file an operator would restore - beside the
+    // good copy the next start made. A stale temporary copy (and the rollback journal SQLite keeps beside it while writing) is removed by a
+    // later start, once it is a minute old (sweepStaleCopies above).
+    const tmp = tempNameFor(file);
+    try {
+      db.exec(`VACUUM INTO '${tmp.replace(/'/g, "''")}'`);
+      verifyCopy(tmp);
+      commitFile(tmp, file);
+    } catch (e) { discardTemp(tmp); discardTemp(`${tmp}-journal`); throw e; }
   } catch (e) {
     throw new SchemaError('SNAPSHOT_FAILED', `The safety copy of the database before migration ${first} could not be made${file ? ` (${file})` : ''}: ${(e as Error).message}. ` +
       'The upgrade is stopped and the database is unchanged; free disk space or make the backups folder writable, then start again.');
   }
   pruneSnapshots(path.dirname(file), keep, file);
   return file;
+}
+
+const STALE_COPY = /^\.publisher-before-.+\.tmp-\d+-[0-9a-f]{12}(-journal|-wal|-shm)?$/;
+function sweepStaleCopies(dir: string, olderThanMs = 60_000): void {
+  let names: string[] = []; try { names = fs.readdirSync(dir); } catch { return; }
+  for (const f of names) if (STALE_COPY.test(f)) { try { const p = path.join(dir, f); if (Date.now() - fs.statSync(p).mtimeMs >= olderThanMs) fs.rmSync(p, { force: true }); } catch { /* in use or gone */ } }
 }
 
 function verifyCopy(file: string): void {

@@ -1,0 +1,41 @@
+{
+ "book": "jsg-uhb",
+ "takenAt": "2026-11-27",
+ "arial": true,
+ "scale": 0.5,
+ "pageCount": 402,
+ "pages": [
+  1,
+  14,
+  261
+ ],
+ "masks": {
+  "1": [
+   [
+    115,
+    187,
+    183,
+    202
+   ],
+   [
+    33,
+    306,
+    86,
+    320
+   ]
+  ],
+  "14": [],
+  "261": []
+ },
+ "fonts": [
+  "DejaVuSans",
+  "Helvetica-Bold",
+  "Times-Bold",
+  "Times-BoldItalic",
+  "Times-Roman"
+ ],
+ "knownNotEmbedded": ["Helvetica-Bold", "Times-Bold", "Times-BoldItalic", "Times-Roman"],
+ "internalLinks": 0,
+ "externalLinks": 0,
+ "bookmarks": 0
+}
