@@ -271,6 +271,7 @@ export class JsgLive {
     this.layer.className = 'jsg-live-cursors'; this.layer.setAttribute('aria-hidden', 'true'); this.layer.dataset.testid = 'collab-cursors';
     parts.scroll.appendChild(this.layer);
     parts.scroll.addEventListener('scroll', this.redraw, { passive: true });
+    parts.root.addEventListener('jsg-rendered', this.redraw);        // the opening draws the sheet in slices: carets once it is all there
     if (typeof ResizeObserver !== 'undefined') { this.ro = new ResizeObserver(this.redraw); this.ro.observe(parts.scroll); }
     document.addEventListener('selectionchange', this.onSelection);
     parts.root.addEventListener('keyup', this.onSelection);
@@ -697,6 +698,7 @@ export class JsgLive {
     if (this.frame) cancelAnimationFrame(this.frame);
     const parts = this.ed.liveParts();
     parts.scroll.removeEventListener('scroll', this.redraw);
+    parts.root.removeEventListener('jsg-rendered', this.redraw);
     parts.root.removeEventListener('keyup', this.onSelection);
     parts.root.removeEventListener('mouseup', this.onSelection);
     parts.root.removeEventListener('focusin', this.onSelection);

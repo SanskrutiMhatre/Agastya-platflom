@@ -23,6 +23,8 @@ const JSG_BLOCK_LABEL: Record<string, string> = { clause: 'Heading', para: 'Para
 
 /** 1 -> i, 4 -> iv ... (the stencil's roman lists) */
 const toRoman = (n: number): string => { const m: Array<[number, string]> = [[1000, 'm'], [900, 'cm'], [500, 'd'], [400, 'cd'], [100, 'c'], [90, 'xc'], [50, 'l'], [40, 'xl'], [10, 'x'], [9, 'ix'], [5, 'v'], [4, 'iv'], [1, 'i']]; let r = ''; for (const [v, t] of m) while (n >= v) { r += t; n -= v; } return r; };
+/** the longest a slice of the sheet's drawing takes when the editor opens (render(..., true)) */
+const SLICE_MS = 30;
 const ALIGNS: Array<[Align | undefined, string]> = [[undefined, 'Justified (default)'], ['left', 'Left'], ['center', 'Centre'], ['right', 'Right']];
 const MARK_TAGS: Record<string, Mark> = { B: 'b', STRONG: 'b', I: 'i', EM: 'i', U: 'u', SUP: 'sup', SUB: 'sub' };
 
@@ -64,6 +66,9 @@ export class JsgEditor implements JsgEditorLike, JsgLiveSurface {
   private slots = new WeakMap<HTMLElement, Slot>();
   /** the elements in `slots`, in drawing order (a selection is found again after a redraw) */
   private slotEls: HTMLElement[] = [];
+  /** render() calls so far (a newer one stops the slices of an older one) and what an unfinished sliced render still has to draw */
+  private renderGen = 0;
+  private pending: { gen: number; run: () => void } | null = null;
   private sheet!: HTMLElement; private nav!: HTMLElement; private bar!: HTMLElement;
   private figures = 0; private tables = 0;
   // history: the document as XML before each burst of editing (typing is grouped by a short pause), so Undo and Redo work on the model whatever was edited
@@ -105,15 +110,15 @@ export class JsgEditor implements JsgEditorLike, JsgLiveSurface {
     this.buildFind(); this.buildStatus();
     document.addEventListener('keydown', this.onKey);          // the page, not just the editor: Ctrl+S must save after a dialog closed with focus on the body
     this.buildBar();
-    this.render();
+    this.render(undefined, true);                                 // opening: drawn in slices (Phase 8, the opening long task)
     this.lastXml = serializeJsg(this.doc); this.refreshHistory();
   }
 
-  destroy(): void { document.removeEventListener('keydown', this.onKey); if (this.histTimer) clearTimeout(this.histTimer); this.clearHits(); this.root.innerHTML = ''; this.root.classList.remove('jsg-ed', 'jsg-ro'); }
+  destroy(): void { this.renderGen++; this.pending = null; document.removeEventListener('keydown', this.onKey); if (this.histTimer) clearTimeout(this.histTimer); this.clearHits(); this.root.innerHTML = ''; this.root.classList.remove('jsg-ed', 'jsg-ro'); }
   isDirty(): boolean { return this.collab ? this.collab.dirty() : this.dirty; }
   // ── live co-editing (JsgLiveSurface) ──
   setCollab(c: JsgCollab | null): void { this.collab = c; if (this.histTimer) { clearTimeout(this.histTimer); this.histTimer = undefined; } this.refreshHistory(); }
-  liveSlots(): JsgSlot[] { this.slotList = this.slotList.filter((s) => s.el.isConnected); return this.slotList; }
+  liveSlots(): JsgSlot[] { this.ensureRendered(); this.slotList = this.slotList.filter((s) => s.el.isConnected); return this.slotList; }
   liveRedraw(): void {
     const keep = this.sheet.parentElement?.scrollTop ?? 0;
     // the selected block (a table, a figure ...) is the same model object after a remote change (it keeps its object when moved): select it again where it now is
@@ -125,13 +130,14 @@ export class JsgEditor implements JsgEditorLike, JsgLiveSurface {
   afterRemote(): void { this.renderNav(); this.refreshStatus(); this.refreshHistory(); if (this.findBar.classList.contains('open')) this.runFind(false); }
   liveParts(): { root: HTMLElement; sheet: HTMLElement; scroll: HTMLElement; nav: HTMLElement } { return { root: this.root, sheet: this.sheet, scroll: this.sheet.parentElement as HTMLElement, nav: this.nav }; }
   /** Show (or stop showing) a code beside each section heading. The document is not touched; the sheet is drawn again where it stood. */
-  setSectionBadge(fn: SectionBadge | undefined): void { this.badge = fn; const keep = this.sheet.parentElement?.scrollTop ?? 0; this.render(); if (this.sheet.parentElement) this.sheet.parentElement.scrollTop = keep; }
+  setSectionBadge(fn: SectionBadge | undefined): void { if (fn === this.badge) return; this.badge = fn; const keep = this.sheet.parentElement?.scrollTop ?? 0; this.render(); if (this.sheet.parentElement) this.sheet.parentElement.scrollTop = keep; }
   private codeEl(s: { id?: string; title: string }, chapter: number): HTMLElement | null { const t = this.badge?.(s, chapter); if (!t) return null; const e = this.el('span', 'jsg-code', t); e.setAttribute('contenteditable', 'false'); e.title = 'Data module code of this section (kept in the backend, not in the document)'; return e; }
   /**
    * Scroll to a section or appendix by the key the server gives it ("id:<element id>", or "t:<number>:<title>" without an id; an appendix is numbered after the chapters),
    * the way the Publication and Explore pages open the editor at a row. Returns false when nothing matches.
    */
   goToModule(key: string): boolean {
+    this.ensureRendered();
     const norm = (t: string): string => t.replace(/[‘’´`]/g, "'").replace(/\s+/g, ' ').trim().toLowerCase();
     const m = /^t:(\d+):(.*?)(?:#(\d+))?$/.exec(key); const id = key.startsWith('id:') ? key.slice(3) : '';
     // WP-21 (GAP-004): "#n" is the n-th section of that title without an id in that chapter (the server numbers them so, xengine/outline.ts keyOf)
@@ -166,6 +172,7 @@ export class JsgEditor implements JsgEditorLike, JsgLiveSurface {
    * above the sheet stays the one place that edits them.
    */
   inspect(): ElementInfo | null {
+    this.ensureRendered();
     const e = this.selectedEl; const slot = this.selected;
     if (!e || !slot || !e.isConnected) return null;
     const x = slot.list[slot.index] as Block | Clause | undefined; if (!x) return null;
@@ -282,6 +289,7 @@ export class JsgEditor implements JsgEditorLike, JsgLiveSurface {
     return out;
   }
   private runFind(jump: boolean): void {
+    this.ensureRendered();
     this.hits = this.collectHits();
     this.hitAt = this.hits.length ? (jump ? 0 : Math.min(Math.max(this.hitAt, 0), this.hits.length - 1)) : -1;
     this.paintHits(jump);
@@ -556,14 +564,20 @@ export class JsgEditor implements JsgEditorLike, JsgLiveSurface {
   private afterEdit(focus: unknown): void { this.touch(false); this.checkpoint(); const keep = this.sheet.parentElement?.scrollTop ?? 0; this.render(focus); if (this.sheet.parentElement) this.sheet.parentElement.scrollTop = keep; }
 
   // ── rendering ────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-  private render(focus?: unknown): void {
+  /**
+   * Draw the whole sheet. `sliced` (opening the editor, Phase 8): the first sections are drawn at once and the rest in short tasks after
+   * it (each at most SLICE_MS), so opening a long handbook is not one long task; anything that needs the whole sheet calls ensureRendered()
+   * first, and any other render() stops the slices of an earlier one.
+   */
+  private render(focus?: unknown, sliced = false): void {
+    const gen = ++this.renderGen; this.pending = null;
     this.sheet.innerHTML = ''; this.slots = new WeakMap(); this.slotEls = []; this.figures = 0; this.tables = 0; this.slotList = [];
     const s = this.sheet; let focusEl: HTMLElement | null = null;
     this.ancillaryNote();
+    const jobs: Array<() => void> = [];
     this.doc.chapters.forEach((ch, ci) => {
-      const h = this.el('div', 'jsg-chapter'); h.id = `jsg-ch-${ci}`;
-      h.append(this.el('span', 'jsg-num', `CHAPTER ${ci + 1}`)); h.append(this.titleEl(ch, 'title', 'Chapter title')); s.appendChild(h);
-      ch.sections.forEach((sec, si) => {
+      jobs.push(() => { const h = this.el('div', 'jsg-chapter'); h.id = `jsg-ch-${ci}`; h.append(this.el('span', 'jsg-num', `CHAPTER ${ci + 1}`)); h.append(this.titleEl(ch, 'title', 'Chapter title')); s.appendChild(h); });
+      ch.sections.forEach((sec, si) => jobs.push(() => {
         const sh = this.el('div', 'jsg-sectionh'); sh.id = `jsg-sec-${ci}-${si}`;
         sh.append(this.el('span', 'jsg-num', `SECTION ${si + 1}`)); sh.append(this.titleEl(sec, 'title', 'Section title')); const code = this.codeEl(sec, ci + 1); if (code) sh.append(code); s.appendChild(sh);
         if (sec.orientation !== 'portrait') s.appendChild(this.el('div', 'jsg-orient', `This section prints on ${sec.orientation === 'a3-landscape' ? 'A3 landscape' : 'landscape'} pages`));
@@ -578,12 +592,28 @@ export class JsgEditor implements JsgEditorLike, JsgLiveSurface {
           } else { const e = this.blockEl(x, slot(list, i)); s.appendChild(e); if (focus === x) focusEl = e; }
         });
         walk(sec.children, `${si + 1}.`);
-      });
+      }));
     });
-    this.doc.appendices.forEach((a, ai) => this.appendix(s, a, ai, focus, (e) => { focusEl = e; }));
-    this.renderNav(); this.refreshStatus();
-    if (focusEl) { const f = focusEl as HTMLElement; const first = f.querySelector<HTMLElement>('[contenteditable]'); (first ?? f).focus?.(); this.select(f); }
+    this.doc.appendices.forEach((a, ai) => jobs.push(() => this.appendix(s, a, ai, focus, (e) => { focusEl = e; })));
+    const finish = (): void => {
+      this.pending = null;
+      this.renderNav(); this.refreshStatus();
+      if (focusEl) { const f = focusEl as HTMLElement; const first = f.querySelector<HTMLElement>('[contenteditable]'); (first ?? f).focus?.(); this.select(f); }
+      if (sliced) this.root.dispatchEvent(new CustomEvent('jsg-rendered'));
+    };
+    if (!sliced) { for (const j of jobs) j(); finish(); return; }
+    // the outline first (it is the model's, not the sheet's), then the sheet in slices
+    this.renderNav();
+    const step = (): void => {
+      if (gen !== this.renderGen) return;
+      const t0 = performance.now();
+      while (jobs.length && performance.now() - t0 < SLICE_MS) jobs.shift()!();
+      if (jobs.length) { this.pending = { gen, run: () => { while (jobs.length) jobs.shift()!(); finish(); } }; setTimeout(step, 0); } else finish();
+    };
+    step();
   }
+  /** Draw what the opening's slices have not drawn yet, now (before anything that reads the sheet: find, go to a section, a live caret). */
+  ensureRendered(): void { const p = this.pending; if (p && p.gen === this.renderGen) { this.pending = null; this.renderGen++; p.run(); } }
 
   private appendix(s: HTMLElement, a: Appendix, ai: number, focus: unknown, setFocus: (e: HTMLElement) => void): void {
     const h = this.el('div', 'jsg-app'); h.id = `jsg-app-${ai}`;
