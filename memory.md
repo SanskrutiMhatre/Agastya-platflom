@@ -24,22 +24,47 @@ entropy and P0/P1 test coverage), 26 EXTERNAL (clean VMs, a real code-signing ce
 24 h soak, screen-reader users, separate client machines). Open defects: FOP does not embed the base-14 fonts (QA-006a, a
 ratchet in the PDF regression baselines); server RSS grew 121 -> 195 MB over a 30-minute soak then levelled (24 h run needed).
 
-**UI redesign, in progress (2026-11-28).** The owner found that the earlier UI work kept the old look, and approved all six
-mockups in `docs/audit/mockups/` as the specification. Merged so far: the design system from the mockups
-(`frontend/src/styles/components.css`, tokens with the mockup names, `components/ui.tsx` pieces), the project dashboard
-(`ProjectHomePage`), the validation report and the administration pages. Being built: the global and project shells and the main
-dashboard, the editor workspace (IDE layout around the existing canvases), publication and PDF preview. When those land, the full
-release gate is re-run.
+**UI redesign (2026-11-28): done.** All six owner-approved mockups in `docs/audit/mockups/` are implemented exactly (tokens equal
+the mockup's `tokens.css`; one Light/Dark toggle, no System theme), plus the owner's round-2 items (panel toggles, Quick preview in
+the navbar for all three editors, JSS/JSG themed sheets, consistency of every page).
+
+**Phase 3 (owner's final decisions, 2026-11-28; `docs/phase3/DECISIONS.md`).** Implemented and merged on `main`:
+* **P3-1 real-time collaboration** on Yjs for S1000D, JSS and JSG (handbook + ISPL): live co-editing is the default, remote carets
+  and presence, per-user undo, continuous saving (SQLite update log -> byte-identical file write-back -> revisions), reviewers see
+  edits live read-only, comments anchored to live text, check-out is an optional exclusive lock (expires, admin/PM release,
+  submit-for-release locks), external changes (import, restore, GitLab pull) merge in. `docs/phase3/collaboration.md`,
+  `COLLAB-CONTRACT.md`, `collab-jss.md`, `collab-jsg.md`. `AGASTYA_COLLAB=0` falls back to save-by-version.
+* **P3-2 / P3-3 performance for 100+ users, no backend rewrite:** Server-Timing + admin perf report, 53 speed budgets in the nightly
+  gate, kept CSDB listing, frozen PM cache, yielding + batched-fsync import, validation content cache + incremental BREX, build
+  cache (unchanged rebuild ~0.02 s), FOP pre-warm, CodeMirror chunk. Collab load: 120 clients, p95 19-29 ms, 171 MB.
+  `docs/phase3/perf-baseline.md`, `performance.md`, `cleanup-backend.md`. Still over target: create at 10 concurrent (247 vs 200 ms),
+  validation after one edit (0.75 vs 0.5 s), JSG real rebuild (two FOP passes).
+* **P3-4 PDF review:** text/area annotations (comment, suggestion, remark), Comments panel with jump-to, anchors re-attached after
+  rebuilds (orphans kept as "Needs re-anchoring"), links to the source module, role permissions, live updates, CSV/XFDF export and
+  XFDF import, in project archives, optional release block. `docs/phase3/pdf-review.md`.
+* **P3-5 GitLab (offline intranet):** admin config with connection test (hidden until it passes), per-user OAuth/PAT, project
+  repository push/pull with conflict choice, branches, release + PDF storage, merge requests for review/approval. Tested against a
+  mock GitLab only. `docs/phase3/gitlab.md`, `docs/OPERATIONS.md` section 15.
+* **P3-6 standalone accounts:** `AGASTYA_DEPLOYMENT=standalone` creates admin/Admin@123, manager/Manager@123, author/Author@123,
+  auditor/Auditor@123 once on a fresh data folder, forced change at first sign-in, credentials shown after install with "Save a
+  copy". Server mode (default) unchanged. `docs/phase3/standalone.md`.
+* **Small UI:** status text, Wi-Fi icon and sidebar Settings removed (Settings in the account menu; version under "About Agastya").
+* **Phase 8 cleanup:** backend part merged (0a100f3); the editors/collaboration part (moved block keeps concurrent typing, spec
+  updates for live editing, JSG opening in slices) is finishing on its branch.
+* **Next: Phase 9, the comprehensive final verification** (full gate, all e2e and visual suites, collab load, security, offline,
+  build and installer) run in parallel shards on separate ports; fix and re-run until it passes. Testing policy until then: targeted
+  checks only (owner, P3-7).
 
 **Database.** `workspace/publisher.db` (node:sqlite) is the owner's real data and the source of truth. Migrations are additive only;
-022-026 were added by the roadmap (audit index, document leases, directory groups and permissions, audit chain, jobs). The server
+022-026 were added by the roadmap (audit index, document leases, directory groups and permissions, audit chain, jobs); 027-030 by
+Phase 3 (027 default accounts, 028 PDF annotations, 029 GitLab, 030 collaboration documents). Next free: 031. The server
 takes a verified safety copy before it migrates. A new machine starts empty or restores a platform backup (`SETUP.md`).
 
 **Owner decisions still standing:** Arial is the house font; JSS is best effort against the stencils; owner-removed screens stay
 removed (CSDB page, System 2 SNS, Brand pack, applicability UI, editor Codes strip and button, PMC/ICN/contents switches); the
 bundled samples are dummy data (d87dc48); S1000D projects start on the Xignal reference layout.
 
-**Remote.** `origin` = GitHub; local `main` is ahead of it (the roadmap and the redesign are not pushed yet).
+**Remote.** `origin` = GitHub. Push only when the owner says so (the owner asked to push before the Phase 9 testing starts).
 
 ## 1. What is in this folder
 

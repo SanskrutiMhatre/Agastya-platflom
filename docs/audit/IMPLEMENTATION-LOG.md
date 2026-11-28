@@ -2610,3 +2610,32 @@ The JSS/JSG paper and canvas styles were not touched.
     (draft PDF, no publication made); S1000D buttons in the top bar in every view.
   * `e2e/00-platform.spec.ts`: Quick preview and Generate are expected in the top bar, not the PDF controls.
   * Parity: two explanation rows (`toggle-side`, `quick-preview-btn`, now given by the shared component).
+
+## Phase 3 (owner's final decisions P3-1..P3-7, 2026-11-28)
+
+Decisions: `docs/phase3/DECISIONS.md`. Each area keeps its own record (files changed, decisions, possible regressions, checks owed);
+this section is the index. Order followed (P3-7): small UI -> baseline -> collaboration -> PDF review -> standalone accounts ->
+GitLab -> performance -> cleanup -> comprehensive verification. Only targeted checks ran during implementation.
+
+| Step | Record | Merge | Migration |
+|---|---|---|---|
+| Small UI + performance baseline | `docs/phase3/ui-and-baseline.md`, `perf-baseline.md`, `perf-budgets.json` | 069d507 | - |
+| Collaboration core + S1000D | `docs/phase3/collaboration.md`, `COLLAB-CONTRACT.md` | 238b6c2 | 030-collab-documents |
+| Collaboration JSS | `docs/phase3/collab-jss.md` | 9d2f0e4 | - |
+| Collaboration JSG (handbook + ISPL) | `docs/phase3/collab-jsg.md` | 76a9cdd | - |
+| PDF review | `docs/phase3/pdf-review.md` | 3a00fc4 | 028-pdf-annotations |
+| Standalone default accounts | `docs/phase3/standalone.md` | a3d9a8b, 2ac4fb2 | 027-default-accounts |
+| GitLab (intranet) | `docs/phase3/gitlab.md`, `docs/OPERATIONS.md` section 15 | c8a1b65 | 029-gitlab (renumbered from 030 at merge) |
+| Performance | `docs/phase3/performance.md` | 422528f | - |
+| Cleanup, backend | `docs/phase3/cleanup-backend.md` | 0a100f3 | - |
+| Cleanup, editors/collaboration | `docs/phase3/cleanup-collab.md` | in progress | - |
+
+Merge notes by the lead: GitLab's migration renumbered to 029 so main has no gap (`storage/schema.ts` refuses gaps); ProjectShell
+kept main's status bar (renderer status removed in step 1) plus the GitLab rail flag; `services/firstRun.ts` typed imports (lint
+ratchet); `POST /api/auth/default-credentials/acknowledge` added to the intended public surface in `routes-guarded`.
+
+Headline numbers (this host, noisy): project reads at 1,000 modules, 10 concurrent p95 0.6-1.0 s -> 17-100 ms; import stall 8.3 s ->
+61 ms; unchanged re-validation 1.27 s -> 0.016 s; unchanged PDF rebuild 2.5-6.7 s -> ~0.02 s; Studio chunk 277 -> 138 KB gzip;
+collab load 120 clients p95 19-29 ms, 171 MB RSS. PDF output byte-identical (wp30-pdf-regression baselines unchanged).
+
+Owed to Phase 9: everything in `docs/audit/PHASE-CHECKLIST.md` section 8, step 9.
