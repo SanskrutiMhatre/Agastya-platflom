@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { authApi, type AdminQueues, type Gates, type User } from '../api';
+import { authApi, type AdminQueues, type DefaultCredential, type Gates, type SetupState, type User } from '../api';
 import { ApiError, setConnectionHandler, setReauthHandler, setUnauthorizedHandler } from '../api/client';
 import { useInbox } from './inbox';
 import { purgeDraftsOf } from '../lib/draftPurge';
@@ -18,6 +18,15 @@ interface SessionState {
   reauth: { reason: string } | null;
   /** FE-004: the server did not answer (restart, network, sleep). The person stays signed in; a banner says it is retrying. */
   unreachable: boolean;
+  /**
+   * P3-6: a standalone installation's first launch - the default accounts that still have their published default password, until someone
+   * acknowledges the screen (the server only sends them to this computer). null = nothing to show; the sign-in screen as usual.
+   */
+  firstLaunch: DefaultCredential[] | null;
+  /** "I have stored them": tell the server (it stops sending them) and go on to sign in. */
+  acknowledgeFirstLaunch: () => Promise<void>;
+  /** "Sign in now": hide the screen for this visit only; the next launch shows it again until it is acknowledged. */
+  dismissFirstLaunch: () => void;
   /** Resolve who is signed in (or whether first-run setup is needed). Called once at boot and after any auth change. */
   load: (o?: { ttl?: number }) => Promise<void>;
   /** Background check (every minute): a 401 opens the re-login dialog; a network error shows the banner. Not activity. */
@@ -49,6 +58,10 @@ let retryDelay = 2000;
 
 export const useSession = create<SessionState>((set, get) => ({
   status: 'loading', user: null, gates: NO_GATES, pendingInvitations: 0, adminQueues: null, signedOutReason: null, reauth: null, unreachable: false,
+  firstLaunch: null,
+
+  async acknowledgeFirstLaunch() { await authApi.acknowledgeDefaultCredentials(); set({ firstLaunch: null }); },
+  dismissFirstLaunch() { set({ firstLaunch: null }); },
 
   async load(o) {
     try {
@@ -70,8 +83,9 @@ export const useSession = create<SessionState>((set, get) => ({
       const s = get();
       if (s.status === 'authed' && s.user) { set({ reauth: { reason: reasonOf(e) ?? 'Your session has ended.' } }); return; }
       const reason = reasonOf(e);
-      const setupNeeded = await authApi.setupRequired().catch(() => ({ setupRequired: false }));
-      set({ status: setupNeeded.setupRequired ? 'setup' : 'anon', user: null, gates: NO_GATES, adminQueues: null, ...(reason ? { signedOutReason: reason } : {}) });
+      const setupNeeded: SetupState = await authApi.setupRequired().catch(() => ({ setupRequired: false }));
+      set({ status: setupNeeded.setupRequired ? 'setup' : 'anon', user: null, gates: NO_GATES, adminQueues: null, ...(reason ? { signedOutReason: reason } : {}),
+        firstLaunch: setupNeeded.defaultCredentials?.length ? setupNeeded.defaultCredentials : null });
     }
   },
 
