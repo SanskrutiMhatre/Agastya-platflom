@@ -10,7 +10,8 @@
 //   routes      the slowest of the last 512 API requests and the routes with the highest mean (route templates only)
 //
 // Overhead: the figures are kept by services/metrics.ts at the cost of a few arithmetic operations per request. The process list for the
-// renderer memory is read only when this route is asked, asynchronously, with a timeout, and kept for RENDERER_CACHE_MS; `?os=0` skips it.
+// renderer memory is read only when this route is asked, asynchronously, with a timeout, and kept for RENDERER_CACHE_MS; `?os=0` skips it,
+// `?fresh=1` measures again now (the benchmark samples the JVMs while a build runs).
 // =============================================================================
 
 import { execFile } from 'child_process';
@@ -73,15 +74,15 @@ async function measureRenderer(): Promise<RendererFigures> {
 }
 
 /** The renderer figures, read at most every RENDERER_CACHE_MS (concurrent askers share one measurement). */
-export function rendererFigures(): Promise<RendererFigures> {
-  if (cache && Date.now() - cache.at < RENDERER_CACHE_MS) return Promise.resolve(cache.value);
+export function rendererFigures(fresh = false): Promise<RendererFigures> {
+  if (!fresh && cache && Date.now() - cache.at < RENDERER_CACHE_MS) return Promise.resolve(cache.value);
   if (!pending) pending = measureRenderer().then((v) => { cache = { at: Date.now(), value: v }; return v; }).finally(() => { pending = null; });
   return pending;
 }
 
 const mb = (n: number): number => Math.round((n / 1048576) * 10) / 10;
 
-export async function perfReport({ os = true, top = 20 }: { os?: boolean; top?: number } = {}): Promise<Record<string, unknown>> {
+export async function perfReport({ os = true, top = 20, fresh = false }: { os?: boolean; top?: number; fresh?: boolean } = {}): Promise<Record<string, unknown>> {
   const m = process.memoryUsage();
   const s = snapshot();
   const j = jobsStatus() as { mode?: string; queued?: number; running?: Record<string, number>; slots?: Record<string, number> };
@@ -92,7 +93,7 @@ export async function perfReport({ os = true, top = 20 }: { os?: boolean; top?: 
     live: liveGauges(),
     jobs: { mode: j.mode, queueDepth: j.queued ?? 0, running: j.running ?? {}, slots: j.slots ?? {} },
     requests: s.requests, db: s.db,
-    renderer: os ? await rendererFigures() : null,
+    renderer: os ? await rendererFigures(fresh) : null,
     routes: routeFigures(Math.max(1, Math.min(100, top))),
   };
 }
