@@ -3,7 +3,7 @@
  * S1000D schemas for issues 4.2, 5.0, 6 and 7 by the unit test suite.
  */
 import { DEFAULT_BREX, DmCodeParts, schemaUrl, todayParts } from './s1000d';
-import { escapeAttr, escapeText } from './xml';
+import { exactAttr, exactText } from './xml';
 
 export interface NewDmOptions {
   issue: string;
@@ -434,7 +434,7 @@ function dmCodeXml(p: DmCodeParts): string {
     ['infoCodeVariant', p.infoCodeVariant], ['itemLocationCode', p.itemLocationCode], ['learnCode', p.learnCode],
     ['learnEventCode', p.learnEventCode],
   ];
-  return '<dmCode ' + attrs.filter(([, v]) => v).map(([k, v]) => `${k}="${escapeAttr(v!)}"`).join(' ') + '/>';
+  return '<dmCode ' + attrs.filter(([, v]) => v).map(([k, v]) => `${k}="${exactAttr(v!)}"`).join(' ') + '/>';
 }
 
 export function defaultBrexCode(issue: string): DmCodeParts {
@@ -450,35 +450,35 @@ export function buildDataModule(o: NewDmOptions): string {
   if (!t) throw new Error('No template for schema ' + o.schema);
   const d = todayParts(o.date);
   const brex = o.brex ?? defaultBrexCode(o.issue);
-  const ent = `enterpriseCode="${escapeAttr(o.enterpriseCode)}"`;
+  const ent = `enterpriseCode="${exactAttr(o.enterpriseCode)}"`;
   return `<?xml version="1.0" encoding="UTF-8"?>
 <dmodule xmlns:dc="http://www.purl.org/dc/elements/1.1/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="${schemaUrl(o.issue, o.schema)}">
   <identAndStatusSection>
     <dmAddress>
       <dmIdent>
         ${dmCodeXml(o.code)}
-        <language languageIsoCode="${escapeAttr(o.language)}" countryIsoCode="${escapeAttr(o.country)}"/>
-        <issueInfo issueNumber="${escapeAttr(o.issueNumber)}" inWork="${escapeAttr(o.inWork)}"/>
+        <language languageIsoCode="${exactAttr(o.language)}" countryIsoCode="${exactAttr(o.country)}"/>
+        <issueInfo issueNumber="${exactAttr(o.issueNumber)}" inWork="${exactAttr(o.inWork)}"/>
       </dmIdent>
       <dmAddressItems>
         <issueDate year="${d.year}" month="${d.month}" day="${d.day}"/>
         <dmTitle>
-          <techName>${escapeText(o.techName)}</techName>${o.infoName ? `
-          <infoName>${escapeText(o.infoName)}</infoName>` : ''}
+          <techName>${exactText(o.techName)}</techName>${o.infoName ? `
+          <infoName>${exactText(o.infoName)}</infoName>` : ''}
         </dmTitle>
       </dmAddressItems>
     </dmAddress>
     <dmStatus issueType="new">
-      <security securityClassification="${escapeAttr(o.security)}"/>
+      <security securityClassification="${exactAttr(o.security)}"/>
       <responsiblePartnerCompany ${ent}>
-        <enterpriseName>${escapeText(o.enterpriseName)}</enterpriseName>
+        <enterpriseName>${exactText(o.enterpriseName)}</enterpriseName>
       </responsiblePartnerCompany>
-      <originator ${o.originatorCode ? `enterpriseCode="${escapeAttr(o.originatorCode)}"` : ent}>
-        <enterpriseName>${escapeText(o.originatorCode ? (o.originatorName ?? '') : o.enterpriseName)}</enterpriseName>
+      <originator ${o.originatorCode ? `enterpriseCode="${exactAttr(o.originatorCode)}"` : ent}>
+        <enterpriseName>${exactText(o.originatorCode ? (o.originatorName ?? '') : o.enterpriseName)}</enterpriseName>
       </originator>
       <applic>
         <displayText>
-          <simplePara>${escapeText(o.applicability || 'All')}</simplePara>
+          <simplePara>${exactText(o.applicability || 'All')}</simplePara>
         </displayText>
       </applic>
       <brexDmRef>

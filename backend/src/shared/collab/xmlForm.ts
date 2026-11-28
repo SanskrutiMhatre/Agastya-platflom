@@ -9,7 +9,7 @@
 // structural `XNode` interface below. The grammar is optional and only asked two questions (`has`, `allowsText`), answered by the Studio's
 // compiled XSD grammar or by the server's reader of the same grammar files (services/collab/grammar.ts).
 //
-// Moved verbatim from the Studio (core/xml.ts: findDoctype, parseDoctype, serializeDoctype, escapeText, escapeAttr, normalizeWhitespace,
+// Moved verbatim from the Studio (core/xml.ts: findDoctype, parseDoctype, serializeDoctype, exactText, exactAttr, normalizeWhitespace,
 // serialize; core/display.ts: BLOCK, PRESERVE, isBlockName, isElementOnly, isPreserved). Only the parameter types changed.
 // =============================================================================
 
@@ -281,16 +281,17 @@ export interface SerializeResult {
   spans: Map<XNode, [number, number]> | null;
 }
 
-// Characters XML 1.0 cannot carry (not even as references) are dropped on output, so a document can always be read back; a bare
+// exactText / exactAttr: the serialiser's own escapes, not the general escaper (shared/xmlEscape.ts): they keep a document's bytes
+// readable back exactly. Characters XML 1.0 cannot carry (not even as references) are dropped on output, so a document can always be read back; a bare
 // carriage return is written as a reference, because a parser would turn it into a line feed.
 const TEXT_SPECIAL = /[&<\r\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]|\]\]>/g;
 const ATTR_SPECIAL = /[&<"\t\n\r\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/g;
 
-export function escapeText(s: string): string {
+export function exactText(s: string): string {
   return s.replace(TEXT_SPECIAL, (m) => (m === '&' ? '&amp;' : m === '<' ? '&lt;' : m === '\r' ? '&#13;' : m === ']]>' ? ']]&gt;' : ''));
 }
 
-export function escapeAttr(s: string): string {
+export function exactAttr(s: string): string {
   return s.replace(ATTR_SPECIAL, (m) => (m === '&' ? '&amp;' : m === '<' ? '&lt;' : m === '"' ? '&quot;' : m === '\t' ? '&#9;' : m === '\n' ? '&#10;' : m === '\r' ? '&#13;' : ''));
 }
 
@@ -351,7 +352,7 @@ export function serialize(node: XNode, opts: SerializeOptions = {}): SerializeRe
   };
 
   const writeAttrs = (el: XElement) => {
-    for (const a of Array.from(el.attributes)) out(' ' + a.name + '="' + escapeAttr(a.value) + '"');
+    for (const a of Array.from(el.attributes)) out(' ' + a.name + '="' + exactAttr(a.value) + '"');
   };
 
   const writeNode = (n: XNode, depth: number, pretty: boolean) => {
@@ -385,7 +386,7 @@ export function serialize(node: XNode, opts: SerializeOptions = {}): SerializeRe
         break;
       }
       case 3:
-        out(escapeText(textAsWritten(n, pretty, grammar)));
+        out(exactText(textAsWritten(n, pretty, grammar)));
         break;
       case 4:
         out('<![CDATA[' + (n.nodeValue || '') + ']]>');

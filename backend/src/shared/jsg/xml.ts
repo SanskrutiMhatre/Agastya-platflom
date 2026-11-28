@@ -8,6 +8,8 @@
 // W3C-style element (the browser's, or @xmldom/xmldom's on the server); the browser's parseJsg(xml) is in frontend/src/jsg/xml.ts. The optional
 // origin hook (readJsgWith) tells the live binding which element each model object was read from (carets and comments map through it).
 
+// the one escaper (shared/xmlEscape.ts, re-exported by lib/xml.ts: WP-16): text & < >, attributes also "; the same bytes as the copies this file had
+import { escText as esc, escAttr as escA } from '../xmlEscape';
 import { emptyFront, isClause, newPart, type Align, type Appendix, type Block, type Cell, type Chapter, type Clause, type Figure, type Front, type Graphic, type Inline, type JsgDoc, type List, type ListItem,
   type ListType, type Mark, type Notice, type Orientation, type Para, type Part, type PartRow, type Plate, type Row, type Section, type Table } from './model';
 
@@ -200,8 +202,7 @@ export function readJsgWith(root: JsgElement, onOrigin: (obj: object, el: JsgEle
 
 // ── writing ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
-export const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const escA = (s: string): string => esc(s).replace(/"/g, '&quot;');
+export { esc };
 const at = (name: string, v: string | number | undefined | boolean): string => (v === undefined || v === '' || v === false ? '' : ` ${name}="${escA(String(v))}"`);
 
 export function inlineXml(inl: Inline[]): string {

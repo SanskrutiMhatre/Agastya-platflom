@@ -91,8 +91,17 @@ test('duplicate scan: one definition each of the escaper, the hash helper, the a
   // the shared folder is plain TypeScript for both runtimes: no Node built-ins, no DOM, no imports from outside it
   for (const f of walk(shared)) {
     const t = fs.readFileSync(f, 'utf8');
-    for (const m of t.matchAll(/from\s+'([^']+)'/g)) assert.match(m[1], /^\.\/[\w-]+$/, `${rel(f)} imports ${m[1]}`);
-    assert.doesNotMatch(strip(t), /\b(require\(|process\.|document\.|window\.)/, `${rel(f)} uses a runtime-specific global`);
+    // a relative import stays inside the shared folder (its sub-folders collab/, jss/, jsg/ use each other since Phase 3); the one package
+    // packages allowed are yjs and lib0 (its encoder, for the collab wire protocol): the live co-editing document model, a dependency of
+    // both runtimes (backend and frontend package.json; frontend/vite.config.ts dedupes them so the page has one copy)
+    for (const m of t.matchAll(/from\s+'([^']+)'/g)) {
+      if (m[1].startsWith('.')) {
+        const to = path.resolve(path.dirname(f), m[1]);
+        assert.ok(to.startsWith(shared + path.sep) && /^[.\/\w-]+$/.test(m[1]), `${rel(f)} imports ${m[1]}, outside backend/src/shared`);
+      } else assert.ok(['yjs', 'lib0'].includes(m[1].split('/')[0]), `${rel(f)} imports ${m[1]}`);
+    }
+    // (not inside a name: 'jsg-document.xml' is a file name, not the browser's document)
+    assert.doesNotMatch(strip(t), /(?<![\w-])(require\(|process\.|document\.|window\.)/, `${rel(f)} uses a runtime-specific global`);
   }
 });
 
