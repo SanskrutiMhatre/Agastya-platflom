@@ -17,8 +17,10 @@ until it is green. Do not start work on a machine where that has not passed.
 2. `docs/audit/IMPLEMENTATION-LOG.md`, newest sections first: every work package, what was done, what was not and why.
 3. `docs/audit/14-PRIORITIZED-IMPLEMENTATION-ROADMAP.md` (work packages WP-01..37 and decisions D1-D23) and
    `docs/audit/RELEASE-EVIDENCE.md` (the 47 release gates and their state).
-4. `docs/audit/mockups/index.html`: the owner-approved UI. New or changed screens must look like these.
-5. `git log --oneline -30`.
+4. `docs/phase3/DECISIONS.md` and the records next to it: real-time collaboration (`COLLAB-CONTRACT.md` is how an editor binds),
+   PDF review, GitLab, standalone accounts, performance baseline and budgets.
+5. `docs/audit/mockups/index.html`: the owner-approved UI. New or changed screens must look like these.
+6. `git log --oneline -30`.
 
 ## Rules (the quality bar)
 
@@ -38,6 +40,9 @@ until it is green. Do not start work on a machine where that has not passed.
 * **PDF baselines** change only with `node backend/scripts/pdf-baseline.js --update`, after looking at the new pages; say why in the commit.
 * **Vendored code** (`backend/vendor/`) changes only as a recorded exception in `docs/JSS_VENDOR_EXCEPTIONS.md`.
 * Arial stays the house font.
+* **Live co-editing is the default.** An editor change goes through its collaboration binding: the server's write-back must stay
+  byte-identical to a normal save, and `reconcile` must change only what differs. Never delete+recreate a block that has content.
+* **Speed budgets** (`docs/phase3/perf-budgets.json`) are checked nightly; a change that slows a measured path must say why.
 
 ## Commands
 

@@ -109,7 +109,37 @@ Legend: ✅ done · ◐ done in part (limits in the log) · ⏸ parked by decisi
 ## 7. Still to do
 
 - ✅ Finish screen 1 and the shared fixes; merge
-- 🔄 Owner review of the exact-match UI on :4040
-- ⬜ Re-run the full release gate on a quiet machine; fix what it finds
-- ⬜ Push `main` to GitHub (local `main` is ahead; nothing from this phase is pushed)
+- ✅ Owner review of the exact-match UI on :4040 (round 2 items done)
+- ⬜ Re-run the full release gate on a quiet machine; fix what it finds (now part of Phase 9 below)
+- 🔄 Push `main` to GitHub: the owner pushes before Phase 9 testing starts
 - ⬜ External gates (section 6), with the owner
+
+## 8. Phase 3 (owner's final decisions, `docs/phase3/DECISIONS.md`)
+
+Testing policy (P3-7): targeted checks only while implementing; one comprehensive verification at the end.
+
+- ✅ 1. Small UI: "Offline · on-premises · v… · Server connected" text, Wi-Fi icon and sidebar Settings removed (069d507)
+- ✅ 2. Performance baseline + instrumentation: Server-Timing, admin perf report, bench scripts, 53 budgets, nightly stage (069d507)
+- ✅ 3. Real-time collaboration: core + S1000D (238b6c2, migration 030), JSS (9d2f0e4), JSG handbook + ISPL (76a9cdd)
+- ✅ 4. PDF review annotations (3a00fc4, migration 028); archive export/import + XFDF import (0a100f3)
+- ✅ 5. Standalone default accounts + forced password change (a3d9a8b, migration 027; fix-ups 2ac4fb2)
+- ✅ 6. GitLab integration for an offline intranet instance (c8a1b65, migration 029)
+- ✅ 7. Performance optimisations (422528f)
+- 🔄 8. Cleanup: backend part merged (0a100f3: batched fsync, PM append, incremental BREX, tailwind removed, any typed, docs);
+  editors/collaboration part finishing (moved block keeps concurrent typing, live-editing spec updates, JSG opening in slices,
+  lint exports, one shared XML escaper)
+- ⬜ Owner pushes `main`
+- ⬜ 9. Comprehensive final verification, in parallel shards on separate ports (fix and re-run only what fails):
+  - ⬜ Full gate (excluding the package/readiness stages: they write HKCU and need a real certificate)
+  - ⬜ Backend suite, frontend vitest, all e2e specs (sharded), visual suite (alone, one ordered run, baselines re-captured once
+    then verified by a second run)
+  - ⬜ All three editors; collaboration concurrency, sync, conflicts (collab-load 120+ clients across S1000D/JSS/JSG)
+  - ⬜ Author and reviewer workflows; PDF annotations; GitLab, repositories, MRs (mock GitLab)
+  - ⬜ Standalone and server installs; auth, authz, security scans
+  - ⬜ API, DB, memory, CPU, frontend performance (speed budgets, median of 3, re-measured on a quiet machine); soak capped at 2 h
+  - ⬜ Offline/intranet operation; full build, packaging, installer build
+  - EXTERNAL (cannot run here): real intranet GitLab (OAuth consent, CA chains, approvals CE/EE, package registry limits), clean
+    Windows VM install, 125%/150% DPI on real screens, real code-signing certificate, 24 h soak, reference-machine load run
+
+Known gaps carried into Phase 9 (documented in the phase records): same-field edits in JSG attributes are last-writer-wins; a
+PDF text selection across a page break is cut at the page edge; import still runs in the server process (yielding, batched).
