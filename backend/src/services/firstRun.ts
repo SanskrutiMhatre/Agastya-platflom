@@ -11,14 +11,12 @@
 
 import type { AccountDeployment } from '../config';
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { ensureDefaultAccounts } = require('../core/auth/defaultAccounts');
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { ensureBootstrapAdmin } = require('../core/auth/bootstrap');
+import { ensureDefaultAccounts } from '../core/auth/defaultAccounts';
+import { ensureBootstrapAdmin } from '../core/auth/bootstrap';
 
 export interface FirstRunDeps {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  store: any;
+  /** The auth store (core/auth/store.js); passed through to the two JS steps unchanged. */
+  store: unknown;
   audit: (fields: Record<string, unknown>) => void;
   deployment: AccountDeployment;
   initialAdmin?: { INITIAL_ADMIN_USERNAME?: string; INITIAL_ADMIN_PASSWORD?: string };
