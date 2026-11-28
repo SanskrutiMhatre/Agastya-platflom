@@ -39,8 +39,12 @@ export function Badge({ tone, children, title }: { tone?: 'ok' | 'warn' | 'bad' 
   return <span className={`v2-badge ${tone ?? ''}`} title={title}>{children}</span>;
 }
 
+/** The mockup's `.alert` (components.css): the tone's icon, then the text in the primary ink on the tone's tint. The old tone names stay
+ *  (bad, warn, ok); the `v2-alert` class stays as the hook of older rules. */
 export function Alert({ tone, children }: { tone?: 'bad' | 'warn' | 'ok'; children: ReactNode }) {
-  return <div className={`v2-alert ${tone ?? ''}`} role={tone === 'bad' ? 'alert' : 'status'}>{children}</div>;
+  const t = tone === 'bad' ? 'danger' : tone === 'warn' ? 'warning' : tone === 'ok' ? 'success' : 'info';
+  const icon: IconId = t === 'danger' ? 'alert' : t === 'warning' ? 'warn' : t === 'success' ? 'ok' : 'info';
+  return <div className={`alert ${t} v2-alert${tone ? ` ${tone}` : ''}`} role={tone === 'bad' ? 'alert' : 'status'}><Icon name={icon} className="ico" /><div>{children}</div></div>;
 }
 
 /**
@@ -135,7 +139,8 @@ export function ConfirmModal({ title, body, confirmLabel = 'Confirm', danger, bu
   icon?: IconId; tone?: 'danger' | 'warning' | 'info';
 }) {
   return (
-    <Modal title={title} onClose={onClose} width={460} icon={icon} tone={tone ?? (danger ? 'danger' : 'info')} buttons={<>
+    // every confirmation is the mockup's confirm dialog (admin.html): the tone's icon in a tinted circle before the title
+    <Modal title={title} onClose={onClose} width={460} icon={icon ?? (danger ? 'alert' : 'info')} tone={tone ?? (danger ? 'danger' : 'info')} buttons={<>
       <button className="btn" onClick={onClose}>Cancel</button>
       <button className={`btn btn-primary ${danger ? 'btn-danger-solid' : ''}`} disabled={busy} aria-busy={busy || undefined} onClick={onConfirm}>{icon && danger ? <Icon name={icon} size={14} /> : null}{confirmLabel}</button>
     </>}>{body}</Modal>
@@ -284,7 +289,7 @@ export function Callout({ tone = 'info', title, children, actions, testId }: { t
   const icon: IconId = tone === 'danger' ? 'alert' : tone === 'warning' ? 'warn' : tone === 'success' ? 'ok' : 'info';
   return (
     <div className={`alert ${tone}`} role={tone === 'danger' ? 'alert' : 'status'} data-testid={testId}>
-      <Icon name={icon} /><div>{title ? <div className="title">{title}</div> : null}{children}</div>{actions ? <div className="actions">{actions}</div> : null}
+      <Icon name={icon} className="ico" /><div>{title ? <div className="title">{title}</div> : null}{children}</div>{actions ? <div className="actions">{actions}</div> : null}
     </div>
   );
 }

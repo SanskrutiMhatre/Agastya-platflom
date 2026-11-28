@@ -93,3 +93,20 @@
 .app.project > .statusbar { grid-column: 1 / -1; grid-row: 3; height: var(--status-h); }
 .statusbar .page-status, .statusbar .default-status { display: contents; }
 .statusbar .page-status:not(:empty) + .default-status { display: none; }
+
+/* ---------------------------------------------------------------- global pieces of both shells (global UI pass, 2026-11-28)
+   "Jump to" (components/QuickSwitcher.tsx) is the mockups' palette (components.css .palette); these rules add its scrolling list, the
+   empty line, the dimmed disabled result and the foot's right-hand key. */
+.palette .palette-list { max-height: min(52vh, 420px); overflow: auto; padding-bottom: var(--space-2); }
+.palette .opt { color: var(--text-primary); }
+.palette .opt.active svg { color: var(--text-link); }
+.palette .opt.off { color: var(--text-disabled); cursor: not-allowed; }
+.palette .palette-none { padding: var(--space-4); color: var(--text-secondary); }
+.palette .palette-foot-end { margin-left: auto; }
+.palette .q input::placeholder { color: var(--text-tertiary); }
+
+/* the server is not answering (components/SessionDialogs.tsx): the mockup's warning alert, floating under the top bar, never over it */
+.v2-offline-banner { position: fixed; left: 50%; top: calc(var(--header-h) + var(--space-2)); transform: translateX(-50%); z-index: var(--z-toast); display: flex; align-items: center; gap: var(--space-2);
+  max-width: calc(100vw - 32px); padding: var(--space-2) var(--space-4); border-radius: var(--radius-lg); background: var(--warning-subtle); color: var(--text-primary);
+  border: 1px solid var(--warning-border); font-size: var(--fs-sm); box-shadow: var(--shadow-2); }
+.v2-offline-banner > svg { color: var(--warning); flex: none; }

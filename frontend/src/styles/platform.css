@@ -15,7 +15,6 @@ a:hover { text-decoration: underline; }
 .v2-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* ----------------------------------------------------------------- shell */
-.v2-brand-mark { width: 28px; height: 28px; border-radius: 7px; background: var(--accent); color: var(--accent-text); display: grid; place-items: center; flex: none; }
 .v2-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 /* WP-23 (UX-005): the main landmark of the shell (it fills the column like the page did), the skip link and the keyboard target of a table row */
 .v2-main-region { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
@@ -44,9 +43,9 @@ html.v2-compact .v2-page { padding: var(--page-pad); }
 .v2-row.wrap { flex-wrap: wrap; }
 .v2-stack { display: flex; flex-direction: column; gap: 12px; }
 .v2-spread { justify-content: space-between; }
-.v2-empty { padding: 32px 16px; text-align: center; color: var(--text-muted); }
+.v2-empty { padding: var(--space-8) var(--space-4); text-align: center; color: var(--text-secondary); }   /* the mockups' .empty-state text */
 /* WP-07 (UX-016, DS-004): only the title is a block; emphasis inside the text stays inline. Title and text are centred alike. */
-.v2-empty-title { display: block; color: var(--text); margin-bottom: 4px; }
+.v2-empty-title { display: block; color: var(--text-primary); font-size: var(--fs-md); font-weight: var(--fw-semibold); margin-bottom: var(--space-1); }
 .v2-badge { display: inline-flex; align-items: center; gap: var(--space-1); height: 20px; padding: 0 var(--space-2); border-radius: var(--radius-pill); font-size: var(--fs-2xs); font-weight: var(--fw-semibold); background: var(--surface-inset); color: var(--text-secondary); border: 1px solid var(--border-default); white-space: nowrap; }
 .v2-badge.ok { background: var(--success-subtle); color: var(--success); border-color: var(--success-border); }
 .v2-badge.warn { background: var(--warning-subtle); color: var(--warning); border-color: var(--warning-border); }
@@ -74,19 +73,15 @@ html.v2-compact .v2-page { padding: var(--page-pad); }
 .v2-jsg-cover .jsg-row > button:hover, .v2-jsg-cover button.add:hover { background: var(--bg-sunken); }
 .v2-hint { font-size: var(--fs-xs); color: var(--text-tertiary); }
 .v2-error { color: var(--danger); font-size: 12.5px; }
-.v2-alert { padding: var(--space-3) var(--space-4); border-radius: var(--radius-lg); font-size: var(--fs-sm); border: 1px solid var(--border-default); background: var(--surface-inset); }
-.v2-alert.bad { background: var(--danger-subtle); color: var(--danger); border-color: var(--danger-border); }
-.v2-alert.warn { background: var(--warning-subtle); color: var(--warning); border-color: var(--warning-border); }
-.v2-alert.ok { background: var(--success-subtle); color: var(--success); border-color: var(--success-border); }
+.v2-alert:not(.alert) { padding: var(--space-3) var(--space-4); border-radius: var(--radius-lg); font-size: var(--fs-sm); border: 1px solid var(--border-default); background: var(--surface-inset); }
+.v2-alert.bad:not(.alert) { background: var(--danger-subtle); color: var(--danger); border-color: var(--danger-border); }
+.v2-alert.warn:not(.alert) { background: var(--warning-subtle); color: var(--warning); border-color: var(--warning-border); }
+.v2-alert.ok:not(.alert) { background: var(--success-subtle); color: var(--success); border-color: var(--success-border); }
 /* WP-35 (group 2): the dashboard parts as classes (were inline styles): sections, the two-column split, invitations, the activity feed */
 .v2-alert.accent { background: var(--accent-soft); color: var(--text); border-color: transparent; }
 .v2-gap-b { margin-bottom: 18px; }
 .v2-cols-main { grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); align-items: start; }
 @media (max-width: 1100px) { .v2-cols-main { grid-template-columns: minmax(0, 1fr); } }
-/* UX-025 (rest): a long project title on an Activity card ends in an ellipsis and never runs under the Open button */
-.v2-grow-min { flex: 1; min-width: 0; }
-.v2-no-shrink { flex: none; }
-.v2-acard-title { display: block; font-size: 14.5px; }
 .v2-mt0 { margin-top: 0; }
 .v2-mt16 { margin-top: 16px; }
 .v2-gap8 { gap: 8px; }
@@ -128,17 +123,21 @@ html.v2-compact .v2-page { padding: var(--page-pad); }
 /* ------------------------------------------------------- project dashboard */
 
 /* ------------------------------------------------------------ login */
-.v2-auth { min-height: 100%; display: grid; place-items: center; align-content: center; padding: 24px; background: var(--bg); overflow: auto; }
-.v2-auth-card { width: 400px; max-width: 100%; padding: 28px; }
-.v2-auth-card h1 { margin: 0 0 4px; font-size: 20px; }
+/* global UI pass (2026-11-28): the sign-in, first-run, onboarding and password screens in the mockups' language: a raised .card on the canvas,
+   the top bar's brand mark, the mockup h1 and field sizes, the primary button full width, links as .link-btn. */
+.v2-auth { min-height: 100%; display: grid; place-items: center; align-content: center; padding: var(--space-6); background: var(--surface-canvas); overflow: auto; line-height: var(--lh-ui); }
+.v2-auth-card { width: 420px; max-width: 100%; padding: var(--space-8); }
+.v2-auth-card h1 { margin: 0 0 var(--space-1); font-size: var(--fs-xl); font-weight: var(--fw-semibold); line-height: var(--lh-tight); }
 /* WP-35 (group 1): the auth card's parts as classes (were inline styles); a button that reads as a link (was <a href="#">) */
-.v2-auth-brand { margin-bottom: 16px; }
-.v2-auth-brand strong { font-size: 15px; }
-.v2-auth-card > .v2-sub { margin-bottom: 16px; }
-.v2-auth-gap { height: 12px; }
-.v2-auth-submit { justify-content: center; height: 34px; }
-.v2-auth-alt { margin-top: 14px; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.v2-auth-foot { margin-top: 14px; text-align: center; font-size: var(--fs-xs); color: var(--text-faint); }
+.v2-auth-brand { margin-bottom: var(--space-5); gap: var(--space-2); }
+.v2-auth-brand strong { font-size: var(--fs-md); font-weight: var(--fw-semibold); }
+.v2-auth-card > .v2-sub { margin-bottom: var(--space-5); }
+.v2-auth-card > .alert { margin-bottom: var(--space-4); }
+.v2-auth-card .v2-stack { gap: var(--space-4); }
+.v2-auth-gap { height: var(--space-3); }
+.v2-auth-submit { justify-content: center; width: 100%; margin-top: var(--space-1); }
+.v2-auth-alt { margin: var(--space-4) 0 0; display: flex; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.v2-auth-foot { margin: var(--space-4) 0 0; text-align: center; font-size: var(--fs-xs); color: var(--text-tertiary); }
 .v2-linkbtn { min-height: 24px; padding: 2px 0; border: 0; background: none; color: var(--text-link); font: inherit; cursor: pointer; }
 .v2-linkbtn:hover { text-decoration: underline; }
 
@@ -193,17 +192,9 @@ html.v2-compact .v2-page { padding: var(--page-pad); }
 .v2-stat dt { color: var(--text-muted); font-size: 11.5px; margin-top: 2px; }
 .v2-stat.ok dd { color: var(--success); } .v2-stat.warn dd { color: var(--warning); } .v2-stat.bad dd { color: var(--danger); } .v2-stat.accent dd { color: var(--text-link); }
 .v2-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--surface-selected); color: var(--text-link); display: inline-grid; place-items: center; font-size: var(--fs-2xs); font-weight: var(--fw-semibold); flex: none; }
-.v2-people { display: flex; flex-direction: column; gap: 6px; }
-.v2-person { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.v2-person > .v2-trunc { flex: 1; }
-.v2-chip { display: inline-block; margin: 2px 4px 2px 0; padding: 1px 9px; border-radius: 10px; background: var(--bg-sunken); border: 1px solid var(--border); font-size: 12px; cursor: pointer; }
-.v2-chip:hover { border-color: var(--accent); color: var(--text-link); }
-.v2-feed-row { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-bottom: 1px solid var(--border); }
-.v2-feed-row > span:nth-child(2) { flex: 1; min-width: 0; }
 
 /* ------------------------------------------------------- notifications */
 .v2-unread { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); display: inline-block; }
-.v2-scroll-x { overflow-x: auto; }
 
 /* ---------------------------------------------------------- editor panel */
 .v2-chap { display: flex; align-items: center; gap: 6px; width: 100%; height: 28px; padding: 0 8px 0 4px; border: 0; background: none; color: var(--text); font: inherit; font-size: 12.5px; font-weight: 600; text-align: left; cursor: pointer; border-radius: 6px; }
@@ -248,9 +239,7 @@ html.v2-compact .v2-table th { padding-top: 5px; padding-bottom: 5px; }
 [data-testid="pdf-pane"] .v2-empty, [data-testid="pdf-pane"] .v2-empty h3, [data-testid="pdf-pane"] .v2-empty > svg { color: var(--text-secondary); }
 [data-testid="pdf-pane"] .v2-empty strong { color: var(--text-primary); font-weight: 600; }
 
-/* FE-004: the server is not answering; the page stays usable. */
-.v2-offline-banner { position: fixed; left: 50%; top: 8px; transform: translateX(-50%); z-index: 1000; padding: 6px 14px; border-radius: 6px;
-  background: var(--warning-soft); color: var(--warning); border: 1px solid currentColor; font-size: 13px; box-shadow: var(--shadow-banner); }
+/* FE-004: the server is not answering; the page stays usable. The banner's look is in styles/shell.css (the mockups' warning alert). */
 
 /* ------------------------------------------------ WP-21: the editor host chrome (editors/host) */
 .v2-kbd { display: inline-flex; align-items: center; height: 18px; padding: 0 5px; border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 4px; background: var(--bg-sunken); color: var(--text-muted); font: 600 10.5px/1 var(--font-mono); white-space: nowrap; }
@@ -287,7 +276,11 @@ html.v2-compact .v2-table th { padding-top: 5px; padding-bottom: 5px; }
 /* the Project Home */
 .btn.is-on { background: var(--accent-soft); color: var(--text-link); }
 /* a page that failed to draw */
-.v2-errpanel { max-width: 640px; }
+.v2-errpanel { max-width: 640px; margin: var(--space-6) auto 0; }
+.v2-errpanel-body { display: flex; gap: var(--space-4); align-items: flex-start; }
+.v2-errpanel .tile-ic.v2-errpanel-ic { background: var(--danger-subtle); color: var(--danger); }
+.v2-errpanel h2 { font-size: var(--fs-lg); font-weight: var(--fw-semibold); }
+.v2-errpanel-msg { overflow-wrap: anywhere; font-size: var(--fs-xs); }
 
 /* WP-35 (UID-001): password field with Show / Hide and the Caps Lock notice */
 .v2-pw { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
@@ -298,15 +291,55 @@ html.v2-compact .v2-table th { padding-top: 5px; padding-bottom: 5px; }
 .v2-pw-toggle[aria-pressed="true"] { background: var(--accent-soft); }
 .v2-pw-caps { font-size: var(--fs-xs); font-weight: 600; color: var(--warning); }
 
-/* WP-35 (UID-005): the context menu of rows and headings (mirrors their visible buttons) */
-.v2-ctx { position: fixed; z-index: var(--z-menu); min-width: 200px; padding: 4px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow-2); }
-.v2-ctx-item { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 30px; padding: 0 10px; border: 0; border-radius: var(--radius-sm); background: none; color: var(--text); font: inherit; text-align: left; white-space: nowrap; cursor: pointer; }
-.v2-ctx-item:hover, .v2-ctx-item:focus { background: var(--bg-hover); }
+/* WP-35 (UID-005): the context menu of rows and headings (mirrors their visible buttons). Global UI pass (2026-11-28): the mockups' .menu
+   (raised surface, large radius, rows one row high with the medium radius, the icons in the tertiary ink). */
+.v2-ctx { position: fixed; z-index: var(--z-menu); min-width: 220px; padding: var(--space-1); background: var(--surface-raised); border: 1px solid var(--border-default); border-radius: var(--radius-lg); box-shadow: var(--shadow-2); }
+.v2-ctx-item { display: flex; align-items: center; gap: var(--space-3); width: 100%; min-height: var(--row-h); padding: 0 var(--space-3); border: 0; border-radius: var(--radius-md); background: none; color: var(--text-primary); font: inherit; text-align: left; white-space: nowrap; cursor: pointer; }
+.v2-ctx-item svg { color: var(--text-tertiary); }
+.v2-ctx-item:hover, .v2-ctx-item:focus { background: var(--surface-hover); }
 .v2-ctx-item:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
-.v2-ctx-item.danger { color: var(--danger); }
-.v2-ctx-item:disabled { color: var(--text-disabled); background: none; cursor: not-allowed; }
+.v2-ctx-item.danger, .v2-ctx-item.danger svg { color: var(--danger); }
+.v2-ctx-item:disabled, .v2-ctx-item:disabled svg { color: var(--text-disabled); background: none; cursor: not-allowed; }
 .v2-ctx-pad { width: 14px; flex: none; }
-/* a small panel under a button (Samples) */
+/* a small panel under a button (Samples): the same .menu look, its buttons as menu rows */
 .v2-pop-anchor { position: relative; display: inline-flex; }
-.v2-pop { position: absolute; right: 0; top: calc(100% + 4px); z-index: var(--z-menu); display: flex; flex-direction: column; align-items: stretch; gap: 4px; min-width: 190px; padding: 6px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px; box-shadow: var(--shadow-2); }
-.v2-pop > .btn { justify-content: flex-start; }
+.v2-pop { position: absolute; right: 0; top: calc(100% + 4px); z-index: var(--z-menu); display: flex; flex-direction: column; align-items: stretch; gap: 0; min-width: 220px; padding: var(--space-1); background: var(--surface-raised); border: 1px solid var(--border-default); border-radius: var(--radius-lg); box-shadow: var(--shadow-2); }
+.v2-pop > .btn { justify-content: flex-start; border-color: transparent; background: transparent; height: var(--row-h); }
+.v2-pop > .btn:hover:not(:disabled) { background: var(--surface-hover); }
+
+/* global UI pass (2026-11-28): the New project wizard (components/project.tsx) - the two ways in as the mockups' link cards, and a chosen
+   option (format, source) as a pressed button (.btn.on: the selected tint), not a second primary button beside the dialog's own */
+.v2-choice-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+@media (max-width: 640px) { .v2-choice-tiles { grid-template-columns: minmax(0, 1fr); } }
+.v2-choice { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-4); text-align: left; cursor: pointer; font: inherit; color: var(--text-primary); }
+.v2-choice:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.v2-choice-text { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.v2-choice-text h3 { margin: 0; font-size: var(--fs-md); font-weight: var(--fw-semibold); }
+.v2-choice-text .faint { font-size: var(--fs-xs); line-height: var(--lh-ui); }
+.btn.v2-choice-btn.on { border-color: var(--focus-ring); }
+
+/* global UI pass (2026-11-28): the activity dashboard (components/ActivityView.tsx: the Activity page and a project's Team tab) in the
+   mockups' card language - project cards with a card head, the figures as small stat columns, the people and the feed as lists with avatars */
+.v2-act { gap: var(--space-4); }
+.v2-act-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(380px, 100%), 1fr)); gap: var(--space-4); align-items: start; }
+.v2-act .card-head h3 { margin: 0; font-size: var(--fs-md); font-weight: var(--fw-semibold); min-width: 0; }
+.v2-act-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.v2-act-title .faint { font-size: var(--fs-xs); }
+.v2-act .card-head .row { flex: none; }
+.v2-act-figs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid var(--border-subtle); }
+.v2-act-figs > div { display: flex; flex-direction: column; gap: 2px; padding: var(--space-3) var(--space-4); min-width: 0; }
+.v2-act-figs > div + div { border-left: 1px solid var(--border-subtle); }
+.v2-act-figs .v { font-size: var(--fs-lg); font-weight: var(--fw-semibold); font-variant-numeric: tabular-nums; line-height: var(--lh-tight); }
+.v2-act-figs .v.v-text { font-size: var(--fs-sm); line-height: 1.6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v2-act-figs .l { font-size: var(--fs-xs); color: var(--text-secondary); }
+.v2-act-people, .v2-act-feed { list-style: none; margin: 0; padding: 0; }
+.v2-act-people li { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-4); min-width: 0; }
+.v2-act-people li + li, .v2-act-feed li + li { border-top: 1px solid var(--border-subtle); }
+.v2-act .avatar { width: 24px; height: 24px; }
+.v2-act .nm { font-weight: var(--fw-medium); }
+.v2-act-who { gap: var(--space-3); min-width: 0; }
+.v2-act-name { display: flex; flex-direction: column; min-width: 0; }
+.v2-act-name .faint { font-size: var(--fs-xs); }
+.v2-act-feed li { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-2) var(--space-4); }
+.v2-act-feed li .faint { font-size: var(--fs-xs); }
+.v2-act .chips .chip { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }

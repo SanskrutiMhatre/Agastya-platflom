@@ -7,4 +7,9 @@
 /* UI redesign 2026-11-28 (mockup 4): the pop-out is the same viewer as the Publication page: a panel-coloured bar over the themed canvas */
 .v2-popout { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--viewer-canvas-themed); }
 .v2-popout-bar { display: flex; align-items: center; gap: var(--space-2); min-height: 40px; padding: 0 var(--space-3); background: var(--surface-panel); border-bottom: 1px solid var(--border-default); flex: none; }
-.v2-popout-bar strong { font-size: var(--fs-sm); }
+.v2-popout-bar strong { font-size: var(--fs-sm); font-weight: var(--fw-semibold); }
+/* global UI pass (2026-11-28): the brand mark of the top bars (smaller: the bar is 40 px), the notices as the mockup alerts, the viewer below */
+.v2-popout-bar .v2-popout-mark { width: 22px; height: 22px; }
+.v2-popout-note { padding: var(--space-2) var(--space-3); flex: none; }
+.v2-popout-note .alert { font-size: var(--fs-xs); padding: var(--space-2) var(--space-3); }
+.v2-popout-pdf { flex: 1; min-height: 0; position: relative; }

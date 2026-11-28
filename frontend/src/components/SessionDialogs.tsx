@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useSession } from '../store/session';
 import { Alert, Field, Modal, errText } from './ui';
 import { PasswordInput } from './PasswordInput';
+import { Icon } from './Icon';
 import { useHandshake } from '../lib/handshake';
 
 /**
@@ -40,7 +41,7 @@ export function ReauthDialog() {
 export function UnreachableBanner() {
   const unreachable = useSession((s) => s.unreachable);
   if (!unreachable) return null;
-  return <div className="v2-offline-banner" role="status" data-testid="server-unreachable">The server is not answering. Your work is still here; trying again…</div>;
+  return <div className="v2-offline-banner" role="status" data-testid="server-unreachable"><Icon name="warn" />The server is not answering. Your work is still here; trying again…</div>;
 }
 
 /**

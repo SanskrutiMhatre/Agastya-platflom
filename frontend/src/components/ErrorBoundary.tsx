@@ -4,6 +4,7 @@
 
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { promptDialog } from '../lib/dialogs';
+import { Icon } from './Icon';
 
 interface Props { children: ReactNode; /** a new value (the address) clears the error: moving to another page tries again */ resetKey?: string; where?: string }
 interface State { error: Error | null; stack: string; copied: boolean }
@@ -39,17 +40,23 @@ export class ErrorBoundary extends Component<Props, State> {
     const e = this.state.error;
     if (!e) return this.props.children;
     return (
+      // global UI pass: the mockups' card with the danger tile, the message in the code face, the actions in the card foot
       <div className="v2-page" data-testid="error-boundary">
-        <div className="v2-card v2-card-pad v2-errpanel" role="alert">
-          <h2 style={{ marginTop: 0 }}>This page stopped working</h2>
-          <p>Something on this page failed while it was being drawn. The rest of the application still works: use the navigation, try again, or reload the page. Unsaved editor changes are offered back after a reload.</p>
-          <p className="v2-hint v2-mono" style={{ wordBreak: 'break-word' }}>{e.message || e.name}</p>
-          <div className="v2-row wrap">
-            <button className="btn btn-primary" onClick={() => this.setState({ error: null, stack: '', copied: false })} data-testid="error-retry">Try again</button>
-            <button className="btn" onClick={() => location.reload()} data-testid="error-reload">Reload page</button>
-            <button className="btn" onClick={() => void this.copy()} data-testid="error-copy">{this.state.copied ? 'Copied' : 'Copy details'}</button>
+        <section className="card v2-errpanel" role="alert" aria-labelledby="error-boundary-h">
+          <div className="card-body v2-errpanel-body">
+            <span className="tile-ic v2-errpanel-ic" aria-hidden="true"><Icon name="alert" size={20} /></span>
+            <div className="stack">
+              <h2 id="error-boundary-h">This page stopped working</h2>
+              <p className="muted">Something on this page failed while it was being drawn. The rest of the application still works: use the navigation, try again, or reload the page. Unsaved editor changes are offered back after a reload.</p>
+              <p className="faint mono v2-errpanel-msg">{e.message || e.name}</p>
+            </div>
           </div>
-        </div>
+          <div className="card-foot">
+            <button className="btn" onClick={() => void this.copy()} data-testid="error-copy"><Icon name="copy" />{this.state.copied ? 'Copied' : 'Copy details'}</button>
+            <button className="btn" onClick={() => location.reload()} data-testid="error-reload"><Icon name="refresh" />Reload page</button>
+            <button className="btn primary btn-primary" onClick={() => this.setState({ error: null, stack: '', copied: false })} data-testid="error-retry">Try again</button>
+          </div>
+        </section>
       </div>
     );
   }
