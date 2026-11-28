@@ -82,6 +82,26 @@ test('a mark made by one member is seen by another, with who and when; unmarking
   assert.deepEqual((await viewer.get(`/api/projects/${id}/problems/reviewed`)).json.marks, []);
 });
 
+test('a mark may carry the reviewer\'s note (the Validation report\'s review form); a bad note is refused and nothing is marked', async () => {
+  const { problems } = (await author.get(`/api/projects/${id}/problems`)).json;
+  const key = problems[0].key;
+  assert.equal((await reviewer.put(`/api/projects/${id}/problems/reviewed`, { keys: [key], reviewed: true, note: 7 })).status, 400);
+  assert.equal((await reviewer.put(`/api/projects/${id}/problems/reviewed`, { keys: [key], reviewed: true, note: 'x'.repeat(501) })).status, 400);
+  assert.equal((await reviewer.put(`/api/projects/${id}/problems/reviewed`, { keys: [key], reviewed: true, note: 'a\u0007b' })).status, 400);
+  assert.deepEqual((await viewer.get(`/api/projects/${id}/problems/reviewed`)).json.marks, [], 'a refused note marks nothing');
+  const put = await reviewer.put(`/api/projects/${id}/problems/reviewed`, { keys: [key], reviewed: true, note: '  Accepted: the graphic ships with the next drop.\r\nSee ticket 12.  ' });
+  assert.equal(put.status, 200, JSON.stringify(put.json));
+  assert.equal(put.json.marks[0].note, 'Accepted: the graphic ships with the next drop.\nSee ticket 12.');
+  const p = (await viewer.get(`/api/projects/${id}/problems`)).json.problems.find((x) => x.key === key);
+  assert.deepEqual([p.state, p.reviewNote], ['reviewed', 'Accepted: the graphic ships with the next drop.\nSee ticket 12.']);
+  // no note: the mark has none, and the model says null
+  await reviewer.put(`/api/projects/${id}/problems/reviewed`, { keys: [key], reviewed: false });
+  await reviewer.put(`/api/projects/${id}/problems/reviewed`, { keys: [key], reviewed: true, note: '   ' });
+  assert.equal((await viewer.get(`/api/projects/${id}/problems/reviewed`)).json.marks[0].note, undefined);
+  assert.equal((await viewer.get(`/api/projects/${id}/problems`)).json.problems.find((x) => x.key === key).reviewNote, null);
+  await reviewer.put(`/api/projects/${id}/problems/reviewed`, { keys: [key], reviewed: false });
+});
+
 test('bad keys are refused; a viewer cannot mark; a stranger gets 404 and an anonymous caller 401', async () => {
   assert.equal((await author.put(`/api/projects/${id}/problems/reviewed`, { keys: [] })).status, 400);
   assert.equal((await author.put(`/api/projects/${id}/problems/reviewed`, { keys: ['a\u0000b'] })).status, 400);

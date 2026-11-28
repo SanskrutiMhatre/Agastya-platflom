@@ -5,7 +5,7 @@ import {
   PanelLeft, Pencil, Play, Plus, RefreshCw, Rocket, Search, Settings, ShieldCheck, Stamp, Sun, Trash2, TriangleAlert, Unlock, Upload, UserPlus, Users, X, FileDown,
   PenLine, Network, Monitor, Server, Layers, CircleUser, Image, Library, Wrench, SlidersHorizontal, MessageSquare, Send, Undo2, Package,
   Keyboard, Maximize2, Minimize2, GitCompare, Command,
-  Flag, Funnel, CircleX, Cpu, Database, HardDrive, Archive, WifiOff, BookOpen, Ban, ListOrdered, Ellipsis, ZoomIn, ZoomOut, ChevronLeft, Save, Link,
+  Flag, Funnel, CircleX, Cpu, Database, HardDrive, Archive, WifiOff, BookOpen, Ban, ListOrdered, Ellipsis, ZoomIn, ZoomOut, ChevronLeft, Save, Link, ListChecks, Hash,
 } from 'lucide';
 
 const ICONS: Record<string, IconNode> = {
@@ -20,7 +20,7 @@ const ICONS: Record<string, IconNode> = {
   keyboard: Keyboard, focus: Maximize2, unfocus: Minimize2, compare: GitCompare, command: Command,
   // UI redesign step 1: the icons the approved mockups draw (docs/audit/mockups)
   flag: Flag, filter: Funnel, xcircle: CircleX, cpu: Cpu, database: Database, disk: HardDrive, archive: Archive, offline: WifiOff, book2: BookOpen, ban: Ban,
-  listOrdered: ListOrdered, more: Ellipsis, zoomIn: ZoomIn, zoomOut: ZoomOut, left: ChevronLeft, save: Save, link: Link,
+  listOrdered: ListOrdered, more: Ellipsis, zoomIn: ZoomIn, zoomOut: ZoomOut, left: ChevronLeft, save: Save, link: Link, listChecks: ListChecks, hash: Hash,
 };
 
 export type IconName = keyof typeof ICONS;
