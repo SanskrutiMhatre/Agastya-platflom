@@ -1,66 +1,93 @@
-// WP-21 (UX-003 stage 1, 06 section 7.1): the one header of the three editor pages.
+// WP-21 (UX-003 stage 1, 06 section 7.1): the one header of the three editor pages, drawn as the owner-approved mockup's top bar
+// (docs/audit/mockups/editor.html, UI redesign): it spans the window over the activity bar (a shell slot, Workspace.tsx useShellSlot).
 //
-//   [lead] Project name / document   [state]          [actions ...]   [Commands Ctrl+K] [?] [focus] [Editor|Split|PDF] [theme]
+//   [brand] Project / section / DOCUMENT [badge]          [team] [Commands Ctrl K] [actions: Validate, Build]  [layout] [?] [focus] [theme] [account]
 //
-// Each page supplies what is its own (the S1000D data-module panel toggle, the JSS/JSG document type, the Save, Check, Generate and package actions);
-// the state words, the palette, the shortcuts, focus mode and the layout switch are the host's and behave the same in all three. In focus mode the
-// header is slim: the name, the state, the palette and the way back.
+// Each page supplies what is its own (the document's place and code, the S1000D data-module panel toggle, Check / Validate, Save, Generate and
+// the package actions); the state words, the palette, the shortcuts, focus mode and the layout switch are the host's and behave the same in all
+// three. In focus mode the bar keeps the name, the palette, the shortcuts and the way back.
 
 import type { ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import { Link } from 'react-router-dom';
 import { Icon } from '../../components/Icon';
 import { ThemeToggle } from '../../components/ThemeToggle';
+import { AccountMenu } from '../../components/AccountMenu';
 import '../../styles/pages/editor-host.css';   // WP-35 second pass: the header's styles load with the editor chunks
 import { saveStateLabel, type SaveStateInput } from './saveState';
 import type { EditorLayout } from './useEditorLayout';
 import type { TestId } from './testIds';
+import { useShellSlot } from './Workspace';
 
+/** The save state, as the mockup's status-bar item (`.save-state`, `.dirty` while there are unsaved changes). */
 export function SaveStateChip({ state, ids }: { state: SaveStateInput; ids: TestId }) {
   const { text, tone } = saveStateLabel(state);
-  const mark = tone === 'ok' ? '✓ ' : tone === 'warn' ? '● ' : tone === 'bad' ? '! ' : '';
-  return <span className={`v2-badge v2-edstate ${tone === 'busy' ? '' : tone}`} {...ids} data-tone={tone} aria-live="polite" title={tone === 'bad' ? 'The last save did not reach the server. Press Save (Ctrl+S) to try again.' : undefined}>{mark}{text}</span>;
+  const icon = tone === 'ok' ? 'ok' : tone === 'bad' ? 'xcircle' : 'edit';
+  return (
+    <span className={`save-state v2-edstate ${tone === 'warn' || tone === 'busy' ? 'dirty' : ''} ${tone === 'bad' ? 'bad' : ''}`} {...ids} data-tone={tone} aria-live="polite"
+      title={tone === 'bad' ? 'The last save did not reach the server. Press Save (Ctrl+S) to try again.' : undefined}>
+      <Icon name={icon} size={14} className="ico sm" />{text}
+    </span>
+  );
 }
 
 export interface EditorHeaderProps {
   layout: EditorLayout;
+  /** the project's name (the first crumb, a link to the project) */
   title: string;
-  /** before the title (the S1000D panel toggle) */
+  /** where the project's name leads */
+  homeHref?: string;
+  /** the second crumb: where the document is (the S1000D chapter or SNS, the JSS/JSG document type) */
+  section?: ReactNode;
+  /** the open document, in mono (the data module code); the page's heading */
+  doc?: ReactNode;
+  /** after the document: a status badge */
+  badge?: ReactNode;
+  /** before the crumbs (the S1000D panel toggle) */
   lead?: ReactNode;
-  /** after the title: the open document, the document type */
-  crumb?: ReactNode;
-  state: ReactNode;
-  /** the page's own actions (Save, Check, packages, Generate) */
+  /** the save state, shown here only while the status bar is not (focus mode) */
+  state?: ReactNode;
+  /** the page's own actions (Validate / Check, Save, packages, Generate) */
   actions?: ReactNode;
   onPalette: () => void;
   onShortcuts: () => void;
-  /** WP-22: beside the palette button, also in focus mode (the review comments) */
+  /** WP-22: beside the palette button, also in focus mode (the check-out, the review comments) */
   extra?: ReactNode;
   /** the layout switch can offer Split (not on a narrow window) */
   canSplit?: boolean;
 }
 
-export function EditorHeader({ layout, title, lead, crumb, state, actions, extra, onPalette, onShortcuts, canSplit = true }: EditorHeaderProps) {
+export function EditorHeader({ layout, title, homeHref, section, doc, badge, lead, state, actions, extra, onPalette, onShortcuts, canSplit = true }: EditorHeaderProps) {
   const { view, setView, narrow, focus, toggleFocus } = layout;
-  return (
-    <header className={`v2-top v2-edhead ed-bar${focus ? ' is-focus' : ''}`} data-testid="editor-header">
+  const slot = useShellSlot('top');
+  const bar = (
+    <header className={`topbar ed-topbar${focus ? ' is-focus' : ''}`} data-testid="editor-header">
+      <Link to="/overview" className="brand" aria-label="Agastya home" title="Agastya home"><span className="brand-mark"><Icon name="book" size={20} className="ico lg" /></span></Link>
       {focus ? null : lead}
-      <h1 className="v2-trunc v2-edtitle" title={title}>{title}</h1>
-      {crumb}
+      <nav className="crumbs" aria-label="Breadcrumb">
+        {homeHref ? <Link to={homeHref} className="trunc ed-crumb-project" title={title}>{title}</Link> : <span className="trunc ed-crumb-project" title={title}>{title}</span>}
+        {section ? <><span className="sep" aria-hidden="true">/</span><span className="trunc ed-crumb-section">{section}</span></> : null}
+        {doc ? <><span className="sep" aria-hidden="true">/</span><h1 className="mono trunc ed-crumb-doc">{doc}</h1></> : <h1 className="sr">{title}</h1>}
+        {badge}
+      </nav>
       {state}
-      <span className="spacer" />
-      {focus ? null : actions}
+      <span className="grow" />
       {extra}
-      <button className="btn btn-sm v2-edcmd search-trigger" onClick={onPalette} data-testid="chrome-palette" title="Command palette: every command of this editor by name (Ctrl+K)" aria-keyshortcuts="Control+K">
-        <Icon name="command" size={12} /><span className="v2-edcmd-label">Commands</span><span className="kbd-group"><kbd className="v2-kbd">Ctrl</kbd><kbd className="v2-kbd">K</kbd></span>
+      <button type="button" className="search-trigger ed-cmd" onClick={onPalette} data-testid="chrome-palette" title="Command palette: every command of this editor by name (Ctrl+K)" aria-keyshortcuts="Control+K">
+        <Icon name="search" size={16} className="ico" /><span className="ed-cmd-label">Commands…</span><span className="kbd-group"><kbd>Ctrl</kbd><kbd>K</kbd></span>
       </button>
-      <button className="icon-btn" onClick={onShortcuts} data-testid="chrome-shortcuts" title="Keyboard shortcuts (F1)" aria-label="Keyboard shortcuts" aria-keyshortcuts="F1"><Icon name="keyboard" size={16} /></button>
-      <button className={`icon-btn${focus ? ' is-on' : ''}`} onClick={toggleFocus} data-testid="chrome-focus" aria-pressed={focus} aria-keyshortcuts="Control+Period"
-        title={focus ? 'Leave focus mode (Ctrl+. or Esc)' : 'Focus mode: only the document (Ctrl+.)'} aria-label={focus ? 'Leave focus mode' : 'Focus mode'}><Icon name={focus ? 'unfocus' : 'focus'} size={16} /></button>
-      {focus ? null : <div className="v2-seg seg" role="group" aria-label="Editor layout">
-        <button className={view === 'edit' ? 'on' : ''} onClick={() => setView('edit')} aria-pressed={view === 'edit'} title="Write only">Editor</button>
-        {narrow || !canSplit ? null : <button className={view === 'split' ? 'on' : ''} onClick={() => setView('split')} aria-pressed={view === 'split'} title="Write and see the PDF side by side">Split</button>}
-        <button className={view === 'pdf' ? 'on' : ''} onClick={() => setView('pdf')} aria-pressed={view === 'pdf'} title="PDF only">PDF</button>
+      {focus ? null : actions}
+      {focus ? null : <div className="seg ed-layout" role="group" aria-label="Editor layout">
+        <button type="button" onClick={() => setView('edit')} aria-pressed={view === 'edit'} aria-label="Editor" title="Editor: write only"><Icon name="editor" size={14} className="ico sm" /></button>
+        {narrow || !canSplit ? null : <button type="button" onClick={() => setView('split')} aria-pressed={view === 'split'} aria-label="Split" title="Split: write and see the PDF side by side"><Icon name="split" size={14} className="ico sm" /></button>}
+        <button type="button" onClick={() => setView('pdf')} aria-pressed={view === 'pdf'} aria-label="PDF" title="PDF only"><Icon name="pdf" size={14} className="ico sm" /></button>
       </div>}
+      <button type="button" className="icon-btn" onClick={onShortcuts} data-testid="chrome-shortcuts" title="Keyboard shortcuts (F1)" aria-label="Keyboard shortcuts" aria-keyshortcuts="F1"><Icon name="keyboard" size={16} className="ico" /></button>
+      <button type="button" className="icon-btn" onClick={toggleFocus} data-testid="chrome-focus" aria-pressed={focus} aria-keyshortcuts="Control+Period"
+        title={focus ? 'Leave focus mode (Ctrl+. or Esc)' : 'Focus mode: only the document (Ctrl+.)'} aria-label={focus ? 'Leave focus mode' : 'Focus mode'}><Icon name={focus ? 'unfocus' : 'focus'} size={16} className="ico" /></button>
       {focus ? null : <ThemeToggle />}
+      {focus ? null : <AccountMenu />}
     </header>
   );
+  return slot ? createPortal(bar, slot) : null;
 }

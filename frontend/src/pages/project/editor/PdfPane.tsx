@@ -137,11 +137,12 @@ export function PdfPane({ ctx, savedTick, onOpenAt, onPopped, slot = null, onRev
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedTick]);
 
-  const quickBtn = <button className="btn btn-sm btn-primary" onClick={() => { onReveal?.(); void quick(); }} disabled={busy !== null || !active} data-testid="quick-preview-btn" title="Preview the data module you are editing">
-    {busy === 'quick' ? <Spinner /> : <Icon name="play" size={12} />}Quick preview
+  // UI redesign (mockup editor.html): in the top bar Quick preview is an icon button and Generate the primary button (the mockup's Build PDF)
+  const quickBtn = <button className={slot ? 'icon-btn' : 'btn btn-sm btn-primary'} aria-label={slot ? 'Quick preview' : undefined} onClick={() => { onReveal?.(); void quick(); }} disabled={busy !== null || !active} data-testid="quick-preview-btn" title="Preview the data module you are editing">
+    {busy === 'quick' ? <Spinner /> : <Icon name="play" size={slot ? 16 : 12} />}{slot ? null : 'Quick preview'}
   </button>;
-  const generateBtn = summary.project.type === 'CIR' ? null : <button className="btn btn-sm" onClick={() => { onReveal?.(); void generate(); }} disabled={busy !== null} data-testid="generate-btn" title="Build the whole publication">
-    {busy === 'build' ? <Spinner /> : <Icon name="rocket" size={12} />}Generate
+  const generateBtn = summary.project.type === 'CIR' ? null : <button className={slot ? 'btn primary' : 'btn btn-sm'} onClick={() => { onReveal?.(); void generate(); }} disabled={busy !== null} data-testid="generate-btn" title="Build the whole publication">
+    {busy === 'build' ? <Spinner /> : <Icon name="rocket" size={slot ? 16 : 12} />}Generate
   </button>;
   return (
     <>

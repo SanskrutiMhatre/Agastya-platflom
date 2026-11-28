@@ -139,6 +139,7 @@ test('B4: one save of an existing data module is followed by at most 2 GETs (no 
 test('B3: a 500-module project opens with a bounded list: at most 60 rows drawn, side panel under 3,000 nodes', async () => {
   await page.goto(`/projects/${big}/editor`);
   await expect(page.getByTestId('studio-host')).toBeVisible({ timeout: 60_000 });
+  await page.getByTestId('explorer-menu').click();   // UI redesign: these commands are in the explorer's menu
   await page.getByTestId('view-all').click();
   await expect(page.getByTestId('virtual-rows')).toHaveAttribute('data-total', '500', { timeout: 30_000 });
   const rows = await page.getByTestId('dm-row').count();

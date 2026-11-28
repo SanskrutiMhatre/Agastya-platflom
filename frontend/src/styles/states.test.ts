@@ -83,7 +83,8 @@ const MATRIX: Control[] = [
   { name: 'tab', base: ['.v2-tab'], states: { hover: ['.v2-tab:hover'], selected: ['.v2-tab.active'], focus: ['.v2-tab:focus-visible'], disabled: ['.v2-tab:disabled'] } },
   { name: 'menu item', base: ['.ctx-item'], states: { hover: ['.ctx-item:hover:not(:disabled)'], disabled: ['.ctx-item:disabled'], focus: [FOCUS_GLOBAL] } },
   { name: 'file menu item', base: ['.fm-item'], states: { hover: ['.fm-item:hover:not(:disabled)'], disabled: ['.fm-item:disabled'], focus: [FOCUS_GLOBAL] } },
-  { name: 'list row (data module)', base: ['.v2-dm'], states: { hover: ['.v2-dm:hover'], selected: ['.v2-dm.active'], focus: ['.v2-dm:focus-visible'] } },
+  // UI redesign (mockup editor.html): the data module row is the explorer's tree row (.tree .node.ed-node, its button .ed-node-btn), no longer .v2-dm
+  { name: 'list row (data module)', base: ['.tree-pane .tree .node.ed-node'], states: { hover: ['.tree-pane .tree .node.ed-node:hover'], selected: ['.tree-pane .tree .node.ed-node[aria-selected="true"]'], focus: ['.tree-pane .tree .node > .ed-node-btn:focus-visible'] } },
   { name: 'JSG toolbar button', base: ['.jsg-bar .jsg-tb'], states: { hover: ['.jsg-bar .jsg-tb:hover:not(:disabled)'], active: ['.jsg-bar .jsg-tb:active:not(:disabled)'], selected: ['.jsg-bar .jsg-tb.on'], focus: ['.jsg-bar .jsg-tb:focus-visible'], disabled: ['.jsg-bar .jsg-tb:disabled'] } },
   { name: 'JSG toolbar tab', base: ['.jsg-tab'], states: { hover: ['.jsg-tab:hover'], selected: ['.jsg-tab.on'], focus: ['.jsg-tab:focus-visible'] } },
   { name: 'shell input', base: ['.v2-input, .v2-select, .v2-textarea'.split(', ')[0]], states: { focus: ['.v2-input:focus'], disabled: ['.v2-input:disabled'], error: [".v2-input[aria-invalid='true']"] } },

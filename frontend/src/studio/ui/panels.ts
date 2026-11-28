@@ -241,7 +241,10 @@ export class AttributesPanel {
       if (i < arr.length - 1) crumbs.appendChild(h('span', { class: 'crumb-sep' }, '›'));
     });
     this.head.append(
-      h('div', { class: 'attr-title' }, h('span', { class: 'attr-el' }, `<${el.nodeName}>`), h('span', { class: 'attr-friendly' }, friendlyName(el.nodeName))),
+      // inside the platform (mockup editor.html): "proceduralStep" over "Procedural step · 3 of 4"
+      this.app.host
+        ? h('div', { class: 'attr-title el-title' }, h('span', { class: 'attr-el mono' }, el.nodeName), h('span', { class: 'attr-friendly muted' }, friendlyName(el.nodeName) + siblingPlace(el)))
+        : h('div', { class: 'attr-title' }, h('span', { class: 'attr-el' }, `<${el.nodeName}>`), h('span', { class: 'attr-friendly' }, friendlyName(el.nodeName))),
       ...(elementDescription(el.nodeName) ? [h('div', { class: 'attr-desc' }, elementDescription(el.nodeName))] : []),
       crumbs,
     );
@@ -275,6 +278,8 @@ export class AttributesPanel {
       list.appendChild(h('div', { class: 'attr-add' }, name, value, h('button', { class: 'btn btn-sm', on: { click: () => { if (name.value.trim()) ed.setAttribute(el, name.value.trim(), value.value); } } }, 'Add')));
     }
     this.body.appendChild(list);
+    // the filter only where there are enough attributes to need one (inside the platform; the mockup draws the rows alone)
+    if (this.app.host) (this.el.querySelector('.panel-toolbar') as HTMLElement | null)?.toggleAttribute('hidden', !this.filter && defs.length + extra.length <= 10);
     // text summary for atomic / special elements
     if (ATOMIC.has(el.nodeName) || el.nodeName === 'graphic' || el.nodeName === 'dmRef') {
       this.body.appendChild(h('div', { class: 'attr-actions' }, h('button', { class: 'btn btn-sm', on: { click: () => this.app.openProperties(el, true) } }, icon('props', 14), ' Edit in dialog…')));
@@ -441,7 +446,7 @@ export class ElementsPanel {
     }
     const container = ed.insertionContainer();
     this.context.appendChild(container
-      ? h('span', null, 'Editing inside ', h('span', { class: 'el-context-name' }, `<${container.nodeName}>`), ' ', h('span', { class: 'el-context-friendly' }, friendlyName(container.nodeName)))
+      ? this.app.host ? h('span', null, 'Insert inside ', h('span', { class: 'el-context-name' }, container.nodeName)) : h('span', null, 'Editing inside ',h('span', { class: 'el-context-name' }, `<${container.nodeName}>`), ' ', h('span', { class: 'el-context-friendly' }, friendlyName(container.nodeName)))
       : h('span', { class: 'el-context-friendly' }, 'No insertion point selected'));
     const { inline, block } = ed.insertableElements();
     const mk = (title: string, names: string[], hint: string) => {
@@ -747,7 +752,7 @@ export class ProblemsPanel {
       h('span', { class: 'spacer' }),
       this.summary,
       h('button', { class: 'btn btn-sm', title: 'Validate (F7)', on: { click: () => this.app.run('review.validate') } }, icon('validate', 14), ' Validate'),
-      h('button', { class: 'icon-btn', title: 'Hide problems pane', on: { click: () => this.app.togglePane('bottom') } }, icon('close', 14)),
+      h('button', { class: 'icon-btn', title: 'Hide problems pane', 'aria-label': 'Hide the Problems panel', on: { click: () => this.app.togglePane('bottom') } }, icon('close', 14)),
     );
     this.el = h('section', { class: 'panel problems-panel', 'aria-label': 'Problems' }, bar, this.list);
     // WP-22 (06 section 7.2): the drawer closes with Escape while the keyboard is in it
@@ -812,4 +817,11 @@ export class ProblemsPanel {
     this.open(((this.index + dir) % n + n) % n);
     this.list.querySelector('.problem.active')?.scrollIntoView({ block: 'nearest' });
   }
+}
+
+/** "· 3 of 4": where an element is among its siblings of the same name (the Properties panel's title inside the platform). */
+function siblingPlace(el: Element): string {
+  const p = el.parentElement; if (!p) return '';
+  const same = Array.from(p.children).filter((c) => c.nodeName === el.nodeName);
+  return same.length > 1 ? ` · ${same.indexOf(el) + 1} of ${same.length}` : '';
 }

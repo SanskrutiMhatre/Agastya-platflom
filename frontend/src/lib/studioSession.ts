@@ -119,6 +119,10 @@ class StudioSession {
   /** The ribbon is folded to its tab strip (WP-21). */
   get ribbonCollapsed(): boolean { return !!this.app?.ribbonCollapsed; }
 
+  /** UI redesign: the Properties panel's Comments tab body, which the editor page fills with the review comments, and its badge. */
+  get commentsEl(): HTMLElement | null { return this.app?.commentsEl ?? null; }
+  setCommentCount(n: number): void { this.app?.setCommentCount(n); }
+
   /** WP-21 (PRD-004): the saved version of a module now (someone else's), to compare with the author's. */
   async serverVersion(file: string): Promise<{ xml: string; hash: string }> {
     const pid = this.projectId; if (!pid) throw new Error('No project is open.');
@@ -178,15 +182,16 @@ class StudioSession {
 
   private async create(): Promise<App> {
     setGrammarBase('/grammar');
-    // A clean first view: the Navigation, Properties and Problems panes stay closed until the author opens them (View ribbon; the status
-    // bar badge opens Problems, and a failed validation does), and the Identification section starts folded. The author's own choice is
-    // remembered from then on; the one-time reset below also applies to layouts saved before this default existed.
+    // The first view is the owner-approved mockup's (docs/audit/mockups/editor.html, UI redesign 2026-11-28; it replaces the earlier
+    // "panes closed" default of WP-21): the Properties panel (right) and the Problems panel (under the document) are open, the Studio's own
+    // Navigation pane (the document outline) is closed because the platform's Explorer is beside it, and the Identification section starts
+    // folded. The author's own choice is remembered from then on; the one-time reset below also applies to layouts saved before this default.
     DesignView.defaultIdentCollapsed = true;
     try {
-      if (!localStorage.getItem('agastya.editor.panes.v1')) {
+      if (!localStorage.getItem('agastya.editor.panes.v2')) {
         const saved = JSON.parse(localStorage.getItem('studio.layout') ?? '{}');
-        localStorage.setItem('studio.layout', JSON.stringify({ ...saved, left: false, right: false, bottom: false }));
-        localStorage.setItem('agastya.editor.panes.v1', '1');
+        localStorage.setItem('studio.layout', JSON.stringify({ ...saved, left: false, right: true, bottom: true, rightTab: 'attributes' }));
+        localStorage.setItem('agastya.editor.panes.v2', '1');
       }
     } catch { /* private mode */ }
     const app = new App(this.root, this.host());

@@ -6,7 +6,7 @@ import {
   PenLine, Network, Monitor, Server, Layers, CircleUser, Image, Library, Wrench, SlidersHorizontal, MessageSquare, Send, Undo2, Package,
   Keyboard, Maximize2, Minimize2, GitCompare, Command,
   Palette, ScrollText,
-  Flag, Funnel, CircleX, Cpu, Database, HardDrive, Archive, WifiOff, BookOpen, Ban, ListOrdered, Ellipsis, ZoomIn, ZoomOut, ChevronLeft, Save, Link, ListChecks, Hash, FileCheck, Printer,
+  Flag, Funnel, CircleX, Cpu, Database, HardDrive, Archive, WifiOff, BookOpen, Ban, ListOrdered, Ellipsis, ZoomIn, ZoomOut, ChevronLeft, Save, Link, ListChecks, Hash, FileCheck, Printer, Columns2,
 } from 'lucide';
 
 const ICONS: Record<string, IconNode> = {
@@ -23,6 +23,8 @@ const ICONS: Record<string, IconNode> = {
   flag: Flag, filter: Funnel, xcircle: CircleX, cpu: Cpu, database: Database, disk: HardDrive, archive: Archive, offline: WifiOff, book2: BookOpen, ban: Ban,
   palette: Palette, log: ScrollText,
   listOrdered: ListOrdered, more: Ellipsis, zoomIn: ZoomIn, zoomOut: ZoomOut, left: ChevronLeft, save: Save, link: Link, listChecks: ListChecks, hash: Hash, fileCheck: FileCheck, print: Printer,
+  // UI redesign (editor workspace): the Editor | Split | PDF switch
+  split: Columns2,
 };
 
 export type IconName = keyof typeof ICONS;

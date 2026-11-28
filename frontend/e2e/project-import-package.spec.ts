@@ -27,6 +27,7 @@ const dialog = (): Locator => page.getByRole('dialog', { name: 'Import package' 
 const openDialog = async (id: string) => {
   await page.goto(`/projects/${id}/editor`);
   await expect(page.getByTestId('studio-host')).toBeVisible();
+  await page.getByTestId('explorer-menu').click();   // UI redesign: these commands are in the explorer's menu
   await page.getByTestId('import-package').click();
   await expect(dialog()).toBeVisible();
 };
@@ -50,6 +51,7 @@ test('the icon is beside the two import buttons, which are still there', async (
   await page.goto(`/projects/${pid}/editor`);
   await expect(page.getByTestId('studio-host')).toBeVisible();
   const side = page.getByRole('complementary', { name: 'Data modules' });
+  await side.getByTestId('explorer-menu').click();   // UI redesign: these commands are in the explorer's menu
   await expect(side.getByRole('button', { name: 'Import data modules and graphics' })).toBeVisible();
   await expect(side.getByRole('button', { name: 'Import without validation' })).toBeVisible();
   const pkg = side.getByRole('button', { name: 'Import package' });
@@ -133,6 +135,7 @@ test('apply: the change log, the modules in the list, and the publication', asyn
 });
 
 test('place the module no publication claimed into a chapter; the pool empties', async () => {
+  await page.getByTestId('explorer-menu').click();   // UI redesign: these commands are in the explorer's menu
   await page.getByTestId('import-package').click();
   await dialog().getByTestId('tab-place').click();
   await expect(dialog().getByTestId('tab-place')).toContainText('(1)');
@@ -223,6 +226,7 @@ test('a viewer does not see the import actions', async () => {
   await expect(v.getByTestId('studio-host')).toBeVisible();
   await expect(v.getByTestId('dm-list').locator(`[data-file="${DESC}"]`)).toBeVisible();
   const side = v.getByRole('complementary', { name: 'Data modules' });
+  await side.getByTestId('explorer-menu').click();   // UI redesign: these commands are in the explorer's menu
   await expect(side.getByRole('button', { name: 'Import package' })).toHaveCount(0);
   await expect(side.getByRole('button', { name: 'Import data modules and graphics' })).toHaveCount(0);
   // and the server agrees
