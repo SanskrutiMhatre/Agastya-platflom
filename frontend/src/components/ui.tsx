@@ -35,7 +35,7 @@ export function Empty({ title, children }: { title: string; children?: ReactNode
   return <div className="v2-empty"><strong className="v2-empty-title">{title}</strong>{children}</div>;
 }
 
-export function Badge({ tone, children, title }: { tone?: 'ok' | 'warn' | 'bad' | 'accent'; children: ReactNode; title?: string }) {
+export function Badge({ tone, children, title }: { tone?: 'ok' | 'warn' | 'bad' | 'accent' | 'info'; children: ReactNode; title?: string }) {
   return <span className={`v2-badge ${tone ?? ''}`} title={title}>{children}</span>;
 }
 
@@ -224,3 +224,76 @@ export const ago = (iso: string | null | undefined): string => {
 
 export const fmtDate = (iso: string | null | undefined): string => (iso ? new Date(iso).toLocaleString() : '—');
 export const fmtSize = (n: number): string => (n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`);
+
+// ---------------------------------------------------------------------------------------------------------------------------------------
+// UI redesign step 1 (owner-approved mockups, docs/audit/mockups): small React wrappers over the mockup classes of styles/components.css.
+// Screens may also write the classes directly (<div className="card">); these exist so the common shapes are written once.
+
+type IconId = Parameters<typeof Icon>[0]['name'];
+/** The status tones of the mockups (badge, dot, alert, progress, toast). */
+export type Tone = 'success' | 'warning' | 'danger' | 'info' | 'accent';
+
+/** `.card` with an optional `.card-head` (icon, title, right-hand actions) and a `.card-body` (or the children as they are with `flush`). */
+export function Card({ title, icon, actions, children, flush, className, id, testId }: {
+  title?: ReactNode; icon?: IconId; actions?: ReactNode; children?: ReactNode; flush?: boolean; className?: string; id?: string; testId?: string;
+}) {
+  const hid = useId();
+  return (
+    <section className={`card${className ? ` ${className}` : ''}`} id={id} data-testid={testId} aria-labelledby={title ? hid : undefined}>
+      {title || actions ? <div className="card-head"><h3 id={hid}>{icon ? <Icon name={icon} /> : null}{title}</h3>{actions ? <div className="row">{actions}</div> : null}</div> : null}
+      {flush ? children : <div className="card-body">{children}</div>}
+    </section>
+  );
+}
+
+/** `.card.stat`: a big figure, its label and an optional detail line (with a tone colour and icon). */
+export function StatTile({ value, label, detail, tone, icon, testId }: { value: ReactNode; label: ReactNode; detail?: ReactNode; tone?: Tone | 'muted'; icon?: IconId; testId?: string }) {
+  const color = tone && tone !== 'muted' ? `var(--${tone === 'accent' ? 'text-link' : tone})` : undefined;
+  return (
+    <div className="card stat" data-testid={testId}>
+      <div className="v">{value}</div><div className="l">{label}</div>
+      {detail ? <div className={`d${color ? '' : ' muted'}`} style={color ? { color } : undefined}>{icon ? <Icon name={icon} size={14} /> : null}{detail}</div> : null}
+    </div>
+  );
+}
+
+/** `.badge` with a tone (the mockup's names: success, warning, danger, info, accent). */
+export function Pill({ tone, children, title, icon }: { tone?: Tone; children: ReactNode; title?: string; icon?: IconId }) {
+  return <span className={`badge${tone ? ` ${tone}` : ''}`} title={title}>{icon ? <Icon name={icon} size={14} /> : null}{children}</span>;
+}
+
+/** `.dot`: a status mark, always beside a text label (never colour alone). */
+export const Dot = ({ tone }: { tone?: Tone }) => <span className={`dot${tone ? ` ${tone}` : ''}`} aria-hidden="true" />;
+
+/** `.progress` as a progressbar with its accessible name. */
+export function Progress({ value, max = 100, label, tone }: { value: number; max?: number; label: string; tone?: Exclude<Tone, 'accent'> }) {
+  const pct = max > 0 ? Math.max(0, Math.min(100, (value / max) * 100)) : 0;
+  return <div className="progress grow" role="progressbar" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100} aria-label={label}><i className={tone} style={{ width: `${pct}%` }} /></div>;
+}
+
+/** `.alert` with an icon, a title line, text and actions on the right. */
+export function Callout({ tone = 'info', title, children, actions, testId }: { tone?: Exclude<Tone, 'accent'>; title?: ReactNode; children?: ReactNode; actions?: ReactNode; testId?: string }) {
+  const icon: IconId = tone === 'danger' ? 'alert' : tone === 'warning' ? 'warn' : tone === 'success' ? 'ok' : 'info';
+  return (
+    <div className={`alert ${tone}`} role={tone === 'danger' ? 'alert' : 'status'} data-testid={testId}>
+      <Icon name={icon} /><div>{title ? <div className="title">{title}</div> : null}{children}</div>{actions ? <div className="actions">{actions}</div> : null}
+    </div>
+  );
+}
+
+/** `.seg`: a segmented choice. Each option is a toggle button (aria-pressed); `count` is shown after the label. */
+export function Seg<T extends string>({ label, value, options, onChange, testId }: { label: string; value: T; options: Array<{ value: T; label: ReactNode; count?: number; title?: string }>; onChange: (v: T) => void; testId?: string }) {
+  return (
+    <div className="seg" role="group" aria-label={label} data-testid={testId}>
+      {options.map((o) => <button key={o.value} type="button" aria-pressed={value === o.value} title={o.title} onClick={() => onChange(o.value)}>{o.label}{o.count !== undefined ? <span className="faint"> {o.count}</span> : null}</button>)}
+    </div>
+  );
+}
+
+/** `.empty-state`: an icon, a title, a line of help and the actions that fill the space. */
+export function EmptyState({ icon = 'info', title, children, actions }: { icon?: IconId; title: string; children?: ReactNode; actions?: ReactNode }) {
+  return <div className="empty-state"><Icon name={icon} size={28} /><div className="title">{title}</div>{children ? <div>{children}</div> : null}{actions ? <div className="actions">{actions}</div> : null}</div>;
+}
+
+/** Two-letter initials for `.avatar`. */
+export const initialsOf = (name: string): string => name.split(/\s+/).filter(Boolean).map((p) => p.charAt(0)).slice(0, 2).join('').toUpperCase();

@@ -463,10 +463,10 @@ export const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ src, downloadName = 'o
         <button className="icon-btn" onClick={() => goPage(page + 1)} disabled={page >= numPages} title="Next page" aria-label="Next page"><Icon name="down" size={15} /></button>
 
         <span className="vsep" />
-        <button className="icon-btn" onClick={() => setScale(s => Math.max(0.4, s - 0.15))} title="Zoom out" aria-label="Zoom out">−</button>
+        <button className="icon-btn" onClick={() => setScale(s => Math.max(0.4, s - 0.15))} title="Zoom out" aria-label="Zoom out"><Icon name="zoomOut" size={15} /></button>
         <span className="zoom">{Math.round(scale * 100)} %</span>
-        <button className="icon-btn" onClick={() => setScale(s => Math.min(3, s + 0.15))} title="Zoom in" aria-label="Zoom in">+</button>
-        <button className="btn btn-sm subtle" onClick={fitWidth}>Fit width</button>
+        <button className="icon-btn" onClick={() => setScale(s => Math.min(3, s + 0.15))} title="Zoom in" aria-label="Zoom in"><Icon name="zoomIn" size={15} /></button>
+        <button className="btn sm subtle" onClick={fitWidth}>Fit width</button>
 
         <span className="grow" />
         <span className="find">
@@ -493,7 +493,7 @@ export const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ src, downloadName = 'o
         )}
 
         {toolbarExtra}
-        {src && !autoFit && <a className="btn btn-sm" href={src} download={downloadName}><Icon name="download" size={13} />Download</a>}
+        {src && !autoFit && <a className="btn sm" href={src} download={downloadName}><Icon name="download" size={13} />Download</a>}
       </div>
 
       {/* Body */}

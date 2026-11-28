@@ -309,7 +309,7 @@ export function PublicationPage() {
               {rel.loading && !rel.data ? <Loading /> : rel.error ? <div className="opt"><Alert tone="bad">{rel.error}</Alert></div> : (
                 <ul className="hist">
                   {(rel.data?.history ?? []).length === 0 ? <li><Icon name="clock" size={14} /><div className="faint">Nothing submitted yet</div><span /></li> : (rel.data?.history ?? []).map((h) => (
-                    <li key={h.id}><Icon name={h.status === 'approved' ? 'ok' : h.status === 'rejected' ? 'close' : 'clock'} size={14} />
+                    <li key={h.id}><Icon name={h.status === 'approved' ? 'ok' : h.status === 'rejected' ? 'xcircle' : 'clock'} size={14} />
                       <div><strong>{h.releaseNumber ? `Release ${h.releaseNumber}` : 'Review request'}</strong><div className="faint">{h.status === 'rejected' ? 'changes requested' : h.status === 'pending' ? 'in review' : h.status}{h.requestedBy ? ` · ${h.requestedBy}` : ''}</div></div>
                       <span className="faint" title={h.requestedAt}>{ago(h.requestedAt)}</span></li>
                   ))}
@@ -321,7 +321,7 @@ export function PublicationPage() {
         <div className="build">
           <div className={`progress${busy === 'build' ? ' busy' : ''}`} role="progressbar" aria-label="Build progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={busy === 'build' ? undefined : built ? 100 : 0}><i style={{ width: busy === 'build' ? '40%' : built ? '100%' : '0%' }} /></div>
           {busy === 'build' && progress.lines.length ? <div className="v2-log">{progress.lines.slice(-5).map((l, i) => <div key={i}>{l}</div>)}</div> : null}
-          <button className="btn btn-primary" onClick={() => void build(false)} disabled={busy !== null || !writable} data-testid="build-publication">{busy === 'build' ? <Spinner /> : <Icon name="play" />}Build publication</button>
+          <button className="btn primary" onClick={() => void build(false)} disabled={busy !== null || !writable} data-testid="build-publication">{busy === 'build' ? <Spinner /> : <Icon name="play" />}Build publication</button>
           <button className="btn" onClick={() => nav('../release')}><Icon name="external" size={14} />Review and release</button>
         </div>
       </aside>

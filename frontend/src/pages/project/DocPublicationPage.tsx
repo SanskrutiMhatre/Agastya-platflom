@@ -371,7 +371,7 @@ export function DocPublicationPage() {
           <div className={`progress${busy === 'build' ? ' busy' : ''}`} role="progressbar" aria-label="Build progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={busy === 'build' ? undefined : hasBuild ? 100 : 0}><i style={{ width: busy === 'build' ? '40%' : hasBuild ? '100%' : '0%' }} /></div>
           {busy === 'build' && progress.lines.length ? <div className="v2-log">{progress.lines.slice(-5).map((l, i) => <div key={i}>{l}</div>)}</div> : null}
           <div className="faint">{builtText}</div>
-          <button className="btn btn-primary" onClick={() => void build()} disabled={busy !== null || !canBuild(can)} data-testid="build-publication" title={canBuild(can) ? 'Save the arrangement, then build the PDF' : 'Reviewers, editors and owners can build the PDF'}>{busy === 'build' ? <Spinner /> : <Icon name="play" />}Build publication</button>
+          <button className="btn primary" onClick={() => void build()} disabled={busy !== null || !canBuild(can)} data-testid="build-publication" title={canBuild(can) ? 'Save the arrangement, then build the PDF' : 'Reviewers, editors and owners can build the PDF'}>{busy === 'build' ? <Spinner /> : <Icon name="play" />}Build publication</button>
           <button className="btn" onClick={() => nav('../release')}><Icon name="external" size={14} />Review and release</button>
         </div>
       </aside>
