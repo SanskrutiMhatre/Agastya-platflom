@@ -138,15 +138,15 @@ export function DocEditorShell({ kind, shortcuts, layout, title, crumb, saveStat
           <div {...pane.separator('Resize the Properties panel', 'rz2')} />
           <PropsPanel tab="Document" onClose={() => setPropsOn(false)}>
             <div className="el-title"><span className="mono">{kind === 'jss' ? 'jss' : 'jsgdoc'}</span><span className="muted">{docName || title}</span></div>
-            <div><div className="sec-h">Document</div><div className="stack">
+            <div><div className="sec-h">Document</div><dl className="kv">
               <PropRow name="Project">{title}</PropRow>
               {meta.map(([k, v]) => <PropRow key={k} name={k}>{v}</PropRow>)}
               <PropRow name="Access">{readOnly ? 'Read only' : 'Can edit'}</PropRow>
-            </div></div>
-            <div><div className="sec-h">Last check</div><div className="stack">
+            </dl></div>
+            <div><div className="sec-h">Last check</div><dl className="kv">
               <PropRow name="Errors">{counts.errors}</PropRow>
               <PropRow name="Warnings">{counts.warnings}</PropRow>
-            </div></div>
+            </dl></div>
           </PropsPanel>
         </> : null}
       </div>

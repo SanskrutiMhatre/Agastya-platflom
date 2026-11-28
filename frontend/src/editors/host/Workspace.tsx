@@ -107,5 +107,5 @@ export function PropsPanel({ tab, onClose, children }: { tab: string; onClose: (
 
 /** One "name  value" row of the Properties panel. */
 export function PropRow({ name, children }: { name: string; children: ReactNode }) {
-  return <div className="attr"><span className="attr-k">{name}</span><span className="attr-v">{children}</span></div>;
+  return <><dt>{name}</dt><dd>{children}</dd></>;
 }
