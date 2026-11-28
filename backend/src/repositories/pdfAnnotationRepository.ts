@@ -38,6 +38,10 @@ export interface PdfAnnotationRepository {
   counts(projectId: string): { open: number; openRequired: number; total: number };
   noteVersion(v: PdfVersionRow): void;
   versions(projectId: string, fileKey: string): PdfVersionRow[];
+  /** Phase 8 (project archive): every version seen of every reviewed PDF of the project. */
+  allVersions(projectId: string): PdfVersionRow[];
+  /** Phase 8 (project archive import): set a thread's updated_at (a restored thread keeps its own time). */
+  touch(id: string, at: string): void;
   getBlockRelease(projectId: string): boolean;
   setBlockRelease(projectId: string, on: boolean, by: string, at: string): void;
 }
@@ -99,6 +103,10 @@ export class SqlitePdfAnnotationRepository extends SqliteRepository implements P
   versions(projectId: string, fileKey: string): PdfVersionRow[] {
     return this.q('SELECT * FROM pdf_review_versions WHERE project_id = ? AND file_key = ? ORDER BY seen_at, hash').all(projectId, fileKey) as unknown as PdfVersionRow[];
   }
+  allVersions(projectId: string): PdfVersionRow[] {
+    return this.q('SELECT * FROM pdf_review_versions WHERE project_id = ? ORDER BY file_key, seen_at, hash').all(projectId) as unknown as PdfVersionRow[];
+  }
+  touch(id: string, at: string): void { this.q('UPDATE pdf_annotations SET updated_at = ? WHERE id = ?').run(at, id); }
   getBlockRelease(projectId: string): boolean {
     const r = this.q('SELECT block_release FROM pdf_review_settings WHERE project_id = ?').get(projectId) as { block_release: number } | undefined;
     return !!r && Number(r.block_release) === 1;

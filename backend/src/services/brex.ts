@@ -539,8 +539,12 @@ export interface BrexResolution {
  * listing (to find the project's BREX by code) and the text of the BREX files. Made by the caller for one pass and dropped after it, so nothing
  * outlives the pass; without one every call reads the disk as before.
  */
-export interface BrexRun { listing: Map<string, string[] | null>; files: Map<string, string | null> }
-export const newBrexRun = (): BrexRun => ({ listing: new Map(), files: new Map() });
+export interface BrexRun {
+  listing: Map<string, string[] | null>; files: Map<string, string | null>;
+  /** phase 8: the chain resolved once per (declared issue, declared BREX, forced issue, CSDB folder) in this pass, not once per module */
+  chains?: Map<string, BrexResolution>;
+}
+export const newBrexRun = (): BrexRun => ({ listing: new Map(), files: new Map(), chains: new Map() });
 
 function findProjectBrex(csdbDir: string | undefined, dmc: string, run?: BrexRun): { xml: string; label: string } | null {
   if (!csdbDir) return null;
@@ -574,13 +578,29 @@ const defaultText = new FileMemo<string>(16);
  * else (a custom code that is not in the project) a PROBLEM: the project's rules cannot be enforced.
  */
 export function resolveBrexChain(documentXml: string, csdbDir?: string, forceIssue?: string | null, run?: BrexRun): BrexResolution {
-  const issue = declaredIssue(documentXml);
+  return chainFor(declaredIssue(documentXml), declaredBrexDmc(documentXml), csdbDir, forceIssue, run);
+}
+
+/**
+ * Phase 8 (docs/phase3/cleanup-backend.md, item 5): the chain depends on the document only through the issue and the BREX it declares, and
+ * within one pass the listing and the BREX texts are the run's, so the answer is the same for every module that declares the same pair: it is
+ * resolved once per pair and pass. Each caller gets its own arrays (the models are shared, as they always were through parseBrexCached).
+ */
+function chainFor(issue: string | null, declared: string | null, csdbDir?: string, forceIssue?: string | null, run?: BrexRun): BrexResolution {
+  const key = `${issue ?? ''}|${declared ?? ''}|${forceIssue ?? ''}|${csdbDir ?? ''}`;
+  const kept = run?.chains?.get(key);
+  if (kept) return { models: [...kept.models], problems: [...kept.problems], notes: [...kept.notes] };
+  const res = resolveChain(issue, declared, csdbDir, forceIssue, run);
+  run?.chains?.set(key, { models: [...res.models], problems: [...res.problems], notes: [...res.notes] });
+  return res;
+}
+
+function resolveChain(issue: string | null, declared: string | null, csdbDir?: string, forceIssue?: string | null, run?: BrexRun): BrexResolution {
   // The project can fix the S1000D issue its checks use (Validation page). It replaces the S1000D DEFAULT business rules only:
   // a BREX data module the project itself holds is always used as it is.
   const forced = letterForIssueSetting(forceIssue);
   const letter = forced ?? defaultLetterFor(issue);
   const res: BrexResolution = { models: [], problems: [], notes: [] };
-  const declared = declaredBrexDmc(documentXml);
   const seen = new Set<string>();
 
   const loadDefault = (l: string, why?: string): BrexModel | null => {
@@ -667,23 +687,54 @@ function modelKey(m: BrexModel): string {
 export function clearBrexResults(): void { resultMemo.clear(); }
 
 export function checkModuleBrex(documentXml: string, csdbDir?: string, forceIssue?: string | null, run?: BrexRun): ModuleBrexReport {
-  const chain = resolveBrexChain(documentXml, csdbDir, forceIssue, run);
+  return report({ sha: crypto.createHash('sha256').update(documentXml).digest('hex'), issue: declaredIssue(documentXml), declared: declaredBrexDmc(documentXml) }, () => documentXml, csdbDir, forceIssue, run);
+}
+
+/*
+  Phase 8 (docs/phase3/cleanup-backend.md, item 5): BREX incremental across validation passes. What a module contributes to a pass is a
+  function of (its text, the models of its chain), and its chain a function of (the issue and BREX it declares, the project's BREX modules).
+  `checkModuleBrexFile` keeps, per module FILE version (size, times, file id: services/fileMemo.ts), the text's SHA-256 and the two
+  declarations, so an unchanged module is neither read nor hashed again; the chain is resolved once per declared pair and pass (`chainFor`,
+  with the pass's own listing and BREX texts, so an added, removed or edited project BREX is seen by the next pass); the result is the kept one
+  for (module SHA-256, model keys) - a changed BREX is a different model and misses. Only a changed module is read and checked again. Same
+  answer as `checkModuleBrex` of the file's text: test/phase8-cleanup.test.js compares a pass with every cache emptied.
+*/
+interface ModuleFacts { sha: string; issue: string | null; declared: string | null }
+const moduleFacts = new FileMemo<ModuleFacts>(20000);
+/** `checkModuleBrex` of the file at `abs`, reading it only when it changed since it was last checked. */
+export function checkModuleBrexFile(abs: string, csdbDir?: string, forceIssue?: string | null, run?: BrexRun): ModuleBrexReport {
+  const st = fs.statSync(abs);
+  let text: string | null = null;
+  const textOf = (): string => (text ??= fs.readFileSync(abs, 'utf8'));
+  const facts = moduleFacts.get(abs, st, () => { const t = textOf(); return { sha: crypto.createHash('sha256').update(t).digest('hex'), issue: declaredIssue(t), declared: declaredBrexDmc(t) }; });
+  return report(facts, textOf, csdbDir, forceIssue, run);
+}
+/** Forget the kept module facts (tests). */
+export function clearBrexModuleFacts(): void { moduleFacts.clear(); }
+
+const lintByModel = new WeakMap<BrexModel, BrexProblem[]>();
+function report(facts: ModuleFacts, textOf: () => string, csdbDir?: string, forceIssue?: string | null, run?: BrexRun): ModuleBrexReport {
+  const chain = chainFor(facts.issue, facts.declared, csdbDir, forceIssue, run);
   const problems = [...chain.problems];
   for (const m of chain.models) {
     if (!m.projectOwn) continue;
-    const key = crypto.createHash('sha1').update(m.label + JSON.stringify(m.rules)).digest('hex');
-    let lint = lintCache.get(key);
-    if (!lint) { lint = lintBrex(m); lintCache.set(key, lint); }
+    let lint = lintByModel.get(m);                                       // phase 8: per model object (parseBrexCached shares it), not a hash per module
+    if (!lint) {
+      const key = crypto.createHash('sha1').update(m.label + JSON.stringify(m.rules)).digest('hex');
+      lint = lintCache.get(key);
+      if (!lint) { lint = lintBrex(m); lintCache.set(key, lint); }
+      lintByModel.set(m, lint);
+    }
     problems.push(...lint);
   }
   let result: BrexCheckResult;
   if (!chain.models.length) result = { valid: true, findings: [], rulesEvaluated: 0, rulesSkipped: 0, skippedRules: [], rulesAdvisory: 0, brexSource: '' };
   else {
-    const key = `${crypto.createHash('sha256').update(documentXml).digest('hex')}|${chain.models.map(modelKey).join('|')}`;
+    const key = `${facts.sha}|${chain.models.map(modelKey).join('|')}`;
     const kept = resultMemo.get(key);
     if (kept) result = structuredClone(kept);
     else {
-      result = checkBrexModels(documentXml, chain.models);
+      result = checkBrexModels(textOf(), chain.models);
       if (result.findings.length <= 500) {
         resultMemo.set(key, structuredClone(result));
         if (resultMemo.size > RESULT_MEMO_MAX) { const first = resultMemo.keys().next().value; if (first !== undefined) resultMemo.delete(first); }

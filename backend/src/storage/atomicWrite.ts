@@ -70,6 +70,68 @@ export function writeFileAtomic(target: string, data: string | Uint8Array, encod
   fsyncDir(path.dirname(target));
 }
 
+/*
+  Phase 8 (docs/phase3/cleanup-backend.md, item 1): many files in one go (the package import writes up to 1,000 modules).
+
+  `writeFilesAtomic` gives every file the same guarantee as `writeFileAtomic` (a reader, or the disk after a crash or a power cut, sees the
+  whole old file or the whole new one, never a torn mixture), with the work grouped:
+    1. every file's bytes go to its own sibling temporary file (opened 'wx', written in full);
+    2. every temporary file is flushed (fsync) - each one, because a rename made durable before the data it names would, after a power cut,
+       leave an empty or garbage target on a file system that does not journal data (NTFS journals metadata only; ext4 delayed allocation).
+       The flushes run in parallel on the libuv thread pool instead of one after another on the event loop: on Windows each FlushFileBuffers
+       takes 4-5 ms, and several in flight at once overlap in the disk queue (measured: 1,000 x 8 KB files, 5.3 s one by one, 3.4 s grouped);
+    3. only after EVERY flush has succeeded is anything renamed, so a failure up to here changes no target at all (all temporary files are
+       removed); each rename is atomic on its own (one folder, one volume), retried like `writeFileAtomic`'s;
+    4. each parent folder is flushed ONCE, after all of its renames (POSIX; Windows cannot flush a folder and NTFS journals the renames),
+       instead of once per file: the folder entry is durable when that flush returns, which is when the function returns, exactly as for
+       a single write.
+  What is NOT promised (and was not before, with one write per file): that the batch is all-or-nothing across files. A failure during step 3
+  leaves the files already renamed with their new content and the rest untouched; the error carries the targets already renamed
+  (`BatchWriteError.renamed`), so a caller can undo or report them (the package import rolls back the files it created).
+*/
+export interface BatchFile { target: string; data: string | Uint8Array; encoding?: BufferEncoding }
+export class BatchWriteError extends Error {
+  constructor(readonly failure: unknown, readonly renamed: string[]) { super((failure as Error)?.message ?? String(failure)); this.name = 'BatchWriteError'; }
+}
+const fsyncAsync = (fd: number): Promise<void> => new Promise((resolve, reject) => fs.fsync(fd, (e) => (e ? reject(e) : resolve())));
+
+/**
+ * Write every file of `files` atomically (see above). Resolves when all are renamed and their folders flushed; the targets must be distinct and
+ * their folders exist. `precommit` runs synchronously after every flush and before the first rename (nothing else runs in between): a caller
+ * whose checks may have been overtaken while the flushes ran re-checks there; when it throws, nothing is renamed and the temporary files go.
+ */
+export async function writeFilesAtomic(files: BatchFile[], precommit?: () => void): Promise<void> {
+  const seen = new Set<string>();
+  for (const f of files) { const k = path.resolve(f.target).toLowerCase(); if (seen.has(k)) throw new Error(`writeFilesAtomic: ${f.target} is named twice`); seen.add(k); }
+  const open: Array<{ target: string; tmp: string; fd: number | null }> = [];
+  const discard = (): void => { for (const o of open) { if (o.fd !== null) try { fs.closeSync(o.fd); } catch { /* closed */ } o.fd = null; try { fs.unlinkSync(o.tmp); } catch { /* none */ } } };
+  try {
+    for (const f of files) {
+      const o = { target: f.target, tmp: tempNameFor(f.target), fd: null as number | null };
+      o.fd = fs.openSync(o.tmp, 'wx'); open.push(o);
+      const buf = typeof f.data === 'string' ? Buffer.from(f.data, f.encoding ?? 'utf8') : f.data;
+      let off = 0;
+      while (off < buf.length) off += fs.writeSync(o.fd, buf, off, buf.length - off);
+    }
+    await Promise.all(open.map((o) => fsyncAsync(o.fd as number)));
+    for (const o of open) { fs.closeSync(o.fd as number); o.fd = null; }
+    precommit?.();
+  } catch (e) { discard(); throw e; }
+  const renamed: string[] = [];
+  try {
+    for (const o of open) {
+      if (atomicFaults.beforeRename) atomicFaults.beforeRename(o.target, o.tmp);
+      renameWithRetry(o.tmp, o.target);
+      renamed.push(o.target);
+    }
+  } catch (e) {
+    for (const o of open) if (!renamed.includes(o.target)) try { fs.unlinkSync(o.tmp); } catch { /* none */ }
+    for (const d of new Set(renamed.map((t) => path.dirname(t)))) fsyncDir(d);
+    throw new BatchWriteError(e, renamed);
+  }
+  for (const d of new Set(open.map((o) => path.dirname(o.target)))) fsyncDir(d);
+}
+
 /**
  * WP-30 (QA-008, found by the chaos suite): make `tmp` - a complete file that another program wrote under a `tempNameFor` name, such as FOP's
  * PDF - the file `target`: flush it, rename it over the target (retrying the transient Windows refusals), flush the folder. A server killed

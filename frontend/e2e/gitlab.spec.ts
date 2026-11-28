@@ -115,6 +115,12 @@ test('a person connects through GitLab sign-in and the Repository page appears',
   await expect(p.getByTestId('gitlab-me-account')).toContainText('gl-anna');
   await p.goto(`/projects/${pid}/home`);
   await expect(p.locator(`a[href="/projects/${pid}/repository"]`).first()).toBeVisible();
+  // phase 8: also a Project Home tile and a "Jump to" (Ctrl+K) entry while GitLab is on
+  await expect(p.getByTestId('home-tile-repository')).toBeVisible();
+  await p.getByTestId('jump-open').click();
+  await p.getByTestId('palette-input').fill('repository');
+  await expect(p.getByTestId('palette-list').getByRole('option', { name: 'Repository', exact: true })).toBeVisible();
+  await p.keyboard.press('Escape');
   // the reviewer connects with a personal access token
   expect((await reviewer.api.post('/api/gitlab/connect/token', { data: { token: gl.addToken(glReviewer.id) } })).status()).toBe(200);
 });

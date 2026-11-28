@@ -326,6 +326,7 @@
   "POST /api/projects/:id/pdf-review/annotations/:aid/place": "requireProject(reviewer,param) :: 401 403 403 404 404 ok 403 | 403 ok ok ok ok",
   "POST /api/projects/:id/pdf-review/annotations/:aid/replies": "requireProject(reviewer,param) :: 401 403 403 404 404 ok 403 | 403 ok ok ok ok",
   "POST /api/projects/:id/pdf-review/annotations/:aid/status": "requireProject(reviewer,param) :: 401 403 403 404 404 ok 403 | 403 ok ok ok ok",
+  "POST /api/projects/:id/pdf-review/import": "requireProject(reviewer,param) :: 401 403 403 404 404 ok 403 | 403 ok ok ok ok",
   "POST /api/projects/:id/pmc/import": "requireProject(viewer,param) > requireProject(editor,param) :: 401 403 403 404 404 ok 403 | 403 403 ok ok ok",
   "POST /api/projects/:id/publish": "requireProject(reviewer,param) :: 401 403 403 404 404 ok 403 | 403 ok ok ok ok",
   "POST /api/projects/:id/publish-waivers": "requireProject(editor,param) :: 401 403 403 404 404 ok 403 | 403 403 ok ok ok",

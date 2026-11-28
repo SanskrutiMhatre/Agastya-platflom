@@ -266,11 +266,71 @@ test('release: blocked while required threads are open when the project says so;
   assert.equal((await owner.put(`/api/projects/${id}/pdf-review/settings`, { blockRelease: false })).status, 200);
 });
 
+test('phase 8: XFDF from a PDF reader becomes threads: highlight quads give the quote, a square is an area, replies and review states follow', async () => {
+  const key = 'Media/reference.pdf';
+  const exact = 'A reference document kept in the project.';
+  const a = await anchorFor(path.join(dir, key), 1, exact);
+  const q = a.rects.map((r) => [r[0], r[3], r[2], r[3], r[0], r[1], r[2], r[1]].join(',')).join(',');
+  const box = a.rects[0];
+  const xfdf = `<?xml version="1.0" encoding="UTF-8"?>
+<xfdf xmlns="http://ns.adobe.com/xfdf/" xml:space="preserve"><annots>
+<highlight page="0" name="h1" title="Acro Reader" creationdate="D:20261120101500+00'00'" rect="${box.join(',')}" coords="${q}"><contents>Is this still current?</contents></highlight>
+<square page="0" name="s1" title="Acro Reader" rect="300,100,400,200"><contents>An empty corner.</contents></square>
+<text page="0" name="r1" inreplyto="h1" title="Other Person" rect="0,0,10,10"><contents>Yes, checked.</contents></text>
+<text page="0" name="r2" inreplyto="h1" title="Acro Reader" state="Completed" statemodel="Review" rect="0,0,10,10"/>
+<text page="0" name="r3" inreplyto="nobody" rect="0,0,10,10"><contents>lost</contents></text>
+<square page="9" name="bad" rect="1,1,2,2"><contents>no such page</contents></square>
+<link page="0" rect="1,1,2,2"/>
+</annots><f href="reference.pdf"/></xfdf>`;
+  assert.equal((await viewer.post(P('/import'), { key, xfdf })).status, 403, 'a viewer cannot import');
+  assert.equal((await reviewer.post(P('/import'), { key, xfdf: '<notxfdf/>' })).status, 400);
+  assert.equal((await reviewer.post(P('/import'), { key, xfdf: '<!DOCTYPE x [<!ENTITY e SYSTEM "file:///c:/windows/win.ini">]><xfdf>&e;</xfdf>' })).status, 400, 'unsafe XML is refused');
+  assert.equal((await reviewer.post(P('/import'), { key: '../x.pdf', xfdf })).status >= 400, true, 'a key outside the project is refused');
+  const r = await reviewer.post(`/api/projects/${id}/pdf-review/import`, { key, xfdf });
+  assert.equal(r.status, 201, JSON.stringify(r.json).slice(0, 400));
+  assert.equal(r.json.annotations.length, 2); assert.equal(r.json.replies, 1);
+  assert.equal(r.json.skipped.length, 3, 'the reply to nothing, the page that is not there and the link are named: ' + r.json.skipped.join(' | '));
+  const listed = (await viewer.get(P(`/annotations?key=${encodeURIComponent(key)}`))).json.annotations;
+  const hl = listed.find((x) => x.body.includes('Is this still current?'));
+  assert.ok(hl); assert.equal(hl.anchor.quote.exact, exact, 'the words under the quads are the quote'); assert.ok(!hl.anchor.area);
+  assert.match(hl.body, /^\[Acro Reader, 2026-11-20\] /); assert.equal(hl.status, 'resolved', 'Completed in the reader = resolved');
+  assert.equal(hl.replies.length, 1); assert.match(hl.replies[0].body, /^\[Other Person\] Yes, checked\./);
+  const sq = listed.find((x) => x.body.includes('An empty corner.'));
+  assert.ok(sq.anchor.area); assert.equal(sq.anchorState, 'unverified', 'an area over no text is kept and flagged');
+});
+
+test('phase 8: the project archive carries the PDF review; the copy has new ids, the same anchors, replies and setting', async () => {
+  const { ZipFileReader } = require('../dist/services/zipio');
+  const { tmp } = require('./helpers');
+  await owner.put(P('/settings'), { blockRelease: true });
+  const before = (await viewer.get(P('/annotations'))).json.annotations;
+  const ex = await owner.get(`/api/projects/${id}/export`); assert.equal(ex.status, 200);
+  const f = path.join(tmp('pdfarch-'), 'a.zip'); fs.writeFileSync(f, ex.buf);
+  const zr = ZipFileReader.open(f);
+  try { const e = zr.entries.find((x) => x.name === 'pdf-review.json'); assert.ok(e, 'pdf-review.json is in the archive'); const j = JSON.parse((await zr.readBuffer(e)).toString('utf8')); assert.equal(j.annotations.length, before.length); assert.ok(j.versions.length >= 1); }
+  finally { zr.close(); }
+  const fd = new FormData(); fd.append('file', new Blob([ex.buf]), 'a.jsspub.zip'); fd.append('source', 's1000d'); fd.append('target', 's1000d'); fd.append('name', 'PDF review copy');
+  const back = await owner.req('POST', '/api/xengine/import', fd);
+  assert.equal(back.status, 201, JSON.stringify(back.json).slice(0, 400)); assert.equal(back.json.restored.pdfComments, before.length);
+  const B = `/api/projects/${back.json.project.id}/pdf-review`;
+  const after = (await owner.get(`${B}/annotations`)).json.annotations;
+  assert.equal(after.length, before.length);
+  const ids = new Set(before.map((x) => x.id)); assert.ok(after.every((x) => !ids.has(x.id)), 'new ids');
+  for (const o of before) {
+    const c = after.find((x) => x.body.endsWith(o.body.replace(/^\[[^\]]*\] /, '')) && x.fileKey === o.fileKey && x.createdAt === o.createdAt);
+    assert.ok(c, `thread "${o.body.slice(0, 40)}" is in the copy`);
+    assert.deepEqual(c.anchor, o.anchor, 'the anchor is kept'); assert.equal(c.status, o.status); assert.equal(c.kind, o.kind); assert.equal(c.required, o.required);
+    assert.equal(c.replies.length, o.replies.length); assert.equal(c.fileHash, o.fileHash); assert.equal(c.updatedAt, o.updatedAt, 'its own time');
+  }
+  assert.equal((await owner.get(`${B}/summary`)).json.blockRelease, true, 'the release setting travels');
+  await owner.put(P('/settings'), { blockRelease: false });
+});
+
 test('every PDF review write is in the audit log', async () => {
   const actions = new Set();
-  for (const a of ['pdfreview.created', 'pdfreview.replied', 'pdfreview.status', 'pdfreview.edited', 'pdfreview.deleted', 'pdfreview.placed', 'pdfreview.settings', 'pdfreview.exported']) {
+  for (const a of ['pdfreview.created', 'pdfreview.replied', 'pdfreview.status', 'pdfreview.edited', 'pdfreview.deleted', 'pdfreview.placed', 'pdfreview.settings', 'pdfreview.exported', 'pdfreview.imported']) {
     const r = await admin.get(`/api/admin/audit?action=${encodeURIComponent(a)}&limit=50`);
     if (r.json.entries.some((e) => e.action === a && e.projectId === id)) actions.add(a);
   }
-  assert.deepEqual([...actions].sort(), ['pdfreview.created', 'pdfreview.deleted', 'pdfreview.edited', 'pdfreview.exported', 'pdfreview.placed', 'pdfreview.replied', 'pdfreview.settings', 'pdfreview.status']);
+  assert.deepEqual([...actions].sort(), ['pdfreview.created', 'pdfreview.deleted', 'pdfreview.edited', 'pdfreview.exported', 'pdfreview.imported', 'pdfreview.placed', 'pdfreview.replied', 'pdfreview.settings', 'pdfreview.status']);
 });

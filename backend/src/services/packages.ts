@@ -36,6 +36,7 @@ import { hasSchema } from './registry';
 import { analyse as analyseExt, usesForeign } from './extensions';
 import { ISSUE_LABEL } from './s1000dRef';
 import { settingsOf, type PackageSettings } from './packageSettings';
+import { BatchWriteError } from '../storage/atomicWrite';
 
 const { validateProjectSchema, declaredSchema } = require('../../vendor/engine/validateSchema');
 const { checkXmlSafety } = require('../core/auth/xmlGuard');
@@ -58,9 +59,13 @@ export const importLimits = (): ExtractLimits => ({ ...DEFAULT_LIMITS, maxEntryB
       judge and apply steps with this one's; other writers are still caught by the checks of createDm / writeDm (identity, version) at apply;
     * each staged file is read once (hash and text from the same bytes; the apply step reuses the text) instead of three times;
     * progress goes out over the project's WebSocket channel (`progress` lines, at most every 500 ms).
-  The per-file fsync of the atomic write (storage/atomicWrite.ts, owned by the storage work) is unchanged: see the record for the lead.
+  Phase 8 (docs/phase3/cleanup-backend.md, item 1): new modules are written IMPORT_WRITE_GROUP at a time through csdb.createDms (one grouped
+  atomic write: the per-file flushes run in parallel off the event loop, each folder is flushed once). The import stays in the server
+  process (not a job worker): see the record, item 4.
 */
 export const IMPORT_SLICE_MS = 15;
+/** Phase 8: new modules per grouped atomic write (storage/atomicWrite.ts writeFilesAtomic). */
+export const IMPORT_WRITE_GROUP = 20;
 /** A function to await inside a long loop: it yields to the event loop (setImmediate) once `ms` of synchronous work has passed. */
 export function slicer(ms = IMPORT_SLICE_MS): () => Promise<void> {
   let last = performance.now();
@@ -313,16 +318,30 @@ async function importPackageNow(projectId: string, zipPath: string, sourceName: 
     if (applied) {
       try {
         const toApply = items.filter((i) => i.status === 'accepted' && i.action); let written = 0;
+        // phase 8 (item 1): new modules are written in groups (csdb.createDms: one grouped atomic write, flushes off the event loop), in
+        // package order; any other item first writes the group gathered so far, so the order of the writes is the order of the items
+        let group: Array<{ file: string; xml: string }> = [];
+        const flush = async (): Promise<void> => {
+          if (!group.length) return;
+          const g = group; group = [];
+          // a failure among the renames leaves the files renamed so far written: they join the files the rollback removes
+          try { await csdb.createDms(projectId, g, actor, !!o.skipChecks, { contentChecked: true }); }
+          catch (e) { if (e instanceof BatchWriteError) created.push(...e.renamed); throw e; }
+          for (const x of g) created.push(path.join(d.csdb, x.file));
+        };
         for (const it of toApply) {
           await turn(); written++; tell(`Package import: writing ${written} of ${toApply.length} files`);
           const src = path.join(staging, it.path); const base = path.basename(it.path);
           const textOf = (): string => texts.get(it.path) ?? fs.readFileSync(src, 'utf8');
           // contentChecked: the judge step ran the same content rules on this same text (validateContent with the same leniency)
-          if (it.as === 'dm') { const xml = textOf(); if (it.action === 'replace') await csdb.writeDm(projectId, base, xml, undefined, actor, role, !!o.skipChecks); else { await csdb.createDm(projectId, base, xml, actor, !!o.skipChecks, { contentChecked: true }); created.push(path.join(d.csdb, base)); } }
+          if (it.as === 'dm' && it.action === 'create') { group.push({ file: base, xml: textOf() }); if (group.length >= IMPORT_WRITE_GROUP) await flush(); continue; }
+          await flush();
+          if (it.as === 'dm') await csdb.writeDm(projectId, base, textOf(), undefined, actor, role, !!o.skipChecks);
           else if (it.as === 'object') { const r = await writeObject(projectId, base, textOf(), actor, { overwrite: true, lenient: !!o.skipChecks }); if (r.created) created.push(path.join(d.csdb, base)); }
           else if (it.as === 'pm') { if (fs.existsSync(d.pm)) fs.copyFileSync(d.pm, `${d.pm}.bak`); else created.push(d.pm); fs.copyFileSync(src, d.pm); }
           else if (it.as === 'asset') { const dest = path.join(/^ICN-/i.test(base) ? d.csdb : d.media, base); fs.mkdirSync(path.dirname(dest), { recursive: true }); if (!fs.existsSync(dest)) created.push(dest); fs.copyFileSync(src, dest); }
         }
+        await flush();
       } catch (e) { for (const f of created) try { fs.unlinkSync(f); } catch { /* best effort */ } throw bad(`Import failed part-way and was rolled back: ${(e as Error).message}`, 'IMPORT_FAILED'); }
     }
     for (const i of items) if (!applied && i.status === 'accepted') i.message = `${i.message} (not applied)`.trim();

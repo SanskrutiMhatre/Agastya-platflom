@@ -134,6 +134,28 @@ class DocIndex {
     return { indexed: 1 };
   }
 
+  /*
+    Phase 8 (docs/phase3/cleanup-backend.md, item 2): ONE file was removed -
+    mark it missing, with the same result for that file as syncProject
+    (which walks the whole project). A file that is still on disk (the
+    removal did not happen) falls back to syncFile, a path without a row
+    falls back to the full sync, and a row already marked keeps its first
+    missing time - all as the full sync would leave that file.
+  */
+  async removeFile(projectId, projectDir, rel, nowIso) {
+    const r = String(rel).replace(/\\/g, '/');
+    let present = false;
+    try { present = fs.statSync(path.join(projectDir, ...r.split('/'))).isFile(); } catch { /* gone, as expected */ }
+    if (present) return this.syncFile(projectId, projectDir, r, nowIso);
+    const existing = this.resolve(projectId, r);
+    // no row under this exact spelling (the name was given in another case on a case-insensitive disk): the full sync finds the real one
+    if (!existing) return this.syncProject(projectId, projectDir, nowIso);
+    if (!existing.missing_at) {
+      this.store.stmt('UPDATE documents SET missing_at = ?, updated_at = ? WHERE id = ?').run(nowIso, nowIso, existing.id);
+    }
+    return { indexed: 0 };
+  }
+
   // Startup reconciliation: heal a cold or stale index for every project on
   // disk, so identity exists before the first client asks.
   async reconcileAll(workspaceDir, projectIds, projectDirFor, nowIso) {

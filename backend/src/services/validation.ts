@@ -25,7 +25,7 @@ import { projectDirFor } from '../context';
 import { readProjectJson, updateProjectJson, csdbRel, mediaRel, pmRel, isS1000dProject } from './projects';
 import { explore } from './pm';
 import { listDms } from './csdb';
-import { checkModuleBrex, newBrexRun } from './brex';
+import { checkModuleBrexFile, newBrexRun } from './brex';
 import { pmRevisionProblems } from './lifecycle';
 import { analyse as analyseExt, usesForeign } from './extensions';
 
@@ -286,8 +286,8 @@ async function brexIssues(input: ValidationInput): Promise<{ issues: Issue[]; no
   for (const d of listDms(projectId)) {
     await tick();
     try {
-      const text = fs.readFileSync(path.join(csdbAbs, d.file), 'utf8');
-      const rep = checkModuleBrex(text, csdbAbs, issueUsed, run);
+      // phase 8 (item 5): an unchanged module is not read or hashed again; its kept result for the same chain is reused
+      const rep = checkModuleBrexFile(path.join(csdbAbs, d.file), csdbAbs, issueUsed, run);
       checked++;
       for (const f of rep.result.findings) {
         issues.push(norm('brex', { sev: f.severity === 'error' ? 'error' : 'warn', title: `BREX ${f.ruleId}`, rel: `${csdb}/${d.file}`, line: 1, loc: f.where, detail: f.message + (f.found !== undefined ? ` [found: ${f.found}]` : '') + ` (from ${f.brexSource})` }));

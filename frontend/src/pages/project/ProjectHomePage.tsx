@@ -26,6 +26,7 @@ import { ExportProjectButton } from '../../components/DocCodes';
 import { ago, errText, fmtDate, fmtSize, useAsync } from '../../components/ui';
 import { useProject } from '../../layouts/ProjectShell';
 import { projectRailItems } from '../../layouts/projectRail';
+import { gitlabApi } from '../../api/gitlab';
 import { actionLabel, isFeedNoise } from '../../lib/activity';
 import { lastDoc } from '../../lib/continueDoc';
 import { initials } from '../../lib/presence';
@@ -115,6 +116,8 @@ export function ProjectHomePage() {
     return { ex, problems: pr?.problems ?? [], waived: pr?.summary.waived ?? 0, dms, graphics: gr ? gr.length : null };
   }, [id, v?.ranAt]);
   const d = detail.data;
+  // phase 8: the Repository tile (GitLab) is shown exactly when the rail shows the page: only while an administrator has GitLab on
+  const gitlabOn = useAsync(() => gitlabApi.enabled(), [id]);
 
   const runCheck = async () => {
     setChecking(true);
@@ -172,7 +175,7 @@ export function ProjectHomePage() {
   const inWork = (d?.dms ?? []).filter((x) => x.inWork && x.inWork !== '00').length;
   const missingGraphics = errorsBy(['graphics', 'icn']);
 
-  const tiles = projectRailItems(id, summary).filter((i) => !/\/(home|settings)$/.test(i.to));
+  const tiles = projectRailItems(id, summary, { gitlab: gitlabOn.data === true }).filter((i) => !/\/(home|settings)$/.test(i.to));   // phase 8: Repository only while GitLab is on
   const tileStat = (label: string): ReactNode => {
     switch (label) {
       // mockup "42 drafts · 3 open tabs": the modules in work (not yet an issue) and the modules of the project

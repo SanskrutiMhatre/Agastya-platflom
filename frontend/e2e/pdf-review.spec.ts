@@ -197,3 +197,14 @@ test('a new version of the PDF (a rebuild) moves the threads with their words; o
   await rob.goto(`/projects/${projectId}/release`);
   await expect(rob.getByTestId('pdf-review-card')).toContainText('3 open');
 });
+
+test('phase 8: comments made in a PDF reader (XFDF) are imported and appear as threads', async () => {
+  await rob.goto(`/projects/${projectId}/review-pdf?key=${encodeURIComponent(key)}`);
+  await expect(rob.getByTestId('pdf-version')).toBeVisible({ timeout: 30_000 });
+  const xfdf = '<?xml version="1.0" encoding="UTF-8"?><xfdf xmlns="http://ns.adobe.com/xfdf/"><annots>'
+    + '<square page="0" name="x1" title="Acro Reader" rect="300,100,400,200"><contents>From the PDF reader</contents></square>'
+    + '</annots></xfdf>';
+  await rob.getByTestId('pdf-import-xfdf-file').setInputFiles({ name: 'notes.xfdf', mimeType: 'application/vnd.adobe.xfdf', buffer: Buffer.from(xfdf) });
+  await expect(item(rob, 'From the PDF reader')).toBeVisible({ timeout: 15_000 });
+  await expect(item(rob, 'From the PDF reader')).toContainText('Acro Reader');
+});
