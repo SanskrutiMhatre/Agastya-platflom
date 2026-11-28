@@ -23,7 +23,7 @@ import type { SaveStateInput } from './saveState';
 import type { EditorLayout } from './useEditorLayout';
 import { useHostKeys } from './useHostKeys';
 import { DOC_IDS } from './testIds';
-import { CommentsButton, CommentsPanel, useEditorComments } from './EditorComments';
+import { CommentsButton, CommentsPanel, useEditorComments, type CommentPinning } from './EditorComments';
 import type { Can } from '../../lib/roles';
 import { TeamChip } from './TeamChip';
 import { useSession } from '../../store/session';
@@ -73,6 +73,11 @@ export interface DocEditorShellProps {
   identity?: () => Array<[string, string]>;
   /** a Problems row was picked: go to its place in the document */
   onPickProblem?: (p: ProblemItem) => void;
+  /** Phase 3 (P3-1): the document is edited live (the check-out is then an exclusive lock: TeamChip says "Locked by") */
+  live?: boolean;
+  /** Phase 3: comments pinned to the selected words of a live document (`commentsFile` names the document in the comments) */
+  pinning?: CommentPinning;
+  commentsFile?: string;
 }
 
 const VIEW_WORDS = { edit: 'Editor', split: 'Split', pdf: 'PDF' } as const;
@@ -80,8 +85,8 @@ const VIEW_WORDS = { edit: 'Editor', split: 'Split', pdf: 'PDF' } as const;
 const OUTLINE = '.jss-outline, .jsg-nav';
 const ROWS = '.jss-ol, a';
 
-export function DocEditorShell({ kind, shortcuts, layout, title, crumb, section, saveState, actions, topActions, guard, banners, loaded, hostRef, pdf, find, readOnly, projectId, can, role, docName, findings = [], meta = [], inspect, identity, onPickProblem }: DocEditorShellProps) {
-  const comments = useEditorComments(projectId, can);
+export function DocEditorShell({ kind, shortcuts, layout, title, crumb, section, saveState, actions, topActions, guard, banners, loaded, hostRef, pdf, find, readOnly, projectId, can, role, docName, findings = [], meta = [], inspect, identity, onPickProblem, live = false, pinning, commentsFile }: DocEditorShellProps) {
+  const comments = useEditorComments(projectId, can, commentsFile);
   // WP-28 (PRD-003): the people in the project and the document's check-out (the whole document; chapter / section check-outs are listed)
   const me = useSession((s) => s.user);
   const teamDoc = { kind, path: `${kind}-document`, title: kind === 'jss' ? 'the JSS document' : 'the JSG document', leases: `/api/projects/${projectId}/${kind}/checkouts`, checkout: `/api/projects/${projectId}/${kind}/checkout` };
@@ -243,10 +248,10 @@ export function DocEditorShell({ kind, shortcuts, layout, title, crumb, section,
       {guard}
       <EditorHeader layout={layout} title={title} homeHref={`/projects/${projectId}/home`} section={section} doc={docName ? <span>{docName}</span> : undefined} badge={crumb} state={focus ? state : null}
         actions={<span className="v2-edactions" ref={topRef}>{topActions}</span>}
-        extra={<><TeamChip projectId={projectId} doc={loaded ? teamDoc : null} writable={!readOnly} canBreak={role === 'owner' || role === 'manager' || me?.role === 'admin'} editing={saveState.dirty} /><CommentsButton state={comments} /></>}
+        extra={<><TeamChip projectId={projectId} doc={loaded ? teamDoc : null} writable={!readOnly} canBreak={role === 'owner' || role === 'manager' || me?.role === 'admin'} editing={saveState.dirty} live={live} /><CommentsButton state={comments} always={!!pinning} /></>}
         panels={narrow ? { problems: { on: problemsOn, set: setProblems } } : { explorer: { on: treeOn, set: setTreeOn }, problems: { on: problemsOn, set: setProblems }, props: { on: propsOn, set: setPropsOn } }}
         onPalette={() => setPalette(true)} onShortcuts={() => setKeysOpen(true)} />
-      <CommentsPanel projectId={projectId} state={comments} />
+      <CommentsPanel projectId={projectId} state={comments} activeFile={commentsFile} pinning={pinning} />
       {banners}
       <div className={`ed ed-doc ed-${kind}${showTree ? ' has-tree' : ''}${showProps ? ' has-props' : ''}${showProblems ? ' has-problems' : ''}${focus ? ' is-focus' : ''}`} data-density="compact"
         style={{ display: loaded ? undefined : 'none', '--tree-w': `${tree.width}px`, '--props-w': `${pane.width}px` } as CSSProperties}>
@@ -313,7 +318,7 @@ export function DocEditorShell({ kind, shortcuts, layout, title, crumb, section,
                 <PropRow name="Errors">{counts.errors}</PropRow>
                 <PropRow name="Warnings">{counts.warnings}</PropRow>
               </div>
-            </> : <CommentsPanel inline projectId={projectId} state={comments} />}
+            </> : <CommentsPanel inline projectId={projectId} state={comments} activeFile={commentsFile} pinning={pinning} />}
           </PropsPanel>
         </> : null}
       </div>

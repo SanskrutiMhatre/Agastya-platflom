@@ -2,6 +2,7 @@
 // Phase 3 (P3-2) sanity load for live co-editing: one real server (its own process, a throwaway workspace), real sessions, real /ws.
 //
 //   node backend/scripts/bench/collab-load.js [--clients 120] [--docs 40] [--typists 15] [--seconds 20] [--port 4311]
+//                                             [--jss 4] [--jss-clients 3] [--jss-typists 5]   (JSS books, readers in each, typists in one paragraph)
 //
 // 120 headless Yjs clients (test/helpers-collab.js, the protocol the page speaks) over 16 accounts join 40 data modules; 15 of them type in
 // the SAME paragraph of one module (a character every 100 ms each, the way a person types); one more client in that module observes.
@@ -38,6 +39,7 @@ if (process.argv[2] === '--server') {
 
 const arg = (name, dflt) => { const i = process.argv.indexOf(`--${name}`); return i > 0 ? Number(process.argv[i + 1]) : dflt; };
 const CLIENTS = arg('clients', 120); const DOCS = arg('docs', 40); const TYPISTS = arg('typists', 15); const SECONDS = arg('seconds', 20); const PORT = arg('port', 4311);
+const JSS_BOOKS = arg('jss', 4); const JSS_CLIENTS = arg('jss-clients', 3); const JSS_TYPISTS = arg('jss-typists', 5);
 const PW = 'Correct-Horse-9!';
 const SAMPLE = fs.readFileSync(path.resolve(ROOT, '..', 'frontend', 'public', 'samples', 'DMC-S1KSTUDIO-A-29-10-00-00A-040A-D_001-00_EN-US.XML'), 'utf8');
 
@@ -56,7 +58,9 @@ async function main() {
   } }; };
   const admin = jar();
   if ((await admin.req('POST', '/api/auth/setup', { username: 'admin', password: PW, fullName: 'Admin' })).status !== 200) throw new Error('setup failed');
-  const ACCOUNTS = Math.max(2, Math.ceil(CLIENTS / 8) + 1);
+  // (a person may hold 8 sockets: the JSS readers and typists count too)
+  const JSS_ALL = JSS_BOOKS ? Math.max(JSS_CLIENTS, JSS_TYPISTS + 1) + (JSS_BOOKS - 1) * JSS_CLIENTS : 0;
+  const ACCOUNTS = Math.max(2, Math.ceil((CLIENTS + JSS_ALL) / 8) + 1);
   const users = [];
   for (let i = 0; i < ACCOUNTS; i++) {
     const name = `load${i}`;
@@ -81,6 +85,17 @@ async function main() {
   const room = (i) => `${pid}/dm/${files[i]}`;
   const HOT = room(0);
 
+  // JSS (the JSS binding, docs/phase3/collab-jss.md): --jss books (one JSS project each, a User Handbook), --jss-clients readers in each,
+  // and --jss-typists people typing in the SAME paragraph of the first book at the same time as the S1000D typists
+  const jssBooks = [];
+  for (let b = 0; b < JSS_BOOKS; b++) {
+    const r = await owner.req('POST', '/api/projects', { name: `Collab load JSS ${b}`, format: 'jss', domain: 'land', manualType: 'uhb' });
+    if (r.status !== 201) throw new Error(`create JSS project: ${r.status} ${JSON.stringify(r.json)}`);
+    const jpid = r.json.project.id;
+    for (const u of users.slice(1)) await owner.req('POST', `/api/projects/${jpid}/assign`, { username: u.name, role: 'editor' });
+    jssBooks.push(`${jpid}/jss/book`);
+  }
+
   // the clients: the typists and the observer in the hot module, the rest spread over all modules
   const clients = [];
   const t0 = Date.now();
@@ -92,8 +107,32 @@ async function main() {
     if (j.error) throw new Error(`join ${name}: ${JSON.stringify(j.error)}`);
     clients.push({ c, name });
   }
+  const jssClients = [];
+  for (let b = 0; b < jssBooks.length; b++) {
+    const n = b === 0 ? Math.max(JSS_CLIENTS, JSS_TYPISTS + 1) : JSS_CLIENTS;
+    for (let i = 0; i < n; i++) {
+      const u = users[1 + ((CLIENTS + jssClients.length) % (users.length - 1))];
+      const c = new CollabClient(base, u.cookie); await c.open();
+      const j = await c.join(jssBooks[b]);
+      if (j.error) throw new Error(`join ${jssBooks[b]}: ${JSON.stringify(j.error)}`);
+      jssClients.push({ c, name: jssBooks[b] });
+    }
+  }
   const joinMs = Date.now() - t0;
   const observer = clients[0].c.room(HOT);
+  // the hot JSS book: a paragraph in its first section (the stencil's sections start empty), then an observer and its typists
+  const JHOT = jssBooks[0];
+  const jssIn = JHOT ? jssClients.filter((x) => x.name === JHOT) : [];
+  const jssPara = (doc) => findEl(doc.getXmlFragment('xml'), 'para');
+  const jlat = [];
+  if (JHOT) {
+    const first = jssIn[0].c.room(JHOT).doc;
+    const section = findEl(first.getXmlFragment('xml'), 'section');
+    first.transact(() => { const p = new Y.XmlElement('para'); p.insert(0, [new Y.XmlText('Load test paragraph.')]); section.insert(1, [p]); });
+    for (const { c } of jssIn) await c.settled(JHOT, 15000);
+    const jobs = jssIn[0].c.room(JHOT).doc;
+    jobs.getMap('bench').observe((ev) => { const now = Date.now(); for (const k of ev.keysChanged) { const v = jobs.getMap('bench').get(k); if (typeof v === 'number') jlat.push(now - v); } });
+  }
   const lat = [];
   observer.doc.getMap('bench').observe((ev) => { const now = Date.now(); for (const k of ev.keysChanged) { const v = observer.doc.getMap('bench').get(k); if (typeof v === 'number') lat.push(now - v); } });
 
@@ -112,11 +151,24 @@ async function main() {
     };
     setTimeout(tick, k * 7);
   }));
+  let jtyped = 0;
+  const jtimers = jssIn.slice(1, 1 + JSS_TYPISTS).map(({ c }, k) => new Promise((resolve) => {
+    const r = c.room(JHOT);
+    const tick = () => {
+      if (Date.now() >= end) { resolve(); return; }
+      const t = firstText(jssPara(r.doc));
+      r.doc.transact(() => { t.insert(Math.floor(Math.random() * (t.length + 1)), String.fromCharCode(65 + (k % 26))); r.doc.getMap('bench').set(`j${k}`, Date.now()); });
+      jtyped++;
+      setTimeout(tick, 100);
+    };
+    setTimeout(tick, k * 11);
+  }));
+  timers.push(...jtimers);
   // the other clients move their cursors now and then (awareness traffic)
   const others = setInterval(() => { for (const { c, name } of clients.slice(1 + TYPISTS)) if (Math.random() < 0.1) c.setAwareness(name, null); }, 1000);
   await Promise.all(timers);
   clearInterval(others);
-  for (const { c, name } of clients) await c.settled(name, 15000);
+  for (const { c, name } of [...clients, ...jssClients]) await c.settled(name, 15000);
   await new Promise((r) => setTimeout(r, 1500));
   const after = await ask('usage');
 
@@ -135,11 +187,21 @@ async function main() {
     serverRssMb: Math.round(after.mem.rss / 1048576), serverHeapMb: Math.round(after.mem.heapUsed / 1048576),
     roomsLoaded: after.rooms, converged: same, writtenBack: !!(fl && fl.info.hash),
   };
+  let jsame = true;
+  if (JHOT) {
+    const jdocs = jssIn.map((x) => x.c.room(JHOT).doc);
+    jsame = jdocs.every((d) => Y.encodeStateVector(d).toString() === Y.encodeStateVector(jdocs[0]).toString() && firstText(jssPara(d)).toString() === firstText(jssPara(jdocs[0])).toString());
+    const jfl = await jssIn[1 % jssIn.length].c.flush(JHOT, true);
+    jlat.sort((a, b) => a - b);
+    const jq = (p) => jlat.length ? jlat[Math.min(jlat.length - 1, Math.floor(p * jlat.length))] : NaN;
+    report.jss = { books: jssBooks.length, clients: jssClients.length, typistsInOneParagraph: Math.min(JSS_TYPISTS, jssIn.length - 1), keystrokes: jtyped, observed: jlat.length,
+      latencyMs: { p50: jq(0.5), p95: jq(0.95), max: jlat[jlat.length - 1] }, converged: jsame, writtenBack: !!(jfl && jfl.info.hash) };
+  }
   console.log(JSON.stringify(report, null, 2));
-  for (const { c } of clients) c.close();
+  for (const { c } of [...clients, ...jssClients]) c.close();
   server.send('stop');
   await new Promise((r) => server.once('exit', r));
-  process.exit(same ? 0 : 1);
+  process.exit(same && jsame ? 0 : 1);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

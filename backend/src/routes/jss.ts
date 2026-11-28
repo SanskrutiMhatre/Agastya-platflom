@@ -27,8 +27,11 @@ import { JSS_XSD, isJssAuthored, jssTypeOfProject, readSource, writeSource, vali
 import { versionGuard } from '../services/versionGuard';
 import { registerOneFileDocumentRoutes, actorOf } from './documentHistory';
 import * as jobs from '../services/jobs';
+import { registerJssCollab } from '../services/jss/collab';
 
 export function registerJssRoutes(app: Express): void {
+  registerJssCollab();   // P3-1: the JSS document is edited live (rooms <projectId>/jss/book, services/jss/collab.ts); the routes below stay the classic flow
+
   app.get('/api/jss/types', requireAuth(), wrap((_req, res) => {
     res.json({ types: JSS_TYPES.map((t) => ({ id: t.id, label: t.label, stencil: t.stencil, domain: t.domain, bodyKind: t.bodyKind, ready: t.ready, notReady: t.notReady, source: t.source ?? 'stencil', derivedFrom: t.derivedFrom, chapters: (t.chapters ?? []).map((c) => c.title), maxDepth: t.maxDepth })) });
   }));

@@ -75,7 +75,8 @@ export function addComment(projectId: string, userId: string, body: { body?: str
   const text = clean(body.body, 4000);
   if (!text) throw bad('A comment cannot be empty.', 'COMMENT_EMPTY');
   const dmFile = clean(body.dmFile, 200) || null;
-  if (dmFile && !/^DMC-[A-Za-z0-9._-]+\.xml$/i.test(dmFile)) throw bad('That is not a data module file name.', 'BAD_FILE_NAME');
+  // P3-1: a comment in a live JSS or JSG document names that document by its room's kind and name ("jss/book"), as a data module is named by its file
+  if (dmFile && !/^DMC-[A-Za-z0-9._-]+\.xml$/i.test(dmFile) && !/^(jss|jsg)\/[A-Za-z0-9._-]{1,64}$/.test(dmFile)) throw bad('That is not a data module file name.', 'BAD_FILE_NAME');
   return store.addReviewComment({ projectId, releaseId: body.releaseId ?? null, userId, kind, body: text, dmFile, anchor: cleanAnchor(body.anchor, dmFile), now: nowIso() });
 }
 

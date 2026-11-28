@@ -137,11 +137,10 @@ export function readSource(projectId: string): { xml: string; hash: string } {
 }
 
 /**
- * Save the authored XML. Malformed text is refused; a draft that breaks the schema is kept and reported. `baseHash` is the version the
- * text was made from (mandatory on the route, WP-11): a save from an older version is merged by chapter, or refused when it overlaps a
- * newer save (oneFileDocument.ts). After a merge the answer carries the merged text (`merged`, `xml`), which the editor takes over.
+ * What every write of the JSS document refuses, whoever writes it (a save, a restore, a live write-back: services/jss/collab.ts): no text, more
+ * than 50 MB, unsafe XML, a DOCTYPE, malformed XML, or a root that is not a JSS document.
  */
-export async function writeSource(projectId: string, xml: string, baseHash?: string, actor: SaveActor = SYSTEM_ACTOR, reason?: string): Promise<{ hash: string; report: JssReport; merged?: boolean; xml?: string }> {
+export function assertJssText(xml: string): void {
   if (typeof xml !== 'string' || !xml.trim()) throw bad('There is no document to save.', 'EMPTY');
   if (Buffer.byteLength(xml) > 50 * 1024 * 1024) throw bad('The document is larger than 50 MB.', 'TOO_LARGE');
   checkXmlSafetyOf(xml);                         // WP-02: the same guard as every S1000D write (XXE, xi:include, entity bombs)
@@ -149,13 +148,25 @@ export async function writeSource(projectId: string, xml: string, baseHash?: str
   const wf = wellFormedError(xml);
   if (wf) throw new HttpError(400, `The document is not well-formed XML: ${wf}`, 'MALFORMED_XML');
   assertNativeJssXml(xml);                       // publication.xml stays the JSS document: never a publication module or a package contents list
+}
+
+/** The document says it is the project's type (or says nothing). */
+export function assertJssType(projectId: string, text: string): void {
   const type = jssTypeOfProject(projectId);
+  const declared = /<jssbook\b[^>]*\bdocType="([^"]+)"/.exec(text)?.[1];
+  if (type && declared && declared !== type.id) throw bad(`This project is a ${type.label}; the document says it is "${declared}".`, 'DOCTYPE_MISMATCH');
+}
+
+/**
+ * Save the authored XML. Malformed text is refused; a draft that breaks the schema is kept and reported. `baseHash` is the version the
+ * text was made from (mandatory on the route, WP-11): a save from an older version is merged by chapter, or refused when it overlaps a
+ * newer save (oneFileDocument.ts). After a merge the answer carries the merged text (`merged`, `xml`), which the editor takes over.
+ */
+export async function writeSource(projectId: string, xml: string, baseHash?: string, actor: SaveActor = SYSTEM_ACTOR, reason?: string): Promise<{ hash: string; report: JssReport; merged?: boolean; xml?: string }> {
+  assertJssText(xml);
   const saved = await saveOneFileDocument({
     projectId, at: sourceInProject(projectId), xml, baseHash, actor, reason, partNames: JSS_PART_NAMES,
-    check: (text) => {
-      const declared = /<jssbook\b[^>]*\bdocType="([^"]+)"/.exec(text)?.[1];
-      if (type && declared && declared !== type.id) throw bad(`This project is a ${type.label}; the document says it is "${declared}".`, 'DOCTYPE_MISMATCH');
-    },
+    check: (text) => assertJssType(projectId, text),
   });
   syncIdentity(projectId, 'jss', saved.xml);           // the document codes kept in the backend (services/xengine) follow the document; never refuses a save
   return { hash: sha(saved.xml), report: await validateJss(projectId, saved.xml), ...(saved.merged ? { merged: true, xml: saved.xml } : {}) };

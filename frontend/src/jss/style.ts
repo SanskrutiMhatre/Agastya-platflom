@@ -175,6 +175,13 @@ export const JSS_CSS = `
 .jss-btn { height: 32px; padding: 0 14px; border-radius: 6px; border: 1px solid var(--border-strong); background: var(--bg-elev); color: var(--text); cursor: pointer; font: inherit; }
 .jss-btn.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
 .jss-btn:disabled { opacity: .55; cursor: default; }
+/* Phase 3 (P3-1): other people's carets and selections on the sheet (jss/live.ts), their faces in the outline */
+.jss-collab-cursors { position: absolute; inset: 0 auto auto 0; width: 0; height: 0; pointer-events: none; z-index: 3; }
+.jss-collab-cursors .collab-caret { position: absolute; width: 0; border-left: 2px solid var(--collab-color, var(--accent)); }
+.jss-collab-cursors .collab-name { position: absolute; left: -2px; bottom: 100%; padding: 0 4px; border-radius: 3px 3px 3px 0; font: 600 10.5px/16px var(--font-ui, sans-serif); white-space: nowrap; background: var(--collab-color, var(--accent)); color: var(--text-on-accent); }
+.jss-collab-cursors .collab-sel { position: absolute; background: var(--collab-color, var(--accent)); opacity: .18; border-radius: 2px; }
+.jss-ol-people { display: inline-flex; gap: 2px; margin-left: auto; flex: none; }
+.jss-ol-face { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 3px; border-radius: 9px; font: 600 9.5px/1 var(--font-ui, sans-serif); background: var(--collab-color, var(--accent)); color: var(--text-on-accent); }
 @media print { .jss-toolbar, .jss-outline, .jss-problems { display: none; } .jss-paper { --sheet: var(--paper); --sheet-ink: var(--paper-ink); --sheet-table-rule: var(--paper-ink); } }
 `;
 
