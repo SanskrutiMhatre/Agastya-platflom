@@ -150,6 +150,7 @@ namespace Agastya
 
             Settings.Set("server", "Bind", bind);
             Settings.Set("server", "Mode", "server");
+            Settings.Set("server", "Deployment", "server");     // P3-6: a team server has no default accounts (a standalone install made a server)
             if (o.Port != null) Settings.Set("server", "Port", o.Port);
             if (o.Names.Count > 0) Settings.Set("server", "ServerNames", string.Join(",", o.Names.ToArray()));
             if (certRel != null) { Settings.Set("tls", "Certificate", certRel); Settings.Set("tls", "Key", keyRel); Settings.Set("tls", "Pfx", ""); }

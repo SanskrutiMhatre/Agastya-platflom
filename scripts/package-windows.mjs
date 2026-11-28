@@ -167,8 +167,8 @@ for (const d of ['dist', 'schemas', 'templates', 'templates-optional', 'brex', '
 fs.copyFileSync(path.join(be, 'package.json'), path.join(appBe, 'package.json'));
 mk('app', 'backend', 'scripts');
 // WP-25: agastya-backup.js (the verified pre-update backup Setup and AgastyaCtl --apply-update make), first-admin.js (Setup /ADMINUSER),
-// make-tls-cert.js (named by agastya.ini's [tls] notes, WP-26), agastya-audit.js (AgastyaCtl --verify-audit, WP-29)
-for (const s of ['doctor.js', 'reset-admin.js', 'recover-structure.js', 'agastya-backup.js', 'first-admin.js', 'make-tls-cert.js', 'agastya-audit.js']) fs.copyFileSync(path.join(be, 'scripts', s), path.join(appBe, 'scripts', s));
+// make-tls-cert.js (named by agastya.ini's [tls] notes, WP-26), agastya-audit.js (AgastyaCtl --verify-audit, WP-29), default-accounts.js (Setup's standalone default accounts, P3-6)
+for (const s of ['doctor.js', 'reset-admin.js', 'recover-structure.js', 'agastya-backup.js', 'first-admin.js', 'default-accounts.js', 'make-tls-cert.js', 'agastya-audit.js']) fs.copyFileSync(path.join(be, 'scripts', s), path.join(appBe, 'scripts', s));
 // vendor: the engine, the pipelines and the tools. Not used at run time and left out: FOP's javadocs (94 MB of HTML) and its examples, two stray test
 // files that were left in FOP's folder (example.fo, output.pdf), and the HTML documentation of libxslt. They also hold the longest paths in the tree.
 copyFiltered(path.join(be, 'vendor'), path.join(appBe, 'vendor'), (src) => {
@@ -390,7 +390,8 @@ if (!flag('--no-zip')) {
   fs.writeFileSync(path.join(stage, 'portable.flag'), 'This file makes the program keep its configuration, data and logs next to itself instead of in C:\\ProgramData.\r\n');
   mk('config');
   fs.writeFileSync(path.join(stage, 'config', 'agastya.ini'), fs.readFileSync(path.join(root, 'packaging', 'agastya.ini.template'), 'utf8')
-    .replace('@PORT@', String(product.defaultPort)).replace('@BIND@', 'loopback').replace('@DATADIR@', '').replace('@SERVICENAME@', product.defaultServiceName));
+    .replace('@PORT@', String(product.defaultPort)).replace('@BIND@', 'loopback').replace('@DATADIR@', '').replace('@SERVICENAME@', product.defaultServiceName)
+    .replace('@DEPLOYMENT@', 'standalone'));   // P3-6: the portable ZIP is a single-computer installation (default accounts at its first start)
   fs.rmSync(zipPath, { force: true });
   const tar = path.join(process.env.WINDIR || 'C:\\Windows', 'System32', 'tar.exe');
   if (!fs.existsSync(tar)) fail('tar.exe (bsdtar, part of Windows 10 and later) is needed to build the ZIP.');
