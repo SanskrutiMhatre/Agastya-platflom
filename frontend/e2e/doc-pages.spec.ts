@@ -5,10 +5,13 @@
 import { test, expect, request as pwRequest, type Page, type APIRequestContext } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
+import { classicOnly } from './support/live';
 
 const PW = 'Correct-Horse-9!';
 const SHOTS = path.join('test-results', 'doc-pages-shots');
 let page: Page; let api: APIRequestContext;
+/** a second page of the same person whose editors save by version (its joins are answered DISABLED) */
+const cpage = async (): Promise<Page> => { const p = await page.context().newPage(); p.on('pageerror', (e) => { throw new Error(`page error: ${e.message}`); }); await classicOnly(p); return p; };
 let jssUhb = ''; let jssFree = ''; let jsgUhb = ''; let jsgIspl = '';
 
 test.describe.configure({ mode: 'serial' });
@@ -275,10 +278,31 @@ test('unsaved work is not lost by clicking a tab: Publication asks, and Stay / L
   await expect(page).toHaveURL(/\/graphics$/); await expect(page.getByRole('dialog', { name: 'Leave without saving?' })).toHaveCount(0);
 });
 
-test('unsaved work in the JSS and the JSG editor is not lost by clicking a tab either; Save and leave keeps it', async () => {
+// Phase 3 / Phase 8: a live editor (the default) has nothing unsent to lose: a tab click leaves at once and the text is already the server's.
+// The leave question belongs to the classic editor (the fallback when the room cannot be joined, C24): the test below opens it on a page
+// whose joins are answered DISABLED (support/live.ts).
+test('live JSS and JSG editors: a tab click leaves without a question and what was typed is kept', async () => {
   await page.goto(`/projects/${jssUhb}/editor`); await expect(page.getByTestId('jss-editor')).toBeVisible({ timeout: 30_000 });
   const purpose = page.getByTestId('jss-paper').locator('.jss-sec').filter({ has: page.locator('.jss-sec-title', { hasText: 'Purpose' }) });
-  await purpose.locator('.jss-empty, .jss-p').first().click(); await page.keyboard.type('Guarded text. ');
+  await purpose.locator('.jss-empty, .jss-para').first().click(); await page.keyboard.type('Live guarded text. ');
+  await expect(page.getByTestId('jss-state')).toHaveText(/^Saved/, { timeout: 15_000 });
+  await page.getByRole('link', { name: 'Explore' }).click();
+  await expect(page).toHaveURL(/\/explore$/); await expect(page.getByRole('dialog', { name: 'Leave without saving?' })).toHaveCount(0);
+  await expect.poll(async () => ((await (await api.get(`/api/projects/${jssUhb}/jss`)).json()).xml as string), { timeout: 20_000 }).toContain('Live guarded text.');
+  // JSG
+  await page.goto(`/projects/${jsgUhb}/editor`); await expect(page.getByTestId('jsg-host')).toBeVisible({ timeout: 30_000 });
+  await page.locator('[data-testid="jsg-host"] [contenteditable="true"]').first().click(); await page.keyboard.type('LIVEJSGGUARD');
+  await expect(page.getByTestId('jsg-state')).toHaveText(/^Saved/, { timeout: 15_000 });
+  await page.getByRole('link', { name: 'Publication' }).click();
+  await expect(page).toHaveURL(/\/publication$/); await expect(page.getByRole('dialog', { name: 'Leave without saving?' })).toHaveCount(0);
+  await expect.poll(async () => ((await (await api.get(`/api/projects/${jsgUhb}/jsg`)).json()).xml as string), { timeout: 20_000 }).toContain('LIVEJSGGUARD');
+});
+
+test('unsaved work in the JSS and the JSG editor is not lost by clicking a tab either; Save and leave keeps it (classic)', async () => {
+  const page = await cpage();
+  await page.goto(`/projects/${jssUhb}/editor`); await expect(page.getByTestId('jss-editor')).toBeVisible({ timeout: 30_000 });
+  const purpose = page.getByTestId('jss-paper').locator('.jss-sec').filter({ has: page.locator('.jss-sec-title', { hasText: 'Purpose' }) });
+  await purpose.locator('.jss-empty, .jss-para').first().click(); await page.keyboard.type('Guarded text. ');
   await expect(page.getByTestId('jss-state')).toHaveText(/Unsaved changes/);
   await page.getByRole('link', { name: 'Explore' }).click();
   await expect(page.getByRole('dialog', { name: 'Leave without saving?' })).toBeVisible();
@@ -293,4 +317,5 @@ test('unsaved work in the JSS and the JSG editor is not lost by clicking a tab e
   await page.getByRole('link', { name: 'Publication' }).click();
   await expect(page.getByRole('dialog', { name: 'Leave without saving?' })).toBeVisible();
   await page.getByTestId('leave-discard').click(); await expect(page).toHaveURL(/\/publication$/);
+  await page.close();
 });

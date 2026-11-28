@@ -147,7 +147,8 @@ export function JssEditorPage() {
 
   // the sections' document codes beside their headings, when the author has switched them on (on the Publication page); the codes themselves are not listed here
   const sectionCode = useSectionCode(id, host.savedAt);
-  useEffect(() => { (host.editorRef.current as JssEditor | null)?.setSectionBadge(sectionCode); }, [sectionCode, loaded, host.editorRef]);
+  // isLive: a live editor is built after the room is joined, later than this effect first ran; it gets the codes once it is there
+  useEffect(() => { (host.editorRef.current as JssEditor | null)?.setSectionBadge(sectionCode); }, [sectionCode, loaded, host.editorRef, isLive]);
 
   // the last built PDF is shown at first
   useEffect(() => { if (!host.src && summary.build) host.setSrc(`${contentApi.pdfUrl(id)}?t=${new Date(summary.build.builtAt).getTime()}`); /* eslint-disable-next-line */ }, [id]);
