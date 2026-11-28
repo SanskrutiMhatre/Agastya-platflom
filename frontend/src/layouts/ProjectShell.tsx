@@ -12,6 +12,7 @@ import { JumpButton, QuickSwitcher, useQuickSwitcher } from '../components/Quick
 import { contentApi, workspaceApi, type ProjectRole, type Summary } from '../api';
 import { Icon } from '../components/Icon';
 import { projectRailItems } from './projectRail';
+import { gitlabApi } from '../api/gitlab';
 import { Alert, Loading, errText } from '../components/ui';
 import { MissingBrex } from '../components/MissingBrex';
 import { may, type Can } from '../lib/roles';
@@ -59,6 +60,9 @@ function ProjectShellFor({ id }: { id: string }) {
   // the mockup's status bar starts with the PDF renderer's state ("Renderer ready")
   const [renderer, setRenderer] = useState<boolean | null>(null);
   useEffect(() => { let live = true; contentApi.rendererStatus(id).then((r) => { if (live) setRenderer(r.warm); }).catch(() => undefined); return () => { live = false; }; }, [id]);
+  // Phase 3 (P3-5): the Repository page is in the rail only while an administrator has GitLab switched on
+  const [gitlab, setGitlab] = useState(false);
+  useEffect(() => { let live = true; void gitlabApi.enabled().then((on) => { if (live) setGitlab(on); }); return () => { live = false; }; }, [id]);
 
   const load = useCallback(() => {
     // A reply for another project (the shell was replaced meanwhile) is ignored by the unmount; one for an older request of this one is
@@ -72,7 +76,7 @@ function ProjectShellFor({ id }: { id: string }) {
   // WP-23 (UX-005, WCAG 2.4.2): "Publication · Project name · Agastya Platform"
   const loc = useLocation();
   const appName = useApp((st) => st.settings.appName);
-  const section = summary ? projectRailItems(id, summary).find((i) => loc.pathname.startsWith(i.to))?.label : null;
+  const section = summary ? projectRailItems(id, summary, { gitlab }).find((i) => loc.pathname.startsWith(i.to))?.label : null;
   useDocumentTitle(section, summary?.project.name, appName);
 
   if (error) {
@@ -82,7 +86,7 @@ function ProjectShellFor({ id }: { id: string }) {
 
   const isCir = summary.project.type === 'CIR';
   const s1000d = (summary.project.format ?? 's1000d') === 's1000d';           // validation (schemas, BREX) belongs to S1000D only
-  const items = projectRailItems(id, summary);                                // WP-34: the rail per project kind lives in projectRail.ts
+  const items = projectRailItems(id, summary, { gitlab });                              // WP-34: the rail per project kind lives in projectRail.ts
   const settings = items.find((i) => i.to.endsWith('/settings'));
   const areas = items.filter((i) => i !== settings);
 

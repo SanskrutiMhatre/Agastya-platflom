@@ -18,6 +18,7 @@ import { PublishRefusal } from '../../components/PublishRefusal';
 import { canWrite, useProject } from '../../layouts/ProjectShell';
 import { refusalOf, type Refusal } from '../../lib/waivers';
 import { useUi } from '../../store/ui';
+import { GitlabMergeRequests } from '../../components/GitlabMrs';
 
 const STATE: Record<ReviewState, { label: string; tone?: 'ok' | 'warn' | 'bad' | 'accent' }> = {
   draft: { label: 'Not submitted' },
@@ -171,6 +172,9 @@ export function ReleasePage() {
               ) : null}
             </div>
           </section>
+
+          {/* Phase 3 (P3-5): the review's merge request in GitLab, once one was opened (nothing while GitLab is off) */}
+          <GitlabMergeRequests id={id} role={role} onSynced={() => { rel.reload(); reload(); }} />
 
           <section className="card" data-testid="review-reader-card" aria-labelledby="rel-read-h">
             <div className="card-head"><h3 id="rel-read-h"><Icon name="file" />Read and comment</h3></div>
