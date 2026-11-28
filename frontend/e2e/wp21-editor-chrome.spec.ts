@@ -9,6 +9,7 @@
 
 import { test, expect, type Browser, type Page, type APIRequestContext } from '@playwright/test';
 import { adminApi, newPerson, type Person } from './support/session';
+import { classicOnly } from './support/live';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -72,7 +73,9 @@ for (const e of EDITORS) {
       await expect(page.locator(e.kind === 's1000d' ? '.app-header [data-testid="view-switch"]' : '[data-testid="doc-tabs"] [data-testid="view-switch"]')).toBeVisible();
       await expect(seg.getByRole('button', { name: 'Editor' })).toHaveAttribute('aria-pressed', 'true');          // a new session is in Write
       for (const v of ['Split', 'PDF']) await expect(seg.getByRole('button', { name: v })).toBeVisible();
-      await expect(page.getByTestId(e.state)).toHaveText(/All changes saved/);                                   // the same words in all three
+      // the same words in all three: a live document (Phase 3, the default) is "Saved" when the server has every change ("All changes saved"
+      // is the classic editor's word for the same, see the Ctrl+S test's classic run)
+      await expect(page.getByTestId(e.state)).toHaveText(/^Saved/, { timeout: 20_000 });
 
       const area = await share(page, e.surface);
       console.log(`${e.kind}: editing surface ${(area * 100).toFixed(1)}% of 1366x768 in Write`);
@@ -137,42 +140,54 @@ test('Esc leaves focus mode in the JSS and JSG editors', async ({ browser, baseU
   } finally { await page.context().close(); }
 });
 
-test('Ctrl+S saves and Ctrl+F finds in all three editors, with the same state words', async ({ browser, baseURL }) => {
-  const page = await fresh(browser, baseURL, 1440, 900);
-  try {
-    // S1000D: an edit in the XML view, Ctrl+S
-    await open(page, EDITORS[0]);
-    await page.locator('.vs-btn', { hasText: 'XML' }).click();
-    await page.evaluate(() => { const v = (window as any).studio.active.xml.view; const i = v.state.doc.toString().indexOf('</para>'); v.dispatch({ changes: { from: i, to: i, insert: ' WP21' } }); });
-    await expect(page.getByTestId('save-state')).toHaveText(/Unsaved changes/);
-    await page.keyboard.press('Control+s');
-    await expect(page.getByTestId('save-state')).toHaveText(/Saved/, { timeout: 15_000 });
-    await page.keyboard.press('Control+f');
-    await expect(page.locator('.find-bar:visible, .cm-search').first()).toBeVisible();          // the Studio's own find (CodeMirror's in the XML view)
-    await page.keyboard.press('Escape');
+// Phase 3 / Phase 8: a live editor (the default) sends every change as it is typed: the state is "Saved" (or "Syncing…" for a moment), never
+// "Unsaved changes", and Ctrl+S writes the file through the room. The classic run is the fallback when the room cannot be joined
+// (C24, a server with AGASTYA_COLLAB=0; here: this browser's joins are answered DISABLED, e2e/support/live.ts): "Unsaved changes", then "Saved".
+for (const mode of ['live', 'classic'] as const) {
+  test(`Ctrl+S saves and Ctrl+F finds in all three editors, with the same state words (${mode})`, async ({ browser, baseURL }) => {
+    const page = await fresh(browser, baseURL, 1440, 900);
+    if (mode === 'classic') await classicOnly(page.context());
+    const edited = mode === 'live' ? /^(Saved|Syncing)/ : /Unsaved changes/;
+    const mark = `WP21${mode.toUpperCase()}`;
+    const file = async (kind: 'dm' | 'jss' | 'jsg'): Promise<string> => (await (await author.api.get(kind === 'dm' ? `/api/projects/${ids.s1000d}/dms/${dmFile}` : `/api/projects/${ids[kind]}/${kind}`)).json()).xml as string;
+    try {
+      // S1000D: an edit in the XML view, Ctrl+S
+      await open(page, EDITORS[0]);
+      await page.locator('.vs-btn', { hasText: 'XML' }).click();
+      await page.evaluate((m) => { const v = (window as any).studio.active.xml.view; const i = v.state.doc.toString().indexOf('</para>'); v.dispatch({ changes: { from: i, to: i, insert: ` ${m}` } }); }, mark);
+      await expect(page.getByTestId('save-state')).toHaveText(edited);
+      await page.keyboard.press('Control+s');
+      await expect(page.getByTestId('save-state')).toHaveText(/Saved/, { timeout: 15_000 });
+      await expect.poll(() => file('dm'), { timeout: 15_000 }).toContain(mark);
+      await page.keyboard.press('Control+f');
+      await expect(page.locator('.find-bar:visible, .cm-search').first()).toBeVisible();          // the Studio's own find (CodeMirror's in the XML view)
+      await page.keyboard.press('Escape');
 
-    // JSS: type, Ctrl+S; Ctrl+F opens the host find bar
-    await open(page, EDITORS[1]);
-    const purpose = page.getByTestId('jss-paper').locator('.jss-sec').filter({ has: page.locator('.jss-sec-title', { hasText: 'Purpose' }) });
-    await purpose.locator('.jss-para, .jss-empty').first().click(); await page.keyboard.press('End'); await page.keyboard.type('Chrome check ');
-    await expect(page.getByTestId('jss-state')).toHaveText(/Unsaved changes/);
-    await page.keyboard.press('Control+s');
-    await expect(page.getByTestId('jss-state')).toHaveText(/Saved/, { timeout: 15_000 });
-    await page.keyboard.press('Control+f');
-    await expect(page.getByTestId('host-find')).toBeVisible();
-    await page.keyboard.press('Escape');
-    await expect(page.getByTestId('host-find')).toHaveCount(0);
+      // JSS: type, Ctrl+S; Ctrl+F opens the host find bar
+      await open(page, EDITORS[1]);
+      const purpose = page.getByTestId('jss-paper').locator('.jss-sec').filter({ has: page.locator('.jss-sec-title', { hasText: 'Purpose' }) });
+      await purpose.locator('.jss-para, .jss-empty').first().click(); await page.keyboard.press('End'); await page.keyboard.type(`Chrome check ${mark} `);
+      await expect(page.getByTestId('jss-state')).toHaveText(edited);
+      await page.keyboard.press('Control+s');
+      await expect(page.getByTestId('jss-state')).toHaveText(/Saved/, { timeout: 15_000 });
+      await expect.poll(() => file('jss'), { timeout: 15_000 }).toContain(mark);
+      await page.keyboard.press('Control+f');
+      await expect(page.getByTestId('host-find')).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(page.getByTestId('host-find')).toHaveCount(0);
 
-    // JSG: type, Ctrl+S; Ctrl+F opens its find bar
-    await open(page, EDITORS[2]);
-    await page.locator('[data-testid="jsg-host"] [contenteditable="true"]').first().click(); await page.keyboard.type('Chrome check ');
-    await expect(page.getByTestId('jsg-state')).toHaveText(/Unsaved changes/);
-    await page.keyboard.press('Control+s');
-    await expect(page.getByTestId('jsg-state')).toHaveText(/Saved/, { timeout: 15_000 });
-    await page.keyboard.press('Control+f');
-    await expect(page.getByTestId('jsg-find')).toBeVisible();
-  } finally { await page.context().close(); }
-});
+      // JSG: type, Ctrl+S; Ctrl+F opens its find bar
+      await open(page, EDITORS[2]);
+      await page.locator('[data-testid="jsg-host"] [contenteditable="true"]').first().click(); await page.keyboard.type(`Chrome check ${mark} `);
+      await expect(page.getByTestId('jsg-state')).toHaveText(edited);
+      await page.keyboard.press('Control+s');
+      await expect(page.getByTestId('jsg-state')).toHaveText(/Saved/, { timeout: 15_000 });
+      await expect.poll(() => file('jsg'), { timeout: 15_000 }).toContain(mark);
+      await page.keyboard.press('Control+f');
+      await expect(page.getByTestId('jsg-find')).toBeVisible();
+    } finally { await page.context().close(); }
+  });
+}
 
 test('JSS find and replace (UX-017): counts the matches, replaces one and all, and the change is saved', async ({ browser, baseURL }) => {
   const page = await fresh(browser, baseURL, 1440, 900);
@@ -192,7 +207,7 @@ test('JSS find and replace (UX-017): counts the matches, replaces one and all, a
     await page.getByTestId('replace-all').click();
     await expect(page.getByTestId('find-count')).toHaveText('No matches');
     await expect(page.getByTestId('jss-paper')).toContainText('OMEGA one OMEGA two OMEGA');
-    await expect(page.getByTestId('jss-state')).toHaveText(/Unsaved changes/);
+    await expect(page.getByTestId('jss-state')).toHaveText(/^(Saved|Syncing)/);                    // live: sent as it is replaced
     await page.keyboard.press('Escape'); await expect(page.getByTestId('host-find')).toHaveCount(0);
     await page.getByTestId('jss-save').click();
     await expect(page.getByTestId('jss-state')).toHaveText(/Saved/, { timeout: 15_000 });
@@ -200,8 +215,11 @@ test('JSS find and replace (UX-017): counts the matches, replaces one and all, a
   } finally { await page.context().close(); }
 });
 
-test('a refused JSS save can be compared and merged: both changes kept, checked, saved (PRD-004)', async ({ browser, baseURL }) => {
+// a refusal needs a save by version: the classic editor, the fallback when the room cannot be joined (a live book merges another save by
+// itself: wp05 FE-007 live)
+test('a refused JSS save can be compared and merged: both changes kept, checked, saved (PRD-004, classic)', async ({ browser, baseURL }) => {
   const page = await fresh(browser, baseURL, 1440, 900);
+  await classicOnly(page.context());
   try {
     await open(page, EDITORS[1]);
     const purpose = page.getByTestId('jss-paper').locator('.jss-sec').filter({ has: page.locator('.jss-sec-title', { hasText: 'Purpose' }) });
