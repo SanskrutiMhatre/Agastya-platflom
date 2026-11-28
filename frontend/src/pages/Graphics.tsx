@@ -5,9 +5,9 @@ import { useNavigate } from 'react-router-dom';
 import { graphicsApi } from '../api';
 import { GraphicsView } from '../components/GraphicsView';
 import { Icon } from '../components/Icon';
-import { Alert, Empty, Loading, StatTile, useAsync } from '../components/ui';
+import { Callout, Empty, Loading, useAsync } from '../components/ui';
 import '../styles/pages/admin.css';   // UI redesign screen 6: the administration look of the global pages
-import { AdmHead } from './adminParts';
+import { AdmHead, HealthTile } from './adminParts';
 
 export function GraphicsPage() {
   const nav = useNavigate();
@@ -18,13 +18,13 @@ export function GraphicsPage() {
 
   return (
     <div className="v2-page adm">
-      <AdmHead icon="image" title="Graphics management" sub="ICN artwork and symbols across your projects. Open a project's Graphics to add or delete." />
+      <AdmHead title="Graphics management" sub="ICN artwork and symbols across your projects. Open a project's Graphics to add or delete." />
       <section className="hh" aria-label="Graphics at a glance" data-testid="graphics-stats">
-        <StatTile label="Projects" value={projects.length} detail="with graphics you can open" />
-        <StatTile label="ICNs" value={icns} detail="information control numbers" tone={icns ? 'info' : undefined} />
-        <StatTile label="Symbols" value={symbols} detail="reusable symbols" tone={symbols ? 'info' : undefined} />
+        <HealthTile label="Projects" tone="info" value={projects.length} line="with graphics you can open" />
+        <HealthTile label="ICNs" tone={icns ? 'success' : undefined} value={icns} line="information control numbers" />
+        <HealthTile label="Symbols" tone={symbols ? 'success' : undefined} value={symbols} line="reusable symbols" />
       </section>
-      {all.error ? <Alert tone="bad">{all.error}</Alert> : null}
+      {all.error ? <Callout tone="danger">{all.error}</Callout> : null}
       {all.loading && !all.data ? <Loading /> : projects.length === 0 ? <Empty title="No projects yet">Graphics belong to projects. Create or open a project first.</Empty> : projects.map((p) => (
         <section key={p.id} className="card mb4" aria-label={`Graphics of ${p.name}`} data-testid="graphics-project">
           <div className="card-head v2-gfx-project-head">

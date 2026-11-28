@@ -1,24 +1,10 @@
 /* =========================================================================
    WP-35 second pass: the Administrator (and the screens it shares with Settings and Project settings > Access: Users, Audit logs,
    Groups, Directory sign-on, S1000D catalogue, Numbering, platform backups) on the design system (mockup docs/audit/mockups/admin.html).
-   The section navigation moved here from platform.css unchanged; the rest replaces the inline styles these screens had (over a hundred)
+   The section navigation became the mockup tab row (2026-11-28); the rest replaces the inline styles these screens had (over a hundred)
    with a small set of layout classes. Imported by Administrator, Settings, AccessAdmin, AdminS1000d and PlatformBackups, so it loads with
    their chunks only. Colours are tokens only.
    ========================================================================= */
-
-/* ------------------------------------------------------------ section navigation */
-.v2-admin { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 18px; align-items: start; }
-.v2-admin-nav { display: flex; flex-direction: column; gap: 10px; position: sticky; top: 8px; padding: 8px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 10px; }
-.v2-admin-group { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); padding: 4px 10px; }
-.v2-admin-nav a { display: block; padding: 6px 10px; border-radius: 6px; color: var(--text); font-size: 13px; text-decoration: none; position: relative; }
-.v2-admin-nav a:hover { background: var(--bg-hover); }
-.v2-admin-nav a.active { background: var(--accent-soft); color: var(--text-link); font-weight: 600; }
-.v2-admin-nav a.active::before { content: ''; position: absolute; left: -8px; top: 6px; bottom: 6px; width: 3px; border-radius: 0 2px 2px 0; background: var(--accent); }
-.v2-admin-nav a:focus-visible, .v2-admin-more:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
-.v2-admin-more { cursor: pointer; padding: 4px 12px; border-radius: 6px; }
-.v2-admin-more:hover { background: var(--bg-hover); color: var(--text); }
-.v2-admin-body { min-width: 0; }
-@media (max-width: 860px) { .v2-admin { grid-template-columns: minmax(0, 1fr); } .v2-admin-nav { position: static; flex-flow: row wrap; gap: 4px 16px; } .v2-admin-nav a.active::before { display: none; } }
 
 /* ------------------------------------------------------------ section heading: title, one line of purpose, actions on the right */
 .v2-admin-head h3, .v2-admin-head h4 { margin: 0; font-size: 16px; font-weight: 650; }
@@ -26,69 +12,122 @@
 
 /* ------------------------------------------------------------ layout helpers (replacing inline styles) */
 .v2-m0, .v2-sub.v2-m0, .v2-hint.v2-m0 { margin: 0; }
-.v2-mb0 { margin-bottom: 0; }
-.v2-mb14 { margin-bottom: 14px; }
-.v2-mt2 { margin: 2px 0 0; }
-.v2-mt6 { margin: 6px 0 0; }
 .v2-mt8 { margin-top: 8px; }
-.v2-mt12 { margin-top: 12px; }
 .v2-gap-4, .v2-row.v2-gap-4 { gap: 4px; }
 .v2-gap-6, .v2-row.v2-gap-6 { gap: 6px; }
 .v2-gap-8, .v2-row.v2-gap-8 { gap: 8px; }
-.v2-align-start { align-items: flex-start; }
-.v2-grid-full { grid-column: 1 / -1; }
-.v2-list-indent { padding-left: 18px; }
-.v2-grow-320 { flex: 1 1 320px; }
 .v2-td-end { text-align: right; white-space: nowrap; }
 .v2-scroll-460 { max-height: 460px; overflow: auto; }
 .v2-scroll-520 { max-height: 520px; overflow: auto; }
-.v2-maxw-280 { max-width: 280px; }
-.v2-maxw-520 { max-width: 520px; }
-.v2-maxw-560 { max-width: 560px; }
 .v2-maxw-900 { max-width: 900px; }
-.v2-w-90 { width: 90px; } .v2-w-140 { width: 140px; } .v2-w-150 { width: 150px; } .v2-w-160 { width: 160px; }
-.v2-w-180 { width: 180px; } .v2-w-190 { width: 190px; } .v2-w-200 { width: 200px; } .v2-w-220 { width: 220px; }
-.v2-w-230 { width: 230px; } .v2-w-260 { width: 260px; } .v2-w-280 { width: 280px; }
-.v2-color-input { width: 44px; height: 32px; padding: 2px; border: 1px solid var(--border-control); border-radius: 6px; background: var(--bg-elev); cursor: pointer; }
-.v2-color-input:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
-
-/* ------------------------------------------------------------ maintenance tool cards: the action sits at the foot of each card */
-.v2-maint-card { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
-.v2-maint-card h4 { margin: 0; }
-.v2-maint-card .v2-sub { margin: 0; }
-.v2-maint-card .v2-hint { margin: 0; }
-.v2-maint-card > .btn:first-of-type, .v2-maint-card > a.btn { margin-top: auto; }
+.v2-w-90 { width: 90px; } .v2-w-150 { width: 150px; } .v2-w-160 { width: 160px; }
+.v2-w-180 { width: 180px; } .v2-w-200 { width: 200px; } .v2-w-220 { width: 220px; }
+.v2-w-230 { width: 230px; } .v2-w-280 { width: 280px; }
 
 
 /* =========================================================================
-   UI redesign screen 6 (owner approved mockups 2026-11-28, docs/audit/mockups/admin.html): the administration look for the global pages
-   (Administrator, Settings, Backup, Notifications, Activity, CIR, Graphics). The shared pieces (.page-head, .card, .card-head, .card-body,
-   .card-foot, .stat, .dot, .avatar, .progress, .toggle, .switch, .row, .stack, .faint) come from styles/components.css; this block holds
-   only what the admin mockup adds (.hh, .adm-cols, .swatches, .disk, the contrast table) and puts the older v2 tables, tabs, KPI tiles and
-   section navigation of these pages in the same language. Scoped to `.adm`; colours are tokens only.
+   UI redesign screen 6 (owner approved mockups 2026-11-28, docs/audit/mockups/admin.html; made exact 2026-11-28): the administration look
+   of the global pages (Administrator, Settings, Backup, Notifications, Activity, CIR, Graphics). The shared pieces (.page-head, .tabs/.tab,
+   .card, .card-head, .card-body, .card-foot, .table, .badge, .stat, .dot, .avatar, .progress, .toggle, .switch, .chip, .alert, .input,
+   .select, .field, .row, .stack, .faint) come from styles/components.css unchanged; this block holds only what the admin mockup adds in its
+   own <style> (.adm-cols, .hh, .swatches, .disk) and the few layout helpers of these pages. Scoped to `.adm`; colours are tokens only.
    ========================================================================= */
+/* the mockup .page: content-max includes the side padding, so the content is 64 px narrower than the shared .v2-page makes it on a wide screen */
+.v2-page.adm { padding-left: max(var(--space-8), calc((100% - var(--content-max)) / 2 + var(--space-8))); padding-right: max(var(--space-8), calc((100% - var(--content-max)) / 2 + var(--space-8))); }
+@media (max-width: 1180px) { .v2-page.adm { padding-left: var(--space-5); padding-right: var(--space-5); } }
 .adm .page-head h1, .adm .page-head h2 { margin: 0; font-size: var(--fs-xl); font-weight: var(--fw-semibold); line-height: var(--lh-tight); }
 .adm .page-head p { margin-bottom: 0; }
-.adm .adm-head-icon { margin-right: var(--space-2); vertical-align: -3px; color: var(--text-link); }
 .adm .row.end { justify-content: flex-end; }
-.adm .mt8 { margin-top: var(--space-2); } .adm .mb4 { margin-bottom: var(--space-4); } .adm .w-150 { width: 150px; }
 .adm .narrow { max-width: 640px; }
+.adm .adm-narrow-col { max-width: 420px; }
 .adm .list-indent { padding-left: 18px; }
+.adm .mb4 { margin-bottom: var(--space-4); } .adm .w-150 { width: 150px; }
 .adm .card.mb4:last-child { margin-bottom: 0; }
+.adm .stack.adm-gap { gap: var(--space-4); } .adm .stack.adm-gap-4 { gap: var(--space-4); }
+.adm .stack > p, .adm .card-body p { margin: 0; }
+.adm .adm-xs { font-size: var(--fs-xs); }
+.adm .nowrap { white-space: nowrap; }
+.adm .adm-wrap { white-space: normal; }
+.adm .adm-list { margin: var(--space-1h) 0 0; padding-left: 18px; }
+.adm .adm-w-140 { width: 140px; } .adm .adm-w-180 { width: 180px; } .adm .adm-w-200 { width: 200px; } .adm .adm-w-220 { width: 220px; }
+.adm .adm-w-actions { width: 48px; }
+.adm .adm-td-end { text-align: right; white-space: nowrap; }
+.adm .adm-td-end .btn + .btn { margin-left: var(--space-2); }
+.adm .adm-grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.adm .adm-grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); align-items: start; }
+.adm .adm-start { align-items: start; }
+@media (max-width: 900px) { .adm .adm-grid-2, .adm .adm-grid-3 { grid-template-columns: minmax(0, 1fr); } }
+
+/* the mockup's tab row under the page head, and a tab's sections as chips */
+.adm .adm-tabs { margin-bottom: var(--space-4); overflow-x: auto; scrollbar-width: none; }
+.adm .adm-tabs .tab { text-decoration: none; white-space: nowrap; flex: none; }
+.adm .adm-tabs .tab:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.adm .adm-sub { margin: calc(-1 * var(--space-1)) 0 var(--space-4); }
+.adm .adm-sub .chip { text-decoration: none; height: 26px; padding: 0 var(--space-3); font-weight: var(--fw-medium); }
+.adm .adm-sub .chip:hover { border-color: var(--border-control); color: var(--text-primary); text-decoration: none; }
+.adm .adm-sub .chip[aria-current="page"] { background: var(--surface-selected); border-color: transparent; color: var(--text-link); }
+.adm .adm-sub .chip:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.adm .adm-sub-sep { width: 1px; align-self: stretch; margin: 2px var(--space-1); background: var(--border-default); }
+
+/* a section's own heading under the tabs, and a card head with a second line */
+.adm .adm-sec-head { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.adm .adm-sec-head h3 { font-size: var(--fs-md); font-weight: var(--fw-semibold); }
+.adm .adm-sec-head p { margin-top: var(--space-1); font-size: var(--fs-xs); max-width: 80ch; }
+.adm .adm-card-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.adm .adm-card-title p { font-size: var(--fs-xs); font-weight: var(--fw-regular); max-width: 80ch; }
 .adm .card-head { flex-wrap: wrap; }
 .adm .card-head h3 { margin: 0; font-size: var(--fs-md); }
 .adm .card-head h3 .count { color: var(--text-tertiary); font-weight: var(--fw-regular); }
+.adm .card-head > a { font-size: var(--fs-sm); }
 .adm .card-head.v2-gfx-project-head { margin-bottom: 0; }
+.adm .card-foot { justify-content: flex-start; }
 
-/* health tiles above the sections (mockup .hh) and the two-column body (mockup .adm-cols) */
+/* health tiles (mockup .hh) and the two-column body (mockup .adm-cols) */
 .adm .hh { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); margin-bottom: var(--space-4); }
 .adm .hh.hh-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.adm .hh .stat .v { font-size: var(--fs-xl); margin-top: var(--space-1); }
+.adm .hh .stat .v { font-size: var(--fs-xl); }
 .adm .adm-cols { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: var(--space-4); align-items: start; }
 @media (max-width: 1280px) { .adm .adm-cols { grid-template-columns: minmax(0, 1fr); } .adm .hh, .adm .hh.hh-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) { .adm .hh, .adm .hh.hh-4 { grid-template-columns: minmax(0, 1fr); } }
 
-/* the older v2 cards and tables of these pages in the mockup's table language (inset header row, sentence case) */
+/* the users table: avatar, name and username; badges; the row's Actions button */
+.adm .user-cell { gap: var(--space-3); min-width: 0; }
+.adm .user-cell .who { gap: 0; min-width: 0; }
+.adm .nm { font-weight: var(--fw-medium); }
+.adm .user-cell .who .faint { font-size: var(--fs-xs); }
+.adm .adm-badges { gap: var(--space-1); flex-wrap: wrap; }
+.adm .adm-search { width: 220px; }
+
+/* the audit log's filter bar inside its card */
+.adm .adm-filters { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border-subtle); }
+.adm .adm-filters .input { height: 30px; width: auto; }
+.adm .adm-date { gap: var(--space-1h); color: var(--text-secondary); font-size: var(--fs-xs); }
+
+/* appearance defaults: accent swatches and the two-theme contrast check (mockup .swatches / .sw) */
+.adm .field .fl { font-weight: var(--fw-medium); color: var(--text-secondary); font-size: var(--fs-xs); }
+.adm .swatches { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; }
+.adm .sw { width: 28px; height: 28px; border-radius: var(--radius-md); border: 2px solid var(--surface-panel); box-shadow: 0 0 0 1px var(--border-control); cursor: pointer; padding: 0; }
+.adm .sw[aria-checked="true"], .adm .sw-custom.on { box-shadow: 0 0 0 2px var(--focus-ring); }
+.adm .sw:focus-visible, .adm .sw-custom:focus-within { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.adm .sw-custom { position: relative; display: inline-grid; place-items: center; background: var(--surface-inset); color: var(--text-secondary); }
+.adm .sw-custom input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
+.adm .contrast { font-size: var(--fs-xs); }
+.adm .contrast td.num { white-space: nowrap; }
+.adm .contrast td.pass { color: var(--success); } .adm .contrast td.fail { color: var(--danger); }
+.adm .contrast td .ico, .adm .contrast td svg { vertical-align: -3px; }
+.adm .toggle .t { font-weight: var(--fw-medium); } .adm .toggle .d { color: var(--text-tertiary); font-size: var(--fs-xs); }
+
+/* storage meters (mockup .disk) */
+.adm .disk { list-style: none; margin: 0; padding: 0; }
+.adm .disk li { display: grid; grid-template-columns: 1fr auto; gap: var(--space-1) var(--space-3); padding: var(--space-2) var(--space-4); }
+.adm .disk li + li { border-top: 1px solid var(--border-subtle); } .adm .disk .progress { grid-column: 1 / -1; }
+
+/* maintenance tools: the action at the foot of each card */
+.adm .adm-tool { display: flex; flex-direction: column; }
+.adm .adm-tool .card-body { flex: 1; }
+.adm .adm-tool .card-body .row.end { margin-top: auto; }
+
+/* the older v2 cards and tables still on these pages (Access, S1000D sections) in the mockup's table language */
 .adm .v2-card { background: var(--surface-panel); border-color: var(--border-default); border-radius: var(--radius-lg); }
 .adm .v2-card-head { padding: var(--space-3) var(--space-4); border-bottom-color: var(--border-subtle); flex-wrap: wrap; }
 .adm .v2-scroll-x { overflow: auto; }
@@ -98,34 +137,22 @@
 .adm .v2-table tbody tr:hover td { background: var(--surface-hover); }
 .adm .v2-card > .v2-table thead tr:first-child th:first-child, .adm .v2-card > .v2-scroll-x .v2-table thead tr:first-child th:first-child { border-top-left-radius: var(--radius-lg); }
 .adm .v2-card > .v2-table thead tr:first-child th:last-child, .adm .v2-card > .v2-scroll-x .v2-table thead tr:first-child th:last-child { border-top-right-radius: var(--radius-lg); }
-.adm .user-cell { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
-.adm .user-cell .who { display: flex; flex-direction: column; min-width: 0; }
-.adm .user-cell .who strong { font-weight: var(--fw-medium); } .adm .user-cell .who span { font-size: var(--fs-xs); color: var(--text-tertiary); }
+.adm .v2-admin-head h3 { font-size: var(--fs-md); font-weight: var(--fw-semibold); }
+.adm .v2-admin-head .v2-sub { color: var(--text-tertiary); font-size: var(--fs-xs); }
 
-/* the section navigation, in the mockup's navigation language (group label, items, selected state) */
-.adm .v2-admin-nav { background: var(--surface-panel); border-color: var(--border-default); border-radius: var(--radius-lg); gap: var(--space-1); padding: var(--space-2); }
-.adm .v2-admin-group { font-size: var(--fs-2xs); font-weight: var(--fw-semibold); letter-spacing: .06em; color: var(--text-tertiary); padding: var(--space-3) var(--space-3) var(--space-1); }
-.adm .v2-admin-nav a { display: flex; align-items: center; min-height: 30px; padding: 0 var(--space-3); border-radius: var(--radius-md); color: var(--text-secondary); font-weight: var(--fw-medium); }
-.adm .v2-admin-nav a:hover { background: var(--surface-hover); color: var(--text-primary); }
-.adm .v2-admin-nav a.active { background: var(--surface-selected); color: var(--text-link); font-weight: var(--fw-semibold); }
-.adm .v2-admin-head h3 { font-size: var(--fs-lg); font-weight: var(--fw-semibold); }
-.adm .v2-admin-head .v2-sub { color: var(--text-secondary); }
+/* the mockup's confirm dialog (components/ui.tsx Modal with an icon): the icon in a tinted circle before the title, the body indented under
+   the title, the buttons on an inset footer */
+.modal.modal-confirm { border-radius: var(--radius-xl); background: var(--surface-raised); border-color: var(--border-default); box-shadow: var(--shadow-3); }
+.modal.modal-confirm .modal-head { display: flex; justify-content: flex-start; gap: var(--space-3); align-items: flex-start; padding: var(--space-4) var(--space-4) 0; border-bottom: 0; }
+.modal.modal-confirm .modal-title { font-size: var(--fs-lg); font-weight: var(--fw-semibold); line-height: 36px; margin: 0; }
+.modal.modal-confirm .ico-wrap { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--danger-subtle); color: var(--danger); }
+.modal.modal-confirm .ico-wrap.warning { background: var(--warning-subtle); color: var(--warning); } .modal.modal-confirm .ico-wrap.info { background: var(--info-subtle); color: var(--info); }
+.modal.modal-confirm .modal-body { padding: var(--space-2) var(--space-4) var(--space-4) calc(var(--space-4) + 48px); color: var(--text-secondary); }
+.modal.modal-confirm .modal-body p { margin: 0; }
+.modal.modal-confirm .modal-buttons { display: flex; justify-content: flex-end; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-top: 1px solid var(--border-subtle); background: var(--surface-inset); border-radius: 0 0 var(--radius-xl) var(--radius-xl); }
 
-/* appearance defaults: accent swatches and the two-theme contrast check */
-.adm .swatches { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; }
-.adm .sw { width: 28px; height: 28px; border-radius: var(--radius-md); border: 2px solid var(--surface-panel); box-shadow: 0 0 0 1px var(--border-control); cursor: pointer; padding: 0; }
-.adm .sw[aria-checked="true"] { box-shadow: 0 0 0 2px var(--focus-ring); }
-.adm .sw:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
-.adm .contrast td.pass { color: var(--success); font-weight: var(--fw-semibold); } .adm .contrast td.fail { color: var(--danger); font-weight: var(--fw-semibold); }
-.adm .toggle .t { font-weight: var(--fw-medium); } .adm .toggle .d { color: var(--text-tertiary); font-size: var(--fs-xs); }
-
-/* storage meters (mockup .disk) */
-.adm .disk { list-style: none; margin: 0; padding: 0; }
-.adm .disk li { display: grid; grid-template-columns: 1fr auto; gap: var(--space-1) var(--space-3); padding: var(--space-2) var(--space-4); }
-.adm .disk li + li { border-top: 1px solid var(--border-subtle); } .adm .disk .progress { grid-column: 1 / -1; }
-
-/* Settings tabs in the mockup's tab language */
-.adm .v2-tabs { gap: var(--space-1); border-bottom-color: var(--border-default); margin-bottom: var(--space-4); }
-.adm .v2-tab { height: 36px; padding: 0 var(--space-3); display: inline-flex; align-items: center; color: var(--text-secondary); font-weight: var(--fw-medium); }
-.adm .v2-tab:hover { color: var(--text-primary); background: var(--surface-hover); }
-.adm .v2-tab.active { color: var(--text-link); border-bottom-color: var(--accent); }
+/* the platform backup card: the storage meters as a band under the head; the schedule as the card's foot note */
+.adm .adm-disk-band { border-bottom: 1px solid var(--border-subtle); }
+.adm .card-foot.adm-foot-text { display: block; }
+.adm .btn.sm + .btn.sm, .adm .adm-td-end .btn + .icon-btn { margin-left: var(--space-1h); }
+.adm .adm-td-end .icon-btn { vertical-align: middle; }

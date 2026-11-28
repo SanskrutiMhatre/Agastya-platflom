@@ -13,6 +13,7 @@ export interface MenuAction {
   icon?: IconName;
   danger?: boolean;
   disabled?: boolean;
+  testId?: string;
 }
 
 type At = { x: number; y: number; actions: MenuAction[]; label: string; back: HTMLElement | null };
@@ -21,6 +22,8 @@ export function useContextMenu(): {
   /** Props for the element that owns the menu: right-click, the Menu key and Shift+F10 open it. */
   bind: (label: string, actions: MenuAction[]) => { onContextMenu: (e: ReactMouseEvent) => void; onKeyDown: (e: ReactKeyboardEvent) => void };
   menu: ReactNode;
+  /** Open the same menu under a visible button (a table row's "Actions" button); the focus returns to that button. */
+  open: (from: HTMLElement, label: string, actions: MenuAction[]) => void;
 } {
   const [at, setAt] = useState<At | null>(null);
   const bind = (label: string, actions: MenuAction[]) => ({
@@ -37,7 +40,12 @@ export function useContextMenu(): {
     },
   });
   const menu = at ? <MenuBox at={at} onClose={(refocus) => { const back = at.back; setAt(null); if (refocus && back?.isConnected) back.focus(); }} /> : null;
-  return { bind, menu };
+  const open = (from: HTMLElement, label: string, actions: MenuAction[]) => {
+    if (!actions.length) return;
+    const r = from.getBoundingClientRect();
+    setAt({ x: r.right - 220, y: r.bottom + 4, actions, label, back: from });
+  };
+  return { bind, menu, open };
 }
 
 function MenuBox({ at, onClose }: { at: At; onClose: (refocus: boolean) => void }) {
@@ -68,7 +76,7 @@ function MenuBox({ at, onClose }: { at: At; onClose: (refocus: boolean) => void 
   return createPortal(
     <div ref={box} className="v2-ctx" role="menu" aria-label={at.label} style={{ left: pos.left, top: pos.top }} onKeyDown={keys} data-testid="context-menu">
       {at.actions.map((a) => (
-        <button key={a.label} type="button" role="menuitem" tabIndex={-1} disabled={a.disabled} className={`v2-ctx-item${a.danger ? ' danger' : ''}`}
+        <button key={a.label} type="button" role="menuitem" tabIndex={-1} disabled={a.disabled} data-testid={a.testId} className={`v2-ctx-item${a.danger ? ' danger' : ''}`}
           onClick={() => { onClose(true); a.onSelect(); }}>
           {a.icon ? <Icon name={a.icon} size={14} /> : <span className="v2-ctx-pad" />}{a.label}
         </button>

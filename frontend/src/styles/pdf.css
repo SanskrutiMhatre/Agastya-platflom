@@ -93,3 +93,16 @@
 .pdfv.compact .vbar .zoom { min-width: 36px; }
 .pdfv.compact .vbar .btn.sm { padding: 0 var(--space-1h); }
 .pdfv.compact .vbar .find .input { height: 24px; }
+
+/* the pages on the canvas (mockup 4: .pages / .sheet / .pageno): a centred column, 20 px apart, the page number under each sheet */
+.pdfv-pages { display: flex; flex-direction: column; align-items: center; gap: var(--space-5); padding: var(--space-5) var(--space-4) var(--space-8); }
+.pdfv-sheet { box-shadow: var(--shadow-2); }
+.pdfv.compact .pdfv-sheet { box-shadow: var(--viewer-page-shadow); }
+.pdfv-pages .pageno { align-self: center; color: var(--text-secondary); font-size: var(--fs-xs); margin-top: calc(var(--space-4) * -1); font-variant-numeric: tabular-nums; }
+/* the full toolbar: the mockup's sizes (body-size page count and zoom, a find box that opens from the Search button) */
+.pdfv:not(.compact) .vbar { min-height: 40px; }
+.pdfv:not(.compact) .vbar .pg, .pdfv:not(.compact) .vbar .zoom { font-size: inherit; }
+.pdfv .vbar .pg .of { white-space: nowrap; }
+.pdfv:not(.compact) .vbar .find .input { width: 160px; }
+/* the contents panel (the PDF bookmarks): a panel of the app in both themes */
+.pdfv-toc { width: 230px; flex-shrink: 0; overflow: auto; background: var(--surface-panel); border-right: 1px solid var(--border-default); padding: var(--space-2) var(--space-1); font-size: var(--fs-xs); }

@@ -12,7 +12,7 @@ import { signInThrottled } from './services/securityEvents';
 import { accessLog } from './services/log';
 import { HttpError } from './services/http';
 import { registerAuditRoutes } from './routes/audit';
-import { readiness } from './services/readiness';
+import { readiness, systemFigures } from './services/readiness';
 import { requestContextMiddleware } from './services/requestContext';
 import { securityHeaders } from './services/securityHeaders';
 import { compressResponses, clientStatic, STUDIO_SCHEMA_SETS } from './services/delivery';
@@ -120,7 +120,7 @@ export function createApp(): express.Express {
     collab: { closeDocumentConnectionsForUser: () => undefined },
     onProjectDecided: () => undefined,
     onAccess: notifyAccess,
-    securityPolicy, auditHealth, authProvider,
+    securityPolicy, auditHealth, authProvider, systemFigures: () => systemFigures(defaultContext()),
     auditedTx, onSignInThrottled: signInThrottled,       // WP-29: critical actions in one transaction with their audit row; event 4111
   });
   registerJssGuard(app);                 // before every S1000D-side writer: a JSS document project's publication.xml is never replaced by them
