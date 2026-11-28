@@ -72,8 +72,6 @@ html[data-editor-focus] .v2-pshell > .v2-rail { visibility: hidden; overflow: hi
 .v2-divider { flex: none; width: 5px; cursor: col-resize; background: var(--border); transition: background .1s; touch-action: none; }
 .v2-divider:hover, .v2-divider.drag { background: var(--accent); }
 .v2-dmpanel { flex: 0 0 248px; display: flex; flex-direction: column; min-height: 0; background: var(--bg-elev); border-right: 1px solid var(--border); }
-.v2-dmpanel-head { padding: 10px 12px 6px; }
-.v2-dmpanel-head h2 { margin: 0; font-size: 13.5px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .v2-btngroup { display: inline-flex; }
 .v2-btngroup > .btn:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .v2-btngroup > .btn:last-child { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: -1px; padding: 0 7px; }
@@ -90,7 +88,6 @@ html[data-editor-focus] .v2-pshell > .v2-rail { visibility: hidden; overflow: hi
 .v2-diff.after { border-left: 3px solid var(--success); }
 .v2-pickbtns { display: flex; gap: 8px; flex-wrap: wrap; }
 .v2-crumb { max-width: 36ch; font-size: 12.5px; }
-.v2-vsep { width: 1px; align-self: stretch; margin: 3px 2px; background: var(--border); }
 .v2-dmcount { padding: 0 12px 6px; font-size: 11.5px; }
 .v2-empty-steps { max-width: 300px; margin: 0 auto; padding: 20px 16px; text-align: left; }
 .v2-empty-steps > svg { display: block; margin: 0 auto 6px; color: var(--text-faint); }
@@ -117,3 +114,178 @@ html[data-editor-focus] .v2-pshell > .v2-rail { visibility: hidden; overflow: hi
 .v2-studio-host { position: relative; flex: 1; min-height: 0; min-width: 0; }
 .v2-studio-host > .app { height: 100%; }
 .v2-pdfbar { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--border); background: var(--bg-elev); flex-wrap: wrap; }
+
+/* =========================================================================
+   UI redesign screen 3 (owner-approved mockup docs/audit/mockups/editor.html, 2026-11-28): the editor workspace around the canvases.
+   The components (.doctabs, .tree .node, .tabs, .statusbar, .pane, .pane-head, .panel-resize, .badge, .dot, .seg, .kv, .sec-h) come from
+   styles/components.css; this block is the page-level layout of editor.html (its <style>) plus the canvases' chrome in the same look.
+   ========================================================================= */
+
+/* the editor bar (page header): compact, chrome surface, the palette as the mockup's search trigger */
+.v2-edhead.ed-bar { min-height: 40px; padding-top: 4px; padding-bottom: 4px; gap: var(--space-2); background: var(--surface-chrome); border-bottom: 1px solid var(--border-default); }
+.v2-edhead.ed-bar .search-trigger { min-width: 200px; height: 30px; font-weight: var(--fw-regular); }
+.v2-edhead.ed-bar .search-trigger .v2-edcmd-label { flex: 1; text-align: left; }
+.v2-edhead.ed-bar .seg button.on { background: var(--surface-panel); color: var(--text-primary); box-shadow: var(--shadow-1); }
+@media (max-width: 1100px) { .v2-edhead.ed-bar .search-trigger { min-width: 0; } }
+
+/* ---------------------------------------------------------------- JSS / JSG: the workspace grid (center | props, problems under center) */
+.ed { --props-w: 288px; display: grid; flex: 1; min-height: 0; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); grid-template-areas: "center"; background: var(--surface-panel); }
+.ed.has-props { grid-template-columns: minmax(0, 1fr) 1px var(--props-w); grid-template-areas: "center rz2 props"; }
+.ed.has-problems { grid-template-rows: minmax(0, 1fr) min(180px, 25vh); grid-template-areas: "center" "problems"; }
+.ed.has-props.has-problems { grid-template-areas: "center rz2 props" "problems rz2 props"; }
+.ed > .center { grid-area: center; background: var(--surface-canvas); min-height: 0; }
+.ed > .center > .v2-split { flex: 1; min-height: 0; }
+.ed > .props { grid-area: props; } .ed > .rz2 { grid-area: rz2; } .ed > .problems { grid-area: problems; }
+.ed > .pane + .pane { border-left: 0; }
+.ed .doctabs { flex: none; align-items: flex-end; }
+.ed .doctabs > .grow { flex: 1; }
+.ed .doctabs > .icon-btn { align-self: center; width: 28px; height: 28px; }
+.ed .doctab { cursor: default; }
+.ed-statusbar { height: var(--status-h); flex: none; }
+.ed-statusbar > .grow { flex: 1; }
+.ed-statusbar .v2-edstate, .ed-status-slot .v2-edstate { height: 18px; font-size: var(--fs-2xs); }
+
+/* the Properties panel */
+.ed .props .tabs, .ed .problems .tabs { padding: 0 var(--space-1) 0 var(--space-2); flex: none; height: 32px; align-items: stretch; }
+.ed .props .tab, .ed .problems .tab { height: 32px; font-size: var(--fs-xs); color: var(--text-link); cursor: default; }
+.ed .props .tab::after, .ed .problems .tab::after { content: ""; position: absolute; left: var(--space-2); right: var(--space-2); bottom: -1px; height: 2px; background: var(--accent); border-radius: 2px; }
+.ed .grow-r { margin-left: auto; align-self: center; display: flex; gap: var(--space-2); align-items: center; }
+.ed .grow-r .icon-btn { width: 24px; height: 24px; }
+.props-body { overflow: auto; flex: 1; padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-3); }
+.el-title { display: flex; flex-direction: column; gap: 2px; }
+.el-title .mono { color: var(--syntax-tag); font-weight: var(--fw-semibold); font-size: var(--fs-md); }
+
+/* the Problems panel (JSG) */
+.ed .problems { border-top: 1px solid var(--border-default); }
+.plist { overflow: auto; flex: 1; margin: 0; padding: 0; list-style: none; }
+.prob { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto auto; gap: var(--space-3); align-items: center; height: var(--row-h); padding: 0 var(--space-3); border-bottom: 1px solid var(--border-subtle); font-size: var(--fs-xs); }
+.prob[tabindex="0"] { cursor: pointer; }
+.prob .mono { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prob:hover { background: var(--surface-hover); }
+.prob .ico { color: var(--danger); display: grid; place-items: center; } .prob.w .ico { color: var(--warning); }
+.prob-none { padding: var(--space-3); color: var(--text-tertiary); font-size: var(--fs-xs); }
+
+/* the JSS canvas: its outline is the explorer (full height, left), its toolbar and sheet the centre, its Problems drawer under the sheet */
+.ed .jss-root { display: grid; grid-template-columns: 248px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; grid-template-areas: "tree toolbar" "tree canvas" "tree problems"; background: var(--surface-canvas); }
+.ed .jss-root > .jss-main { display: contents; }
+.ed .jss-root .jss-outline { grid-area: tree; width: auto; min-height: 0; background: var(--surface-panel); border-right: 1px solid var(--border-default); padding: 0 0 var(--space-2); }
+.ed .jss-root .jss-outline h3 { display: flex; align-items: center; height: 32px; margin: 0; padding: 0 var(--space-3); font-size: var(--fs-2xs); font-weight: var(--fw-semibold); letter-spacing: .06em; color: var(--text-secondary); }
+.ed .jss-root .jss-ol { min-height: var(--row-h); margin: 0 var(--space-2); padding: 2px var(--space-2); border-left: 0; border-radius: var(--radius-md); color: var(--text-primary); align-items: center; }
+.ed .jss-root .jss-ol:hover { background: var(--surface-hover); }
+.ed .jss-root .jss-ol.cur { background: var(--surface-selected); color: var(--text-link); }
+.ed .jss-root .jss-ol .n { color: var(--text-tertiary); }
+.ed .jss-root .jss-ol.ch { color: var(--text-secondary); font-weight: var(--fw-semibold); }
+.ed .jss-root .jss-toolbar { grid-area: toolbar; background: var(--surface-panel); border-bottom: 1px solid var(--border-default); }
+.ed .jss-root .jss-tabs { padding: 0 var(--space-2); background: var(--surface-panel); border-bottom: 1px solid var(--border-subtle); }
+.ed .jss-root .jss-tab { height: 32px; border: 0; border-radius: 0; position: relative; color: var(--text-secondary); font-size: var(--fs-xs); }
+.ed .jss-root .jss-tab.on { background: none; color: var(--text-link); border: 0; }
+.ed .jss-root .jss-tab.on::after { content: ""; position: absolute; left: var(--space-2); right: var(--space-2); bottom: 0; height: 2px; background: var(--accent); border-radius: 2px; }
+.ed .jss-root .jss-panels { background: var(--surface-panel); }
+.ed .jss-root .jss-panel { min-height: 0; padding: var(--space-1) var(--space-2); }
+.ed .jss-root .jss-tb { height: 28px; border-radius: var(--radius-md); color: var(--text-secondary); }
+.ed .jss-root .jss-tb:hover:not(:disabled) { background: var(--surface-hover); color: var(--text-primary); }
+.ed .jss-root .jss-tb.on { background: var(--surface-selected); color: var(--text-link); border-color: transparent; }
+.ed .jss-root .jss-scroll, .ed .jss-root .jss-source { grid-area: canvas; min-height: 0; background: var(--surface-canvas); }
+.ed .jss-root .jss-problems { grid-area: problems; background: var(--surface-panel); border-top: 1px solid var(--border-default); }
+.ed .jss-root .jss-problems summary { height: 32px; display: flex; align-items: center; padding: 0 var(--space-3); font-size: var(--fs-xs); background: var(--surface-panel); color: var(--text-secondary); }
+.ed .jss-root .jss-pr { min-height: var(--row-h); align-items: center; border-bottom: 1px solid var(--border-subtle); font-size: var(--fs-xs); }
+@media (max-width: 900px) { .ed .jss-root { grid-template-columns: minmax(0, 1fr); grid-template-areas: "toolbar" "canvas" "problems"; } }
+
+/* the JSG canvas: its outline is the explorer, its bar the toolbar, its status line the path bar under the toolbar */
+.ed .jsg-ed { background: var(--surface-canvas); }
+.ed .jsg-nav { flex: 0 0 248px; background: var(--surface-panel); border-right: 1px solid var(--border-default); padding: 0 var(--space-2) var(--space-2); }
+.ed .jsg-nav h4 { display: flex; align-items: center; height: 32px; margin: 0; padding: 0 var(--space-1); font-size: var(--fs-2xs); font-weight: var(--fw-semibold); letter-spacing: .06em; color: var(--text-secondary); }
+.ed .jsg-nav a { display: flex; align-items: center; min-height: var(--row-h); padding: 0 var(--space-2); border-radius: var(--radius-md); color: var(--text-primary); }
+.ed .jsg-nav a:hover { background: var(--surface-hover); }
+.ed .jsg-nav a.l2 { padding-left: 24px; } .ed .jsg-nav a.l3 { padding-left: 40px; }
+.ed .jsg-bar { background: var(--surface-panel); border-bottom: 1px solid var(--border-default); order: 0; }
+.ed .jsg-main > .jsg-status { order: 1; height: 24px; flex: none; display: flex; align-items: center; gap: var(--space-3); padding: 0 var(--space-3); font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-tertiary); background: var(--surface-panel); border-top: 0; border-bottom: 1px solid var(--border-subtle); overflow: hidden; white-space: nowrap; }
+.ed .jsg-main > .jsg-status select { height: 20px; font-size: var(--fs-2xs); }
+.ed .jsg-main > .jsg-find { order: 2; }
+.ed .jsg-main > :not(.jsg-bar):not(.jsg-status):not(.jsg-find) { order: 3; }
+.ed .jsg-scroll { background: var(--surface-canvas); }
+
+/* ---------------------------------------------------------------- S1000D: the explorer (data modules) beside the Studio */
+.ed-s1000d { background: var(--surface-panel); }
+.ed-s1000d > .v2-divider.panel-resize { width: 7px; margin: 0 -3px; z-index: 2; position: relative; cursor: col-resize; background: linear-gradient(var(--border-default), var(--border-default)) center / 1px 100% no-repeat; }
+.ed-s1000d > .v2-divider.panel-resize::after { content: none; }
+.ed-s1000d > .v2-divider.panel-resize:hover, .ed-s1000d > .v2-divider.panel-resize.drag { background: linear-gradient(var(--accent), var(--accent)) center / 3px 100% no-repeat; }
+.v2-dmpanel.tree-pane { background: var(--surface-panel); border-right: 0; }
+.tree-pane .ed-explorer { flex: 1; min-height: 120px; border-top: 0; }
+.tree-pane .ed-explorer-tools { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1); row-gap: var(--space-1h); padding: 0 var(--space-2) var(--space-2); text-transform: none; letter-spacing: 0; font-weight: var(--fw-regular); }
+.tree-pane .ed-explorer-tools .icon-btn { width: 26px; height: 26px; }
+.tree-pane .ed-explorer-tools .seg button { height: 22px; font-size: var(--fs-xs); }
+.tree-pane .ed-explorer-tools .seg button.on { background: var(--surface-panel); color: var(--text-primary); box-shadow: var(--shadow-1); }
+.tree-pane .search-box { margin: 0 var(--space-2) var(--space-2); border-color: var(--border-default); background: var(--surface-inset); }
+.tree-pane .search-box:focus-within { border-color: var(--accent); box-shadow: none; outline: 2px solid var(--focus-ring); outline-offset: -1px; }
+.tree-pane .tree-scroll { overflow: auto; flex: 1; padding: 0 var(--space-2) var(--space-2); }
+.tree-foot { border-top: 1px solid var(--border-subtle); padding: var(--space-1h) var(--space-3); color: var(--text-secondary); font-size: var(--fs-xs); display: flex; gap: var(--space-3); flex: none; }
+.tree-foot .ed-foot-warn { color: var(--warning); }
+.tree-pane .tree .node { gap: var(--space-1); padding: 0 var(--space-1) 0 calc(var(--space-1) + var(--depth, 0) * 14px); }
+.tree-pane .tree .node.ed-node { cursor: default; }
+.tree-pane .tree .node > .ed-node-btn { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-1h); height: 100%; padding: 0; border: 0; border-radius: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.v2-dmpanel .tree .v2-dm.ed-node-btn, .v2-dmpanel .tree .v2-dm.ed-node-btn.active { border-left: 0; background: none; }
+.tree-pane .tree .node > .ed-node-btn > svg { color: var(--text-tertiary); flex: none; }
+.tree-pane .tree .node[aria-selected="true"] > .ed-node-btn > svg { color: var(--text-link); }
+.tree-pane .tree .node .t.label { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.tree-pane .tree .node .t.label b { font-weight: var(--fw-regular); font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-pane .tree .node[aria-selected="true"] .t.label b { font-weight: var(--fw-medium); }
+.tree-pane .tree .node .t.label > span { display: none; }
+.tree-pane .tree .node .ed-node-del { width: 22px; height: 22px; opacity: 0; }
+.tree-pane .tree .node:hover .ed-node-del, .tree-pane .tree .node .ed-node-del:focus-visible { opacity: .7; }
+.tree-pane .tree .v2-chap.node { width: 100%; height: var(--row-h); border: 0; background: none; font: inherit; font-size: var(--fs-sm); font-weight: var(--fw-semibold); color: var(--text-secondary); text-align: left; letter-spacing: 0; }
+.tree-pane .tree .v2-chap.node:hover { background: var(--surface-hover); }
+.tree-pane .tree .v2-chap.node .twist, .tree-pane .tree .v2-chap.node svg { color: var(--text-tertiary); flex: none; }
+.tree-pane .tree .v2-chap.static.node { margin-top: var(--space-2); text-transform: uppercase; letter-spacing: .05em; font-size: var(--fs-2xs); cursor: default; }
+.tree-pane .tree .ed-node-missing { color: var(--warning); font-size: var(--fs-xs); cursor: default; }
+/* the untitled (new) documents keep their two lines */
+.tree-pane .tree > .v2-dm { border-left: 0; border-radius: var(--radius-md); }
+
+/* ---------------------------------------------------------------- S1000D: the Studio inside the platform, laid out as the mockup's workspace
+   tabs / toolbar (ribbon) / path / canvas / problems in the centre column, the outline on the left and the properties on the right of it,
+   the status bar under all three. The Studio's own elements, classes and commands are unchanged. */
+.app.app--embedded { height: 100%; min-height: 0; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto auto auto minmax(0, 1fr) auto var(--status-h);
+  grid-template-areas: "left tabs right" "left ribbon right" "left path right" "left center right" "left bottom right" "status status status"; background: var(--surface-canvas); }
+.app.app--embedded > .workspace { display: contents; }
+.app.app--embedded > .app-header { grid-area: tabs; height: var(--tab-h); padding: 0 var(--space-2); gap: var(--space-2); background: var(--surface-chrome); border-bottom: 1px solid var(--border-default); }
+.app.app--embedded > .ribbon { grid-area: ribbon; background: var(--surface-panel); border-bottom: 1px solid var(--border-default); box-shadow: none; }
+.app.app--embedded > .studio-pathbar { grid-area: path; display: flex; align-items: center; height: 24px; padding: 0 var(--space-3); font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-tertiary); background: var(--surface-panel); border-bottom: 1px solid var(--border-subtle); overflow: hidden; white-space: nowrap; min-width: 0; }
+.app.app--embedded > .studio-pathbar .crumb { font-size: var(--fs-xs); color: var(--text-tertiary); }
+.app.app--embedded > .studio-pathbar .crumb.active { color: var(--text-link); font-weight: var(--fw-medium); }
+.app.app--embedded .pane-left { grid-area: left; background: var(--surface-panel); border-right: 1px solid var(--border-default); }
+.app.app--embedded .pane-right { grid-area: right; background: var(--surface-panel); border-left: 1px solid var(--border-default); }
+.app.app--embedded .center { grid-area: center; background: var(--surface-canvas); }
+.app.app--embedded > .pane-bottom { grid-area: bottom; background: var(--surface-panel); border-top: 1px solid var(--border-default); }
+.app.app--embedded > .status-bar { grid-area: status; height: var(--status-h); gap: var(--space-4); padding: 0 var(--space-3); background: var(--surface-chrome); border-top: 1px solid var(--border-default); font-size: var(--fs-xs); color: var(--text-secondary); }
+.app.app--embedded > .status-bar .status-badge { font-size: var(--fs-xs); }
+.ed-status-slot { display: inline-flex; align-items: center; flex: none; }
+/* the open-document tabs in the mockup's look (.doctab) */
+.app.app--embedded .doc-tab { height: calc(var(--tab-h) - 4px); padding: 0 var(--space-2) 0 var(--space-3); border-radius: var(--radius-md) var(--radius-md) 0 0; color: var(--text-secondary); max-width: 240px; }
+.app.app--embedded .doc-tab:hover { background: var(--surface-hover); color: var(--text-primary); }
+.app.app--embedded .doc-tab.active { background: var(--surface-canvas); border-color: var(--border-default); color: var(--text-primary); }
+.app.app--embedded .doc-tab-dirty { color: var(--warning); }
+/* the ribbon tabs as the toolbar row; the Design | Tags | Split | XML switch as a .seg */
+.app.app--embedded .ribbon-tabs { height: 36px; padding: 0 var(--space-2); }
+.app.app--embedded .ribbon-tab { height: 28px; padding: 0 var(--space-3); color: var(--text-secondary); font-size: var(--fs-sm); }
+.app.app--embedded .ribbon-tab:hover { background: var(--surface-hover); color: var(--text-primary); }
+.app.app--embedded .ribbon-tab.active { color: var(--text-link); }
+.app.app--embedded .ribbon-tab.file-tab { background: var(--accent); color: var(--text-on-accent); }
+.app.app--embedded .ribbon-viewswitch { background: var(--surface-inset); border-color: var(--border-default); border-radius: var(--radius-md); }
+.app.app--embedded .vs-btn { color: var(--text-secondary); }
+.app.app--embedded .vs-btn.pressed { background: var(--surface-panel); color: var(--text-primary); }
+.app.app--embedded .ribbon-body { min-height: 72px; }
+.app.app--embedded .rb-large { height: 58px; }
+.app.app--embedded .rb-large .icon { color: var(--text-link); }
+.app.app--embedded .rb:hover:not(:disabled) { background: var(--surface-hover); }
+.app.app--embedded .rb.pressed { background: var(--surface-selected); color: var(--text-link); }
+/* the side panels' tabs (Attributes | Elements) and the Problems bar in the mockup's .tabs look */
+.app.app--embedded .panel-tabs { padding: 0 var(--space-1); border-bottom: 1px solid var(--border-default); }
+.app.app--embedded .panel-tab { height: 32px; padding: 0 var(--space-2); font-size: var(--fs-xs); color: var(--text-secondary); border-radius: 0; }
+.app.app--embedded .panel-tab.active { color: var(--text-link); }
+.app.app--embedded .panel-tab.active::after { background: var(--accent); }
+.app.app--embedded .panel-head { height: 32px; display: flex; align-items: center; padding: 0 var(--space-3); font-size: var(--fs-2xs); font-weight: var(--fw-semibold); letter-spacing: .06em; color: var(--text-secondary); }
+.app.app--embedded .problems-bar { min-height: 32px; padding: 0 var(--space-2); border-bottom: 1px solid var(--border-default); }
+.app.app--embedded .attr-el { color: var(--syntax-tag); }
+.app.app--embedded .outline-row { min-height: var(--row-h); margin: 0 var(--space-2); padding: 0 var(--space-2); border-left: 0; border-radius: var(--radius-md); }
+.app.app--embedded .outline-row:hover { background: var(--surface-hover); }
+.app.app--embedded .outline-row.current { background: var(--surface-selected); color: var(--text-link); }
