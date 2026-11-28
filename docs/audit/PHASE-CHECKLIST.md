@@ -13,7 +13,7 @@ Legend: ✅ done · ◐ done in part (limits in the log) · ⏸ parked by decisi
 - [x] No fake completion, no weakened tests, no feature lost; owner-removed features stay removed; Arial kept
 - [x] The original database is the source of truth; migrations are additive only
 - [x] Work in parallel to finish fast
-- [ ] The UI looks like the approved mockups (`docs/audit/mockups/`): in progress, section 4
+- [x] The UI looks like the approved mockups (`docs/audit/mockups/`): built, owner review pending (section 4)
 
 ## 2. Architecture positions (audit doc 17)
 
@@ -85,9 +85,9 @@ Legend: ✅ done · ◐ done in part (limits in the log) · ⏸ parked by decisi
 - ✅ Screen 4 - Publication and PDF preview
 - ✅ Screen 5 - Validation report
 - ✅ Screen 6 - Administration, settings, users, access, audit, backups and the other global pages
-- 🔄 Screen 1 - Global shell, project shell and main dashboard
-- 🔄 Shared fixes: button hover in the light theme, the editor "Built in" log line, themed PDF canvas token, unused shared classes (lint)
-- ⬜ Restart :4040 with the new UI for the owner's review
+- ✅ Screen 1 - Global shell, project shell and main dashboard
+- ✅ Shared fixes: button hover in the light theme, the editor "Built in" log line, themed PDF canvas token, unused shared classes (lint)
+- ✅ Restart :4040 with the new UI for the owner's review
 
 ## 5. Other work this session
 
@@ -105,8 +105,8 @@ Legend: ✅ done · ◐ done in part (limits in the log) · ⏸ parked by decisi
 
 ## 7. Still to do
 
-- ⬜ Finish screen 1 and the shared fixes; merge
-- ⬜ Restart :4040 with the new UI; owner review
+- ✅ Finish screen 1 and the shared fixes; merge
+- 🔄 Owner review of the new UI on :4040
 - ⬜ Re-run the full release gate on a quiet machine; fix what it finds
 - ⬜ Push `main` to GitHub (local `main` is ahead; nothing from this phase is pushed)
 - ⬜ External gates (section 6), with the owner
