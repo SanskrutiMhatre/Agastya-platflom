@@ -55,13 +55,20 @@ test('every project page names the project; the rail starts with Home and can be
     const home = rail.getByRole('link', { name: 'Home' });
     await expect(home).toBeVisible();
     await expect(home).toHaveAttribute('data-tip', 'Home');                                 // unpinned: icon only, the label is the tooltip
+    // the mockups' rail has no pin button: the switch is an item of the account menu inside a project
+    await page.getByTestId('account-menu').click();
+    await expect(page.getByTestId('rail-pin')).toHaveAttribute('aria-checked', 'false');
     await page.getByTestId('rail-pin').focus(); await page.keyboard.press('Enter');
-    await expect(page.getByTestId('rail-pin')).toHaveAttribute('aria-pressed', 'true');
     await expect(rail.locator('.v2-rail-label', { hasText: 'Home' })).toBeVisible();     // pinned: the labels are written out
     await page.reload();
-    await expect(page.getByTestId('rail-pin')).toHaveAttribute('aria-pressed', 'true');  // remembered
+    await expect(rail.locator('.v2-rail-label', { hasText: 'Home' })).toBeVisible();     // remembered
+    await page.getByTestId('account-menu').click();
+    await expect(page.getByTestId('rail-pin')).toHaveAttribute('aria-checked', 'true');
     await page.getByTestId('rail-pin').focus(); await page.keyboard.press('Enter');
-    await expect(page.getByTestId('rail-pin')).toHaveAttribute('aria-pressed', 'false');
+    await expect(rail.locator('.v2-rail-label', { hasText: 'Home' })).toHaveCount(0);
+    await page.getByTestId('account-menu').click();
+    await expect(page.getByTestId('rail-pin')).toHaveAttribute('aria-checked', 'false');
+    await page.getByTestId('account-menu').click();
     // opening a project still lands in the editor (the owner's rule); the editor page has no breadcrumb bar
     await page.goto(`/projects/${ids.jss}`);
     await expect(page).toHaveURL(/\/editor$/);

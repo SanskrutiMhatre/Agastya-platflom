@@ -34,6 +34,8 @@ test.afterAll(async () => { await owner.page.context().close(); await admin.disp
 
 async function open(browser: Browser, baseURL: string | undefined, size: (typeof SIZES)[number], scheme: (typeof SCHEMES)[number], who: APIRequestContext): Promise<Page> {
   const ctx = await browser.newContext({ storageState: await who.storageState(), viewport: { width: size.width, height: size.height }, colorScheme: scheme, baseURL });
+  // two themes only (owner rule 2026-11-28): the app does not follow the OS, so the theme is chosen the way a person chooses it
+  await ctx.addInitScript((t) => { try { localStorage.setItem('agastya.theme', t); } catch { /* none */ } }, scheme);
   const page = await ctx.newPage();
   page.on('pageerror', (e) => { throw new Error(`page error: ${e.message}`); });
   return page;

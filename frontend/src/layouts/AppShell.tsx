@@ -6,8 +6,9 @@
 //   author           Overview, Workspace, Projects, Graphics, CIR, Backup, Settings
 // Notifications and the account menu sit at the right of the top bar, icons only; the account menu names the role, never the person.
 
-import { useEffect } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { workspaceApi } from '../api';
 import { HeadingLevel, MAIN_ID, SkipLink, useDocumentTitle } from '../components/a11y';
 import { Icon, type IconName } from '../components/Icon';
 import { ThemeToggle } from '../components/ThemeToggle';
@@ -35,6 +36,8 @@ const NAV: Item[] = [
 const GROUP_HEAD: Record<Group, string | null> = { work: null, library: 'Library', operations: 'Operations', platform: 'Platform' };
 // Notifications is not in the sidebar: the bell in the top bar opens it.
 const TITLES: Record<string, string> = { '/notifications': 'Notifications' };
+// The breadcrumb names the area the way the mockups do (admin.html: "Platform / Administration"); the navigation keeps its own label.
+const CRUMB: Record<string, string> = { '/administrator': 'Administration' };
 const NAV_REUSE_MS = 30_000;
 const VERSION = typeof __AGASTYA_CLIENT_VERSION__ === 'string' ? __AGASTYA_CLIENT_VERSION__ : '';
 
@@ -57,6 +60,10 @@ export function AppShell() {
   const refreshCount = useInbox((s) => s.refreshCount);
   const loc = useLocation();
   const switcher = useQuickSwitcher();          // WP-22 (UX-021): Ctrl+K, Jump to…
+  // the mockup's count beside Projects: how many projects this person can open (a one-row page in the background, reused for 30 s)
+  const [projectCount, setProjectCount] = useState<number | null>(null);
+  useEffect(() => { let live = true; workspaceApi.projectCount().then((n) => { if (live) setProjectCount(n); }).catch(() => undefined); return () => { live = false; }; }, [loc.pathname]);
+  const unreachable = useSession((s) => s.unreachable);
 
   // Keep the badges (invitations, queues, unread notifications) fresh as the user moves around, and every half minute.
   // WP-18 (FE-020): an answer from the last 30 s is enough here, so moving around does not ask who is signed in each time; any write the
@@ -70,6 +77,7 @@ export function AppShell() {
   const current = items.find((n) => loc.pathname.startsWith(n.to));
   const title = current?.label ?? TITLES[loc.pathname] ?? appName;
   const groupHead = current ? GROUP_HEAD[current.group] : null;
+  const crumb = (current && CRUMB[current.to]) ?? title;
   useDocumentTitle(title, appName);
 
   return (
@@ -79,8 +87,8 @@ export function AppShell() {
         <div className="brand v2-brand"><span className="brand-mark"><Icon name="book" size={20} /></span><span className="trunc brand-name">{appName}</span></div>
         <nav className="crumbs" aria-label="Breadcrumb">
           <span className="sep" aria-hidden="true">/</span>
-          {groupHead ? <><span className="crumb-group">{groupHead}</span><span className="sep" aria-hidden="true">/</span></> : null}
-          <h1 className="crumb-current trunc" aria-current="page">{title}</h1>
+          {groupHead ? <><Link to="/overview" className="crumb-group">{groupHead}</Link><span className="sep" aria-hidden="true">/</span></> : null}
+          <h1 className="crumb-current trunc" aria-current="page">{crumb}</h1>
         </nav>
         <span className="grow" />
         <JumpButton onClick={() => switcher.setOpen(true)} />
@@ -99,10 +107,11 @@ export function AppShell() {
           <NavLink key={n.to} to={n.to} title={n.hint ?? n.label} className="nav-item">
             <Icon name={n.icon} /><span className="nav-label">{n.label}</span>
             {n.to === '/overview' && pendingInvitations > 0 ? <span className="count" title="Pending project invitations">{pendingInvitations}</span> : null}
+            {n.to === '/projects' && projectCount !== null ? <span className="count" aria-hidden="true" title="Projects you can open" data-testid="nav-project-count">{projectCount}</span> : null}
             {n.to === '/settings' && queued > 0 ? <span className="count" title="Items waiting for an administrator">{queued}</span> : null}
           </NavLink>,
         ])}
-        <div className="sidenav-foot faint">Offline · on-premises{VERSION ? <><br />v{VERSION}</> : null}</div>
+        <div className="sidenav-foot faint">Offline · on-premises<br />{VERSION ? <>v{VERSION} · </> : null}{unreachable ? 'Server not answering' : 'Server connected'}</div>
       </nav>
 
       <main id={MAIN_ID} className="main v2-main-region" tabIndex={-1}>

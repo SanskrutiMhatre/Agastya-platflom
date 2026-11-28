@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { authApi, notifyApi } from '../api';
 import { ApiError } from '../api/client';
 import { onSignedOut, useSession } from './session';
-import { applyTheme, useUi } from './ui';
+import { applyTheme, initialTheme, useUi } from './ui';
 import { useInbox } from './inbox';
 
 const user = (id = 'u1', username = 'asha') => ({ id, username, fullName: 'Asha Rao', role: 'author' }) as never;
@@ -102,17 +102,23 @@ describe('session store', () => {
 describe('ui store', () => {
   beforeEach(() => { useUi.setState({ toasts: [] }); localStorage.clear(); });
 
-  it('setTheme remembers light/dark, forgets "system", and sets the page theme', () => {
+  it('setTheme remembers light/dark and sets the page theme; there is no "system" theme and the OS is not followed', () => {
     vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('dark'), media: q, addEventListener() {}, removeEventListener() {} }));
     useUi.getState().setTheme('light');
     expect(localStorage.getItem('agastya.theme')).toBe('light'); expect(document.documentElement.dataset.theme).toBe('light');
     useUi.getState().setTheme('dark');
-    expect(document.documentElement.dataset.theme).toBe('dark');
-    useUi.getState().setTheme('system');
+    expect(localStorage.getItem('agastya.theme')).toBe('dark'); expect(document.documentElement.dataset.theme).toBe('dark');
+    // a new person: light, even though the OS prefers dark in this stub
+    localStorage.clear();
+    expect(initialTheme()).toBe('light');
+    // the organisation default decides until the person picks (TH-008)
+    localStorage.setItem('agastya.theme.default', 'dark');
+    expect(initialTheme()).toBe('dark');
+    // an old stored "system" is not a choice: it is cleared and the default applies
+    localStorage.setItem('agastya.theme', 'system'); localStorage.setItem('agastya.theme.default', 'light');
+    expect(initialTheme()).toBe('light');
     expect(localStorage.getItem('agastya.theme')).toBeNull();
-    expect(document.documentElement.dataset.theme).toBe('dark');             // the OS prefers dark in this stub
-    localStorage.setItem('agastya.theme.default', 'light'); applyTheme('system');
-    expect(document.documentElement.dataset.theme).toBe('light');            // the organisation default wins over the OS (TH-008)
+    applyTheme('dark'); expect(document.documentElement.dataset.theme).toBe('dark');
     vi.unstubAllGlobals();
   });
 

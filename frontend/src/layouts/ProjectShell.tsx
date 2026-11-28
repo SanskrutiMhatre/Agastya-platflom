@@ -9,7 +9,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { JumpButton, QuickSwitcher, useQuickSwitcher } from '../components/QuickSwitcher';
-import { workspaceApi, type ProjectRole, type Summary } from '../api';
+import { contentApi, workspaceApi, type ProjectRole, type Summary } from '../api';
 import { Icon } from '../components/Icon';
 import { projectRailItems } from './projectRail';
 import { Alert, Loading, errText } from '../components/ui';
@@ -20,7 +20,7 @@ import { useApp } from '../store/appSettings';
 import { useSession } from '../store/session';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { AccountMenu } from '../components/AccountMenu';
-import { formatLabel, RoleBadge } from '../components/project';
+import { formatLabel } from '../components/project';
 import { ShellSlotsContext } from './shellSlots';
 
 export interface ProjectCtx {
@@ -56,6 +56,9 @@ function ProjectShellFor({ id }: { id: string }) {
   const [actionsEl, setActionsEl] = useState<HTMLElement | null>(null);
   const [statusEl, setStatusEl] = useState<HTMLElement | null>(null);
   const unreachable = useSession((s) => s.unreachable);
+  // the mockup's status bar starts with the PDF renderer's state ("Renderer ready")
+  const [renderer, setRenderer] = useState<boolean | null>(null);
+  useEffect(() => { let live = true; contentApi.rendererStatus(id).then((r) => { if (live) setRenderer(r.warm); }).catch(() => undefined); return () => { live = false; }; }, [id]);
 
   const load = useCallback(() => {
     // A reply for another project (the shell was replaced meanwhile) is ignored by the unmount; one for an older request of this one is
@@ -87,6 +90,7 @@ function ProjectShellFor({ id }: { id: string }) {
   // WP-22 (UX-007): every project page names the project. The editors carry it in their own header; the other pages get the shell's top bar
   // (Projects / project / page) with the quick switcher, so the editing area keeps all its height.
   const inEditor = /\/editor\/?$/.test(loc.pathname);
+  const atHome = /\/home\/?$/.test(loc.pathname);
   const togglePin = () => setPinned((p) => { try { localStorage.setItem(PIN_KEY, p ? '0' : '1'); } catch { /* private mode */ } return !p; });
   const back = isCir ? { to: '/cir', label: 'Back to the repository', short: 'Repository' } : { to: '/workspace', label: 'Back to workspace', short: 'Workspace' };
   const railLink = (i: (typeof items)[number]) => (
@@ -104,17 +108,20 @@ function ProjectShellFor({ id }: { id: string }) {
           <header className="topbar" data-testid="project-bar">
             <Link to="/overview" className="brand" aria-label={`${appName} home`} title={`${appName} home`}><span className="brand-mark"><Icon name="book" size={20} /></span></Link>
             <nav className="crumbs" aria-label="Breadcrumb">
-              <Link to={isCir ? '/cir' : '/projects'}>{isCir ? 'Repository' : 'Projects'}</Link>
-              <span className="sep" aria-hidden="true">/</span>
-              <Link to={isCir ? 'editor' : 'home'} className="v2-pbar-name trunc" data-testid="project-bar-name" title={summary.project.name}>{summary.project.name}</Link>
-              {section ? <><span className="sep" aria-hidden="true">/</span><strong aria-current="page">{section}</strong></> : null}
-              <span className="crumb-meta"><RoleBadge role={summary.role} /></span>
+              {atHome ? <>
+                <Link to={isCir ? '/cir' : '/projects'}>{isCir ? 'Repository' : 'Projects'}</Link>
+                <span className="sep" aria-hidden="true">/</span>
+                <strong className="v2-pbar-name trunc" data-testid="project-bar-name" title={`${summary.project.name} · your role: ${summary.role}`} aria-current="page">{summary.project.name}</strong>
+              </> : <>
+                <Link to={isCir ? 'editor' : 'home'} className="v2-pbar-name trunc" data-testid="project-bar-name" title={`${summary.project.name} · your role: ${summary.role}`}>{summary.project.name}</Link>
+                {section ? <><span className="sep" aria-hidden="true">/</span><strong aria-current="page">{section}</strong></> : null}
+              </>}
             </nav>
             <span className="grow" />
-            <span className="topbar-actions row" ref={setActionsEl} />
             <JumpButton compact onClick={() => switcher.setOpen(true)} />
+            <span className="topbar-actions row" ref={setActionsEl} />
             <ThemeToggle />
-            <AccountMenu />
+            <AccountMenu railPin={{ pinned, toggle: togglePin }} />
           </header>
         )}
         <aside className={`activity v2-rail${pinned ? ' is-pinned' : ''}`} aria-label="Project navigation">
@@ -122,18 +129,11 @@ function ProjectShellFor({ id }: { id: string }) {
             <Icon name="back" size={18} />{pinned ? <span className="v2-rail-label">{back.short}</span> : null}
           </NavLink>
           <span className="act-sep" aria-hidden="true" />
-          <span className="act-project" data-tip={pinned ? undefined : `${summary.project.name} · ${summary.role}`} role="img" aria-label={`Project ${summary.project.name}, your role ${summary.role}`} tabIndex={0}>
-            {summary.project.name.trim().charAt(0).toUpperCase()}
-          </span>
           <nav className="v2-rail-nav" aria-label="Project sections">
             {areas.map(railLink)}
             <span className="spacer" aria-hidden="true" />
             {settings ? railLink(settings) : null}
           </nav>
-          <button type="button" className="act-btn v2-rail-item v2-rail-pin" onClick={togglePin} aria-pressed={pinned} data-testid="rail-pin"
-            aria-label={pinned ? 'Show icons only' : 'Show the names beside the icons'} data-tip={pinned ? undefined : 'Show the names beside the icons'}>
-            <Icon name={pinned ? 'collapse' : 'panel'} size={16} />{pinned ? <span className="v2-rail-label">Icons only</span> : null}
-          </button>
         </aside>
         <main id={MAIN_ID} className="main v2-main" tabIndex={-1}>
           {s1000d ? <MissingBrex projectId={id} canCreate={canWrite(ctx.can)} /> : null}
@@ -143,7 +143,7 @@ function ProjectShellFor({ id }: { id: string }) {
           <footer className="statusbar" data-testid="project-status-bar">
             <span className="page-status" ref={setStatusEl} />
             <span className="default-status">
-              <span className="item"><span className={`dot ${unreachable ? 'danger' : 'success'}`} />{unreachable ? 'Server not answering' : 'Server connected'}</span>
+              <span className="item"><span className={`dot ${unreachable ? 'danger' : renderer === false ? 'warning' : 'success'}`} />{unreachable ? 'Server not answering' : renderer === false ? 'Renderer starts with the first build' : 'Renderer ready'}</span>
               <span className="item">{formatLabel(summary.project)}</span>
               <span className="item">{summary.dataModules.total} data module{summary.dataModules.total === 1 ? '' : 's'}</span>
               <span className="grow" />

@@ -7,8 +7,7 @@
    ========================================================================= */
 
 /* the page: the mockup's .page (max-width var(--content-max), padding 24 32 40, centred) inside the app's scrolling .v2-page */
-.v2-page.v2-home { padding: var(--space-6) max(var(--space-8), calc((100% - var(--content-max)) / 2 + var(--space-8))) var(--space-10); color: var(--text-primary); font-size: var(--fs-sm); line-height: var(--lh-ui); }
-@media (max-width: 1180px) { .v2-page.v2-home { padding: var(--space-5) var(--space-5) var(--space-8); } }
+.v2-page.v2-home { color: var(--text-primary); font-size: var(--fs-sm); line-height: var(--lh-ui); }
 .v2-home a:not(.btn):not(.card):not(.badge):not(.cell) { color: var(--text-link); text-decoration: none; }
 .v2-home a:not(.btn):not(.card):not(.badge):not(.cell):hover { text-decoration: underline; }
 .v2-home a.badge { text-decoration: none; }
@@ -73,7 +72,7 @@
 /* "Working now" (WP-28): the foot of the Team card, one quiet line when nobody else is here */
 .v2-home .now { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-2); padding: var(--space-2) var(--space-4); border-top: 1px solid var(--border-subtle); font-size: var(--fs-xs); }
 .v2-home .now-h { font-size: inherit; font-weight: var(--fw-medium); color: var(--text-secondary); margin: 0; }
-.v2-home .now-list { flex-basis: 100%; display: flex; flex-direction: column; gap: var(--space-1h); font-size: inherit; }   /* also .v2-team-list (platform.css), whose 13px is not the foot's size */
+.v2-home .now-list { flex-basis: 100%; display: flex; flex-direction: column; gap: var(--space-1h); font-size: inherit; }
 .v2-home .now-list li { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
 .v2-home .avatar.sm { width: 22px; height: 22px; font-size: 10px; }
 .v2-home .avatar.here { box-shadow: 0 0 0 2px var(--success-solid); }
