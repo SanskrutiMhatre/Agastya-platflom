@@ -123,6 +123,8 @@ test('every content-write route carries the version guard (found from the live r
     'PUT /api/projects/:id/sns-rows/:rowId': 'one SNS row (database row)',
     'PATCH /api/projects/:id': 'rename (one field, owner only)',
     'PATCH /api/projects/:id/members/:userId': 'the role of a member (a database row)',
+    'PUT /api/projects/:id/pdf-review/annotations/:aid': 'one PDF review thread (a database row); a stale edit is refused by its updatedAt (409 EDIT_CONFLICT, Phase 3 P3-4)',
+    'PUT /api/projects/:id/pdf-review/settings': 'one switch (block a release while required PDF comments are open)',
   };
   const unguarded = routes.filter((r) => /^(PUT|PATCH) \/api\/projects\/:id/.test(r.label) && !guardedLabels.has(r.label)).map((r) => r.label);
   assert.deepEqual(unguarded.filter((r) => !EXEMPT[r]), [], 'a project PUT/PATCH with neither the guard nor a stated reason');

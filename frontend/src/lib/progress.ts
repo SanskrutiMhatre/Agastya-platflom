@@ -11,7 +11,9 @@ import { CLIENT_VERSION } from './handshake';
 const SESSION_ENDED = 4401;
 
 export interface ProgressMsg {
-  type: 'progress' | 'reload' | 'presence' | 'leases'; projectId: string; message?: string; done?: boolean; error?: boolean; file?: string; line?: number; hint?: string; preview?: boolean; kind?: string;
+  type: 'progress' | 'reload' | 'presence' | 'leases' | 'pdf-annotations'; projectId: string;
+  /** Phase 3 'pdf-annotations': the PDF (its key in the project), what changed, the thread and its new state (lib/pdfReview.ts) */
+  fileKey?: string; change?: 'created' | 'updated' | 'deleted' | 'reanchored'; id?: string; annotation?: unknown; message?: string; done?: boolean; error?: boolean; file?: string; line?: number; hint?: string; preview?: boolean; kind?: string;
   /** WP-28 'leases': the document (path in the project), the part, who held / holds it, and whether it was given back (or broken) */
   path?: string; part?: string; holder?: string | null; released?: boolean; broken?: boolean;
 }
@@ -61,7 +63,7 @@ export function useProgress(projectId: string): ProgressState {
   const [failed, setFailed] = useState<ProgressMsg | null>(null);
   const [reloadTick, setTick] = useState(0);
   useEffect(() => subscribe((m) => {
-    if (m.projectId !== projectId || m.preview || m.type === 'presence' || m.type === 'leases') return;
+    if (m.projectId !== projectId || m.preview || m.type === 'presence' || m.type === 'leases' || m.type === 'pdf-annotations') return;
     if (m.type === 'reload') { setTick((t) => t + 1); return; }
     if (m.message) setLines((l) => [...l.slice(-199), m.message!]);
     if (m.error) setFailed(m);

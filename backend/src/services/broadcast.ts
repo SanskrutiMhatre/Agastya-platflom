@@ -147,7 +147,9 @@ export type BroadcastMessage =
   /** WP-28: a check-out was taken (released false) or given back / broken / expired (released true) */
   | { type: 'leases'; path: string; part: string; holder: string | null; released: boolean; broken?: boolean }
   /** WP-14: a job changed state (queued, running, succeeded, failed, cancelled). No `message` field, so a progress pane ignores it. */
-  | { type: 'job'; job: Record<string, unknown> };
+  | { type: 'job'; job: Record<string, unknown> }
+  /** Phase 3 (P3-4): a PDF review thread of `fileKey` was created, changed, deleted, or the file's threads were re-anchored on a new version. */
+  | { type: 'pdf-annotations'; fileKey: string; change: 'created' | 'updated' | 'deleted' | 'reanchored'; id?: string; annotation?: Record<string, unknown> };
 
 /**
  * WP-14: in a job worker process there are no sockets; the worker hands every message to its server (services/jobs/worker.ts), which

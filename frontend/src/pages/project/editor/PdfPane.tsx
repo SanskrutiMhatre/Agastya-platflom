@@ -14,6 +14,7 @@ import { onlyRuleBreaks } from '../../../lib/ruleBreaks';
 import { ApiError } from '../../../api/client';
 import { Icon } from '../../../components/Icon';
 import { LazyPdfViewer } from '../../../components/pdf/LazyPdfViewer';
+import { usePaneAnnotations } from '../../../components/pdfreview/usePaneAnnotations';
 import { PublishRefusal } from '../../../components/PublishRefusal';
 import { Spinner, ago, errText } from '../../../components/ui';
 import { canBuild, type ProjectCtx } from '../../../layouts/ProjectShell';
@@ -41,6 +42,8 @@ export function PdfPane({ ctx, savedTick, onOpenAt, onPopped, slot = null, onRev
   const [auto, setAuto] = useState(() => localStorage.getItem('agastya.pdf.auto') !== '0');
   const [src, setSrc] = useState<string | null>(null);
   const [shown, setShown] = useState('');
+  // Phase 3 (P3-4): the PDF review threads, read-only on the generated publication (not on a Quick preview, a draft held in the browser)
+  const review = usePaneAnnotations(id, 'jss-output.pdf', !!src && shown.startsWith('Publication'));
   const [busy, setBusy] = useState<'quick' | 'build' | null>(null);
   const [problem, setProblem] = useState<Problem | null>(null);
   const [note, setNote] = useState('');
@@ -167,9 +170,9 @@ export function PdfPane({ ctx, savedTick, onOpenAt, onPopped, slot = null, onRev
         </div>
       ) : null}
       {popped.quick || popped.build ? <div className="v2-hint" style={{ padding: '4px 10px' }} data-testid="popped-note">{popped.quick && popped.build ? 'Quick preview and Generate are open in their own windows.' : popped.quick ? 'Quick preview is open in its own window.' : 'Generate is open in its own window.'}</div> : null}
-      {shown ? <div className="v2-hint v2-trunc" style={{ padding: '4px 10px' }} title={shown} data-testid="pdf-shown">{shown}</div> : null}
+      {shown ? <div className="v2-hint v2-trunc" style={{ padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 8 }} title={shown} data-testid="pdf-shown"><span className="v2-trunc" style={{ flex: 1 }}>{shown}</span>{review.badge}</div> : null}
       <div style={{ flex: 1, minHeight: 0, position: 'relative' }} data-testid="pdf-pane">
-        <LazyPdfViewer autoFit src={src} downloadName={`${summary.project.name}.pdf`}
+        <LazyPdfViewer autoFit src={src} downloadName={`${summary.project.name}.pdf`} pageOverlay={review.overlay}
           placeholder={<div className="v2-center"><div className="v2-empty v2-empty-steps">
             <Icon name="pdf" size={30} />
             <h3>No PDF yet</h3>
