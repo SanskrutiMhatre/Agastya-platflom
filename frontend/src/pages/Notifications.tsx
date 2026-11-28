@@ -35,12 +35,13 @@ export function Notifications() {
 
   return (
     <div className="v2-page adm">
-      <AdmHead icon="bell" title="Notifications" sub={unread ? `${unread} unread` : 'You are all caught up.'}
+      <AdmHead title="Notifications" sub={unread ? `${unread} unread` : 'You are all caught up.'}
         actions={<>
-          <div className="v2-seg" role="group" aria-label="Show"><button className={filter === 'all' ? 'on' : ''} onClick={() => setFilter('all')}>All</button><button className={filter === 'unread' ? 'on' : ''} onClick={() => setFilter('unread')}>Unread</button></div>
+          <div className="seg" role="group" aria-label="Show"><button type="button" aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>All</button><button type="button" aria-pressed={filter === 'unread'} onClick={() => setFilter('unread')}>Unread</button></div>
           <button className="btn" disabled={!unread} onClick={() => void markRead()} data-testid="mark-all-read"><Icon name="check" />Mark all as read</button>
         </>} />
       <section className="card" data-testid="notifications" aria-label="Notifications">
+        <div className="card-head"><h3><Icon name="bell" />{filter === 'unread' ? 'Unread' : 'Inbox'} <span className="count">{shown.length}</span></h3>{unread ? <span className="badge info"><span className="dot info" />{unread} unread</span> : null}</div>
         {!loaded ? <Loading /> : shown.length === 0 ? <Empty title={filter === 'unread' ? 'Nothing unread' : 'No notifications yet'} /> : shown.map((n) => (
           <div key={n.id} className={`v2-note ${n.read ? '' : 'unread'}`} data-testid="notification" data-read={n.read}>
             <span className={`v2-note-icon ${KIND_TONE[n.kind] ?? ''}`}><Icon name={KIND_ICON[n.kind] ?? 'info'} size={16} /></span>

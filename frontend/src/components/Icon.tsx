@@ -6,6 +6,7 @@ import {
   PenLine, Network, Monitor, Server, Layers, CircleUser, Image, Library, Wrench, SlidersHorizontal, MessageSquare, Send, Undo2, Package,
   Keyboard, Maximize2, Minimize2, GitCompare, Command,
   Flag, Funnel, CircleX, Cpu, Database, HardDrive, Archive, WifiOff, BookOpen, Ban, ListOrdered, Ellipsis, ZoomIn, ZoomOut, ChevronLeft, Save, Link,
+  Palette, ScrollText,
 } from 'lucide';
 
 const ICONS: Record<string, IconNode> = {
@@ -21,6 +22,7 @@ const ICONS: Record<string, IconNode> = {
   // UI redesign step 1: the icons the approved mockups draw (docs/audit/mockups)
   flag: Flag, filter: Funnel, xcircle: CircleX, cpu: Cpu, database: Database, disk: HardDrive, archive: Archive, offline: WifiOff, book2: BookOpen, ban: Ban,
   listOrdered: ListOrdered, more: Ellipsis, zoomIn: ZoomIn, zoomOut: ZoomOut, left: ChevronLeft, save: Save, link: Link,
+  palette: Palette, log: ScrollText,
 };
 
 export type IconName = keyof typeof ICONS;

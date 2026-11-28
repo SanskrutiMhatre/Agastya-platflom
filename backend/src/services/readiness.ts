@@ -24,3 +24,13 @@ export function readiness(ctx: Pick<AppContext, 'repos' | 'workspaceDir' | 'conf
   });
   return { ready: database === 'ok' && workspace === 'ok' && disk === 'ok', checks: { database, workspace, disk } };
 }
+
+/** The administration page's Service tile and Storage card (read-only): seconds since the server started, and the size and free space of
+ *  the disk that holds the data folder (null when the system cannot say). Sizes go to administrators only (GET /api/admin/health). */
+export interface SystemFigures { uptimeSeconds: number; startedAt: string; disk: { totalBytes: number; freeBytes: number } | null }
+export function systemFigures(ctx: Pick<AppContext, 'workspaceDir'>): SystemFigures {
+  let disk: SystemFigures['disk'] = null;
+  try { const s = fs.statfsSync(ctx.workspaceDir); disk = { totalBytes: Number(s.blocks) * Number(s.bsize), freeBytes: Number(s.bavail) * Number(s.bsize) }; } catch { /* unknown */ }
+  const up = process.uptime();
+  return { uptimeSeconds: Math.round(up), startedAt: new Date(Date.now() - up * 1000).toISOString(), disk };
+}

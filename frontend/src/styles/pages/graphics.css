@@ -1,18 +1,19 @@
 /* =========================================================================
    WP-35 second pass: Graphics (the project's Graphics page and the main Graphics management page) on the design system. The tile and
    drop-zone rules moved here from platform.css unchanged; the toolbar, list and preview rules replace inline styles. Imported by
-   components/GraphicsView.tsx, so it loads with the two graphics chunks only. Colours are tokens only.
+   components/GraphicsView.tsx, so it loads with the two graphics chunks only. Colours are tokens only (UI redesign screen 6: the design
+   system names, 2026-11-28).
    ========================================================================= */
 .v2-gfx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
-.v2-gfx { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-elev); display: flex; flex-direction: column; transition: border-color .12s; }
-.v2-gfx:hover, .v2-gfx:focus-within { border-color: var(--border-strong); }
-.v2-gfx-thumb { height: 120px; display: grid; place-items: center; background: repeating-conic-gradient(var(--bg-hover) 0 25%, transparent 0 50%) 0 0 / 16px 16px; }
+.v2-gfx { border: 1px solid var(--border-default); border-radius: var(--radius-lg); overflow: hidden; background: var(--surface-panel); display: flex; flex-direction: column; transition: border-color .12s; }
+.v2-gfx:hover, .v2-gfx:focus-within { border-color: var(--border-control); }
+.v2-gfx-thumb { height: 120px; display: grid; place-items: center; background: repeating-conic-gradient(var(--surface-hover) 0 25%, transparent 0 50%) 0 0 / 16px 16px; }
 .v2-gfx-thumb img { max-width: 100%; max-height: 100%; object-fit: contain; }
-.v2-gfx-meta { padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; }
+.v2-gfx-meta { padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-xs); }
 .v2-gfx-tags { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .v2-gfx-tags .icon-btn { margin-left: auto; }
 .v2-drop { border-style: dashed; }
-.v2-drop.over { border-color: var(--accent); background: var(--accent-soft); }
+.v2-drop.over { border-color: var(--accent); background: var(--surface-selected); }
 .v2-drop-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .v2-drop-row .v2-drop-as { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
 .v2-drop .v2-hint { margin-bottom: 0; }
@@ -28,7 +29,7 @@
 /* the zoom buttons around a thumbnail: an image is the content, the button only takes the click */
 .v2-zoom { background: none; border: 0; padding: 0; cursor: zoom-in; border-radius: 4px; }
 .v2-zoom:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
-.v2-gfx-thumb.v2-zoom { width: 100%; border-radius: 0; background: repeating-conic-gradient(var(--bg-hover) 0 25%, transparent 0 50%) 0 0 / 16px 16px; }
+.v2-gfx-thumb.v2-zoom { width: 100%; border-radius: 0; background: repeating-conic-gradient(var(--surface-hover) 0 25%, transparent 0 50%) 0 0 / 16px 16px; }
 .v2-gfx-list-thumb { width: 54px; }
 .v2-gfx-list-thumb img { max-height: 36px; max-width: 100%; }
 

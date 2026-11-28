@@ -11,7 +11,7 @@ export function BackupPage() {
   const admin = role === 'admin';
   return (
     <div className="v2-page adm">
-      <AdmHead icon="download" title="Backup" sub={admin ? 'Everything on the platform, as one ZIP file.' : 'Every project you can open, as one ZIP file.'} />
+      <AdmHead title="Backup" sub={admin ? 'Everything on the platform, as one ZIP file.' : 'Every project you can open, as one ZIP file.'} />
       <section className="card narrow" aria-labelledby="bk-h">
         <div className="card-head"><h3 id="bk-h"><Icon name="package" />{admin ? 'Back up the platform' : 'Back up my projects'}</h3></div>
         <div className="card-body v2-stack">

@@ -500,20 +500,40 @@ test('CIR: an Author adds a common data module for everyone and copies one into 
 test('administrator: every V1 section is there; reference data is edited, maintenance and settings do real things', async () => {
   const a = adminPage;
   await a.goto('/administrator');
+  // UI redesign screen 6 (mockup admin.html): the sections are grouped into the mockup's tab row; a tab with several sections lists them as
+  // links in the "Administrator sections" navigation. Every V1 section is still one tab, or one link inside a tab, away.
+  const tabs = a.getByRole('tablist', { name: 'Administration' });
   const nav = a.getByRole('navigation', { name: 'Administrator sections' });
-  // the Administrator is grouped by manual type now (shared / S1000D / JSS / JSG / system) and the sections have plain names
-  for (const n of ['Roles', 'Users', 'Information codes', 'Numbering (SNS)', 'Country codes', 'Language codes', 'Data module types', 'Publication templates', 'Responsible partner companies', 'Originator companies', 'Security classifications',
-    'PDF customisations', 'Interface languages', 'Audit logs', 'Maintenance', 'Visual settings', 'Settings', 'Licence']) {
-    await expect(nav.getByRole('link', { name: n, exact: true })).toBeVisible();
+  const open = async (tab: string, section?: string) => {
+    await tabs.getByRole('tab', { name: tab, exact: true }).click();
+    if (section) await nav.getByRole('link', { name: section, exact: true }).click();
+  };
+  await expect(a.getByTestId('admin-health')).toBeVisible();                                                   // the overview: health, users, audit, appearance, storage
+  await expect(a.getByTestId('users-card')).toBeVisible();
+  await expect(a.getByTestId('recent-audit')).toBeVisible();
+  await expect(a.getByTestId('appearance-defaults')).toBeVisible();
+  await expect(a.getByTestId('admin-storage')).toBeVisible();
+  const sections: Record<string, string[]> = {
+    'Users and roles': ['Users', 'Roles'],
+    'Reference data': ['Country codes', 'Language codes', 'Security classifications', 'PDF customisations', 'Interface languages'],
+    S1000D: ['Information codes', 'Numbering (SNS)', 'Data module types', 'Publication templates', 'Responsible partner companies', 'Originator companies'],
+    System: ['Maintenance', 'Licence'],
+    Appearance: ['Visual settings', 'Settings'],
+  };
+  for (const [tab, names] of Object.entries(sections)) {
+    await open(tab, tab === 'Users and roles' ? 'Roles' : undefined);
+    for (const n of names) await expect(nav.getByRole('link', { name: n, exact: true })).toBeVisible();
+    // the owner removed the second SNS screen on 2026-11-26 (one numbering system per project kind): it must not come back
+    await expect(nav.getByRole('link', { name: 'SNS defaults', exact: true })).toHaveCount(0);
   }
-  // the owner removed the second SNS screen on 2026-11-26 (one numbering system per project kind): it must not come back
-  await expect(nav.getByRole('link', { name: 'SNS defaults', exact: true })).toHaveCount(0);
+  for (const t of ['Access', 'Backup', 'Audit log']) await expect(tabs.getByRole('tab', { name: t, exact: true })).toBeVisible();
+  await a.goto('/administrator');
   await shot(a, '39-administrator');
 
-  await nav.getByRole('link', { name: 'Data module types', exact: true }).click();
+  await open('S1000D', 'Data module types');
   await expect(a.getByTestId('config-row')).toHaveCount(21);
 
-  await nav.getByRole('link', { name: 'Country codes', exact: true }).click();
+  await open('Reference data', 'Country codes');
   await a.getByTestId('config-add').click();
   await a.getByLabel('ISO code', { exact: true }).fill('ZZ');
   await a.getByLabel('Country', { exact: true }).fill('Test country');
@@ -524,17 +544,17 @@ test('administrator: every V1 section is there; reference data is edited, mainte
   await a.getByRole('button', { name: 'Delete', exact: true }).click();
   await expect(row).toHaveCount(0);
 
-  await nav.getByRole('link', { name: 'Responsible partner companies', exact: true }).click();
+  await open('S1000D', 'Responsible partner companies');
   await expect(a.getByText('not checked', { exact: true })).toBeVisible();                                    // empty list = the import check is off
 
-  await nav.getByRole('link', { name: 'Maintenance', exact: true }).click();
+  await open('System', 'Maintenance');
   await a.getByTestId('maint-schemas').click();
   await expect(a.getByTestId('maint-schemas-result')).toContainText('All schema sets installed');
 
-  await nav.getByRole('link', { name: 'Audit logs', exact: true }).click();
+  await open('Audit log');
   await expect(a.getByTestId('audit-export')).toBeVisible();
 
-  await nav.getByRole('link', { name: 'Settings', exact: true }).click();
+  await open('Appearance', 'Settings');
   await a.getByLabel('Application name').fill('Defence Docs');
   await a.getByTestId('settings-save').click();
   await expect(a.locator('.v2-brand')).toContainText('Defence Docs');
@@ -837,7 +857,8 @@ test.describe('roles: administrator -> Project Manager -> Author', () => {
     await page.getByRole('button', { name: 'Create account' }).click();
     managerTemp = await page.getByLabel('Temporary password').inputValue();
     await page.getByRole('button', { name: 'Done' }).click();
-    await expect(page.getByRole('row', { name: /Meera Rao/ }).getByLabel(/Role of meera/)).toHaveValue('project_manager');
+    // UI redesign screen 6: the role is a badge in the row now (Change role… in the row's Actions menu holds the select)
+    await expect(page.getByRole('row', { name: /Meera Rao/ })).toContainText('Project manager');
   });
 
   test('the Project Manager creates an Author, a project, and assigns the Author', async ({ browser }) => {

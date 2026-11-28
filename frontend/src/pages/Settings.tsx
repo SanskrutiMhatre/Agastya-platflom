@@ -1,23 +1,27 @@
 // Platform settings. Everyone gets their account; administrators also get user
 // management, the approval queues (password resets, release requests), active
 // sessions and the audit log - all backed by the JSS Publisher admin routes.
+//
+// UI redesign screen 6 (owner-approved mockup docs/audit/mockups/admin.html): the page head, the mockup's tab row, the users table with
+// one Actions button per row, and the audit table with its Time / Actor / Event / Type columns. The Administration page shows the same
+// Users and audit pieces.
 
 import { useEffect, useId, useRef, useState } from 'react';
-import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
+import { Link, Navigate, Route, Routes } from 'react-router-dom';
 import { adminApi, auditApi, auditQueryString, authApi, teamApi, type AuditQuery, type AuditVerifyReport, type GlobalRole, type User } from '../api';
 import { globalLabel } from '../lib/roles';
 import { Icon } from '../components/Icon';
 import { ThemeChoiceControl } from '../components/ThemeToggle';
-import { Alert, Badge, ConfirmModal, Empty, Field, Loading, Modal, ago, errText, fmtDate, initialsOf, Pill, useAsync } from '../components/ui';
+import { Callout, ConfirmModal, Dot, Empty, Field, Loading, Modal, ago, errText, fmtDate, initialsOf, Pill, useAsync } from '../components/ui';
 import '../styles/pages/admin.css';   // WP-35 second pass: Users and Audit logs share the administrator styles
 import { useSession } from '../store/session';
 import { useUi } from '../store/ui';
 import { BackupButton } from '../components/Oversight';
 import { actionLabel } from '../lib/activity';
 import { MoreRows, useProgressive } from '../components/windowing';
-import { tablistKeys } from '../components/a11y';
+import { useContextMenu, type MenuAction } from '../components/ContextMenu';
 import { PasswordInput } from '../components/PasswordInput';
-import { AdmHead } from './adminParts';
+import { AdmHead, TabLinks } from './adminParts';
 
 function Account() {
   const { user, logout } = useSession();
@@ -37,34 +41,45 @@ function Account() {
   };
 
   return (
-    <div className="v2-stack v2-maxw-560">
-      <section className="card" aria-labelledby="acct-profile">
-        <div className="card-head"><h3 id="acct-profile"><Icon name="user" />Profile</h3></div>
-        <div className="card-body v2-stack">
-          <div className="user-cell"><span className="avatar" aria-hidden="true">{initialsOf(user?.fullName || user?.username || '')}</span><div className="who"><strong>{user?.fullName}</strong><span className="v2-mono">@{user?.username}</span></div></div>
-          <Field label="Name"><input className="v2-input" value={user?.fullName ?? ''} readOnly /></Field>
-          <Field label="Username"><input className="v2-input" value={user?.username ?? ''} readOnly /></Field>
-          <div className="v2-row"><Badge tone={user?.role === 'author' ? undefined : 'accent'}>{globalLabel(user?.role)}</Badge></div>
-        </div>
-      </section>
-      <section className="card" aria-labelledby="acct-pw">
-        <div className="card-head"><h3 id="acct-pw"><Icon name="key" />Change password</h3></div>
-        <form className="card-body v2-stack" onSubmit={(e) => { e.preventDefault(); void change(); }}>
-          <Field label="Current password"><PasswordInput value={cur} onChange={(e) => setCur(e.target.value)} autoComplete="current-password" /></Field>
-          <Field label="New password" hint="At least 15 characters (a few words make a good one), and not a common password or your name."><PasswordInput value={p} onChange={(e) => setP(e.target.value)} autoComplete="new-password" /></Field>
-          <Field label="Repeat new password" error={mismatch && p !== p2 ? 'The new passwords do not match.' : undefined}><PasswordInput id={repeatId} value={p2} onChange={(e) => setP2(e.target.value)} autoComplete="new-password" /></Field>
-          {err ? <Alert tone="bad">{err}</Alert> : null}
-          <div><button className="btn btn-primary" disabled={busy || !cur || !p}>Change password</button></div>
-        </form>
-      </section>
-      <section className="card" data-testid="appearance" aria-labelledby="acct-look">
-        <div className="card-head"><h3 id="acct-look"><Icon name="monitor" />Appearance</h3></div>
-        <div className="card-body v2-stack">
-        <p className="v2-sub v2-m0">Theme on this computer. "Follow the system" uses your organisation's default, or else the Windows setting.</p>
-        <ThemeChoiceControl />
-        </div>
-      </section>
-      <div><button className="btn" onClick={() => void logout()}><Icon name="logout" />Sign out</button></div>
+    <div className="adm-cols">
+      <div className="stack adm-gap">
+        <section className="card" aria-labelledby="acct-profile">
+          <div className="card-head"><h3 id="acct-profile"><Icon name="user" />Profile</h3><Pill tone={user?.role === 'admin' ? 'danger' : user?.role === 'project_manager' ? 'info' : undefined}>{globalLabel(user?.role)}</Pill></div>
+          <div className="card-body stack adm-gap">
+            <div className="row user-cell"><span className="avatar" aria-hidden="true">{initialsOf(user?.fullName || user?.username || '')}</span><div className="stack who"><span className="nm">{user?.fullName}</span><span className="faint">@{user?.username}</span></div></div>
+            <div className="adm-grid-2">
+              <Field label="Name"><input className="input" value={user?.fullName ?? ''} readOnly /></Field>
+              <Field label="Username"><input className="input" value={user?.username ?? ''} readOnly /></Field>
+            </div>
+          </div>
+        </section>
+        <section className="card" aria-labelledby="acct-pw">
+          <div className="card-head"><h3 id="acct-pw"><Icon name="key" />Change password</h3></div>
+          <form className="card-body stack adm-gap" onSubmit={(e) => { e.preventDefault(); void change(); }}>
+            <Field label="Current password"><PasswordInput value={cur} onChange={(e) => setCur(e.target.value)} autoComplete="current-password" /></Field>
+            <Field label="New password" hint="At least 15 characters (a few words make a good one), and not a common password or your name."><PasswordInput value={p} onChange={(e) => setP(e.target.value)} autoComplete="new-password" /></Field>
+            <Field label="Repeat new password" error={mismatch && p !== p2 ? 'The new passwords do not match.' : undefined}><PasswordInput id={repeatId} value={p2} onChange={(e) => setP2(e.target.value)} autoComplete="new-password" /></Field>
+            {err ? <Callout tone="danger">{err}</Callout> : null}
+            <div className="row end"><button className="btn primary" disabled={busy || !cur || !p}>Change password</button></div>
+          </form>
+        </section>
+      </div>
+      <aside className="stack adm-gap">
+        <section className="card" data-testid="appearance" aria-labelledby="acct-look">
+          <div className="card-head"><h3 id="acct-look"><Icon name="palette" />Appearance</h3></div>
+          <div className="card-body stack adm-gap">
+            <p className="faint">The colour theme on this computer. It is kept for you only; the top bar's theme button changes it too.</p>
+            <ThemeChoiceControl />
+          </div>
+        </section>
+        <section className="card" aria-labelledby="acct-session">
+          <div className="card-head"><h3 id="acct-session"><Icon name="logout" />Session</h3></div>
+          <div className="card-body stack adm-gap">
+            <p className="faint">Sign out on this computer. Your other sessions stay signed in until they time out.</p>
+            <div className="row end"><button className="btn" onClick={() => void logout()}><Icon name="logout" />Sign out</button></div>
+          </div>
+        </section>
+      </aside>
     </div>
   );
 }
@@ -72,11 +87,11 @@ function Account() {
 function Backup() {
   const role = useSession((s) => s.user?.role);
   return (
-    <section className="card v2-maxw-560" aria-labelledby="set-backup">
-      <div className="card-head"><h3 id="set-backup"><Icon name="download" />Backup</h3></div>
-      <div className="card-body v2-stack">
-      <p className="v2-sub v2-m0">{role === 'admin' ? 'Every project, the people and memberships, and the activity log, as one ZIP file.' : role === 'project_manager' ? 'Every project you can open, as one ZIP file.' : 'Every project you can open, as one ZIP file.'}</p>
-      <div><BackupButton label={role === 'admin' ? 'Back up the platform' : 'Back up my projects'} /></div>
+    <section className="card narrow" aria-labelledby="set-backup">
+      <div className="card-head"><h3 id="set-backup"><Icon name="archive" />Backup</h3></div>
+      <div className="card-body stack adm-gap">
+        <p className="faint">{role === 'admin' ? 'Every project, the people and memberships, and the activity log, as one ZIP file.' : 'Every project you can open, as one ZIP file.'}</p>
+        <div className="row end"><BackupButton label={role === 'admin' ? 'Back up the platform' : 'Back up my projects'} /></div>
       </div>
     </section>
   );
@@ -84,74 +99,144 @@ function Backup() {
 
 function TempPassword({ title, name, password, onClose }: { title: string; name: string; password: string; onClose: () => void }) {
   return (
-    <Modal title={title} onClose={onClose} width={480} buttons={<button className="btn btn-primary" onClick={onClose}>Done</button>}>
-      <p className="v2-mt0">Temporary password for <strong>{name}</strong>. It works for the first sign-in only.</p>
-      <div className="v2-row"><input className="v2-input v2-mono" readOnly value={password} onFocus={(e) => e.currentTarget.select()} aria-label="Temporary password" /><button className="btn" onClick={() => void navigator.clipboard?.writeText(password)}><Icon name="copy" />Copy</button></div>
+    <Modal title={title} onClose={onClose} width={480} buttons={<button className="btn primary" onClick={onClose}>Done</button>}>
+      <div className="stack adm-gap">
+        <p>Temporary password for <strong>{name}</strong>. It works for the first sign-in only.</p>
+        <div className="row"><input className="input mono" readOnly value={password} onFocus={(e) => e.currentTarget.select()} aria-label="Temporary password" /><button className="btn" onClick={() => void navigator.clipboard?.writeText(password)}><Icon name="copy" />Copy</button></div>
+      </div>
     </Modal>
   );
 }
 
-export function Users() {
+/** The role names and badge tones of the mockup's users table (Author plain, Project manager info, Administrator danger). */
+const ROLE_NAME: Record<string, string> = { author: 'Author', project_manager: 'Project manager', admin: 'Administrator' };
+const ROLE_TONE: Record<string, 'info' | 'danger' | undefined> = { project_manager: 'info', admin: 'danger' };
+const ROLE_SAYS: Record<string, string> = {
+  admin: 'An administrator can manage every account, the settings and every project.',
+  project_manager: 'A Project manager can create projects and approve releases of the projects they manage.',
+  author: 'An Author works only in the projects shared with them.',
+};
+
+/** "Today 13:02", "Yesterday", "3 days ago", "3 weeks ago" (the mockup's Last sign-in column); "Never" before the first sign-in. */
+export function signInWhen(iso: string | null | undefined, now = new Date()): string {
+  if (!iso) return 'Never';
+  const d = new Date(iso);
+  const day = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((day(now) - day(d)) / 86400000);
+  if (days <= 0) return `Today ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}`;
+  if (days === 1) return 'Yesterday';
+  if (days < 14) return `${days} days ago`;
+  if (days < 60) return `${Math.round(days / 7)} weeks ago`;
+  return d.toLocaleDateString();
+}
+
+/** One account's state as the mockup's status badge (a dot and a word); directory and auditor marks follow it. */
+function UserStatus({ u }: { u: User }) {
+  const s = u.disabled
+    ? { tone: undefined, label: u.disabledReason === 'directory' ? 'Offboarded by the directory' : 'Disabled', title: u.disabledReason === 'directory' ? 'Disabled by the directory (removed from its groups or disabled there)' : undefined }
+    : u.onboardingPending ? { tone: 'warning' as const, label: 'Awaiting first sign-in' }
+      : u.mustChangePassword ? { tone: 'warning' as const, label: 'Must change password' } : { tone: 'success' as const, label: 'Active' };
+  return (
+    <span className="row adm-badges">
+      <span className={`badge${s.tone ? ` ${s.tone}` : ''}`} title={'title' in s ? s.title : undefined}><Dot tone={s.tone} />{s.label}</span>
+      {u.authSource === 'directory' ? <Pill title="Signs in with the domain password">Directory</Pill> : null}
+    </span>
+  );
+}
+
+/**
+ * The people of the platform, as the administration mockup draws them: a card with the count and a search, one row per person (avatar,
+ * name, username, role badge, status, last sign-in) and one "Actions" button per row that opens the row's actions (change role, auditor,
+ * reset password, disable or enable). Every change that takes effect at once is confirmed first (FE-012).
+ *   limit       show the first N people and a "Show all" button (the Administration overview shows 6, as the mockup does)
+ *   createTick  a counter: when it changes, the New user dialog opens (the page head's button on the Administration page)
+ *   inlineNew   the New user button in the card head (Settings > Users, where the page head has none)
+ */
+export function Users({ limit, createTick = 0, startCreating = false, inlineNew = true, rolesHref }: { limit?: number; createTick?: number; startCreating?: boolean; inlineNew?: boolean; rolesHref?: string } = {}) {
   const me = useSession((s) => s.user);
   const toast = useUi((s) => s.toast);
   const users = useAsync(() => adminApi.users(), []);
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState(startCreating);
   const [temp, setTemp] = useState<{ title: string; name: string; password: string } | null>(null);
   const [confirm, setConfirm] = useState<{ user: User; action: 'disable' | 'reset' } | null>(null);
-  // FE-012: a role change takes effect at once (what the person may see and do), so it is confirmed first
-  const [roleChange, setRoleChange] = useState<{ user: User; role: string } | null>(null);
-  const ROLE_NAME: Record<string, string> = { author: 'Author', project_manager: 'Project Manager', admin: 'Software administrator' };
+  // FE-012: a role change takes effect at once (what the person may see and do), so it is chosen in a dialog and confirmed there
+  const [roleOf, setRoleOf] = useState<{ user: User; role: string } | null>(null);
   const [q, setQ] = useState('');                    // the mockup's user search: narrows the list on this page
+  const [all, setAll] = useState(false);             // past the overview's limit
+  const menu = useContextMenu();
+  const firstTick = useRef(createTick);
+  useEffect(() => { if (createTick !== firstTick.current) setCreating(true); }, [createTick]);
 
   const act = async (fn: () => Promise<unknown>, ok: string) => { try { await fn(); toast(ok, 'success'); users.reload(); } catch (e) { toast(errText(e), 'error'); } };
+  const actions = (u: User): MenuAction[] => [
+    { label: 'Change role…', icon: 'users', disabled: u.id === me?.id, onSelect: () => setRoleOf({ user: u, role: u.role }) },
+    ...(u.role !== 'admin' ? [{ label: u.auditor ? 'End auditor' : 'Make auditor', icon: 'eye' as const, testId: `auditor-${u.username}`, onSelect: () => void act(() => adminApi.updateUser(u.id, { auditor: !u.auditor }), u.auditor ? 'No longer read-only' : 'Now a read-only auditor') }] : []),
+    ...(u.authSource !== 'directory' ? [{ label: 'Reset password…', icon: 'key' as const, onSelect: () => setConfirm({ user: u, action: 'reset' }) }] : []),
+    u.disabled
+      ? { label: 'Enable', icon: 'ok', onSelect: () => void act(() => adminApi.enable(u.id), 'Account enabled') }
+      : { label: 'Disable…', icon: 'ban', danger: true, disabled: u.id === me?.id, onSelect: () => setConfirm({ user: u, action: 'disable' }) },
+  ];
 
-  const all = users.data ?? [];
+  const list = users.data ?? [];
   const needle = q.trim().toLowerCase();
-  const shown = needle ? all.filter((u) => `${u.fullName} ${u.username}`.toLowerCase().includes(needle)) : all;
+  const found = needle ? list.filter((u) => `${u.fullName} ${u.username}`.toLowerCase().includes(needle)) : list;
+  const shown = limit && !all && !needle ? found.slice(0, limit) : found;
   return (
     <>
       <section className="card" aria-labelledby="users-h" data-testid="users-card">
         <div className="card-head">
-          <h3 id="users-h"><Icon name="users" />Users <span className="count">{all.length}</span></h3>
-          <div className="row wrap">
-            <input className="v2-input v2-w-220" type="search" placeholder="Search users…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search users" data-testid="users-search" />
-            <button className="btn btn-primary" onClick={() => setCreating(true)}><Icon name="invite" />New user</button>
+          <h3 id="users-h"><Icon name="users" />Users <span className="count">{list.length}</span></h3>
+          <div className="row">
+            <input className="input search adm-search" type="search" placeholder="Search users…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search users" data-testid="users-search" />
+            {inlineNew ? <button className="btn primary" onClick={() => setCreating(true)}><Icon name="plus" />New user</button> : null}
           </div>
         </div>
         {users.loading && !users.data ? <Loading /> : shown.length === 0 ? <Empty title={needle ? 'Nobody matches' : 'No users yet'} /> : (
-          <div className="table-wrap"><table className="v2-table">
-            <thead><tr><th>User</th><th>Role</th><th>Status</th><th><span className="v2-sr">Actions</span></th></tr></thead>
+          <div className="table-wrap"><table className="table">
+            <thead><tr><th>User</th><th>Role</th><th>Status</th><th>Last sign-in</th><th className="adm-w-actions"><span className="sr">Actions</span></th></tr></thead>
             <tbody>{shown.map((u) => (
-              <tr key={u.id}>
-                <td><div className="user-cell"><span className="avatar" aria-hidden="true">{initialsOf(u.fullName || u.username)}</span><div className="who"><strong>{u.fullName}</strong><span className="v2-mono">@{u.username}</span></div></div></td>
-                <td>
-                  <select className="v2-select v2-w-190" value={u.role} disabled={u.id === me?.id} aria-label={`Role of ${u.username}`}
-                    onChange={(e) => setRoleChange({ user: u, role: e.target.value })}>
-                    <option value="author">Author</option><option value="project_manager">Project Manager</option><option value="admin">Software administrator</option>
-                  </select>
-                </td>
-                <td>{u.disabled ? <Badge tone="bad" title={u.disabledReason === 'directory' ? 'Disabled by the directory (removed from its groups or disabled there)' : undefined}>{u.disabledReason === 'directory' ? 'Offboarded by the directory' : 'Disabled'}</Badge> : u.onboardingPending ? <Badge tone="warn">Awaiting first sign-in</Badge> : u.mustChangePassword ? <Badge tone="warn">Must change password</Badge> : <Badge tone="ok">Active</Badge>}
-                  {u.authSource === 'directory' ? <> <Badge title="Signs in with the domain password">Directory</Badge></> : null}{u.auditor ? <> <Badge tone="accent" title="Reads every project and the audit log, changes nothing">Auditor</Badge></> : null}</td>
-                <td className="v2-td-end">
-                  {u.role !== 'admin' ? <><button className="btn btn-sm" data-testid={`auditor-${u.username}`} onClick={() => act(() => adminApi.updateUser(u.id, { auditor: !u.auditor }), u.auditor ? 'No longer read-only' : 'Now a read-only auditor')}>{u.auditor ? 'End auditor' : 'Make auditor'}</button>{' '}</> : null}
-                  {u.authSource !== 'directory' ? <><button className="btn btn-sm" onClick={() => setConfirm({ user: u, action: 'reset' })}><Icon name="key" size={13} />Reset password</button>{' '}</> : null}
-                  {u.disabled
-                    ? <button className="btn btn-sm" onClick={() => act(() => adminApi.enable(u.id), 'Account enabled')}>Enable</button>
-                    : <button className="btn btn-sm" disabled={u.id === me?.id} onClick={() => setConfirm({ user: u, action: 'disable' })}>Disable</button>}
+              <tr key={u.id} {...menu.bind(`Actions for ${u.fullName}`, actions(u))}>
+                <td><div className="row user-cell"><span className="avatar" aria-hidden="true">{initialsOf(u.fullName || u.username)}</span><div className="stack who"><span className="nm">{u.fullName}</span><span className="faint">@{u.username}</span></div></div></td>
+                <td><span className="row adm-badges"><Pill tone={ROLE_TONE[u.role]}>{ROLE_NAME[u.role] ?? globalLabel(u.role)}</Pill>{u.auditor ? <Pill tone="accent" title="Reads every project and the audit log, changes nothing">Auditor</Pill> : null}</span></td>
+                <td><UserStatus u={u} /></td>
+                <td className="faint" title={u.lastSignInAt ? fmtDate(u.lastSignInAt) : undefined}>{signInWhen(u.lastSignInAt)}</td>
+                <td className="adm-td-end">
+                  <button type="button" className="icon-btn" aria-label={`Actions for ${u.fullName}`} title="Actions" aria-haspopup="menu" data-testid={`user-actions-${u.username}`}
+                    onClick={(e) => menu.open(e.currentTarget, `Actions for ${u.fullName}`, actions(u))}><Icon name="more" /></button>
                 </td>
               </tr>))}</tbody>
           </table></div>
         )}
-        {users.data ? <div className="card-foot"><span className="faint" data-testid="users-shown">{shown.length} of {all.length} shown</span></div> : null}
+        {users.data ? (
+          <div className="card-foot">
+            <span className="faint" data-testid="users-shown">{shown.length} of {list.length} shown</span>
+            <span className="grow" />
+            {limit && !needle && found.length > limit ? <button className="btn sm" onClick={() => setAll(!all)}>{all ? `Show ${limit}` : 'Show all'}</button> : null}
+            {rolesHref ? <Link className="btn sm" to={rolesHref}><Icon name="shield" size={14} />Roles and what they can do</Link> : null}
+          </div>
+        ) : null}
       </section>
+      {menu.menu}
 
       {creating ? <CreateUser roles={[['author', 'Author'], ['project_manager', 'Project Manager']]} create={(b) => adminApi.createUser(b)} onClose={() => setCreating(false)} onCreated={(name, pw) => { setCreating(false); users.reload(); setTemp({ title: 'Account created', name, password: pw }); }} /> : null}
       {temp ? <TempPassword {...temp} onClose={() => setTemp(null)} /> : null}
-      {roleChange ? <ConfirmModal title={`Make ${roleChange.user.fullName} a ${ROLE_NAME[roleChange.role] ?? roleChange.role}?`} confirmLabel="Change role" onClose={() => setRoleChange(null)} onConfirm={() => { const r = roleChange; setRoleChange(null); void act(() => adminApi.updateUser(r.user.id, { role: r.role }), 'Role updated'); }} body={<p>{roleChange.role === 'admin' ? 'A software administrator can manage every account, the settings and every project.' : roleChange.role === 'project_manager' ? 'A Project Manager can create projects and approve releases of the projects they manage.' : 'An author works only in the projects shared with them.'} The change applies at once; the audit log records it.</p>} /> : null}
+      {roleOf ? (
+        <Modal title={`Change the role of ${roleOf.user.fullName}?`} icon="users" tone="info" width={460} onClose={() => setRoleOf(null)}
+          buttons={<><button className="btn" onClick={() => setRoleOf(null)}>Cancel</button>
+            <button className="btn primary" disabled={roleOf.role === roleOf.user.role} onClick={() => { const r = roleOf; setRoleOf(null); void act(() => adminApi.updateUser(r.user.id, { role: r.role }), 'Role updated'); }}>Change role</button></>}>
+          <div className="stack">
+            <select className="select" value={roleOf.role} aria-label={`Role of ${roleOf.user.username}`} onChange={(e) => setRoleOf({ ...roleOf, role: e.target.value })}>
+              <option value="author">Author</option><option value="project_manager">Project manager</option><option value="admin">Administrator</option>
+            </select>
+            <p>{ROLE_SAYS[roleOf.role]} The change applies at once; the audit log records it.</p>
+          </div>
+        </Modal>
+      ) : null}
       {confirm ? (
         <ConfirmModal title={confirm.action === 'reset' ? `Reset ${confirm.user.fullName}'s password?` : `Disable ${confirm.user.fullName}?`} danger={confirm.action === 'disable'}
-          confirmLabel={confirm.action === 'reset' ? 'Reset password' : 'Disable account'} onClose={() => setConfirm(null)}
-          body={confirm.action === 'reset' ? 'Their current password stops working, every session is signed out, and they must choose a new password at next sign-in.' : 'They are signed out immediately and cannot sign in again until you enable the account.'}
+          icon={confirm.action === 'reset' ? 'key' : 'ban'} tone={confirm.action === 'reset' ? 'warning' : 'danger'}
+          confirmLabel={confirm.action === 'reset' ? 'Reset password' : 'Disable user'} onClose={() => setConfirm(null)}
+          body={<p>{confirm.action === 'reset' ? 'Their current password stops working, every session is signed out, and they must choose a new password at next sign-in.' : `${confirm.user.fullName.split(' ')[0]} is signed out at once and cannot sign in again until you enable the account. Their work stays in the history.`}</p>}
           onConfirm={async () => {
             const { user, action } = confirm; setConfirm(null);
             if (action === 'disable') await act(() => adminApi.disable(user.id), 'Account disabled');
@@ -178,12 +263,12 @@ function CreateUser({ roles, create, onClose, onCreated }: { roles: Array<[Globa
     catch (e) { setErr(errText(e)); setBusy(false); }
   };
   return (
-    <Modal title="New user" onClose={onClose} width={440} buttons={<><button className="btn" onClick={onClose}>Cancel</button><button className="btn btn-primary" disabled={busy || !fullName.trim() || !username.trim()} onClick={submit}>Create account</button></>}>
-      <form className="v2-stack" onSubmit={(e) => { e.preventDefault(); if (fullName.trim() && username.trim() && !busy) void submit(); }}>
-        <Field label="Name"><input className="v2-input" autoFocus value={fullName} onChange={(e) => setFullName(e.target.value)} autoComplete="off" /></Field>
-        <Field label="Username"><input className="v2-input" value={username} onChange={(e) => { typed.current = true; setUsername(e.target.value.toLowerCase()); }} autoComplete="off" /></Field>
-        {roles.length > 1 ? <Field label="Role"><select className="v2-select" value={role} onChange={(e) => setRole(e.target.value as GlobalRole)}>{roles.map(([r, label]) => <option key={r} value={r}>{label}</option>)}</select></Field> : null}
-        {err ? <Alert tone="bad">{err}</Alert> : null}
+    <Modal title="New user" onClose={onClose} width={440} buttons={<><button className="btn" onClick={onClose}>Cancel</button><button className="btn primary" disabled={busy || !fullName.trim() || !username.trim()} onClick={submit}>Create account</button></>}>
+      <form className="stack adm-gap" onSubmit={(e) => { e.preventDefault(); if (fullName.trim() && username.trim() && !busy) void submit(); }}>
+        <Field label="Name"><input className="input" autoFocus value={fullName} onChange={(e) => setFullName(e.target.value)} autoComplete="off" /></Field>
+        <Field label="Username"><input className="input" value={username} onChange={(e) => { typed.current = true; setUsername(e.target.value.toLowerCase()); }} autoComplete="off" /></Field>
+        {roles.length > 1 ? <Field label="Role"><select className="select" value={role} onChange={(e) => setRole(e.target.value as GlobalRole)}>{roles.map(([r, label]) => <option key={r} value={r}>{label}</option>)}</select></Field> : null}
+        {err ? <Callout tone="danger">{err}</Callout> : null}
         <button type="submit" hidden />
       </form>
     </Modal>
@@ -197,18 +282,20 @@ function Authors() {
   const [temp, setTemp] = useState<{ name: string; password: string } | null>(null);
   return (
     <>
-      <div className="v2-row v2-spread v2-mb14">
-        <span />
-        <button className="btn btn-primary" onClick={() => setCreating(true)} data-testid="new-author"><Icon name="invite" />New author</button>
-      </div>
-      <div className="v2-card">
+      <section className="card" aria-labelledby="authors-h">
+        <div className="card-head">
+          <h3 id="authors-h"><Icon name="users" />Authors <span className="count">{list.data?.length ?? 0}</span></h3>
+          <button className="btn primary" onClick={() => setCreating(true)} data-testid="new-author"><Icon name="plus" />New author</button>
+        </div>
         {list.loading && !list.data ? <Loading /> : !list.data?.length ? <Empty title="No authors yet">Create your first Author, then assign them to a project.</Empty> : (
-          <table className="v2-table"><thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Status</th><th>Created by</th></tr></thead>
+          <div className="table-wrap"><table className="table"><thead><tr><th>User</th><th>Role</th><th>Status</th><th>Created by</th></tr></thead>
             <tbody>{list.data.map((u) => (
-              <tr key={u.id}><td><strong>{u.fullName}</strong></td><td className="v2-mono">@{u.username}</td><td>{globalLabel(u.role)}</td>
-                <td>{u.disabled ? <Badge tone="bad">Disabled</Badge> : u.onboardingPending ? <Badge tone="warn">Awaiting first sign-in</Badge> : <Badge tone="ok">Active</Badge>}</td><td>{u.createdBy ?? '-'}</td></tr>))}</tbody></table>
+              <tr key={u.id}>
+                <td><div className="row user-cell"><span className="avatar" aria-hidden="true">{initialsOf(u.fullName || u.username)}</span><div className="stack who"><span className="nm">{u.fullName}</span><span className="faint">@{u.username}</span></div></div></td>
+                <td><Pill tone={ROLE_TONE[u.role]}>{ROLE_NAME[u.role] ?? globalLabel(u.role)}</Pill></td>
+                <td><UserStatus u={u} /></td><td className="faint">{u.createdBy ?? '-'}</td></tr>))}</tbody></table></div>
         )}
-      </div>
+      </section>
       {creating ? <CreateUser roles={[['author', 'Author']]} create={(b) => teamApi.createUser(b)} onClose={() => setCreating(false)} onCreated={(name, pw) => { setCreating(false); list.reload(); setTemp({ name, password: pw }); }} /> : null}
       {temp ? <TempPassword title="Author account created" name={temp.name} password={temp.password} onClose={() => setTemp(null)} /> : null}
     </>
@@ -222,29 +309,29 @@ function Approvals() {
   const [temp, setTemp] = useState<{ name: string; password: string } | null>(null);
   const run = async (fn: () => Promise<unknown>, ok: string, reload: () => void) => { try { await fn(); toast(ok, 'success'); reload(); } catch (e) { toast(errText(e), 'error'); } };
   return (
-    <div className="v2-stack">
-      <div className="v2-card">
-        <div className="card-head"><h3><Icon name="stamp" />Release requests</h3></div>
+    <div className="stack adm-gap">
+      <section className="card" aria-labelledby="appr-rel-h">
+        <div className="card-head"><h3 id="appr-rel-h"><Icon name="stamp" />Release requests <span className="count">{releases.data?.length ?? 0}</span></h3></div>
         {releases.loading && !releases.data ? <Loading /> : !releases.data?.length ? <Empty title="No release requests waiting" /> : (
-          <table className="v2-table"><thead><tr><th>Project</th><th>Requested by</th><th>Takes effect</th><th>Note</th><th /></tr></thead>
+          <div className="table-wrap"><table className="table"><thead><tr><th>Project</th><th>Requested by</th><th>Takes effect</th><th>Note</th><th><span className="sr">Actions</span></th></tr></thead>
             <tbody>{releases.data.map((r) => (
-              <tr key={r.id}><td><strong>{r.projectName}</strong></td><td>{r.requestedBy ?? '—'}</td><td>{fmtDate(r.scheduledAt)}</td><td>{r.note ?? ''}</td>
-                <td className="v2-td-end">
-                  <button className="btn btn-sm btn-primary" onClick={() => run(() => adminApi.approveRelease(r.id), 'Release approved', releases.reload)}>Approve</button>{' '}
-                  <button className="btn btn-sm" onClick={() => run(() => adminApi.rejectRelease(r.id), 'Release rejected', releases.reload)}>Reject</button></td></tr>))}</tbody></table>
+              <tr key={r.id}><td><span className="nm">{r.projectName}</span></td><td>{r.requestedBy ?? '—'}</td><td className="faint">{fmtDate(r.scheduledAt)}</td><td>{r.note ?? ''}</td>
+                <td className="adm-td-end">
+                  <button className="btn sm primary" onClick={() => run(() => adminApi.approveRelease(r.id), 'Release approved', releases.reload)}>Approve</button>
+                  <button className="btn sm" onClick={() => run(() => adminApi.rejectRelease(r.id), 'Release rejected', releases.reload)}>Reject</button></td></tr>))}</tbody></table></div>
         )}
-      </div>
-      <div className="v2-card">
-        <div className="card-head"><h3><Icon name="key" />Password reset requests</h3></div>
+      </section>
+      <section className="card" aria-labelledby="appr-pw-h">
+        <div className="card-head"><h3 id="appr-pw-h"><Icon name="key" />Password reset requests <span className="count">{resets.data?.length ?? 0}</span></h3></div>
         {resets.loading && !resets.data ? <Loading /> : !resets.data?.length ? <Empty title="No reset requests waiting" /> : (
-          <table className="v2-table"><thead><tr><th>Person</th><th>Requested</th><th /></tr></thead>
+          <div className="table-wrap"><table className="table"><thead><tr><th>User</th><th>Requested</th><th><span className="sr">Actions</span></th></tr></thead>
             <tbody>{resets.data.map((r) => (
-              <tr key={r.id}><td><strong>{r.fullName}</strong> <span className="v2-hint">@{r.username}</span></td><td>{ago(r.requestedAt)}</td>
-                <td className="v2-td-end">
-                  <button className="btn btn-sm btn-primary" onClick={async () => { try { const x = await adminApi.approveReset(r.id); setTemp({ name: r.fullName, password: x.tempPassword }); resets.reload(); } catch (e) { toast(errText(e), 'error'); } }}>Approve</button>{' '}
-                  <button className="btn btn-sm" onClick={() => run(() => adminApi.rejectReset(r.id), 'Request rejected', resets.reload)}>Reject</button></td></tr>))}</tbody></table>
+              <tr key={r.id}><td><div className="row user-cell"><span className="avatar" aria-hidden="true">{initialsOf(r.fullName || r.username)}</span><div className="stack who"><span className="nm">{r.fullName}</span><span className="faint">@{r.username}</span></div></div></td><td className="faint">{ago(r.requestedAt)}</td>
+                <td className="adm-td-end">
+                  <button className="btn sm primary" onClick={async () => { try { const x = await adminApi.approveReset(r.id); setTemp({ name: r.fullName, password: x.tempPassword }); resets.reload(); } catch (e) { toast(errText(e), 'error'); } }}>Approve</button>
+                  <button className="btn sm" onClick={() => run(() => adminApi.rejectReset(r.id), 'Request rejected', resets.reload)}>Reject</button></td></tr>))}</tbody></table></div>
         )}
-      </div>
+      </section>
       {temp ? <TempPassword title="Password reset" name={temp.name} password={temp.password} onClose={() => setTemp(null)} /> : null}
     </div>
   );
@@ -254,14 +341,16 @@ function Sessions() {
   const toast = useUi((s) => s.toast);
   const s = useAsync(() => adminApi.sessions(), []);
   return (
-    <div className="v2-card">
+    <section className="card" aria-labelledby="sess-h">
+      <div className="card-head"><h3 id="sess-h"><Icon name="monitor" />Active sessions <span className="count">{s.data?.length ?? 0}</span></h3></div>
       {s.loading && !s.data ? <Loading /> : (
-        <table className="v2-table"><thead><tr><th>User</th><th>Signed in</th><th>Last seen</th><th>From</th><th /></tr></thead>
+        <div className="table-wrap"><table className="table"><thead><tr><th>User</th><th>Signed in</th><th>Last seen</th><th>From</th><th><span className="sr">Actions</span></th></tr></thead>
           <tbody>{(s.data ?? []).map((x) => (
-            <tr key={x.id}><td><strong>{x.fullName}</strong> <span className="v2-hint">@{x.username}</span></td><td>{fmtDate(x.createdAt)}</td><td>{ago(x.lastSeenAt)}</td><td className="v2-mono">{x.ip ?? ''}</td>
-              <td className="v2-td-end"><button className="btn btn-sm" onClick={async () => { try { await adminApi.revokeSession(x.id); toast('Session ended', 'success'); s.reload(); } catch (e) { toast(errText(e), 'error'); } }}>End session</button></td></tr>))}</tbody></table>
+            <tr key={x.id}><td><div className="row user-cell"><span className="avatar" aria-hidden="true">{initialsOf(x.fullName || x.username)}</span><div className="stack who"><span className="nm">{x.fullName}</span><span className="faint">@{x.username}</span></div></div></td>
+              <td className="faint">{fmtDate(x.createdAt)}</td><td className="faint">{ago(x.lastSeenAt)}</td><td className="mono adm-xs">{plainIp(x.ip)}</td>
+              <td className="adm-td-end"><button className="btn sm" onClick={async () => { try { await adminApi.revokeSession(x.id); toast('Session ended', 'success'); s.reload(); } catch (e) { toast(errText(e), 'error'); } }}>End session</button></td></tr>))}</tbody></table></div>
       )}
-    </div>
+    </section>
   );
 }
 
@@ -269,12 +358,49 @@ function Sessions() {
 export const plainIp = (ip: string | null): string => (ip ?? '').replace(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i, '$1');
 
 /** The mockup's Type column: what kind of event a row is, from its action name (sign-in trouble and access changes are Security, settings
- *  and reference data are Config, everything else is Info). */
+ *  and reference data are Config, everything else is Info; an ordinary sign-in or sign-out is Info, as the mockup draws it). */
 export function auditKind(action: string): { label: string; tone: 'danger' | 'warning' | 'info' } {
   const a = action.toLowerCase();
+  if (a === 'auth.login' || a === 'auth.logout' || a === 'auth.onboarding.completed') return { label: 'Info', tone: 'info' };
   if (/(fail|denied|refused|locked|lockout|offboard|revoke|disable|reset|password|session\.ended|auth\.)/.test(a)) return { label: 'Security', tone: 'danger' };
   if (/(setting|config|policy|accent|theme|backup|restore|access\.|role|group|directory|maintenance)/.test(a)) return { label: 'Config', tone: 'warning' };
   return { label: 'Info', tone: 'info' };
+}
+
+type AuditRow = Awaited<ReturnType<typeof adminApi.audit>>[number];
+
+/** The mockup's Event column: the action as a sentence ("Signed in from 10.20.4.17", "Created an account: rita"). */
+export function auditEvent(e: Pick<AuditRow, 'action' | 'ip' | 'meta'>): string {
+  const said = actionLabel(e.action);
+  const text = said.charAt(0).toUpperCase() + said.slice(1);
+  const m = (e.meta && typeof e.meta === 'object' ? e.meta : {}) as Record<string, unknown>;
+  const who = typeof m.username === 'string' ? m.username : '';
+  if (e.action.startsWith('auth.login') && e.ip) return `${text} from ${plainIp(e.ip)}`;
+  return who ? `${text}: ${who}` : text;
+}
+
+/** The mockup's Time column: the clock time for today, the day and time before that. */
+export function auditTime(iso: string, now = new Date()): string {
+  const d = new Date(iso);
+  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  return d.toDateString() === now.toDateString() ? time : `${d.toLocaleDateString([], { day: 'numeric', month: 'short' })} ${time}`;
+}
+
+/** The Administration overview's audit card: the newest entries, as the mockup draws them, and View all. */
+export function RecentAudit({ rows = 5, allHref }: { rows?: number; allHref: string }) {
+  const a = useAsync(() => adminApi.audit(rows), [rows]);
+  return (
+    <section className="card" aria-labelledby="recent-audit-h" data-testid="recent-audit">
+      <div className="card-head"><h3 id="recent-audit-h"><Icon name="log" />Audit log</h3><Link to={allHref}>View all</Link></div>
+      {a.loading && !a.data ? <Loading /> : a.error ? <div className="card-body"><Callout tone="danger">{a.error}</Callout></div> : !a.data?.length ? <Empty title="No entries yet" /> : (
+        <div className="table-wrap"><table className="table">
+          <thead><tr><th>Time</th><th>Actor</th><th>Event</th><th>Type</th></tr></thead>
+          <tbody>{a.data.map((e) => { const k = auditKind(e.action); return (
+            <tr key={e.id}><td className="faint mono nowrap" title={fmtDate(e.at)}>{auditTime(e.at)}</td><td>{e.actor ?? 'unknown'}</td><td title={e.action}>{auditEvent(e)}</td><td><Pill tone={k.tone}>{k.label}</Pill></td></tr>); })}</tbody>
+        </table></div>
+      )}
+    </section>
+  );
 }
 
 export function Audit() {
@@ -299,33 +425,39 @@ export function Audit() {
   const set = (k: keyof AuditQuery) => (e: React.ChangeEvent<HTMLInputElement>) => setTyped({ ...typed, [k]: e.target.value });
   const enter = (e: React.KeyboardEvent) => { if (e.key === 'Enter') setFilter(typed); };
   return (
-    <div className="v2-stack">
-      <div className="v2-row wrap v2-gap-8">
-        <input className="v2-input v2-w-220" placeholder="Action, e.g. release.approved" value={typed.action ?? ''} onChange={set('action')} onKeyDown={enter} aria-label="Filter audit log by action" />
-        <input className="v2-input v2-w-140" placeholder="Person" value={typed.actor ?? ''} onChange={set('actor')} onKeyDown={enter} aria-label="Filter audit log by person" data-testid="audit-actor" />
-        <input className="v2-input v2-w-180" placeholder="Project id" value={typed.project ?? ''} onChange={set('project')} onKeyDown={enter} aria-label="Filter audit log by project" data-testid="audit-project" />
-        <label className="v2-row v2-gap-4">From <input className="v2-input" type="date" value={typed.from ?? ''} onChange={set('from')} aria-label="Entries from this date" data-testid="audit-from" /></label>
-        <label className="v2-row v2-gap-4">To <input className="v2-input" type="date" value={typed.to ?? ''} onChange={set('to')} aria-label="Entries up to this date" data-testid="audit-to" /></label>
-        <button className="btn" onClick={a.reload}><Icon name="refresh" />Refresh</button>
-      </div>
-      <div className="v2-row wrap v2-gap-8">
-        <a className="btn" href={auditApi.exportUrl('csv', filter)} download data-testid="audit-export-csv"><Icon name="download" />Export CSV</a>
-        <a className="btn" href={auditApi.exportUrl('jsonl', filter)} download data-testid="audit-export-jsonl"><Icon name="download" />Export JSON Lines</a>
-        <button className="btn" onClick={verify} disabled={verifying} data-testid="audit-verify"><Icon name="check" />{verifying ? 'Verifying…' : 'Verify chain'}</button>
-        <span className="v2-hint">The export holds every matching entry, not only those shown.</span>
-      </div>
-      {verr ? <Alert tone="bad">{verr}</Alert> : null}
+    <div className="stack adm-gap">
+      {verr ? <Callout tone="danger">{verr}</Callout> : null}
       {report ? (
-        <Alert tone={report.ok ? 'ok' : 'bad'}>
+        <Callout tone={report.ok ? 'success' : 'danger'}>
           <span data-testid="audit-verify-result">{report.ok ? 'Intact' : 'Problems found'}: {report.summary}.</span>
-          {!report.ok ? <ul className="v2-mt6">{report.problems.slice(0, 20).map((p, i) => <li key={i}>{p.message}</li>)}{report.problemCount > 20 ? <li>… and {report.problemCount - 20} more (run AgastyaCtl --verify-audit for the full list)</li> : null}</ul> : null}
-        </Alert>
+          {!report.ok ? <ul className="adm-list">{report.problems.slice(0, 20).map((p, i) => <li key={i}>{p.message}</li>)}{report.problemCount > 20 ? <li>… and {report.problemCount - 20} more (run AgastyaCtl --verify-audit for the full list)</li> : null}</ul> : null}
+        </Callout>
       ) : null}
       <section className="card" aria-labelledby="audit-h">
-        <div className="card-head"><h3 id="audit-h"><Icon name="history" />Entries <span className="count">{rows.length}</span></h3><span className="faint">Newest first · at most 300 shown</span></div>
+        <div className="card-head">
+          <h3 id="audit-h"><Icon name="log" />Audit log <span className="count">{rows.length}</span></h3>
+          <div className="row wrap">
+            <button className="btn sm" onClick={verify} disabled={verifying} data-testid="audit-verify"><Icon name="shield" size={14} />{verifying ? 'Verifying…' : 'Verify chain'}</button>
+            <a className="btn sm" href={auditApi.exportUrl('csv', filter)} download data-testid="audit-export-csv"><Icon name="download" size={14} />Export CSV</a>
+            <a className="btn sm" href={auditApi.exportUrl('jsonl', filter)} download data-testid="audit-export-jsonl"><Icon name="download" size={14} />Export JSON Lines</a>
+          </div>
+        </div>
+        <div className="adm-filters">
+          <input className="input search adm-w-220" placeholder="Action, e.g. release.approved" value={typed.action ?? ''} onChange={set('action')} onKeyDown={enter} aria-label="Filter audit log by action" />
+          <input className="input search adm-w-140" placeholder="Person" value={typed.actor ?? ''} onChange={set('actor')} onKeyDown={enter} aria-label="Filter audit log by person" data-testid="audit-actor" />
+          <input className="input search adm-w-180" placeholder="Project id" value={typed.project ?? ''} onChange={set('project')} onKeyDown={enter} aria-label="Filter audit log by project" data-testid="audit-project" />
+          <label className="row adm-date">From <input className="input" type="date" value={typed.from ?? ''} onChange={set('from')} aria-label="Entries from this date" data-testid="audit-from" /></label>
+          <label className="row adm-date">To <input className="input" type="date" value={typed.to ?? ''} onChange={set('to')} aria-label="Entries up to this date" data-testid="audit-to" /></label>
+          <button className="icon-btn" onClick={a.reload} aria-label="Refresh" title="Refresh"><Icon name="refresh" /></button>
+          <span className="grow" />
+          <span className="faint adm-xs">Newest first · at most 300 shown; the export holds every matching entry.</span>
+        </div>
         {a.loading && !a.data ? <Loading /> : !rows.length ? <Empty title="No entries" /> : (
-          <div className="table-wrap"><table className="v2-table"><thead><tr><th>When</th><th>Who</th><th>Action</th><th>Type</th><th>Project</th><th>From</th></tr></thead>
-            <tbody>{rows.slice(0, drawn.limit).map((e) => { const k = auditKind(e.action); return <tr key={e.id}><td title={fmtDate(e.at)} className="faint">{ago(e.at)}</td><td>{e.actor ?? '—'}</td><td title={e.action}>{actionLabel(e.action)} <span className="v2-hint v2-mono">{e.action}</span></td><td><Pill tone={k.tone}>{k.label}</Pill></td><td className="v2-mono">{e.projectId ?? ''}</td><td className="v2-mono">{plainIp(e.ip)}</td></tr>; })}
+          <div className="table-wrap"><table className="table"><thead><tr><th>Time</th><th>Actor</th><th>Event</th><th>Type</th><th>Project</th><th>From</th></tr></thead>
+            <tbody>{rows.slice(0, drawn.limit).map((e) => { const k = auditKind(e.action); return (
+              <tr key={e.id}><td title={fmtDate(e.at)} className="faint mono nowrap">{auditTime(e.at)}</td><td>{e.actor ?? 'unknown'}</td>
+                <td title={e.action}>{auditEvent(e)} <span className="faint mono adm-xs">{e.action}</span></td><td><Pill tone={k.tone}>{k.label}</Pill></td>
+                <td className="mono adm-xs">{e.projectId ?? ''}</td><td className="mono adm-xs">{plainIp(e.ip)}</td></tr>); })}
               <MoreRows as="tr" colSpan={6} shown={drawn.limit} total={rows.length} onMore={drawn.more} onAll={drawn.all} /></tbody></table></div>
         )}
       </section>
@@ -350,10 +482,8 @@ export function Settings() {
 
   return (
     <div className="v2-page adm">
-      <AdmHead title="Settings" sub={isAdmin ? 'Account, people and platform administration.' : isManager ? 'Your account and your authors.' : 'Your account and preferences.'} />
-      <div className="v2-tabs" role="tablist" aria-label="Settings sections" onKeyDown={tablistKeys}>
-        {tabs.map((t) => <NavLink key={t.to} to={t.to} className={({ isActive }) => `v2-tab ${isActive ? 'active' : ''}`} role="tab" style={{ textDecoration: 'none' }}>{t.label}</NavLink>)}
-      </div>
+      <AdmHead title="Settings" sub={isAdmin ? 'Your account, the people and platform administration of this installation.' : isManager ? 'Your account and your authors.' : 'Your account and preferences.'} />
+      <TabLinks label="Settings sections" tabs={tabs} />
       <Routes>
         <Route index element={<Navigate to="account" replace />} />
         <Route path="account" element={<Account />} />
