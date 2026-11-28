@@ -22,7 +22,7 @@
 /* ---------------------------------------------------------------- disabled */
 .btn:disabled, .btn[aria-disabled='true'], .x-btn:disabled, .x-btn[aria-disabled='true'],
 .btn-primary:disabled, .btn-danger:disabled, .btn-danger-solid:disabled, .x-btn--primary:disabled {
-  background: var(--surface-disabled); color: var(--text-disabled); border-color: var(--border-default); cursor: not-allowed; box-shadow: none; opacity: 1;
+  background: var(--surface-disabled); color: var(--text-disabled); border-color: var(--border-subtle); cursor: not-allowed; box-shadow: none; opacity: 1;   /* the mockup's disabled .btn */
 }
 .btn:disabled .icon, .x-btn:disabled .icon { color: inherit; }
 .icon-btn:disabled, .icon-btn[aria-disabled='true'] { opacity: 1; color: var(--text-disabled); background: transparent; cursor: not-allowed; }
@@ -53,7 +53,7 @@ input[type='checkbox']:disabled, input[type='radio']:disabled { cursor: not-allo
 
 /* ---------------------------------------------------------------- active (pressed) and focus */
 .btn:active:not(:disabled), .x-btn:active:not(:disabled) { background: var(--surface-pressed); }
-.btn-primary:active:not(:disabled), .x-btn--primary:active:not(:disabled) { background: var(--accent-hover); }
+.btn-primary:active:not(:disabled), .btn.primary:active:not(:disabled), .x-btn--primary:active:not(:disabled) { background: var(--accent-pressed); }   /* the mockup's pressed primary */
 .v2-seg button:focus-visible, .v2-tab:focus-visible, .v2-chap:focus-visible, .v2-dm:focus-visible, .v2-anc-name:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 .v2-seg button:hover:not(:disabled):not(.on) { background: var(--surface-hover); color: var(--text); }
 
