@@ -420,7 +420,7 @@ export class JssEditor {
     const blocks = children.filter((c): c is Block => !isSection(c)); const subs = children.filter(isSection);
     for (const b of blocks) bodyEl.append(this.blockEl(b));
     if (!blocks.length && !this.opts.readOnly) {
-      bodyEl.append(h('div', { class: 'jss-empty', style: 'color:var(--paper-placeholder);font-size:10pt;cursor:text;margin:0 0 3mm', on: { click: () => this.insertParaInto(owner) } }, 'Click to add text here, or use Insert.'));
+      bodyEl.append(h('div', { class: 'jss-empty', style: 'color:var(--sheet-placeholder);font-size:10pt;cursor:text;margin:0 0 3mm', on: { click: () => this.insertParaInto(owner) } }, 'Click to add text here, or use Insert.'));
     }
     for (const s of subs) subsEl.append(this.sectionEl(s, depth + 1));
   }
@@ -638,7 +638,7 @@ export class JssEditor {
       f.legend.forEach((k, i) => {
         const n = h('b'); const tx = h('span', { style: 'flex:1', 'data-ph': 'Part name' });
         this.plainEditable(n, () => k.num, (v) => { k.num = v; }); this.plainEditable(tx, () => k.text, (v) => { k.text = v; });
-        const rm = this.opts.readOnly ? null : h('button', { type: 'button', title: 'Remove this key item', 'aria-label': 'Remove this key item', style: 'border:0;background:none;cursor:pointer;color:var(--paper-error)', on: { mousedown: (e: Event) => e.preventDefault(), click: () => this.mutate(() => { f.legend.splice(i, 1); }, () => f) } }, '✕');
+        const rm = this.opts.readOnly ? null : h('button', { type: 'button', title: 'Remove this key item', 'aria-label': 'Remove this key item', style: 'border:0;background:none;cursor:pointer;color:var(--sheet-error)', on: { mousedown: (e: Event) => e.preventDefault(), click: () => this.mutate(() => { f.legend.splice(i, 1); }, () => f) } }, '✕');
         legend.append(h('div', { class: 'row' }, n, tx, rm)); void i;
       });
       el.append(legend);
