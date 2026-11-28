@@ -36,7 +36,30 @@ Upgrading and uninstalling never touch the data folder. **Back it up** (section 
   the service on the same port; the tray application notices and just opens the browser.
 * **Console** (diagnosis): `AgastyaCtl.exe --console` runs the server in the window; Ctrl+C stops it cleanly.
 
-**First visit:** the application asks for the administrator account. Nothing ships with a default password.
+**First visit** depends on how the accounts begin (`[server] Deployment=` in `agastya.ini`, written by Setup; shown read-only under
+Administration > Access > Security; owner decision P3-6, `docs/phase3/standalone.md`):
+
+* **Standalone** (`Deployment=standalone`: the single-computer installation, Setup without *Allow other computers*, and the portable ZIP). The
+  first start of a fresh data folder creates one account per role with **fixed, published** credentials:
+
+  | Role | Username | Password |
+  |---|---|---|
+  | Administrator | `admin` | `Admin@123` |
+  | Project Manager | `manager` | `Manager@123` |
+  | Author | `author` | `Author@123` |
+  | Auditor (read-only) | `auditor` | `Auditor@123` |
+
+  Setup's finish page lists them with *Save a copy...* (written only to the file you choose); the application's first screen lists them too,
+  with the same button, until someone chooses *I have stored them*. Each account must choose its own password at its first sign-in (the
+  screen cannot be skipped; a default password is never accepted again), and until then it signs in from this computer only. The overview of
+  the administration page lists the default accounts that still have their default password. They are created **once** per data folder:
+  never on an upgrade, never on a data folder that already has accounts, never again after they are deleted. Setup creates them with
+  `AgastyaCtl.exe --default-accounts` (exit 0 created, 3 nothing to do); the server does the same at its first start, so a silent
+  installation or the portable ZIP gets them too. `/ADMINUSER` (below) takes precedence: that data folder then has an account and gets none.
+* **Common server** (`Deployment=server`: a team server, a client installation, and every server that does not say). No default accounts:
+  the application asks for the administrator account at the first visit, everyone else is added under Administration. A standalone
+  installation made a team server with `AgastyaCtl.exe --configure-server` (or `--install-service --lan`) is switched to `Deployment=server`;
+  `Deployment=standalone` with a network address does not start (the server log names `AGASTYA_DEPLOYMENT`).
 **Forgotten administrator password** (run on the server, in an elevated prompt):
 
 ```
@@ -325,6 +348,7 @@ Agastya-Platform-<version>-win-x64-Setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORE
 | `/CURRENTUSER` | install for the signed-in user only, no administrator rights (no service, no firewall rule) |
 | `/ALLUSERS` | per-machine install (the default; needs an elevated prompt) |
 | `/ADMINUSER=` `/ADMINPASSWORDFILE=` | create the first administrator without anyone at the first screen. The file's first line is a **temporary** password (it must meet the password policy); it is read by `AgastyaCtl.exe` and handed to the server's tool on standard input, never on a command line; the administrator chooses their own password at the first sign-in. Delete the file afterwards. Ignored once an administrator exists. |
+| (neither `/LAN` nor `/CLIENTOF`) | a standalone installation (`Deployment=standalone`): a fresh data folder gets the default accounts of section 2. A silent run shows no finish page; the application's first screen shows the credentials instead. With `/ADMINUSER` it gets none. |
 
 The exit code is the standard Inno Setup one (0 = success; 7 = the upgrade could not be prepared - the server did not stop or the pre-update backup
 failed, nothing changed; anything else is a failure or a cancellation); `/LOG=` has the details. A fresh installation asks one question (the licence,

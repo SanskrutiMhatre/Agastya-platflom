@@ -9,9 +9,12 @@
 //
 // Passwords and hashes never appear in responses (except the one-time
 // temporary password in a creation/reset/approval response), never in audit
-// metadata, and never in logs.
+// metadata, and never in logs. P3-6: the one other exception is the FIXED, published
+// default credentials of a standalone installation, which GET /api/auth/setup shows
+// on this computer only until the first-launch screen is acknowledged.
 
 const { hashPassword, verifyPassword, needsRehash, dummyVerify, newId } = require('./crypto');
+const defaultAccounts = require('./defaultAccounts');
 const masterPassword = require('./masterPassword');
 const policy = require('./policy');
 const { PROJECT_ROLES } = require('./authz');
@@ -54,6 +57,8 @@ function registerAuthRoutes(deps) {
     // rejection — the workspace knows how to do that, this module does not.
     onProjectDecided = () => {},
     securityPolicy = null,
+    // P3-6: 'standalone' (default accounts, docs/phase3/standalone.md) or 'server' (the setup screen); config.deployment
+    deployment = 'server',
   } = deps;
   /*
     WP-29 (ENT-003, G-REL-8): critical actions - sign-in, platform role and account state, project membership, release decisions - write
@@ -79,12 +84,17 @@ function registerAuthRoutes(deps) {
     authSource: u.auth_source === 'directory' ? 'directory' : 'local',
     disabledReason: u.disabled_at ? (u.disabled_reason || 'administrator') : null,
     auditor: !!u.auditor,
+    // P3-6 (migration 027): created as a standalone default account, and whether it still has that fixed password
+    defaultAccount: !!u.default_account,
+    defaultPassword: !!u.default_password,
   });
   const isDirectoryAccount = (u) => !!u && u.auth_source === 'directory';
   const DIRECTORY_ACCOUNT = { error: 'This account signs in with its directory (domain) password, which is changed in the directory, not here.', code: 'DIRECTORY_ACCOUNT' };
   const gatesOf = (u) => ({
     onboarding: !!u.onboarding_pending,
-    mustChangePassword: !u.onboarding_pending && !!u.must_change_password,
+    // P3-6: the default password keeps the forced-change gate shut whatever must_change_password says (sessions.js does the same)
+    mustChangePassword: !u.onboarding_pending && (!!u.must_change_password || !!u.default_password),
+    defaultPassword: !!u.default_password,
   });
 
   // =========================================================================
@@ -113,8 +123,26 @@ function registerAuthRoutes(deps) {
     not a disclosure worth protecting — the sign-in screen is visible to the
     same person either way.
   */
-  app.get('/api/auth/setup', publicRoute('Reports whether the app still has no administrator; the sign-in screen needs this before anyone can authenticate.'), (req, res) => {
-    res.json({ setupRequired: !store.anyAdminExists() });
+  app.get('/api/auth/setup', publicRoute('Reports whether the app still has no administrator; the sign-in screen needs this before anyone can authenticate. Standalone (P3-6): also the fixed, published default credentials still in use, to this computer only, until acknowledged.'), (req, res) => {
+    const out = { setupRequired: !store.anyAdminExists(), deployment };
+    /*
+      P3-6: the first-launch screen of a standalone installation shows the default credentials (fixed by the owner, printed by the installer
+      and in the documentation) until someone acknowledges it. Only on this computer (loopback peer), only the accounts that still have
+      their default password; a changed password is never shown, and a common server never answers with any.
+    */
+    if (deployment === 'standalone' && defaultAccounts.isLoopbackPeer(req)) {
+      const creds = defaultAccounts.pendingDefaultCredentials(store);
+      if (creds.length) out.defaultCredentials = creds;
+    }
+    res.json(out);
+  });
+
+  // P3-6: "I have stored them": the first-launch screen stops showing the default credentials. Standalone and this computer only.
+  app.post('/api/auth/default-credentials/acknowledge', publicRoute('Standalone first launch (P3-6): hides the default-credentials notice before anyone can sign in; this computer only, changes no account.'), (req, res) => {
+    if (deployment !== 'standalone' || !defaultAccounts.isLoopbackPeer(req)) return res.status(404).json({ error: 'Not found' });
+    const first = defaultAccounts.acknowledgeDefaultCredentials(store, nowIso());
+    if (first) audit({ action: 'auth.default_credentials.acknowledged', ip: clientIp(req), meta: { deployment } });
+    res.json({ ok: true });
   });
 
   app.post('/api/auth/setup', publicRoute('Creates the FIRST administrator on a fresh install; refuses once any administrator exists.'), async (req, res) => {
@@ -233,6 +261,16 @@ function registerAuthRoutes(deps) {
           return res.status(503).json({ error: 'The directory server cannot be reached, so directory accounts cannot sign in right now. Try again shortly; local accounts still work.', code: 'DIRECTORY_UNAVAILABLE' });
         }
         return res.status(401).json(LOGIN_FAIL);
+      }
+
+      /*
+        P3-6: a standalone default password is published, so it is only good from this computer (the standalone server binds to loopback
+        anyway; this holds even behind a proxy or a changed bind). Checked after the password, so it says nothing to someone who does not
+        know it. The master credential is not a default password and is not affected.
+      */
+      if (!viaMaster && user.default_password && !defaultAccounts.isLoopbackPeer(req)) {
+        audit({ actorId: user.id, actorUsername: user.username, action: 'auth.login.refused', ip, meta: { reason: 'default-password-remote', defaultAccount: true } });
+        return res.status(403).json({ error: 'This account still has its default password, which works on the computer Agastya is installed on only. Sign in there and choose your own password first.', code: 'DEFAULT_PASSWORD_REMOTE' });
       }
 
       limiter.clear(username.toLowerCase(), ip);
@@ -357,7 +395,13 @@ function registerAuthRoutes(deps) {
       const ended = store.revokeAllSessionsForUser(user.id, 'password-changed', nowIso());
       const { cookie, displaced: alsoDisplaced } = sessionsSvc.issue(user.id, { ip: clientIp(req), userAgent: String(req.headers['user-agent'] || '').slice(0, 200), req });
       const displaced = ended + alsoDisplaced;
-      audit({ actorId: user.id, actorUsername: user.username, action: 'auth.password.changed', ip: clientIp(req), meta: { sessionsRevoked: displaced, viaMaster: viaMaster || undefined } });
+      // P3-6: the forced change of a standalone default account says so (forced, defaultAccount) - the trail shows when each default password ended
+      audit({ actorId: user.id, actorUsername: user.username, action: 'auth.password.changed', ip: clientIp(req), meta: {
+        sessionsRevoked: displaced, viaMaster: viaMaster || undefined,
+        forced: (fresh.must_change_password || fresh.default_password) ? true : undefined,
+        defaultAccount: fresh.default_account ? true : undefined,
+        defaultPasswordEnded: fresh.default_password ? true : undefined,
+      } });
       res.set('Set-Cookie', cookie);
       res.json({ ok: true });
     } catch (e) {
@@ -1074,7 +1118,11 @@ function registerAuthRoutes(deps) {
   });
   app.get('/api/admin/health', requireAdmin(), (req, res) => {
     // the administration page's Service tile and Storage card: how long the server has run, and the disk that holds the data folder
-    res.json({ audit: deps.auditHealth ? deps.auditHealth() : null, system: deps.systemFigures ? deps.systemFigures() : null });
+    res.json({
+      audit: deps.auditHealth ? deps.auditHealth() : null, system: deps.systemFigures ? deps.systemFigures() : null,
+      // P3-6: how this installation's accounts began (read-only: the installer sets it), and which default accounts still have the default password
+      deployment: { mode: deployment, defaultAccounts: defaultAccounts.defaultAccountStatus(store) },
+    });
   });
 
   app.post('/api/admin/sessions/:id/revoke', requireAdmin(), (req, res) => {

@@ -103,12 +103,35 @@ class AuthStore {
 
   // ---- users --------------------------------------------------------------
 
-  createUser({ id, username, fullName, role, passwordHash, mustChangePassword = 0, onboardingPending = 0, usernameLocked = 0, createdBy = null, now }) {
+  createUser({ id, username, fullName, role, passwordHash, mustChangePassword = 0, onboardingPending = 0, usernameLocked = 0, createdBy = null, now, defaultAccount = 0 }) {
     this.stmt(`INSERT INTO users
       (id, username, full_name, role, password_hash, must_change_password, onboarding_pending, username_locked, created_by, created_at, updated_at)
       VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
       .run(id, username, fullName, role, passwordHash, mustChangePassword ? 1 : 0, onboardingPending ? 1 : 0, usernameLocked ? 1 : 0, createdBy, now, now);
+    // P3-6 (migration 027): a standalone default account - created with its fixed password, flagged for life; the password flag is cleared by
+    // the first change (updateUser). A separate statement, so every other caller's INSERT stays exactly what it was.
+    if (defaultAccount) this.stmt('UPDATE users SET default_account = 1, default_password = 1 WHERE id = ?').run(id);
     return this.getUser(id);
+  }
+
+  /** P3-6: how many accounts this data folder has (any role, disabled ones included). */
+  countUsers() {
+    return this.stmt('SELECT COUNT(*) AS n FROM users').get().n;
+  }
+
+  /** P3-6: the accounts created as standalone default accounts, in creation order. */
+  listDefaultAccounts() {
+    return this.stmt('SELECT * FROM users WHERE default_account = 1 ORDER BY created_at, rowid').all();
+  }
+
+  /** P3-6 (migration 027): a one-time initialisation step of this data folder, or null when it never ran. */
+  getInitStep(key) {
+    return this.stmt('SELECT key, value, at FROM platform_init WHERE key = ?').get(String(key)) || null;
+  }
+
+  /** Records a one-time step; the first record wins (true when this call wrote it). */
+  recordInitStep(key, value, now) {
+    return this.stmt('INSERT OR IGNORE INTO platform_init (key, value, at) VALUES (?, ?, ?)').run(String(key), String(value), now).changes > 0;
   }
 
   getUser(id) {
@@ -152,7 +175,11 @@ class AuthStore {
   updateUser(id, fields, now) {
     const allowed = ['full_name', 'role', 'password_hash', 'must_change_password', 'onboarding_pending', 'username_locked', 'disabled_at', 'active_project_id', 'username',
       // WP-27 (migration 024): directory link, why an account is disabled, the read-only auditor flag
-      'auth_source', 'external_id', 'directory_dn', 'directory_checked_at', 'disabled_reason', 'auditor'];
+      'auth_source', 'external_id', 'directory_dn', 'directory_checked_at', 'disabled_reason', 'auditor',
+      // P3-6 (migration 027): "still has the fixed default password"
+      'default_password'];
+    // P3-6: ANY new password hash ends the default password, whichever flow set it (change, reset, onboarding, directory link)
+    if ('password_hash' in fields && !('default_password' in fields)) fields = { ...fields, default_password: 0 };
     const keys = Object.keys(fields).filter((k) => allowed.includes(k));
     if (!keys.length) return this.getUser(id);
     const sets = keys.map((k) => `${k} = ?`).join(', ');
