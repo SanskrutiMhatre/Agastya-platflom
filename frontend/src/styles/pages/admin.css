@@ -12,7 +12,7 @@
 .v2-admin-group { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); padding: 4px 10px; }
 .v2-admin-nav a { display: block; padding: 6px 10px; border-radius: 6px; color: var(--text); font-size: 13px; text-decoration: none; position: relative; }
 .v2-admin-nav a:hover { background: var(--bg-hover); }
-.v2-admin-nav a.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.v2-admin-nav a.active { background: var(--accent-soft); color: var(--text-link); font-weight: 600; }
 .v2-admin-nav a.active::before { content: ''; position: absolute; left: -8px; top: 6px; bottom: 6px; width: 3px; border-radius: 0 2px 2px 0; background: var(--accent); }
 .v2-admin-nav a:focus-visible, .v2-admin-more:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 .v2-admin-more { cursor: pointer; padding: 4px 12px; border-radius: 6px; }

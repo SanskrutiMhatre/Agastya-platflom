@@ -102,7 +102,7 @@ export const BASE_CSS = `
 .jsg-quick{display:inline-flex;gap:1px;margin:0 10px 3px 0;padding-right:10px;border-right:1px solid var(--border)}
 .jsg-tab{height:30px;padding:0 14px;border:1px solid transparent;border-bottom:0;border-radius:6px 6px 0 0;background:none;color:var(--text-muted);font:inherit;font-size:12.5px;cursor:pointer;margin-bottom:-1px}
 .jsg-tab:hover{color:var(--text);background:var(--bg-hover)}
-.jsg-tab.on{background:var(--bg);color:var(--accent);font-weight:600;border-color:var(--border);border-bottom:1px solid var(--bg)}
+.jsg-tab.on{background:var(--bg);color:var(--text-link);font-weight:600;border-color:var(--border);border-bottom:1px solid var(--bg)}
 .jsg-tab:focus-visible{outline:2px solid var(--focus-ring);outline-offset:1px}
 .jsg-panels{background:var(--bg)}
 .jsg-panel{display:flex;flex-wrap:wrap;align-items:stretch;gap:2px 0;padding:6px 10px 4px;min-height:60px}
@@ -115,7 +115,7 @@ export const BASE_CSS = `
 .jsg-bar .jsg-tb:hover:not(:disabled){background:var(--bg-hover)}
 .jsg-bar .jsg-tb:active:not(:disabled){background:var(--bg-active)}
 .jsg-bar .jsg-tb:disabled{color:var(--text-disabled);cursor:not-allowed}
-.jsg-bar .jsg-tb.on{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+.jsg-bar .jsg-tb.on{background:var(--accent-soft);color:var(--text-link);border-color:var(--accent)}
 .jsg-bar .jsg-tb:focus-visible{outline:2px solid var(--focus-ring);outline-offset:1px}
 .jsg-thint{align-self:center;max-width:52ch;font-size:11.5px;color:var(--text-faint);padding:0 12px}
 .jsg-menu{position:fixed;z-index:60;min-width:210px;background:var(--bg-elev);border:1px solid var(--border-strong);border-radius:8px;box-shadow:var(--shadow-menu);padding:4px;font:13px system-ui,sans-serif}

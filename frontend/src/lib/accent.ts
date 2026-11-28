@@ -22,9 +22,11 @@ const BLACK = tokens.primitive.black, WHITE = tokens.primitive.white;
 export const DEFAULT_ACCENT = tok('accent', 0);
 
 /** The surfaces of each theme the accent must read on (the semantic tokens of styles/tokens/tokens.json). */
+/** The dark ink an administrator accent falls back to when white text does not read on it (both themes now put white on the default accent). */
+const INK_DARK = (tokens.primitive as Record<string, string>)['ink-990'];
 export const ACCENT_SURFACES = {
-  light: { panel: tok('surface-panel', 0), canvas: tok('surface-canvas', 0), hover: tok('surface-hover', 0), pressed: tok('surface-pressed', 0), ink: tok('text-on-accent', 0), inkAlt: tok('text-on-accent', 1) },
-  dark: { panel: tok('surface-panel', 1), canvas: tok('surface-canvas', 1), hover: tok('surface-hover', 1), pressed: tok('surface-pressed', 1), ink: tok('text-on-accent', 1), inkAlt: tok('text-on-accent', 0) },
+  light: { panel: tok('surface-panel', 0), canvas: tok('surface-canvas', 0), hover: tok('surface-hover', 0), pressed: tok('surface-pressed', 0), ink: tok('text-on-accent', 0), inkAlt: INK_DARK },
+  dark: { panel: tok('surface-panel', 1), canvas: tok('surface-canvas', 1), hover: tok('surface-hover', 1), pressed: tok('surface-pressed', 1), ink: tok('text-on-accent', 1), inkAlt: INK_DARK },
 } as const;
 
 const TEXT = 4.5;

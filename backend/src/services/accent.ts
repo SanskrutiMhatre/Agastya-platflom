@@ -22,8 +22,8 @@ export const DEFAULT_ACCENT = '#2456c9';
 
 /** The surfaces of each theme the accent must read on: a copy of the semantic tokens of frontend/src/styles/tokens/tokens.json (the parity test fails when they drift). */
 export const ACCENT_SURFACES = {
-  light: { panel: '#ffffff', canvas: '#f3f4f7', hover: '#e7eaf1', pressed: '#dde4f3', ink: '#ffffff', inkAlt: '#0d1424' },
-  dark: { panel: '#1e2128', canvas: '#16181d', hover: '#2a2e37', pressed: '#27344f', ink: '#0d1424', inkAlt: '#ffffff' },
+  light: { panel: '#ffffff', canvas: '#f3f5f8', hover: '#e9edf3', pressed: '#dde3ec', ink: '#ffffff', inkAlt: '#0d1424' },
+  dark: { panel: '#171b22', canvas: '#111419', hover: '#222833', pressed: '#2b3240', ink: '#ffffff', inkAlt: '#0d1424' },
 } as const;
 
 const TEXT = 4.5;

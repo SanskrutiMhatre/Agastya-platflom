@@ -212,7 +212,7 @@ function Danger() {
       <h3 style={{ margin: 0, color: 'var(--danger)' }}>Delete this project</h3>
       <p style={{ margin: 0 }}>Removes the project and all {summary.dataModules.total} data modules, its publication, settings and built PDFs from the server. This cannot be undone.</p>
       <Field label={`Type “${summary.project.name}” to confirm`}><input className="v2-input" value={typed} onChange={(e) => setTyped(e.target.value)} aria-label="Confirm project name" /></Field>
-      <div><button className="btn btn-primary" style={{ background: 'var(--danger)', borderColor: 'var(--danger)' }} disabled={typed !== summary.project.name || busy} onClick={del}>Delete project</button></div>
+      <div><button className="btn btn-primary" style={{ background: 'var(--danger-solid)', borderColor: 'var(--danger-solid)' }} disabled={typed !== summary.project.name || busy} onClick={del}>Delete project</button></div>
     </div>
   );
 }
