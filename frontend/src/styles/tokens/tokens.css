@@ -337,9 +337,9 @@
   --fs-lg: 16px;
   --fs-xl: 20px;
   --z-sticky: 10;
-  --z-rail: 30;
-  --z-menu: 60;
-  --z-modal: 100;
+  --z-rail: 20;
+  --z-menu: 100;
+  --z-modal: 210;
   --z-toast: 300;
   --z-tooltip: 400;
   --motion-fast: 80ms;
@@ -452,7 +452,6 @@
   --paper-find-current: var(--p-paper-find-current);
   --paper-watermark-preview: var(--p-paper-watermark-preview);
   --paper-watermark-preview-strong: var(--p-paper-watermark-preview-strong);
-  --viewer-canvas: var(--p-viewer-canvas);
   --viewer-sidebar: var(--p-viewer-sidebar);
   --viewer-text: var(--p-viewer-text);
   --viewer-text-strong: var(--p-white);
@@ -482,6 +481,7 @@
   --paper-rule: var(--p-ds-paper-rule);
   --paper-accent: var(--p-ds-paper-accent);
   --paper-warning: var(--p-ds-paper-warning);
+  --viewer-chrome: var(--p-viewer-canvas);
   /* semantic: light */
   --surface-canvas: var(--p-ds-surface-canvas-l);
   --surface-panel: var(--p-ds-surface-panel-l);
@@ -500,7 +500,7 @@
   --text-disabled: var(--p-ds-text-disabled-l);
   --text-on-accent: var(--admin-text-on-accent-light, var(--p-ds-text-on-accent-l));
   --border-default: var(--p-ds-border-default-l);
-  --border-strong: var(--p-gray-300);
+  --border-strong: var(--p-ds-border-control-l);
   --border-control: var(--p-ds-border-control-l);
   --accent: var(--admin-accent-light, var(--p-ds-accent-l));
   --accent-hover: var(--admin-accent-hover-light, var(--p-ds-accent-hover-l));
@@ -513,7 +513,7 @@
   --info: var(--p-ds-info-l);
   --ctx-text: var(--p-amber-750);
   --ctx-line: var(--p-amber-500);
-  --toast-error: var(--p-red-700);
+  --toast-error: var(--p-ds-danger-solid-l);
   --toast-warning: var(--p-amber-800);
   --toast-success: var(--p-green-700);
   --syntax-tag: var(--p-ds-syntax-tag-l);
@@ -563,7 +563,7 @@
   --text-on-warning-solid: var(--p-ds-text-on-warning-solid-l);
   --tooltip-bg: var(--p-ds-tooltip-bg-l);
   --tooltip-text: var(--p-ds-tooltip-text-l);
-  --viewer-canvas-themed: var(--p-ds-viewer-canvas-themed-l);
+  --viewer-canvas: var(--p-ds-viewer-canvas-themed-l);
   --shadow-3: var(--p-ds-shadow-3-l);
   --scrollbar-thumb: var(--p-ds-scrollbar-thumb-l);
   --scrollbar-track: var(--p-ds-scrollbar-track-l);
@@ -618,6 +618,11 @@
   --x-ok-bg: var(--success-subtle);
   --x-ok-line: var(--success);
   --x-white: var(--surface-panel);
+  --viewer-canvas-themed: var(--viewer-canvas);
+  --x-text: var(--text-primary);
+  --x-line-strong: var(--border-control);
+  --x-surface-alt: var(--surface-inset);
+  --x-warn: var(--warning);
   color-scheme: light;
 }
 
@@ -640,7 +645,7 @@
   --text-disabled: var(--p-ds-text-disabled-d);
   --text-on-accent: var(--admin-text-on-accent-dark, var(--p-ds-text-on-accent-d));
   --border-default: var(--p-ds-border-default-d);
-  --border-strong: var(--p-ink-700);
+  --border-strong: var(--p-ds-border-control-d);
   --border-control: var(--p-ds-border-control-d);
   --accent: var(--admin-accent-dark, var(--p-ds-accent-d));
   --accent-hover: var(--admin-accent-hover-dark, var(--p-ds-accent-hover-d));
@@ -653,7 +658,7 @@
   --info: var(--p-ds-info-d);
   --ctx-text: var(--p-amber-300);
   --ctx-line: var(--p-amber-300);
-  --toast-error: var(--p-red-800);
+  --toast-error: var(--p-ds-danger-solid-d);
   --toast-warning: var(--p-amber-800);
   --toast-success: var(--p-green-600);
   --syntax-tag: var(--p-ds-syntax-tag-d);
@@ -703,7 +708,7 @@
   --text-on-warning-solid: var(--p-ds-text-on-warning-solid-d);
   --tooltip-bg: var(--p-ds-tooltip-bg-d);
   --tooltip-text: var(--p-ds-tooltip-text-d);
-  --viewer-canvas-themed: var(--p-ds-viewer-canvas-themed-d);
+  --viewer-canvas: var(--p-ds-viewer-canvas-themed-d);
   --shadow-3: var(--p-ds-shadow-3-d);
   --scrollbar-thumb: var(--p-ds-scrollbar-thumb-d);
   --scrollbar-track: var(--p-ds-scrollbar-track-d);

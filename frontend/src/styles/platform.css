@@ -261,8 +261,8 @@ html.v2-compact .v2-table th { padding-top: 5px; padding-bottom: 5px; }
 /* JSS editor: narrow windows get one pane at a time, and the outline gets out of the way. */
 
 /* the PDF viewer is dark in both themes (a recorded decision, TH-007: tokens viewer-*): its empty-state text must read on it */
-[data-testid="pdf-pane"] .v2-empty, [data-testid="pdf-pane"] .v2-empty h3, [data-testid="pdf-pane"] .v2-empty > svg { color: var(--viewer-text); }
-[data-testid="pdf-pane"] .v2-empty strong { color: var(--viewer-text-strong); font-weight: 600; }
+[data-testid="pdf-pane"] .v2-empty, [data-testid="pdf-pane"] .v2-empty h3, [data-testid="pdf-pane"] .v2-empty > svg { color: var(--text-secondary); }
+[data-testid="pdf-pane"] .v2-empty strong { color: var(--text-primary); font-weight: 600; }
 
 /* FE-004: the server is not answering; the page stays usable. */
 .v2-offline-banner { position: fixed; left: 50%; top: 8px; transform: translateX(-50%); z-index: 1000; padding: 6px 14px; border-radius: 6px;
