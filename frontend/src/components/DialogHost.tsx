@@ -18,7 +18,9 @@ function ServiceDialog({ req }: { req: DialogRequest }) {
   const ok = () => req.resolve(req.kind === 'prompt' ? value : true);
   const confirmLabel = o.confirmLabel ?? (req.kind === 'alert' ? 'OK' : req.kind === 'prompt' ? 'OK' : 'Confirm');
   return (
-    <Modal title={o.title} onClose={cancel} width={req.kind === 'prompt' && o.multiline ? 560 : 460} buttons={<>
+    // a question or a notice is the mockup's confirm dialog (admin.html: the tone's icon in a tinted circle); a prompt is a form dialog
+    <Modal title={o.title} onClose={cancel} width={req.kind === 'prompt' && o.multiline ? 560 : 460}
+      icon={req.kind === 'prompt' ? undefined : o.danger ? 'alert' : 'info'} tone={o.danger ? 'danger' : 'info'} buttons={<>
       {req.kind === 'alert' ? null : <button type="button" className="btn" onClick={cancel} data-testid="app-dialog-cancel" autoFocus={!!o.danger}>{o.cancelLabel ?? 'Cancel'}</button>}
       <button type="button" className={`btn btn-primary ${o.danger ? 'btn-danger-solid' : ''}`} onClick={ok} data-testid="app-dialog-confirm"
         autoFocus={req.kind !== 'prompt' && !o.danger}>{confirmLabel}</button>

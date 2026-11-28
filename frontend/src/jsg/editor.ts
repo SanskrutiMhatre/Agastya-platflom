@@ -633,7 +633,7 @@ export class JsgEditor implements JsgEditorLike {
       li.appendChild(body); e.appendChild(li);
     });
     if (!this.readOnly) {
-      const add = this.el('button', '', '+ item'); (add as HTMLButtonElement).type = 'button'; add.style.cssText = 'font:11px system-ui;margin-left:48px;border:1px dashed var(--paper-jsg-placeholder);background:var(--paper);color:var(--paper-ink);border-radius:3px;cursor:pointer';
+      const add = this.el('button', '', '+ item'); (add as HTMLButtonElement).type = 'button'; add.style.cssText = 'font:11px system-ui;margin-left:48px;border:1px dashed var(--sheet-jsg-placeholder);background:var(--sheet);color:var(--sheet-ink);border-radius:3px;cursor:pointer';
       add.addEventListener('mousedown', (ev) => ev.preventDefault());
       add.addEventListener('click', () => { l.items.push({ parts: [{ k: 'text', inline: [] }] }); this.afterEdit(l); });
       e.appendChild(add);

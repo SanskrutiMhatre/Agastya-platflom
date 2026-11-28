@@ -92,10 +92,15 @@ export async function settle(page: Page, theme: Theme): Promise<void> {
 export async function markVolatile(page: Page): Promise<void> {
   await page.evaluate(() => {
     const VOLATILE = /\b\d{1,2}:\d{2}\b|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}[./]\d{1,2}[./]\d{2,4}\b|\bago\b|\bjust now\b|\byesterday\b|\b[0-9a-f]{8,}\b|\bv?\d+\.\d+\.\d+\b|\b\d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d{4}\b/i;
+    // A relative time ("just now", "1 min ago", "2 h ago") is masked, but its width still moves table columns from run to run; so the
+    // text itself is first set to one fixed phrase, which keeps the layout identical on every run.
+    const RELATIVE = /\b(just now|\d+ (s|sec|secs|second|seconds|min|mins|minute|minutes|h|hr|hrs|hour|hours|d|day|days|w|week|weeks) ago)\b/i;
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     while (walker.nextNode()) {
-      const t = walker.currentNode.textContent || '';
-      if (VOLATILE.test(t) && walker.currentNode.parentElement) walker.currentNode.parentElement.setAttribute('data-vmask', '');
+      const node = walker.currentNode;
+      const t = node.textContent || '';
+      if (RELATIVE.test(t)) node.textContent = t.replace(new RegExp(RELATIVE.source, 'gi'), '5 min ago');
+      if (VOLATILE.test(node.textContent || '') && node.parentElement) node.parentElement.setAttribute('data-vmask', '');
     }
     for (const el of Array.from(document.querySelectorAll('input, textarea'))) if (VOLATILE.test((el as HTMLInputElement).value)) el.setAttribute('data-vmask', '');
     // Live figures that move between runs without a clock-like pattern: server uptime, a user's first sign-in ("Never" until the

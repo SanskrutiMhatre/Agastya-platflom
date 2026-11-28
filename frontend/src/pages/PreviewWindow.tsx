@@ -8,7 +8,7 @@ import { contentApi } from '../api';
 import { Icon } from '../components/Icon';
 import { LazyPdfViewer } from '../components/pdf/LazyPdfViewer';
 import { ThemeToggle } from '../components/ThemeToggle';
-import { Spinner, errText } from '../components/ui';
+import { Callout, Spinner, errText } from '../components/ui';
 import { channelFor, type Mode, type ToEditor, type ToPopout } from '../lib/previewBus';
 import '../styles/pages/preview.css';   // WP-35 second pass: the pop-out window's styles load with its chunk
 
@@ -59,16 +59,17 @@ export function PreviewWindow() {
   return (
     <div className="v2-popout">
       <header className="v2-popout-bar">
-        <strong>{title}</strong>
+        {/* global UI pass: the top bars' brand mark, the mockup alerts (icon first) without inline styles */}
+        <span className="brand-mark v2-popout-mark" aria-hidden="true"><Icon name="book" size={16} /></span><strong>{title}</strong>
         <button className="btn sm primary" onClick={() => void run()} disabled={busy} data-testid="popout-run">
           {busy ? <Spinner /> : <Icon name={mode === 'quick' ? 'play' : 'rocket'} size={12} />}{mode === 'quick' ? 'Refresh preview' : 'Generate'}
         </button>
-        <span className="v2-hint v2-trunc" style={{ flex: 1 }}>{label}{note ? ` · ${note}` : ''}</span>
+        <span className="v2-hint v2-trunc grow">{label}{note ? ` · ${note}` : ''}</span>
         <ThemeToggle />
       </header>
-      {mode === 'quick' && !editor ? <div className="alert warning" style={{ margin: 8, fontSize: 'var(--fs-xs)' }}>Keep the editor open in the main window: it provides the text to preview.</div> : null}
-      {problem ? <div className="alert danger" style={{ margin: 8, fontSize: 'var(--fs-xs)' }}>{problem}</div> : null}
-      <div style={{ flex: 1, minHeight: 0, position: 'relative' }} data-testid="popout-pdf">
+      {mode === 'quick' && !editor ? <div className="v2-popout-note"><Callout tone="warning">Keep the editor open in the main window: it provides the text to preview.</Callout></div> : null}
+      {problem ? <div className="v2-popout-note"><Callout tone="danger">{problem}</Callout></div> : null}
+      <div className="v2-popout-pdf" data-testid="popout-pdf">
         <LazyPdfViewer autoFit compact={false} src={src} downloadName={`${mode === 'quick' ? 'preview' : 'publication'}.pdf`}
           placeholder={<div className="v2-center"><div style={{ textAlign: 'center', padding: 16 }}><Icon name="pdf" size={30} /><p>{mode === 'quick' ? 'Use Quick preview in the editor, or Refresh preview here.' : 'Press Generate to build the publication.'}</p></div></div>} />
       </div>

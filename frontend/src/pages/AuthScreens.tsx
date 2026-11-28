@@ -15,9 +15,9 @@ function Frame({ title, sub, children }: { title: string; sub?: string; children
   useDocumentTitle(title, 'Agastya Platform');   // WP-23 (WCAG 2.4.2)
   return (
     <main className="v2-auth">
-      <div className="v2-card v2-auth-card">
-        <div className="v2-row v2-auth-brand">
-          <span className="v2-brand-mark"><Icon name="book" size={16} /></span><strong>Agastya Platform</strong>
+      <div className="card raised v2-auth-card">
+        <div className="row v2-auth-brand">
+          <span className="brand-mark"><Icon name="book" size={18} /></span><strong>Agastya Platform</strong>
         </div>
         <h1>{title}</h1>
         {sub ? <p className="v2-sub">{sub}</p> : <div className="v2-auth-gap" />}
@@ -33,7 +33,7 @@ function Form({ onSubmit, children, submit, busy, error }: { onSubmit: () => Pro
     <form className="v2-stack" onSubmit={(e: FormEvent) => { e.preventDefault(); void onSubmit(); }}>
       {children}
       {error ? <Alert tone="bad">{error}</Alert> : null}
-      <button className="btn btn-primary v2-auth-submit" disabled={busy} aria-busy={busy || undefined}>{busy ? 'Please wait…' : submit}</button>
+      <button className="btn primary btn-primary v2-auth-submit" disabled={busy} aria-busy={busy || undefined}>{busy ? 'Please wait…' : submit}</button>
     </form>
   );
 }
@@ -78,9 +78,9 @@ function Login() {
         {sent
           ? <Alert tone="ok">If that account exists, an administrator has been notified and will give you a temporary password.</Alert>
           : <Form submit="Ask an administrator" busy={a.busy} error={a.error} onSubmit={() => a.run(async () => { await authApi.forgot(u); setSent(true); })}>
-            <Field label="Username"><input className="v2-input" autoFocus value={u} onChange={(e) => setU(e.target.value)} autoComplete="username" /></Field>
+            <Field label="Username"><input className="input" autoFocus value={u} onChange={(e) => setU(e.target.value)} autoComplete="username" /></Field>
           </Form>}
-        <p className="v2-auth-alt"><button type="button" className="v2-linkbtn" onClick={() => { a.setError(''); setForgot(false); setSent(false); }}>Back to sign in</button></p>
+        <p className="v2-auth-alt"><button type="button" className="link-btn v2-linkbtn" onClick={() => { a.setError(''); setForgot(false); setSent(false); }}>Back to sign in</button></p>
       </Frame>
     );
   }
@@ -88,10 +88,10 @@ function Login() {
     <Frame title="Sign in" sub="Offline, on-premises authoring and publishing for S1000D, JSS and JSG.">
       {signedOutReason && <Alert tone="warn">{signedOutReason}</Alert>}
       <Form submit="Sign in" busy={a.busy} error={a.error} onSubmit={() => a.run(() => login(u, p))}>
-        <Field label="Username"><input className="v2-input" autoFocus value={u} onChange={(e) => setU(e.target.value)} autoComplete="username" name="username" /></Field>
+        <Field label="Username"><input className="input" autoFocus value={u} onChange={(e) => setU(e.target.value)} autoComplete="username" name="username" /></Field>
         <Field label="Password"><PasswordInput value={p} onChange={(e) => setP(e.target.value)} autoComplete="current-password" name="password" /></Field>
       </Form>
-      <p className="v2-auth-alt"><button type="button" className="v2-linkbtn" onClick={() => { a.setError(''); setForgot(true); }}>Forgot your password?</button></p>
+      <p className="v2-auth-alt"><button type="button" className="link-btn v2-linkbtn" onClick={() => { a.setError(''); setForgot(true); }}>Forgot your password?</button></p>
     </Frame>
   );
 }
@@ -109,8 +109,8 @@ function Setup() {
       <Form submit="Create administrator" busy={a.busy} error={a.error} onSubmit={() => (rep.check() ? a.run(async () => {
         await setup(u, p, name);
       }) : Promise.resolve())}>
-        <Field label="Full name"><input className="v2-input" autoFocus value={name} onChange={(e) => setName(e.target.value)} name="fullName" /></Field>
-        <Field label="Username" hint="3–32 characters: lowercase letters, digits, dot, dash, underscore."><input className="v2-input" value={u} onChange={(e) => setU(e.target.value)} autoComplete="username" name="username" /></Field>
+        <Field label="Full name"><input className="input" autoFocus value={name} onChange={(e) => setName(e.target.value)} name="fullName" /></Field>
+        <Field label="Username" hint="3–32 characters: lowercase letters, digits, dot, dash, underscore."><input className="input" value={u} onChange={(e) => setU(e.target.value)} autoComplete="username" name="username" /></Field>
         <Field label="Password" hint="At least 15 characters (a few words make a good one), and not a common password or your name."><PasswordInput value={p} onChange={(e) => setP(e.target.value)} autoComplete="new-password" name="password" /></Field>
         <Field label="Repeat password" error={rep.error}><PasswordInput id={rep.id} value={p2} onChange={(e) => setP2(e.target.value)} autoComplete="new-password" name="password2" /></Field>
       </Form>
@@ -131,11 +131,11 @@ function Onboarding() {
         await authApi.onboarding({ username: u, password: p });
         await load();
       }) : Promise.resolve())}>
-        <Field label="Username" hint="You cannot change this later."><input className="v2-input" autoFocus value={u} onChange={(e) => setU(e.target.value)} autoComplete="username" name="username" /></Field>
+        <Field label="Username" hint="You cannot change this later."><input className="input" autoFocus value={u} onChange={(e) => setU(e.target.value)} autoComplete="username" name="username" /></Field>
         <Field label="New password"><PasswordInput value={p} onChange={(e) => setP(e.target.value)} autoComplete="new-password" name="password" /></Field>
         <Field label="Repeat password" error={rep.error}><PasswordInput id={rep.id} value={p2} onChange={(e) => setP2(e.target.value)} autoComplete="new-password" name="password2" /></Field>
       </Form>
-      <p className="v2-auth-alt"><button type="button" className="v2-linkbtn" onClick={() => { void logout(); }}>Sign out</button></p>
+      <p className="v2-auth-alt"><button type="button" className="link-btn v2-linkbtn" onClick={() => { void logout(); }}>Sign out</button></p>
     </Frame>
   );
 }
@@ -157,7 +157,7 @@ function ForcedChange() {
         <Field label="New password"><PasswordInput value={p} onChange={(e) => setP(e.target.value)} autoComplete="new-password" /></Field>
         <Field label="Repeat password" error={rep.error}><PasswordInput id={rep.id} value={p2} onChange={(e) => setP2(e.target.value)} autoComplete="new-password" /></Field>
       </Form>
-      <p className="v2-auth-alt"><button type="button" className="v2-linkbtn" onClick={() => { void logout(); }}>Sign out</button></p>
+      <p className="v2-auth-alt"><button type="button" className="link-btn v2-linkbtn" onClick={() => { void logout(); }}>Sign out</button></p>
     </Frame>
   );
 }

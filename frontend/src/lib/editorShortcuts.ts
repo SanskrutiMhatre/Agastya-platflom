@@ -78,6 +78,11 @@ export const EDITOR_SHORTCUTS: EditorShortcut[] = [
 
   // ---- WP-22: the platform pages (not an editor): the quick switcher (components/QuickSwitcher.tsx). On an editor page Ctrl+K stays the palette.
   { id: 'platform.jump', editor: 'platform', keys: ['Mod+K'], action: 'Jump to a project, a page or a data module', where: 'every platform and project page except the editors', file: 'components/QuickSwitcher.tsx' },
+  // the switcher draws its own list since the global UI pass (2026-11-28: the mockups' palette); the keys are the command palette's
+  { id: 'platform.jumpMove', editor: 'platform', keys: ['ArrowDown', 'ArrowUp'], action: 'Move through the results', where: 'Jump to', file: 'components/QuickSwitcher.tsx' },
+  { id: 'platform.jumpOpen', editor: 'platform', keys: ['Enter'], action: 'Open the result', where: 'Jump to', file: 'components/QuickSwitcher.tsx' },
+  { id: 'platform.jumpClose', editor: 'platform', keys: ['Escape'], action: 'Close Jump to', where: 'Jump to', file: 'components/QuickSwitcher.tsx' },
+  { id: 'platform.jumpStay', editor: 'platform', keys: ['Tab'], action: 'Keep the focus in the search field (the only control)', where: 'Jump to', file: 'components/QuickSwitcher.tsx' },
 ];
 
 /** The keys of one editor page: the host's, then the editor's own (JSG parts lists also have the JSG editor's page keys). */

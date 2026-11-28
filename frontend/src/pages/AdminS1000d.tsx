@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { s1000dApi, issueLabel, KIND_LABEL, type CodeKind, type CodeRow, type Impact, type IssueKey, type PresetNode } from '../api';
 import { Icon } from '../components/Icon';
 import { RowButton, tablistKeys } from '../components/a11y';
-import { Alert, Badge, ConfirmModal, Empty, Field, Loading, Modal, PromptModal, errText, useAsync } from '../components/ui';
+import { Alert, Badge, Callout, ConfirmModal, Empty, EmptyState, Field, Loading, Modal, PromptModal, errText, useAsync } from '../components/ui';
 import '../styles/pages/admin.css';   // WP-35 second pass
 import { useUi } from '../store/ui';
 import { csdbApi } from '../api/csdb';
@@ -47,17 +47,22 @@ export function CatalogueSection() {
     catch (e) { toast(errText(e), 'error'); }
   };
   return (
-    <div className="v2-stack" data-testid="s1000d-catalogue">
-      <div className="v2-admin-head"><h3>Information codes</h3><p className="v2-sub">The codes projects choose from when they create a data module, for each S1000D issue. Pick the issue, search the list, and add your own code if a project needs one. Where the codes come from is under <b>Technical details</b> at the bottom.</p></div>
-      <div className="v2-row wrap">
-        <select className="v2-select v2-w-150" value={issue} onChange={(e) => setIssue(e.target.value as IssueKey)} aria-label="Issue" data-testid="cat-issue">{ov.issues.map((i) => <option key={i.key} value={i.key}>Issue {i.label}</option>)}</select>
-        <div className="v2-tabs" role="tablist" aria-label="Code lists" onKeyDown={tablistKeys}>{KINDS.map((k) => <button key={k} role="tab" aria-selected={kind === k} className={`v2-tab ${kind === k ? 'active' : ''}`} onClick={() => setKind(k)}>{KIND_LABEL[k]}</button>)}</div>
-        <input className="v2-input v2-w-220" placeholder="Filter…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Filter codes" />
-        <button className="btn btn-primary" onClick={() => setAdding(true)} data-testid="cat-add"><Icon name="plus" />Add custom code</button>
-      </div>
-      <div className="v2-card">
+    // global UI pass: one card as the mockup's tables are drawn (title, count and purpose in the head, the action on the right; the issue,
+    // the code list and the filter in the card's filter row; the table under it)
+    <div className="stack adm-gap" data-testid="s1000d-catalogue">
+      <section className="card" aria-labelledby="cat-h">
+        <div className="card-head">
+          <div className="adm-card-title"><h3 id="cat-h"><Icon name="book2" />Information codes <span className="count">{rows.length}</span></h3><p className="faint">The codes projects choose from when they create a data module, for each S1000D issue. Pick the issue, search the list, and add your own code if a project needs one. Where the codes come from is under <b>Technical details</b> below.</p></div>
+          <div className="row"><button className="btn primary btn-primary" onClick={() => setAdding(true)} data-testid="cat-add"><Icon name="plus" />Add custom code</button></div>
+        </div>
+        <div className="adm-filters">
+          <select className="select v2-w-150" value={issue} onChange={(e) => setIssue(e.target.value as IssueKey)} aria-label="Issue" data-testid="cat-issue">{ov.issues.map((i) => <option key={i.key} value={i.key}>Issue {i.label}</option>)}</select>
+          <div className="tabs adm-inline-tabs" role="tablist" aria-label="Code lists" onKeyDown={tablistKeys}>{KINDS.map((k) => <button key={k} role="tab" aria-selected={kind === k} className="tab" onClick={() => setKind(k)}>{KIND_LABEL[k]}</button>)}</div>
+          <span className="grow" />
+          <input className="input search adm-search" placeholder="Filter…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Filter codes" />
+        </div>
         {cat.loading && !cat.data ? <Loading /> : rows.length === 0 ? <Empty title="Nothing matches" /> : (
-          <div className="v2-scroll-x v2-scroll-520"><table className="v2-table"><thead><tr><th className="v2-w-90">Code</th><th>Title</th><th className="v2-w-230">Source</th><th /></tr></thead><tbody>
+          <div className="table-wrap v2-scroll-520"><table className="table"><thead><tr><th className="v2-w-90">Code</th><th>Title</th><th className="v2-w-230">Source</th><th /></tr></thead><tbody>
             {rows.map((c) => (
               <tr key={c.code} data-testid="cat-row">
                 <td className="v2-mono">{c.code}</td><td>{c.title}</td>
@@ -67,11 +72,11 @@ export function CatalogueSection() {
                   <button className="icon-btn" aria-label={`Delete ${c.code}`} title={`Delete ${c.code}`} onClick={() => void askDelete(c)}><Icon name="trash" size={14} /></button></> : null}</td>
               </tr>))}</tbody></table></div>
         )}
-      </div>
-      <details className="v2-card v2-card-pad" data-testid="cat-technical"><summary><b>Technical details</b> — where the codes come from</summary><div className="v2-stack v2-mt8">
+      </section>
+      <details className="card adm-details" data-testid="cat-technical"><summary><Icon name="info" /><b>Technical details</b> — where the codes come from</summary><div className="card-body stack">
       <div className="v2-card"><table className="v2-table"><thead><tr><th>Issue</th>{KINDS.map((k) => <th key={k}>{KIND_LABEL[k]}</th>)}</tr></thead><tbody>
         {ov.summary.map((s) => <tr key={s.issue}><td><b>{s.label}</b></td>{KINDS.map((k) => <td key={k}>{s.kinds[k].count}{s.kinds[k].ranges ? ` + ${s.kinds[k].ranges} ranges` : ''}{s.kinds[k].custom ? <> <Badge tone="warn">{s.kinds[k].custom} custom</Badge></> : null}</td>)}</tr>)}</tbody></table></div>
-      <details className="v2-card v2-card-pad" data-testid="default-evidence"><summary><b>Default information codes: what the specification says</b> ({Object.keys(ov.evidence.types).length} checked, {Object.keys(ov.unresolved).length} still open)</summary>
+      <details className="v2-card adm-details" data-testid="default-evidence"><summary><b>Default information codes: what the specification says</b> ({Object.keys(ov.evidence.types).length} checked, {Object.keys(ov.unresolved).length} still open)</summary>
         <p className="v2-hint">The six defaults that were unconfirmed were read against the S1000D specification. {ov.evidence.limitation} <b>Still open</b> (flagged, author-editable, nothing invented): {Object.keys(ov.unresolved).join(', ')}.</p>
         <table className="v2-table"><thead><tr><th>Type</th><th>Default</th><th>Status</th><th>Evidence</th></tr></thead><tbody>{Object.entries(ov.evidence.types).map(([schema, e]) => (
           <tr key={schema}><td className="v2-mono">{schema}</td>
@@ -155,28 +160,35 @@ export function SnsPresetsSection() {
   const nodes = useMemo(() => (detail.data?.nodes ?? []).filter((n) => !q || `${n.path} ${n.title}`.toLowerCase().includes(q.toLowerCase())), [detail.data, q]);
   if (list.loading && !list.data) return <Loading />;
   return (
-    <div className="v2-stack" data-testid="sns-presets">
-      <div className="v2-row v2-spread"><div className="v2-admin-head"><h3>Numbering (SNS)</h3><p className="v2-sub">The system / subsystem / assembly numbers of a data module code. Give a preset a <b>model code</b> and every project with that model code is offered it when it is created: add the model's systems once, and its data module codes follow. Reusable starting points. Projects copy a preset and then own their SNS; changing a preset never changes a project.</p></div>
-        <button className="btn btn-primary" onClick={() => setCreating(true)} data-testid="preset-new"><Icon name="plus" />New preset</button></div>
-      <div className="v2-card"><table className="v2-table"><thead><tr><th>Preset</th><th>Model code</th><th>Systems</th><th>Entries</th><th /></tr></thead><tbody>
-        {(list.data ?? []).map((x) => <tr key={x.id} className="clickable" onClick={() => setSel(x.id)} data-testid="preset-row"><td><b><RowButton onSelect={() => setSel(x.id)} selected={sel === x.id}>{x.name}</RowButton></b> {x.readOnly ? <Badge>read-only</Badge> : <Badge tone="ok">custom</Badge>}</td><td className="v2-mono">{x.model ?? '—'}</td><td>{x.systems}</td><td>{x.entries}</td><td className="v2-td-end">{sel === x.id ? <Badge tone="accent">open</Badge> : null}</td></tr>)}</tbody></table></div>
+    // global UI pass: the presets table and the open preset are cards with the mockup head (title, count, purpose; actions on the right)
+    <div className="stack adm-gap" data-testid="sns-presets">
+      <section className="card" aria-labelledby="sns-h">
+        <div className="card-head">
+          <div className="adm-card-title"><h3 id="sns-h"><Icon name="tree" />Numbering (SNS) <span className="count">{list.data?.length ?? 0}</span></h3><p className="faint">The system / subsystem / assembly numbers of a data module code. Give a preset a <b>model code</b> and every project with that model code is offered it when it is created: add the model's systems once, and its data module codes follow. Reusable starting points. Projects copy a preset and then own their SNS; changing a preset never changes a project.</p></div>
+          <div className="row"><button className="btn primary btn-primary" onClick={() => setCreating(true)} data-testid="preset-new"><Icon name="plus" />New preset</button></div>
+        </div>
+        <div className="table-wrap"><table className="table"><thead><tr><th>Preset</th><th>Model code</th><th className="num">Systems</th><th className="num">Entries</th><th><span className="sr">Open</span></th></tr></thead><tbody>
+        {(list.data ?? []).map((x) => <tr key={x.id} className={`clickable${sel === x.id ? ' is-open' : ''}`} onClick={() => setSel(x.id)} data-testid="preset-row"><td><span className="nm"><RowButton onSelect={() => setSel(x.id)} selected={sel === x.id}>{x.name}</RowButton></span> {x.readOnly ? <Badge>read-only</Badge> : <Badge tone="ok">custom</Badge>}</td><td className="mono">{x.model ?? '—'}</td><td className="num">{x.systems}</td><td className="num">{x.entries}</td><td className="adm-td-end">{sel === x.id ? <Badge tone="accent">open</Badge> : null}</td></tr>)}</tbody></table></div>
+      </section>
       {p ? (
-        <div className="v2-card v2-card-pad v2-stack">
-          <div className="v2-row v2-spread wrap"><h4 className="v2-m0">{p.name}</h4>
-            <div className="v2-row wrap"><input className="v2-input v2-w-200" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search the preset" />
-              <a className="btn" href={s1000dApi.presetExportUrl(p.id, 'csv')} download>Export CSV</a><a className="btn" href={s1000dApi.presetExportUrl(p.id, 'json')} download>Export JSON</a>
-              <button className="btn" onClick={() => setDup(true)}>Copy as custom…</button>
-              {!p.readOnly ? <button className="btn" onClick={() => setDel(true)}>Delete preset</button> : null}</div></div>
+        <section className="card" aria-labelledby="sns-open-h">
+          <div className="card-head"><h3 id="sns-open-h"><Icon name="folderOpen" />{p.name}</h3>
+            <div className="row wrap"><input className="input search adm-search" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search the preset" />
+              <a className="btn" href={s1000dApi.presetExportUrl(p.id, 'csv')} download><Icon name="download" />Export CSV</a><a className="btn" href={s1000dApi.presetExportUrl(p.id, 'json')} download><Icon name="download" />Export JSON</a>
+              <button className="btn" onClick={() => setDup(true)}><Icon name="copy" />Copy as custom…</button>
+              {!p.readOnly ? <button className="btn danger btn-danger" onClick={() => setDel(true)}><Icon name="trash" />Delete preset</button> : null}</div></div>
+          <div className="card-body stack">
           {!p.readOnly ? <ModelField preset={p} onSaved={() => list.reload()} /> : null}
-          <p className="v2-hint v2-m0"><b>Source:</b> {p.source}<br /><b>Limitation:</b> {p.limitation ?? 'none recorded'}</p>
+          <p className="faint adm-xs"><b>Source:</b> {p.source}<br /><b>Limitation:</b> {p.limitation ?? 'none recorded'}</p>
           {!p.readOnly ? <PresetEditor id={p.id} onChanged={() => { detail.reload(); list.reload(); }} /> : null}
-          <div className="v2-card v2-scroll-460"><table className="v2-table"><tbody>{nodes.map((n: PresetNode) => (
-            <tr key={n.path}><td style={{ paddingLeft: 8 + Math.max(0, n.level - 1) * 22, width: 160 }} className="v2-mono">{n.code}{n.note?.ambiguous ? '*' : ''}</td>
+          </div>
+          <div className="table-wrap v2-scroll-460 adm-band"><table className="table"><tbody>{nodes.map((n: PresetNode) => (
+            <tr key={n.path}><td style={{ paddingLeft: 12 + Math.max(0, n.level - 1) * 22, width: 160 }} className="mono">{n.code}{n.note?.ambiguous ? '*' : ''}</td>
               <td>{n.title}{n.note?.category ? <> <Badge>category</Badge></> : null}{n.note?.ambiguous ? <> <Badge tone="warn" title="The specification defines this system more than once; it is not copied into projects automatically">defined twice</Badge></> : null}{n.note?.rangeEnd ? <> <Badge>range to {String(n.note.rangeEnd)}</Badge></> : null}
                 {n.definition ? <div className="v2-hint">{n.definition}</div> : null}</td>
-              {!p.readOnly ? <td className="v2-td-end"><button className="icon-btn" aria-label={`Delete ${n.path}`} title={`Delete ${n.path}`} onClick={async () => { try { await s1000dApi.deletePresetNode(p.id, n.path, true); detail.reload(); list.reload(); } catch (e) { toast(errText(e), 'error'); } }}><Icon name="trash" size={14} /></button></td> : null}</tr>))}</tbody></table></div>
-        </div>
-      ) : <Empty title="Choose a preset to see its entries" />}
+              {!p.readOnly ? <td className="adm-td-end"><button className="icon-btn" aria-label={`Delete ${n.path}`} title={`Delete ${n.path}`} onClick={async () => { try { await s1000dApi.deletePresetNode(p.id, n.path, true); detail.reload(); list.reload(); } catch (e) { toast(errText(e), 'error'); } }}><Icon name="trash" size={14} /></button></td> : null}</tr>))}</tbody></table></div>
+        </section>
+      ) : <section className="card"><EmptyState icon="tree" title="Choose a preset to see its entries">Click a row above: its systems, subsystems and assemblies open here.</EmptyState></section>}
       {creating ? <PromptModal title="New SNS preset" label="Name" confirmLabel="Create" onClose={() => setCreating(false)} onSubmit={async (name) => { const r = await s1000dApi.createPreset(name); toast('Preset created', 'success'); list.reload(); setSel(r.preset.id); }} /> : null}
       {dup && p ? <PromptModal title="Copy as a custom preset" label="Name" initial={`${p.name} (copy)`} confirmLabel="Copy" onClose={() => setDup(false)} onSubmit={async (name) => { const r = await s1000dApi.duplicatePreset(p.id, name); list.reload(); setSel(r.preset.id); }} /> : null}
       {del && p ? <ConfirmModal title="Delete this preset?" danger confirmLabel="Delete" onClose={() => setDel(false)} body={<p className="v2-mt0">{p.name}. Projects that copied it keep their SNS.</p>} onConfirm={async () => { setDel(false); try { await s1000dApi.deletePreset(p.id); setSel(''); list.reload(); } catch (e) { toast(errText(e), 'error'); } }} /> : null}
@@ -208,21 +220,27 @@ export function ExtensionsSection() {
   const add = async () => { try { await csdbApi.registerExtension(form); toast('Profile registered', 'success'); setForm({ name: '', namespace: '', description: '', xsd: '', xsdName: '' }); list.reload(); } catch (e) { toast(errText(e), 'error'); } };
   if (list.loading && !list.data) return <Loading />;
   return (
-    <div className="v2-stack" data-testid="ext-admin">
-      <Alert tone="ok"><b>What is this?</b> Some organisations add their own elements to S1000D data modules (a customer-specific tag, for example). S1000D allows that only when the elements sit in their own XML namespace and come with their own schema. An extension profile registers that namespace and schema, so the platform accepts and checks those elements instead of reporting them as errors. <b>Most projects never need one</b>: if nobody adds custom elements, you can ignore this page.</Alert>
-      <p className="v2-hint">An extension profile lets a project use content in another XML namespace. The XSD must be one self-contained file whose targetNamespace equals the namespace. Content in a namespace with no profile is a validation error; nothing is ever dropped.</p>
-      {!list.data?.profiles.length ? <Empty title="No profiles yet">Register one below.</Empty> : (
-        <table className="v2-table"><thead><tr><th>Name</th><th>Namespace</th><th>Schema</th><th>Projects</th><th /></tr></thead><tbody>
-          {list.data.profiles.map((p) => <tr key={p.id}><td>{p.name}</td><td className="v2-mono">{p.namespace}</td><td>{p.xsdName}</td><td>{p.projects}</td><td><button className="v2-btn v2-btn-sm v2-btn-danger" onClick={() => setDel(p.id)}>Delete</button></td></tr>)}</tbody></table>
-      )}
-      <div className="v2-card"><h3 className="v2-mt0">Register a profile</h3>
-        <div className="v2-stack">
-          <Field label="Name"><input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
-          <Field label="Namespace URI"><input value={form.namespace} onChange={(e) => setForm({ ...form, namespace: e.target.value })} placeholder="http://example.com/ns/ext" /></Field>
-          <Field label="Description"><input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>
-          <Field label="XSD file"><input type="file" accept=".xsd" onChange={(e) => pick(e.target.files?.[0])} /></Field>
-          <div><button className="v2-btn v2-btn-primary" disabled={!form.name || !form.namespace || !form.xsd} onClick={add}>Register</button></div>
-        </div></div>
+    // global UI pass: the explanation as the mockup's info alert, the profiles and the registration form as cards (the buttons used
+    // class names no stylesheet defined, so they rendered as bare browser buttons)
+    <div className="stack adm-gap" data-testid="ext-admin">
+      <Callout tone="info" title="What is this?">Some organisations add their own elements to S1000D data modules (a customer-specific tag, for example). S1000D allows that only when the elements sit in their own XML namespace and come with their own schema. An extension profile registers that namespace and schema, so the platform accepts and checks those elements instead of reporting them as errors. <b>Most projects never need one</b>: if nobody adds custom elements, you can ignore this page.</Callout>
+      <section className="card" aria-labelledby="ext-h">
+        <div className="card-head"><div className="adm-card-title"><h3 id="ext-h"><Icon name="xml" />Extension profiles <span className="count">{list.data?.profiles.length ?? 0}</span></h3><p className="faint">An extension profile lets a project use content in another XML namespace. The XSD must be one self-contained file whose targetNamespace equals the namespace. Content in a namespace with no profile is a validation error; nothing is ever dropped.</p></div></div>
+        {!list.data?.profiles.length ? <EmptyState icon="xml" title="No profiles yet">Register one below.</EmptyState> : (
+          <div className="table-wrap"><table className="table"><thead><tr><th>Name</th><th>Namespace</th><th>Schema</th><th className="num">Projects</th><th><span className="sr">Actions</span></th></tr></thead><tbody>
+            {list.data.profiles.map((p) => <tr key={p.id}><td className="nm">{p.name}</td><td className="mono">{p.namespace}</td><td>{p.xsdName}</td><td className="num">{p.projects}</td><td className="adm-td-end"><button className="btn sm danger btn-danger" onClick={() => setDel(p.id)}><Icon name="trash" size={14} />Delete</button></td></tr>)}</tbody></table></div>
+        )}
+      </section>
+      <section className="card narrow" aria-labelledby="ext-reg-h">
+        <div className="card-head"><h3 id="ext-reg-h"><Icon name="plus" />Register a profile</h3></div>
+        <div className="card-body stack">
+          <Field label="Name"><input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
+          <Field label="Namespace URI"><input className="input mono" value={form.namespace} onChange={(e) => setForm({ ...form, namespace: e.target.value })} placeholder="http://example.com/ns/ext" /></Field>
+          <Field label="Description"><input className="input" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></Field>
+          <Field label="XSD file"><input className="input" type="file" accept=".xsd" onChange={(e) => pick(e.target.files?.[0])} /></Field>
+        </div>
+        <div className="card-foot adm-foot-end"><button className="btn primary btn-primary" disabled={!form.name || !form.namespace || !form.xsd} onClick={add}>Register</button></div>
+      </section>
       {del ? <ConfirmModal title="Delete this profile?" body="Projects that enabled it must disable it first." confirmLabel="Delete" danger onConfirm={async () => { try { await csdbApi.deleteExtension(del); list.reload(); } catch (e) { toast(errText(e), 'error'); } setDel(null); }} onClose={() => setDel(null)} /> : null}
     </div>
   );
@@ -234,10 +252,11 @@ export function CoverageSection() {
   if (cov.loading && !cov.data) return <Loading />;
   const issues = [['4-2', '4.2'], ['5-0', '5.0'], ['6', '6.0'], ['7', '7.0']];
   return (
-    <div className="v2-stack" data-testid="coverage">
-      <p className="v2-hint">Schema availability per S1000D issue, read from the bundled XSD sets. A missing cell means no schema is bundled for that issue (nothing is invented).</p>
-      <table className="v2-table"><thead><tr><th>Schema</th><th>Name</th><th>Category</th><th>File prefix</th>{issues.map(([, l]) => <th key={l}>{l}</th>)}</tr></thead><tbody>
-        {(cov.data?.rows ?? []).map((r) => <tr key={r.schema}><td className="v2-mono">{r.schema}</td><td>{r.name}</td><td>{r.category}</td><td>{r.filePrefix ?? '—'}</td>{issues.map(([k]) => <td key={k}>{r.xsd[k] ? <Badge tone="ok">{r.root[k]}</Badge> : <Badge tone="bad">missing</Badge>}</td>)}</tr>)}</tbody></table>
-    </div>
+    // global UI pass: the registry is a card with the mockup head, like the other reference tables
+    <section className="card" data-testid="coverage" aria-labelledby="cov-h">
+      <div className="card-head"><div className="adm-card-title"><h3 id="cov-h"><Icon name="xml" />Standards coverage <span className="count">{cov.data?.rows.length ?? 0}</span></h3><p className="faint">Schema availability per S1000D issue, read from the bundled XSD sets. A missing cell means no schema is bundled for that issue (nothing is invented).</p></div></div>
+      <div className="table-wrap"><table className="table"><thead><tr><th>Schema</th><th>Name</th><th>Category</th><th>File prefix</th>{issues.map(([, l]) => <th key={l}>{l}</th>)}</tr></thead><tbody>
+        {(cov.data?.rows ?? []).map((r) => <tr key={r.schema}><td className="mono">{r.schema}</td><td>{r.name}</td><td>{r.category}</td><td>{r.filePrefix ?? '—'}</td>{issues.map(([k]) => <td key={k}>{r.xsd[k] ? <Badge tone="ok">{r.root[k]}</Badge> : <Badge tone="bad">missing</Badge>}</td>)}</tr>)}</tbody></table></div>
+    </section>
   );
 }
