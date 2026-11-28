@@ -10,6 +10,8 @@
 // live document back with the editor's own serializer (a write-back is byte for byte a normal save). It runs on any W3C-style DOM: the browser's
 // (DOMParser, the default) or @xmldom/xmldom's on the server (parseJss(xml, parser)); the DOM types below are structural for that reason.
 
+// the one escaper (shared/xmlEscape.ts, re-exported by lib/xml.ts: WP-16): text & < >, attributes also "; the same bytes as the copies this file had
+import { escText as esc, escAttr } from '../xmlEscape';
 import {
   META_FIELDS, type Align, type Block, type Cell, type Chapter, type Figure, type Graphic, type Inline, type JssDoc, type List, type ListItem, type ListType,
   type Mark, type Notice, type NoticeKind, type Orientation, type Para, type Part, type Row, type Section, type Table,
@@ -212,8 +214,6 @@ export function parseJssElement(root: Element): JssDoc {
 
 // ── Writing ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
-const esc = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const escAttr = (s: string): string => esc(s).replace(/"/g, '&quot;');
 const at = (name: string, v: string | number | undefined): string => (v === undefined || v === '' ? '' : ` ${name}="${escAttr(String(v))}"`);
 
 function inlineXml(runs: Inline[]): string {

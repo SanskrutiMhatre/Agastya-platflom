@@ -48,6 +48,20 @@ export async function joinJsgRoom(projectId: string, user: LiveUser): Promise<Li
 }
 
 /** A DOM copy of what a Y document holds, child for child (the shadow the keyed reconcile compares against). */
+/**
+ * This person's undo history in a room, kept while the editor is rebuilt (the page builds the editor again when this person's right to change
+ * the document changes: a check-out taken or freed, the release lock). A Y.UndoManager belongs to the Y document, not to the editor, so the
+ * next binding of the same room takes it over; it ends with the room's document.
+ */
+const keptUndo = new WeakMap<Y.Doc, Y.UndoManager>();
+function undoFor(ydoc: Y.Doc): Y.UndoManager {
+  const k = keptUndo.get(ydoc);
+  if (k) { keptUndo.delete(ydoc); return k; }
+  const um = new Y.UndoManager(ydom.undoScope(ydoc), { trackedOrigins: new Set([ORIGIN_LOCAL]), captureTimeout: 600 });
+  ydoc.once('destroy', () => { keptUndo.delete(ydoc); um.destroy(); });
+  return um;
+}
+
 function shadowOf(ydoc: Y.Doc): XMLDocument {
   const d = document.implementation.createDocument(null, '', null);
   while (d.firstChild) d.removeChild(d.firstChild);
@@ -185,7 +199,7 @@ function moved(a: string, b: string, pos: number): number {
 function yUnits(y: Y.XmlElement, cb: (t: Y.XmlText | Y.XmlElement, start: number, len: number) => boolean | void): number {
   let acc = 0;
   const walk = (n: Y.XmlElement): boolean => {
-    for (const c of n.toArray()) {
+    for (const c of ydom.ychildren(n)) {
       if (c instanceof Y.XmlText) { const len = c.length; if (cb(c, acc, len)) return true; acc += len; }
       else if (c instanceof Y.XmlElement) { if (c.nodeName === 'br') { if (cb(c, acc, 1)) return true; acc += 1; } else if (walk(c)) return true; }
     }
@@ -215,6 +229,7 @@ export class JsgLive {
   private ro: ResizeObserver | null = null;
   private closed = false;
   private readonly onDeep = (_e: unknown, tr: Y.Transaction): void => { if (tr.origin !== ORIGIN_LOCAL) this.pull(); };
+  private unobserve: (() => void) | null = null;
   /** the last selection made in the sheet (a comment is written in the comments panel, which takes the focus from the words it is about) */
   private lastSel: { a: Point; b: Point } | null = null;
   private readonly onSelection = (): void => { const s = this.selection(); if (s) this.lastSel = s; this.publishSoon(); };
@@ -232,7 +247,8 @@ export class JsgLive {
     this.frag = room.doc.getXmlFragment(ydom.ROOT);
     this.shadow = shadowOf(room.doc);
     this.lastText = serializeJsg(ed.getDoc());
-    this.undo = new Y.UndoManager(this.frag, { trackedOrigins: new Set([ORIGIN_LOCAL]), captureTimeout: 600 });
+    // the tree, its blocks and their placements (ydom.ts schema 2: a moved block or plate is re-placed, its content stays)
+    this.undo = undoFor(room.doc);         // kept across a rebuild of the editor (see undoFor)
     ed.setCollab({
       changed: (typing) => this.local(typing),
       undo: () => this.undoLocal(),
@@ -241,7 +257,7 @@ export class JsgLive {
       canRedo: () => this.undo.redoStack.length > 0,
       dirty: () => room.unacknowledged > 0,
     });
-    this.frag.observeDeep(this.onDeep);
+    this.unobserve = ydom.observeTree(room.doc, this.onDeep);
     room.setEvents({
       state: (s) => this.onState(s),
       status: () => this.events.changed(),
@@ -255,6 +271,7 @@ export class JsgLive {
     this.layer.className = 'jsg-live-cursors'; this.layer.setAttribute('aria-hidden', 'true'); this.layer.dataset.testid = 'collab-cursors';
     parts.scroll.appendChild(this.layer);
     parts.scroll.addEventListener('scroll', this.redraw, { passive: true });
+    parts.root.addEventListener('jsg-rendered', this.redraw);        // the opening draws the sheet in slices: carets once it is all there
     if (typeof ResizeObserver !== 'undefined') { this.ro = new ResizeObserver(this.redraw); this.ro.observe(parts.scroll); }
     document.addEventListener('selectionchange', this.onSelection);
     parts.root.addEventListener('keyup', this.onSelection);
@@ -442,11 +459,11 @@ export class JsgLive {
     return n.nodeType === 1 ? (n as unknown as Element) : null;
   }
   /** The object a field edits whose element is in the room (a rich field: its paragraph, text part or note; a plain field: the object holding the attribute). */
-  private targetOf(slot: JsgSlot): object { return Array.isArray(slot.owner) ? ((slot.owner as unknown[])[slot.key as number] as object) : slot.owner; }
+  private targetOf(slot: JsgSlot): object { if (slot.kind === 'cell') return slot.owner; return Array.isArray(slot.owner) ? ((slot.owner as unknown[])[slot.key as number] as object) : slot.owner; }
   private slotFor(obj: object | undefined, rich: boolean, attr?: string): JsgSlot | null {
     if (!obj) return null;
     for (const s of this.ed.liveSlots()) {
-      if (rich ? s.kind === 'rich' && this.targetOf(s) === obj : (s.kind === 'title' || s.kind === 'input') && s.owner === obj && s.key === attr) return s;
+      if (rich ? (s.kind === 'rich' || s.kind === 'cell') && this.targetOf(s) === obj : (s.kind === 'title' || s.kind === 'input') && s.owner === obj && s.key === attr) return s;
     }
     return null;
   }
@@ -457,15 +474,15 @@ export class JsgLive {
     const el = o.m2e.get(this.targetOf(p.slot)); if (!el) return null;
     const y = this.yOfEl(el); if (!(y instanceof Y.XmlElement)) return null;
     try {
-      if (p.slot.kind === 'rich') {
+      // rich text, and an ISPL appendix cell (its <cell><text>: the characters of the input, by the same count)
+      if (p.slot.kind === 'rich' || p.slot.kind === 'cell') {
         let rel: Y.RelativePosition | null = null;
         yUnits(y, (t, start, len) => { if (t instanceof Y.XmlText && p.offset <= start + len) { rel = Y.createRelativePositionFromTypeIndex(t, p.offset - start); return true; } return false; });
         rel ??= Y.createRelativePositionFromTypeIndex(y, y.length);
         return toBase64(Y.encodeRelativePosition(rel));
       }
-      const parent = (y as unknown as { parent: Y.XmlElement | Y.XmlFragment }).parent;
-      const idx = parent.toArray().indexOf(y);
-      const rel = Y.createRelativePositionFromTypeIndex(parent, idx);
+      // inside the element itself: it follows the element wherever it is moved (a block, ydom.ts schema 2)
+      const rel = Y.createRelativePositionFromTypeIndex(y, 0);
       return `A|${String(p.slot.key)}|${p.offset}|${y.nodeName}|${toBase64(Y.encodeRelativePosition(rel))}`;
     } catch { return null; }
   }
@@ -476,24 +493,25 @@ export class JsgLive {
         const [, attr, off, name, b64] = s.split('|');
         const abs = Y.createAbsolutePositionFromRelativePosition(Y.decodeRelativePosition(fromBase64(b64)), this.room.doc);
         if (!abs || !(abs.type instanceof Y.XmlElement || abs.type instanceof Y.XmlFragment)) return null;
-        const y = abs.type.toArray()[abs.index];
+        // the element itself (positions made since Phase 8), or the child at a place in its parent (older anchors)
+        const y = abs.type instanceof Y.XmlElement && abs.type.nodeName === name ? abs.type : ydom.liveAt(abs.type, abs.index);
         if (!(y instanceof Y.XmlElement) || y.nodeName !== name) return null;
         const el = this.elOfY(y); const slot = this.slotFor(el ? o.e2m.get(el) : undefined, false, attr);
         return slot ? { slot, offset: Number(off) || 0 } : null;
       }
       const abs = Y.createAbsolutePositionFromRelativePosition(Y.decodeRelativePosition(fromBase64(s)), this.room.doc);
       if (!abs) return null;
-      for (let y: unknown = abs.type instanceof Y.XmlText ? (abs.type as unknown as { parent: unknown }).parent : abs.type; y instanceof Y.XmlElement; y = (y as unknown as { parent: unknown }).parent) {
+      for (let y: unknown = abs.type instanceof Y.XmlText ? ydom.treeParent(abs.type) : abs.type; y instanceof Y.XmlElement; y = ydom.treeParent(y)) {
         const el = this.elOfY(y); const slot = this.slotFor(el ? o.e2m.get(el) : undefined, true);
         if (!slot) continue;
         let offset = 0;
         if (abs.type instanceof Y.XmlText) { const t = abs.type; yUnits(y, (u, start) => { if (u === t) { offset = start + abs.index; return true; } return false; }); }
-        else if (abs.type === y) { const stop = y.toArray()[abs.index]; let found = -1; const total = yUnits(y, (u, start) => { if (stop && (u === stop || (stop instanceof Y.XmlElement && isInside(u, stop)))) { found = start; return true; } return false; }); offset = found >= 0 ? found : total; }
+        else if (abs.type === y) { const stop = ydom.liveAt(y, abs.index); let found = -1; const total = yUnits(y, (u, start) => { if (stop && (u === stop || (stop instanceof Y.XmlElement && isInside(u, stop)))) { found = start; return true; } return false; }); offset = found >= 0 ? found : total; }
         return { slot, offset };
       }
       // a heading's or field's anchor made by a comment on it (the element's place in its parent)
       if (abs.type instanceof Y.XmlElement || abs.type instanceof Y.XmlFragment) {
-        const y = abs.type.toArray()[abs.index];
+        const y = ydom.liveAt(abs.type, abs.index);
         if (y instanceof Y.XmlElement) { const el = this.elOfY(y); const obj = el ? o.e2m.get(el) : undefined; const slot = obj ? this.ed.liveSlots().find((x) => x.owner === obj && x.kind !== 'cell') ?? null : null; if (slot) return { slot, offset: 0 }; }
       }
       return null;
@@ -507,7 +525,7 @@ export class JsgLive {
     let slot = active instanceof HTMLInputElement ? this.slotOf(active) : null;
     if (slot && slot.el instanceof HTMLInputElement) {
       const a = slot.el.selectionStart ?? 0; const b = slot.el.selectionEnd ?? a;
-      return slot.kind === 'cell' ? null : { a: { slot, offset: a }, b: { slot, offset: b } };
+      return { a: { slot, offset: a }, b: { slot, offset: b } };
     }
     slot = this.slotOf(sel?.anchorNode ?? null);
     if (!slot || slot.kind === 'cell' || slot.kind === 'input') return null;
@@ -613,7 +631,7 @@ export class JsgLive {
         if (client === this.room.doc.clientID || !s?.user || !s.cursor) continue;
         const y = this.yOfCursor(s.cursor.head); if (!y) continue;
         let row = -1;
-        for (let n: unknown = y; n && row < 0; n = (n as { parent?: unknown }).parent) { const i = index.get(n); if (i !== undefined) row = i; }
+        for (let n: unknown = y; n && row < 0; n = ydom.treeParent(n)) { const i = index.get(n); if (i !== undefined) row = i; }
         if (row < 0) continue;
         const l = here.get(row) ?? []; if (!l.some((p) => p.id === s.user.id)) l.push({ id: s.user.id, name: s.user.name, color: s.user.color }); here.set(row, l);
       }
@@ -634,7 +652,11 @@ export class JsgLive {
       const b64 = s.startsWith('A|') ? s.split('|')[4] : s;
       const abs = Y.createAbsolutePositionFromRelativePosition(Y.decodeRelativePosition(fromBase64(b64)), this.room.doc);
       if (!abs) return null;
-      if (s.startsWith('A|') && (abs.type instanceof Y.XmlElement || abs.type instanceof Y.XmlFragment)) return abs.type.toArray()[abs.index] ?? abs.type;
+      if (s.startsWith('A|') && (abs.type instanceof Y.XmlElement || abs.type instanceof Y.XmlFragment)) {
+        const name = s.split('|')[3];
+        if (abs.type instanceof Y.XmlElement && abs.type.nodeName === name) return abs.type;
+        return ydom.liveAt(abs.type, abs.index) ?? abs.type;
+      }
       return abs.type;
     } catch { return null; }
   }
@@ -676,6 +698,7 @@ export class JsgLive {
     if (this.frame) cancelAnimationFrame(this.frame);
     const parts = this.ed.liveParts();
     parts.scroll.removeEventListener('scroll', this.redraw);
+    parts.root.removeEventListener('jsg-rendered', this.redraw);
     parts.root.removeEventListener('keyup', this.onSelection);
     parts.root.removeEventListener('mouseup', this.onSelection);
     parts.root.removeEventListener('focusin', this.onSelection);
@@ -683,8 +706,8 @@ export class JsgLive {
     document.removeEventListener('keydown', this.onKey, true);
     this.ro?.disconnect(); this.navObserver?.disconnect();
     this.layer.remove();
-    try { this.frag.unobserveDeep(this.onDeep); } catch { /* destroyed */ }
-    this.undo.destroy();
+    try { this.unobserve?.(); this.unobserve = null; } catch { /* destroyed */ }
+    if (leave) this.undo.destroy(); else { this.undo.stopCapturing(); keptUndo.set(this.room.doc, this.undo); }
     this.ed.setCollab(null);
     try { this.room.setEvents({}); this.room.setPresence(null); } catch { /* the room closed */ }
     if (leave) this.room.close();
@@ -692,6 +715,6 @@ export class JsgLive {
 }
 
 function isInside(n: unknown, ancestor: Y.XmlElement): boolean {
-  for (let p = (n as { parent?: unknown }).parent; p; p = (p as { parent?: unknown }).parent) if (p === ancestor) return true;
+  for (let p: unknown = ydom.treeParent(n); p; p = ydom.treeParent(p)) if (p === ancestor) return true;
   return false;
 }

@@ -91,6 +91,10 @@ When the room cannot be joined (`AGASTYA_COLLAB=0`, an old server, a time-out), 
 
 ## Moves (the lead's question)
 
+**Phase 8: fixed.** The move-aware schema this section asked for is in place (Yjs schema 2, blocks + placements, `ydom.ts`; record
+`docs/phase3/cleanup-collab.md`): a moved block is re-placed and keeps its content, so concurrent typing in it is kept. The analysis below is
+what was true before.
+
 Yjs 13.6 has no move operation on `XmlFragment`/`XmlElement` children, so a moved block (UHB Arrange up/down, ISPL plate or row order)
 reaches Y as a delete plus an insert, the same as in JSS.
 * What `reconcileKeyed` gives: its LCS keeps the longest unchanged run. Swapping two neighbours therefore re-inserts only one of them, and
@@ -107,11 +111,12 @@ reaches Y as a delete plus an insert, the same as in JSS.
 * **Same ISPL cell, or the same title, edited by two people at once: last writer wins** for that cell. This applies to part fields, plate
   ref/title/caption, view caption, graphic label, and chapter/section/table/figure titles, all of which are attributes. The model holds
   them as strings, so character merging would need them as Y text, which means changing the JSG XML form. Different cells of one row merge.
-* **ISPL appendix cells** (`<cell><text>`) show as plain inputs: they merge by character in Y, but the remote caret is not drawn inside them.
-* **Moved blocks**: see above.
+* **ISPL appendix cells** (`<cell><text>`) merge by character in Y. Since Phase 8 the remote caret is drawn inside them too (approximate
+  in a cell of several text parts).
+* **Moved blocks**: fixed in Phase 8, see above.
 * **Ancillary pages** (cover, certificate, preface…) are edited elsewhere and still save by version. They are part of the same file, so
   their save reaches the room as an external change and merges.
-* **Undo history is lost** when the editor is rebuilt because the person's writability changed (a check-out taken or freed, the review lock).
+* ~~Undo history is lost when the editor is rebuilt~~: since Phase 8 the undo manager is kept per room across a rebuild.
 * **Find/replace "Replace all"** in the handbook is one change; a remote change during it is merged at the model level afterwards.
 
 ## Tests (run)

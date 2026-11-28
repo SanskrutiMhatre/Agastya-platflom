@@ -77,9 +77,10 @@ export interface Config {
    * 10): a write-back cuts a revision in the history at most this often (and always when the room closes, at Save and at server stop);
    * `idleUnloadMs` (AGASTYA_COLLAB_IDLE_MS, default 60000): a room nobody is in is written back and unloaded after this long; `maxRooms`
    * (AGASTYA_COLLAB_MAX_ROOMS, default 2000) rooms in memory at once; `persistMs` (AGASTYA_COLLAB_PERSIST_MS, default 100): updates are
-   * stored in batches this often, one transaction per batch.
+   * stored in batches this often, one transaction per batch; `leaseRenewMs` (AGASTYA_COLLAB_LEASE_RENEW_MS, default 60000): a check-out holder's
+   * leases are renewed at most this often while they type.
    */
-  collab: { enabled: boolean; maxUpdateBytes: number; writeBackMs: number; writeBackMaxMs: number; revisionMinutes: number; idleUnloadMs: number; maxRooms: number; persistMs: number };
+  collab: { enabled: boolean; maxUpdateBytes: number; writeBackMs: number; writeBackMaxMs: number; revisionMinutes: number; idleUnloadMs: number; maxRooms: number; persistMs: number; leaseRenewMs: number };
   /** The packaged launcher asks for a clean stop by closing standard input (AGASTYA_SHUTDOWN_ON_STDIN_CLOSE=1). */
   shutdownOnStdinClose: boolean;
   /** A pdfjs-dist folder to use for structure recovery before the bundled candidates (AGASTYA_PDFJS_DIR). */
@@ -521,6 +522,7 @@ export function buildConfig(env: Env = process.env): Config {
       idleUnloadMs: envPositive('AGASTYA_COLLAB_IDLE_MS', 60_000, env),
       maxRooms: envPositive('AGASTYA_COLLAB_MAX_ROOMS', 2000, env),
       persistMs: envPositive('AGASTYA_COLLAB_PERSIST_MS', 100, env),
+      leaseRenewMs: envPositive('AGASTYA_COLLAB_LEASE_RENEW_MS', 60_000, env),
     },
     shutdownOnStdinClose: env.AGASTYA_SHUTDOWN_ON_STDIN_CLOSE === '1',
     pdfjsDir: env.AGASTYA_PDFJS_DIR || undefined,

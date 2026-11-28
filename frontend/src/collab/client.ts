@@ -262,6 +262,3 @@ export class LiveRoom {
     releaseSocket();
   }
 }
-
-/** The live room client for a room name (tests and the binding). */
-export function liveRoom(name: string): LiveRoom | null { return rooms.get(name) ?? null; }

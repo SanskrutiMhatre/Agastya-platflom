@@ -27,7 +27,7 @@ export interface ParseError {
 // Phase 3 (collaboration): the DOCTYPE reader and writer, the whitespace normaliser and the serializer are shared with the collaboration
 // server, which writes a live document back to its file in exactly the Studio's form (backend/src/shared/collab/xmlForm.ts, moved verbatim).
 export type { Doctype, DoctypeDecl } from '../../../../backend/src/shared/collab/xmlForm';
-export { findDoctype, parseDoctype, serializeDoctype, escapeText, escapeAttr } from '../../../../backend/src/shared/collab/xmlForm';
+export { findDoctype, parseDoctype, exactText, exactAttr } from '../../../../backend/src/shared/collab/xmlForm';
 
 /**
  * Names of the internal general entities (`<!ENTITY name "text">`) that the document body uses as `&name;`. A parser expands

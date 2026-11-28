@@ -110,6 +110,146 @@
       "decision": "Phase 3 item 1 (owner small UI changes)",
       "batch": "Phase 3: small UI + performance baseline",
       "date": "2026-11-28"
+    },
+    {
+      "category": "tests",
+      "key": "e2e doc-pages.spec.ts > unsaved work in the JSS and the JSG editor is not lost by clicking a tab either; Save and leave keeps it",
+      "reason": "Phase 3 live co-editing made the editors save as they type (no draft, no PUT, no edit conflict); the classic save-by-version flow is now the fallback when the room cannot be joined (C24, AGASTYA_COLLAB=0). Split in two: the leave guard is tested on the classic fallback (joins answered DISABLED, e2e/support/live.ts) with every assertion kept; a new live test checks a tab click leaves at once and the text reaches the file",
+      "newHome": "e2e doc-pages.spec.ts > unsaved work in the JSS and the JSG editor is not lost by clicking a tab either; Save and leave keeps it (classic) + live JSS and JSG editors: a tab click leaves without a question and what was typed is kept",
+      "checklistRow": "Editors: save, drafts, conflicts",
+      "decision": "Phase 3 live co-editing (docs/phase3/COLLAB-CONTRACT.md C24)",
+      "batch": "Phase 8 collab cleanup",
+      "date": "2026-11-28"
+    },
+    {
+      "category": "tests",
+      "key": "e2e jss-editor.spec.ts > content order: a document whose content follows a sub-section opens as unsaved with an explanation, the problem is listed, and saving writes it in order",
+      "reason": "Phase 3 live co-editing made the editors save as they type (no draft, no PUT, no edit conflict); the classic save-by-version flow is now the fallback when the room cannot be joined (C24, AGASTYA_COLLAB=0). Run twice: classic keeps every assertion (opens unsaved with the explanation, Save writes it in order); live: the room holds the book in print order (loadDoc/reconcileDoc from parseJss), so it opens Saved and Save writes it in order",
+      "newHome": "e2e jss-editor.spec.ts > content order (live) + content order (classic): a document whose content follows a sub-section is drawn in print order and saving writes it in order",
+      "checklistRow": "Editors: save, drafts, conflicts",
+      "decision": "Phase 3 live co-editing (docs/phase3/COLLAB-CONTRACT.md C24)",
+      "batch": "Phase 8 collab cleanup",
+      "date": "2026-11-28"
+    },
+    {
+      "category": "tests",
+      "key": "e2e jss-editor.spec.ts > a second author\\'s save is not overwritten silently: the stale save is refused and offers the saved document",
+      "reason": "Phase 3 live co-editing made the editors save as they type (no draft, no PUT, no edit conflict); the classic save-by-version flow is now the fallback when the room cannot be joined (C24, AGASTYA_COLLAB=0). Renamed: runs on the classic fallback page, where a refusal exists, every assertion kept; a live book merges the other save instead (wp05 FE-007 live)",
+      "newHome": "e2e jss-editor.spec.ts > a second author's save is not overwritten silently: the stale save is refused and offers the saved document (classic)",
+      "checklistRow": "Editors: save, drafts, conflicts",
+      "decision": "Phase 3 live co-editing (docs/phase3/COLLAB-CONTRACT.md C24)",
+      "batch": "Phase 8 collab cleanup",
+      "date": "2026-11-28"
+    },
+    {
+      "category": "tests",
+      "key": "e2e wp05-dataloss.spec.ts > FE-001: after the S1000D editor was opened, Ctrl+S in the JSS editor saves the JSS document (and only it)",
+      "reason": "Phase 3 live co-editing made the editors save as they type (no draft, no PUT, no edit conflict); the classic save-by-version flow is now the fallback when the room cannot be joined (C24, AGASTYA_COLLAB=0). Split: live checks Ctrl+S writes the JSS file through the room, no PUT of /jss or /dms/; classic keeps the original PUT assertions",
+      "newHome": "e2e wp05-dataloss.spec.ts > FE-001 (live) + FE-001 (classic)",
+      "checklistRow": "Editors: save, drafts, conflicts",
+      "decision": "Phase 3 live co-editing (docs/phase3/COLLAB-CONTRACT.md C24)",
+      "batch": "Phase 8 collab cleanup",
+      "date": "2026-11-28"
+    },
+    {
+      "category": "tests",
+      "key": "e2e wp05-dataloss.spec.ts > FE-003: a session revoked while typing keeps the editor; signing in again sends the refused save once more",
+      "reason": "Phase 3 live co-editing made the editors save as they type (no draft, no PUT, no edit conflict); the classic save-by-version flow is now the fallback when the room cannot be joined (C24, AGASTYA_COLLAB=0). Renamed: runs on the classic fallback page, every assertion kept",
+      "newHome": "e2e wp05-dataloss.spec.ts > FE-003 (classic): a session revoked while typing keeps the editor; signing in again sends the refused save once more",
+      "checklistRow": "Editors: save, drafts, conflicts",
+      "decision": "Phase 3 live co-editing (docs/phase3/COLLAB-CONTRACT.md C24)",
+      "batch": "Phase 8 collab cleanup",
+      "date": "2026-11-28"
+    },
+    {
+      "category": "tests",
+      "key": "e2e wp05-dataloss.spec.ts > FE-006 / PUB-023: unsaved JSS text survives a reload and is offered back; a save removes the draft",
+      "reason": "Phase 3 live co-editing made the editors save as they type (no draft, no PUT, no edit conflict); the classic save-by-version flow is now the fallback when the room cannot be joined (C24, AGASTYA_COLLAB=0). Renamed to (classic), every assertion kept; a new live test checks a live book keeps no draft and survives a reload",
+      "newHome": "e2e wp05-dataloss.spec.ts > FE-006 / PUB-023 (classic) + FE-006 (live): a live JSS document keeps no draft",
+      "checklistRow": "Editors: save, drafts, conflicts",
+      "decision": "Phase 3 live co-editing (docs/phase3/COLLAB-CONTRACT.md C24)",
+      "batch": "Phase 8 collab cleanup",
+      "date": "2026-11-28"
+    },
+    {
+      "category": "tests",
+      "key": "e2e wp05-dataloss.spec.ts > FE-006: the JSG editor keeps a draft too and autosave is on by default",
+      "reason": "Phase 3 live co-editing made the editors save as they type (no draft, no PUT, no edit conflict); the classic save-by-version flow is now the fallback when the room cannot be joined (C24, AGASTYA_COLLAB=0). Renamed to (classic), every assertion kept; a new live test checks no draft and auto-save disabled while live",
+      "newHome": "e2e wp05-dataloss.spec.ts > FE-006 (classic): the JSG editor keeps a draft too and autosave is on by default + FE-006 (live): the JSG editor is live too",
+      "checklistRow": "Editors: save, drafts, conflicts",
+      "decision": "Phase 3 live co-editing (docs/phase3/COLLAB-CONTRACT.md C24)",
+      "batch": "Phase 8 collab cleanup",
+      "date": "2026-11-28"
+    },
+    {
+      "category": "tests",
+      "key": "e2e wp05-dataloss.spec.ts > FE-007: a refused save keeps the author\\'s version: it can be downloaded",
+      "reason": "Phase 3 live co-editing made the editors save as they type (no draft, no PUT, no edit conflict); the classic save-by-version flow is now the fallback when the room cannot be joined (C24, AGASTYA_COLLAB=0). Renamed to (classic), every assertion kept; a new live test checks the other save merges, no conflict",
+      "newHome": "e2e wp05-dataloss.spec.ts > FE-007 (classic): a refused save keeps the author's version + FE-007 (live): a save by someone else is merged",
+      "checklistRow": "Editors: save, drafts, conflicts",
+      "decision": "Phase 3 live co-editing (docs/phase3/COLLAB-CONTRACT.md C24)",
+      "batch": "Phase 8 collab cleanup",
+      "date": "2026-11-28"
+    },
+    {
+      "category": "tests",
+      "key": "e2e wp05-dataloss.spec.ts > FE-024: after a sign-out the next person finds no open document or draft of the previous one",
+      "reason": "Phase 3 live co-editing made the editors save as they type (no draft, no PUT, no edit conflict); the classic save-by-version flow is now the fallback when the room cannot be joined (C24, AGASTYA_COLLAB=0). Renamed: drafts exist only in the classic editor; runs on the classic fallback page, every assertion kept",
+      "newHome": "e2e wp05-dataloss.spec.ts > FE-024 (classic): after a sign-out the next person finds no open document or draft of the previous one",
+      "checklistRow": "Editors: save, drafts, conflicts",
+      "decision": "Phase 3 live co-editing (docs/phase3/COLLAB-CONTRACT.md C24)",
+      "batch": "Phase 8 collab cleanup",
+      "date": "2026-11-28"
+    },
+    {
+      "category": "tests",
+      "key": "e2e wp05-dataloss.spec.ts > FE-024: a sign-out chosen from the account menu removes the person\\'s drafts",
+      "reason": "Phase 3 live co-editing made the editors save as they type (no draft, no PUT, no edit conflict); the classic save-by-version flow is now the fallback when the room cannot be joined (C24, AGASTYA_COLLAB=0). Renamed: runs on the classic fallback page, every assertion kept",
+      "newHome": "e2e wp05-dataloss.spec.ts > FE-024 (classic): a sign-out chosen from the account menu removes the person's drafts",
+      "checklistRow": "Editors: save, drafts, conflicts",
+      "decision": "Phase 3 live co-editing (docs/phase3/COLLAB-CONTRACT.md C24)",
+      "batch": "Phase 8 collab cleanup",
+      "date": "2026-11-28"
+    },
+    {
+      "category": "tests",
+      "key": "e2e wp18-performance.spec.ts > B4: one save of an existing data module is followed by at most 2 GETs (no /media, /settings or /explore)",
+      "reason": "Phase 3 live co-editing made the editors save as they type (no draft, no PUT, no edit conflict); the classic save-by-version flow is now the fallback when the room cannot be joined (C24, AGASTYA_COLLAB=0). Run twice: classic keeps the PUT and the GET budget after it; live asserts no PUT /dms/ and the same budget after the key press",
+      "newHome": "e2e wp18-performance.spec.ts > B4: ... (live) + B4: ... (classic)",
+      "checklistRow": "Editors: save, drafts, conflicts",
+      "decision": "Phase 3 live co-editing (docs/phase3/COLLAB-CONTRACT.md C24)",
+      "batch": "Phase 8 collab cleanup",
+      "date": "2026-11-28"
+    },
+    {
+      "category": "tests",
+      "key": "e2e wp21-editor-chrome.spec.ts > Ctrl+S saves and Ctrl+F finds in all three editors, with the same state words",
+      "reason": "Phase 3 live co-editing made the editors save as they type (no draft, no PUT, no edit conflict); the classic save-by-version flow is now the fallback when the room cannot be joined (C24, AGASTYA_COLLAB=0). Run twice: classic keeps every assertion (Unsaved changes, then Saved); live asserts the state never says unsaved and each file holds the edit after Ctrl+S",
+      "newHome": "e2e wp21-editor-chrome.spec.ts > Ctrl+S saves and Ctrl+F finds in all three editors, with the same state words (live) + (classic)",
+      "checklistRow": "Editors: save, drafts, conflicts",
+      "decision": "Phase 3 live co-editing (docs/phase3/COLLAB-CONTRACT.md C24)",
+      "batch": "Phase 8 collab cleanup",
+      "date": "2026-11-28"
+    },
+    {
+      "category": "tests",
+      "key": "e2e wp21-editor-chrome.spec.ts > a refused JSS save can be compared and merged: both changes kept, checked, saved (PRD-004)",
+      "reason": "Phase 3 live co-editing made the editors save as they type (no draft, no PUT, no edit conflict); the classic save-by-version flow is now the fallback when the room cannot be joined (C24, AGASTYA_COLLAB=0). Renamed: runs on the classic fallback, where a refusal exists; every assertion kept",
+      "newHome": "e2e wp21-editor-chrome.spec.ts > a refused JSS save can be compared and merged: both changes kept, checked, saved (PRD-004, classic)",
+      "checklistRow": "Editors: save, drafts, conflicts",
+      "decision": "Phase 3 live co-editing (docs/phase3/COLLAB-CONTRACT.md C24)",
+      "batch": "Phase 8 collab cleanup",
+      "date": "2026-11-28"
+    },
+    {
+      "category": "tests",
+      "key": "e2e wp22-navigation.spec.ts > JSS: Esc takes the focus off the paper, and Ctrl+S still saves",
+      "reason": "Phase 3 live co-editing made the editors save as they type (no draft, no PUT, no edit conflict); the classic save-by-version flow is now the fallback when the room cannot be joined (C24, AGASTYA_COLLAB=0). Run twice: classic keeps every assertion; live asserts no unsaved state and the file holds the text after Ctrl+S",
+      "newHome": "e2e wp22-navigation.spec.ts > JSS: Esc takes the focus off the paper, and Ctrl+S still saves (live) + (classic)",
+      "checklistRow": "Editors: save, drafts, conflicts",
+      "decision": "Phase 3 live co-editing (docs/phase3/COLLAB-CONTRACT.md C24)",
+      "batch": "Phase 8 collab cleanup",
+      "date": "2026-11-28"
     }
   ]
 }

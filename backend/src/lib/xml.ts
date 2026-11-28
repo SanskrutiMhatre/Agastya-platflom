@@ -12,15 +12,8 @@
 // returned as written (entities are not decoded), as before. xmlHead.ts re-exports it.
 // =============================================================================
 
-/** Escapes a value for element content (`&`, `<`, `>`). */
-export function escText(s: unknown): string {
-  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-/** Escapes a value for a double-quoted attribute (`&`, `<`, `>`, `"`). */
-export function escAttr(s: unknown): string {
-  return escText(s).replace(/"/g, '&quot;');
-}
+// Phase 8: the escaper itself is in shared/xmlEscape.ts, so the browser's JSS and JSG serialisers use the same one (one definition).
+export { escText, escAttr } from '../shared/xmlEscape';
 
 /** The double-quoted attributes of a start tag's source text, by name (`modelIdentCode="S1000D" systemCode="00"`). */
 export function readAttrs(src: string): Record<string, string> {

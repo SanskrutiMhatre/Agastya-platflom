@@ -10,6 +10,7 @@ import { EditorDocument } from '../studio/core/document';
 import { parseXml } from '../studio/core/xml';
 import * as ydom from '../../../backend/src/shared/collab/ydom';
 import { DomBinding } from './binding';
+import { moveElement, demote } from '../studio/core/ops';
 
 const SAMPLE = fs.readFileSync(path.resolve(__dirname, '../../public/samples/DMC-S1KSTUDIO-A-29-10-00-00A-040A-D_001-00_EN-US.XML'), 'utf8');
 const NET = Symbol('net');
@@ -123,6 +124,79 @@ describe('live co-editing binding', () => {
     a.doc.transact('Typing', () => textNode(paras(a.doc)[0]).insertData(0, 'XYZ'));
     sync();
     expect(b.doc.selection!.focus.offset).toBe(8);
+  });
+
+  // Phase 8: a moved element is a re-placed block (ydom.ts schema 2), so concurrent typing inside it is never lost
+  const count = (s: string, w: string): number => s.split(w).length - 1;
+
+  it('Move down while the other author types in the moved paragraph: the move and the typing both survive', () => {
+    const [a, b, sync] = pair();
+    const pa = paras(a.doc)[1]; const words = textNode(pa).data;
+    a.doc.transact('Move down', () => moveElement(pa, 1, null));
+    b.doc.transact('Typing', () => textNode(paras(b.doc)[1]).appendData(' TYPED-WHILE-MOVED'));
+    sync();
+    expect(text(a.doc)).toBe(text(b.doc));
+    expect(count(text(a.doc), `${words} TYPED-WHILE-MOVED`)).toBe(1);
+    // moved: it now follows the paragraph that held the list
+    const pb = paras(b.doc).find((p) => textNode(p)?.data.startsWith(words))!;
+    expect(pb.previousElementSibling?.nodeName).toBe('para');
+    expect(pb.previousElementSibling!.getElementsByTagName('randomList').length + pb.previousElementSibling!.getElementsByTagName('sequentialList').length).toBeGreaterThan(0);
+  });
+
+  it('nesting a levelled paragraph into the one above while the other author types inside it keeps the typing', () => {
+    const [a, b, sync] = pair();
+    const lp = (d: EditorDocument, id: string): Element => Array.from(d.xml.getElementsByTagName('levelledPara')).find((e) => e.getAttribute('id') === id)!;
+    a.doc.transact('Demote', () => demote(lp(a.doc, 'par-0002'), null));
+    const target = lp(b.doc, 'par-0003').getElementsByTagName('para')[0];
+    b.doc.transact('Typing', () => textNode(target).insertData(0, 'NESTED-TYPING '));
+    sync();
+    expect(text(a.doc)).toBe(text(b.doc));
+    expect(count(text(a.doc), 'NESTED-TYPING The pump assembly')).toBe(1);
+    expect(lp(b.doc, 'par-0002').parentElement!.getAttribute('id')).toBe('par-0001');
+  });
+
+  it('two authors moving the same paragraph at once: one place wins on both sides, the paragraph is there once', () => {
+    const [a, b, sync] = pair();
+    const words = textNode(paras(a.doc)[0]).data;
+    a.doc.transact('Move down', () => moveElement(paras(a.doc)[0], 1, null));
+    b.doc.transact('Move down', () => { const p = paras(b.doc)[0]; moveElement(p, 1, null); moveElement(p, 1, null); });
+    b.doc.transact('Typing', () => textNode(paras(b.doc).find((p) => textNode(p)?.data === words)!).insertData(0, 'AND MORE '));
+    sync();
+    expect(text(a.doc)).toBe(text(b.doc));
+    expect(count(text(a.doc), `AND MORE ${words}`)).toBe(1);
+    expect(count(text(a.doc), words)).toBe(1);
+  });
+
+  it('undo of a move puts the paragraph back, keeping what the other author typed in it', () => {
+    const [a, b, sync] = pair();
+    const before = text(a.doc);
+    a.doc.transact('Move down', () => moveElement(paras(a.doc)[1], 1, null));
+    sync();
+    b.doc.transact('Typing', () => textNode(paras(b.doc).find((p) => textNode(p)?.data.startsWith('The pump has'))!).appendData(' (B)'));
+    sync();
+    expect(a.doc.undo()).toBe(true);
+    sync();
+    expect(text(a.doc)).toBe(text(b.doc));
+    expect(text(a.doc)).toBe(before.replace('The pump has these main characteristics:', 'The pump has these main characteristics: (B)'));
+  });
+
+  it('a selected table follows a remote move: the element selection is re-mapped to where the table now is', () => {
+    const [a, b, sync] = pair();
+    const tb = b.doc.xml.getElementsByTagName('table')[0];
+    const parent = tb.parentNode!; const i = Array.prototype.indexOf.call(parent.childNodes, tb) as number;
+    b.doc.selection = { anchor: { node: parent, offset: i }, focus: { node: parent, offset: i + 1 }, element: tb };
+    // A moves the table up above the paragraph before it, and adds a paragraph in front of everything in that container
+    const ta = a.doc.xml.getElementsByTagName('table')[0];
+    a.doc.transact('Move up', () => moveElement(ta, -1, null));
+    sync();
+    const sel = b.doc.selection!;
+    expect(sel.element).toBe(tb);                                     // the same element (re-placed, not re-created)
+    expect(tb.isConnected).toBe(true);
+    const j = Array.prototype.indexOf.call(tb.parentNode!.childNodes, tb) as number;
+    expect(sel.anchor.node).toBe(tb.parentNode);
+    expect(sel.anchor.offset).toBe(j);
+    expect(sel.focus.offset).toBe(j + 1);
+    expect(j).not.toBe(i);
   });
 
   it('a relative position (comment anchor, cursor) follows the text', () => {

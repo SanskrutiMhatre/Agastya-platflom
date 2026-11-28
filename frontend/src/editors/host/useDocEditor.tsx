@@ -108,12 +108,15 @@ export function useDocEditor<L extends DocLoaded>(ctx: ProjectCtx, adapter: DocA
   // (a live document keeps no draft: its unacknowledged changes are in IndexedDB until the server has them, collab/pending.ts)
   const draft = useLocalDraft(id, adapter.kind, () => { const ed = editorRef.current; return ed && !liveRef.current && ed.isDirty() ? ed.getXml() : null; }, dirty, () => hashRef.current, loaded?.xml ?? null);
 
-  const save = useCallback(async (): Promise<boolean> => {
+  const save = useCallback(async (opts?: { revision?: boolean }): Promise<boolean> => {
     const ed = editorRef.current; if (!ed || !writable) return true;
     if (liveRef.current) {
-      // P3-1: live: everything is sent; the server writes the file now (and a revision), so a build or a preview reads the merged document
-      setSaving(true);
-      try { await liveRef.current.flush(true); setSavedAt(new Date()); setFailed(false); if (adapter.reloadProject) ctx.reload(); return true; }
+      // P3-1: live: everything is sent; the server writes the file now (and a revision), so a build or a preview reads the merged document.
+      // Phase 8: a Quick preview asks for the file only (revision false): an auto-preview after every save would otherwise add a history
+      // entry each time; it is not a save either (no "saved" moment, so it does not start another auto-preview)
+      const quiet = opts?.revision === false;
+      if (!quiet) setSaving(true);
+      try { await liveRef.current.flush(!quiet); if (!quiet) setSavedAt(new Date()); setFailed(false); if (adapter.reloadProject && !quiet) ctx.reload(); return true; }
       catch (e) { setFailed(true); toast(errText(e), 'error'); return false; }
       finally { setSaving(false); }
     }
@@ -195,7 +198,7 @@ export function useDocEditor<L extends DocLoaded>(ctx: ProjectCtx, adapter: DocA
     layout.reveal();
     setPreviewing(true); setNote(''); progress.clear();
     try {
-      if (!(await save())) return;
+      if (!(await save({ revision: false }))) return;          // live: the file is written for the preview, no revision
       const t0 = performance.now();
       const blob = await adapter.preview(id);
       if (mine !== previewRun.current) return;

@@ -8,6 +8,7 @@
 process.env.AGASTYA_COLLAB_WRITEBACK_MS = '800';
 process.env.AGASTYA_COLLAB_PERSIST_MS = '20';
 process.env.AGASTYA_COLLAB_IDLE_MS = '1000';
+process.env.AGASTYA_COLLAB_LEASE_RENEW_MS = '50';   // a check-out holder's lease is renewed while they type (Phase 8: with its own part)
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -160,6 +161,43 @@ test('two authors at once: typing in the same paragraph merges, and concurrent s
   a.leave(ROOM()); b.leave(ROOM());
 });
 
+// Phase 8: a moved block is re-placed, not deleted and re-created (ydom.ts schema 2), so typing inside it at the same time is kept
+test('one author moves a paragraph and indents a section while the other types in both: both converge, the typing is kept, once', async () => {
+  const a = await client(ann); const b = await client(ben);
+  const ja = await a.join(ROOM()); const jb = await b.join(ROOM());
+  assert.ok(!ja.error && !jb.error, JSON.stringify(ja.error || jb.error));
+  const A = bound(ja.room);
+  const chA = A.doc.chapters[0];
+  // two sections side by side to indent one into the other (made and settled first)
+  chA.children.push({ k: 'section', id: 'smv1', title: 'Outer', children: [{ k: 'para', inline: [{ t: 'text', text: 'outer text' }] }] },
+    { k: 'section', id: 'smv2', title: 'Inner', children: [{ k: 'para', inline: [{ t: 'text', text: 'inner text' }] }] });
+  A.sync();
+  assert.ok(await a.settled(ROOM()));
+  assert.ok(await until(() => textOfRoom(jb.room).includes('inner text')));
+  const B2 = bound(jb.room); const chB2 = B2.doc.chapters[0];
+  // Ann: the first paragraph down below the list, and section "Inner" into section "Outer"
+  const idx = chA.children.findIndex((c) => c.k === 'para');
+  const [moved] = chA.children.splice(idx, 1); const at = chA.children.findIndex((c) => c.k === 'list'); chA.children.splice(at + 1, 0, moved);
+  const inner = chA.children.find((c) => c.id === 'smv2'); chA.children.splice(chA.children.indexOf(inner), 1); chA.children.find((c) => c.id === 'smv1').children.push(inner);
+  // Ben, at the same moment, types in both
+  const pB = chB2.children.find((c) => c.k === 'para'); const was = pB.inline.find((r) => r.t === 'text').text;
+  pB.inline = [...pB.inline, { t: 'text', text: ' MOVED-TYPING' }];
+  chB2.children.find((c) => c.id === 'smv2').children[0].inline = [{ t: 'text', text: 'inner text INDENT-TYPING' }];
+  A.sync(); B2.sync();
+  assert.ok(await a.settled(ROOM()) && await b.settled(ROOM()), 'every change acknowledged');
+  assert.ok(await until(() => textOfRoom(ja.room) === textOfRoom(jb.room) && textOfRoom(ja.room).includes('INDENT-TYPING') && textOfRoom(ja.room).includes('MOVED-TYPING')), 'both converge with both typings');
+  const merged = textOfRoom(ja.room);
+  assert.equal(merged.split('MOVED-TYPING').length - 1, 1, 'the moved paragraph once');
+  assert.equal(merged.split('INDENT-TYPING').length - 1, 1, 'the indented section once');
+  assert.match(merged, /<\/list>\s*<para[^>]*>[^]*?MOVED-TYPING/, 'the paragraph is below the list, with the typing');
+  assert.match(merged, /<section id="smv1">[^]*<section id="smv2">[^]*INDENT-TYPING[^]*<\/section>\s*<\/section>/, 'Inner is inside Outer, with the typing');
+  assert.ok(merged.includes(was), 'the paragraph keeps its words');
+  const fl = await a.flush(ROOM(), true); assert.ok(fl);
+  assert.equal(fileText(), merged, 'the merged document is the file');
+  assert.equal(fileText(), editorText(merged), 'and it is a normal save of itself');
+  a.leave(ROOM()); b.leave(ROOM());
+});
+
 test('the write-back refuses what a save refuses: the room keeps the change, members are told, the file is untouched', async () => {
   const a = await client(ann);
   const ja = await a.join(ROOM()); assert.ok(!ja.error);
@@ -245,6 +283,18 @@ test('a reviewer sees the document live but cannot change it; a check-out locks 
   // checked in: Ann writes again
   assert.equal((await ben.del(`${U()}/checkout`)).status, 200);
   assert.ok(await until(() => ja.room.state && ja.room.state.writable === true));
+  // Phase 8: a chapter check-out stays a chapter check-out while its holder types live (it was renewed as the whole book before)
+  const chapterId = (/<chapter\b[^>]*\sid="([^"]+)"/.exec(fileText()) ?? [])[1] ?? 'ch-test';
+  assert.equal((await ben.post(`${U()}/checkout`, { part: chapterId })).status, 200);
+  assert.ok(await until(() => ja.room.state && ja.room.state.code === 'CHECKED_OUT'), 'the book is locked for the others (documented: per room)');
+  const B = bound(jb.room); const bp = B.doc.chapters[0].children.filter((c) => c.k === 'para')[1];
+  for (let i = 0; i < 3; i++) { bp.inline = [...bp.inline, { t: 'text', text: ` RENEW${i}` }]; B.sync(); await new Promise((res) => setTimeout(res, 120)); }
+  assert.ok(await b.settled(ROOM()));
+  const held = (await ben.get(`${U()}/checkouts`)).json;
+  const parts = (held.checkouts ?? held.leases ?? held).map((l) => l.part);
+  assert.deepEqual(parts, [chapterId], `only the chapter is checked out: ${JSON.stringify(held)}`);
+  assert.equal((await ben.del(`${U()}/checkout?part=${encodeURIComponent(chapterId)}`)).status, 200);
+  assert.ok(await until(() => ja.room.state && ja.room.state.writable === true), 'checked in: the book is free (no whole-book check-out was left behind)');
   a.close(); b.close(); r.close();
 });
 

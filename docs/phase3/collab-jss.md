@@ -125,15 +125,18 @@ These existing specs assume the classic JSS save. They need updating for the liv
 
 ## 6. Known gaps
 
-* **Per-chapter check-out** (D22) locks the whole live book for the others, not only the chapter.
-* A moved block (Move up or Move down, an indent change) is synced as a delete plus an insert. If another author is typing in that block at
-  the same moment, their concurrent edits in it are lost. Edits made after the move are not affected.
-* Element-level selection (a selected table or figure) is not re-mapped after a remote structural change. Text carets are.
+* **Per-chapter check-out** (D22) locks the whole live book for the others, not only the chapter. Still so after Phase 8: a per-part live
+  lock needs client-side refusal per part (a server refusal leaves the change in the sender's Y doc; SYNC2 would bypass it). Phase 8
+  fixed the lease renewal, which renewed a chapter lease as a whole-document one (`docs/phase3/cleanup-collab.md`).
+* ~~A moved block is synced as a delete plus an insert; concurrent edits in it are lost.~~ Fixed in Phase 8: Yjs schema 2 re-places the
+  block and keeps its content (`docs/phase3/cleanup-collab.md`).
+* ~~Element-level selection is not re-mapped after a remote structural change.~~ Fixed: the model keeps object identity through a move.
 * The read-only sheet of a reviewer or a locked author is redrawn when the lock comes or goes, and the scroll position is kept.
 * The outline faces come from awareness, at the section of each person's caret. The shell's TeamChip faces still come from page presence.
 * Generate PDF and Quick preview call the host's `save()` first. While the book is live, that is `flush(true)`: the server writes the merged
   book before the build. A side effect is that every preview also asks for a revision, so auto-preview can add history entries. Whether the
-  core's revision interval throttles these was not checked. A `flush(false)` path for previews would avoid them.
+  core's revision interval throttles these was not checked. A `flush(false)` path for previews would avoid them. **Done in Phase 8:**
+  a preview saves with `{ revision: false }` (no history entry); Generate still records one.
 
 ## 7. Checks run (2026-11-28) and checks owed
 

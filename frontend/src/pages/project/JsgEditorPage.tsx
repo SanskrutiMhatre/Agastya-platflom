@@ -166,7 +166,8 @@ export function JsgEditorPage() {
 
   // the sections' document codes beside their headings, when the author has switched them on (on the Publication page; a User Handbook; a parts list has no sections of this kind)
   const sectionCode = useSectionCode(id, savedAt);
-  useEffect(() => { (host.editorRef.current as JsgEditorLike | null)?.setSectionBadge?.(loaded?.docType === 'uhb' ? sectionCode : undefined); }, [sectionCode, loaded, host.editorRef]);
+  // the editor is built again when the room is joined or the right to change it changes (the mount effect's deps): it gets the codes again then
+  useEffect(() => { (host.editorRef.current as JsgEditorLike | null)?.setSectionBadge?.(loaded?.docType === 'uhb' ? sectionCode : undefined); }, [sectionCode, loaded, host.editorRef, live, liveTried, writableNow]);
 
   // Auto-save: a minute after the last change, when the author has asked for it. A save that fails (someone else saved, or the document is broken) is not repeated by it.
   useEffect(() => { try { localStorage.setItem('agastya.jsg.autosave', autosave ? '1' : '0'); } catch { /* private mode */ } }, [autosave]);
