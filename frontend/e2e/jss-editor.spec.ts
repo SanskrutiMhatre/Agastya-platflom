@@ -1,10 +1,14 @@
 // The JSS editor in a real browser, against the real server: an author opens a new User Handbook, writes in it, saves it as XML, and the server builds
 // the PDF from that XML. Nothing here is mocked: the sheet, the toolbar, the dialogs, the save, the schema check and the FOP render are all the real ones.
+// Phase 3 / Phase 8: the editor opens the book live (co-editing): every change reaches the server as it is typed ("Saved", never "Unsaved
+// changes"), Save writes the file through the room. The stale-save refusal belongs to the classic editor (the fallback when the room
+// cannot be joined, C24): that test opens the book on a page whose joins are answered DISABLED (support/live.ts).
 
 import { test, expect, request as pwRequest, type Page, type APIRequestContext } from '@playwright/test';
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
+import { classicOnly } from './support/live';
 
 // The PDF is read with the backend tests' pdf.js helper (backend/test/pdftools.js): no pdftotext needed. The checks below used to be skipped
 // silently when pdftotext was missing (`if (!t.error)`), which on Windows was always (WP-08, QA-003).
@@ -42,6 +46,8 @@ const state = () => page.getByTestId('jss-state');
 /** The toolbar is in tabs (Write, Insert, Arrange, Document): open the one that holds the button. */
 const tab = (name: string) => page.getByRole('tab', { name, exact: true }).click();
 const saved = async () => (await (await api.get(`${U}/jss`)).json());
+/** a second page of the same person whose editor saves by version (its joins are answered DISABLED) */
+const cpage = async (): Promise<Page> => { const p = await page.context().newPage(); p.on('pageerror', (e) => { throw new Error(`page error: ${e.message}`); }); await classicOnly(p); return p; };
 
 test('the catalogue offers the 18 types of the JSS catalogue, all ready', async () => {
   const types = (await (await api.get('/api/formats')).json()).formats.find((f: any) => f.id === 'jss').domains.find((d: any) => d.id === 'land').manualTypes;
@@ -59,7 +65,7 @@ test('opening a JSS project opens the JSS editor, with the stencil chapters lock
   await expect(page.locator('[data-testid="studio-host"]')).toHaveCount(0);           // not the S1000D Studio
   await expect(page.getByRole('link', { name: 'Explore' })).toBeVisible(); await expect(page.getByRole('link', { name: 'Publication' })).toBeVisible();   // the document's codes have their own pages (doc-pages.spec.ts)
   await expect(page.getByTestId('doc-codes-strip')).toHaveCount(0);                    // and are never a strip on the editor page
-  await expect(state()).toHaveText(/All changes saved/);
+  await expect(state()).toHaveText(/^Saved/, { timeout: 20_000 });                      // live: the server has every change
   await page.screenshot({ path: path.join(SHOTS, '1-opened.png') });
 });
 
@@ -69,7 +75,8 @@ test('writing: a paragraph with bold text, a list that nests, a captioned table,
   await page.keyboard.type('The system gives ');
   await page.keyboard.press('Control+b'); await page.keyboard.type('early warning'); await page.keyboard.press('Control+b');
   await page.keyboard.type(' of low-level threats.');
-  await expect(state()).toHaveText(/Unsaved changes/);
+  await expect(state()).toHaveText(/^(Saved|Syncing)/);                                 // live: sent as it is typed
+  await expect(state()).not.toHaveText(/Unsaved changes/);
 
   // a lettered list: Enter adds items, Tab nests one
   await tab('Insert'); await page.getByRole('button', { name: 'Add or change a list' }).click();
@@ -193,37 +200,47 @@ test('merging cells: Merge right and Merge down in the browser, saved as colspan
   await page.screenshot({ path: path.join(SHOTS, '5-merged.png') });
 });
 
-test('content order: a document whose content follows a sub-section opens as unsaved with an explanation, the problem is listed, and saving writes it in order', async () => {
-  const d = await saved();
-  const late = d.xml.replace(/(<section id="[^"]+"><title>Purpose<\/title>)/, '$1<section id="zsub"><title>Zeta sub-section</title></section><para>Content after the sub-section</para>');
-  expect(late).not.toBe(d.xml);
-  const put = await api.put(`${U}/jss`, { data: { xml: late, baseHash: d.hash } }); expect(put.ok()).toBeTruthy();
-  expect((await put.json()).report.findings.some((f: { rule: string }) => f.rule === 'JSS-ORDER')).toBe(true);
-  await page.reload(); await expect(page.getByTestId('jss-editor')).toBeVisible({ timeout: 30_000 });
-  await expect(state()).toHaveText(/Unsaved changes/);
-  await expect(page.getByText(/had content after a sub-section/)).toBeVisible();
-  const paras = await sheet().locator('.jss-sec').filter({ has: page.locator('.jss-sec-title', { hasText: 'Purpose' }) }).first().locator('.jss-para').allTextContents();
-  expect(paras.join(' ')).toContain('Content after the sub-section');                       // drawn in the section's own content, ahead of the sub-section
-  await page.keyboard.press('Control+s').catch(() => undefined); await sheet().locator('.jss-para').first().click(); await page.keyboard.press('Control+s');
-  await expect(state()).toHaveText(/Saved/, { timeout: 15_000 });
-  const after = await saved(); expect(after.report.errors).toBe(0);
-  expect(after.xml.indexOf('Content after the sub-section')).toBeLessThan(after.xml.indexOf('Zeta sub-section'));
-  expect(after.xml.indexOf('Content after the sub-section')).toBeGreaterThan(0);
-});
+// classic (the fallback): the document opens as unsaved, with the explanation, and Save writes it in order. live (the default): the room
+// holds the book as the model reads it (yjss loadDoc/reconcileDoc from parseJss: content first), so it opens in that order with nothing
+// unsent ("Saved", no explanation needed), and Save writes the file in that order.
+for (const mode of ['live', 'classic'] as const) {
+  test(`content order (${mode}): a document whose content follows a sub-section is drawn in print order and saving writes it in order`, async () => {
+    const p = mode === 'live' ? page : await cpage();
+    const d = await saved();
+    const late = d.xml.replace(/(<section id="[^"]+"><title>Purpose<\/title>)/, `$1<section id="zsub${mode}"><title>Zeta sub-section ${mode}</title></section><para>Content after the sub-section ${mode}</para>`);
+    expect(late).not.toBe(d.xml);
+    const put = await api.put(`${U}/jss`, { data: { xml: late, baseHash: d.hash } }); expect(put.ok()).toBeTruthy();
+    expect((await put.json()).report.findings.some((f: { rule: string }) => f.rule === 'JSS-ORDER')).toBe(true);
+    if (mode === 'live') await p.reload(); else await p.goto(`/projects/${pid}/editor`);
+    await expect(p.getByTestId('jss-editor')).toBeVisible({ timeout: 30_000 });
+    await expect(p.getByTestId('jss-state')).toHaveText(mode === 'live' ? /^Saved/ : /Unsaved changes/, { timeout: 20_000 });
+    if (mode === 'classic') await expect(p.getByText(/had content after a sub-section/)).toBeVisible();
+    const purpose = p.getByTestId('jss-paper').locator('.jss-sec').filter({ has: p.locator('.jss-sec-title', { hasText: 'Purpose' }) }).first();
+    await expect.poll(async () => (await purpose.locator('.jss-para').allTextContents()).join(' '), { timeout: 15_000 }).toContain(`Content after the sub-section ${mode}`);   // drawn in the section's own content, ahead of the sub-section
+    await p.keyboard.press('Control+s').catch(() => undefined); await p.getByTestId('jss-paper').locator('.jss-para').first().click(); await p.keyboard.press('Control+s');
+    await expect(p.getByTestId('jss-state')).toHaveText(/Saved/, { timeout: 15_000 });
+    await expect.poll(async () => { const x = (await saved()).xml as string; const c = x.indexOf(`Content after the sub-section ${mode}`); return c > 0 && c < x.indexOf(`Zeta sub-section ${mode}`); }, { timeout: 15_000 }).toBeTruthy();
+    expect((await saved()).report.errors).toBe(0);
+    if (p !== page) await p.close();
+  });
+}
 
-test('a second author\'s save is not overwritten silently: the stale save is refused and offers the saved document', async () => {
+test('a second author\'s save is not overwritten silently: the stale save is refused and offers the saved document (classic)', async () => {
+  // a live book merges the other save instead (wp05 FE-007 live); a refusal is the classic editor's
+  const page = await cpage();
   await page.goto(`/projects/${pid}/editor`); await expect(page.getByTestId('jss-editor')).toBeVisible({ timeout: 30_000 });
   const d = await saved();
   expect((await api.put(`${U}/jss`, { data: { xml: d.xml.replace('Search radar', 'Search radar (long range)'), baseHash: d.hash } })).ok()).toBeTruthy();   // someone else saves
-  await sheet().locator('.jss-para').first().click(); await page.keyboard.type(' more');
+  await page.getByTestId('jss-paper').locator('.jss-para').first().click(); await page.keyboard.type(' more');
   await page.keyboard.press('Control+s');
   await expect(page.getByText(/Someone else saved this document/)).toBeVisible({ timeout: 15_000 });
   // WP-05 (FE-007): the refused save keeps the author's text; opening the other version asks first, in the platform's dialog
   await expect(page.getByTestId('conflict-download')).toBeVisible();
   await page.getByTestId('conflict-reload').click();
   await page.getByRole('button', { name: 'Discard my changes' }).click();
-  await expect(sheet().locator('.jss-li').first()).toContainText('Search radar (long range)');
-  await expect(state()).toHaveText(/All changes saved/);
+  await expect(page.getByTestId('jss-paper').locator('.jss-li').first()).toContainText('Search radar (long range)');
+  await expect(page.getByTestId('jss-state')).toHaveText(/All changes saved/);
+  await page.close();
 });
 
 test('the S1000D Studio is untouched: an S1000D project still opens the Studio', async () => {

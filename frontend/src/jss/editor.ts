@@ -280,14 +280,18 @@ export class JssEditor {
   }
 
   undo(): void {
-    if (this.collab) { this.collab.undo(); this.updateToolbar(); return; }
+    if (this.collab) { this.collab.undo(); this.updateToolbar(); this.keepKeyboard(); return; }
     if (!this.undoStack.length) return;
     this.redoStack.push(serializeJss(this.doc)); this.restore(this.undoStack.pop() as string);
   }
   redo(): void {
-    if (this.collab) { this.collab.redo(); this.updateToolbar(); return; }
+    if (this.collab) { this.collab.redo(); this.updateToolbar(); this.keepKeyboard(); return; }
     if (!this.redoStack.length) return;
     this.undoStack.push(serializeJss(this.doc)); this.restore(this.redoStack.pop() as string);
+  }
+  /** Live undo or redo can take away the block that had focus: keep the keyboard (Ctrl+Z, Ctrl+Y, Ctrl+S) inside the editor, as restore() does. */
+  private keepKeyboard(): void {
+    if (!this.root.contains(document.activeElement)) this.root.focus({ preventScroll: true });
   }
   private restore(xml: string): void {
     const top = this.scrollEl.scrollTop; this.doc = parseJss(xml); this.renderAll(); this.scrollEl.scrollTop = top; this.setDirty(true); this.updateToolbar();
