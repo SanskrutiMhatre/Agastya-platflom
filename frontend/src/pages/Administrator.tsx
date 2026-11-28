@@ -369,12 +369,12 @@ function VisualSection() {
   const blocked = !!derived && !derived.ok;                 // the server refuses it too (TH-003); saving waits for a readable colour
   return (
     <div className="v2-stack" data-testid="visual-settings">
-      <div className="v2-admin-head"><h3>Visual settings</h3><p className="v2-sub">How the application looks for everyone. Each person can still choose light, dark or the system theme for themselves.</p></div>
+      <div className="v2-admin-head"><h3>Visual settings</h3><p className="v2-sub">How the application looks for everyone. Each person can still choose light or dark for themselves.</p></div>
       <section className="card narrow" aria-labelledby="ap-h">
         <div className="card-head"><h3 id="ap-h"><Icon name="sliders" />Appearance defaults</h3><span className="faint">For everyone on this installation</span></div>
         <div className="card-body stack">
           <Field label="Default theme for new users" hint="Used until a person picks their own with the theme button; the choice is kept per person."><select className="v2-select" value={form.theme} onChange={(e) => setForm({ ...form, theme: e.target.value as AppSettings['theme'] })}>
-            <option value="system">Follow the device</option><option value="light">Light</option><option value="dark">Dark</option></select></Field>
+            <option value="light">Light</option><option value="dark">Dark</option></select></Field>
           <Field label="Accent colour" hint="Buttons, links and highlights. Clear it to use the default."><div className="v2-row wrap">
             <div className="swatches" role="radiogroup" aria-label="Ready-made accents">
               {SWATCHES.map(([name, hex]) => (
@@ -392,7 +392,7 @@ function VisualSection() {
           </div>
           {err ? <Alert tone="bad">{err}</Alert> : null}
           <div className="row end">
-            <button className="btn" onClick={() => setForm({ ...form, accent: '', theme: 'system', compact: false })}>Reset</button>
+            <button className="btn" onClick={() => setForm({ ...form, accent: '', theme: 'light', compact: false })}>Reset</button>
             <button className="btn btn-primary" disabled={busy || blocked} title={blocked ? 'A check fails in one theme: choose another colour' : undefined} onClick={() => void save({ accent: form.accent, theme: form.theme, compact: form.compact })} data-testid="visual-save">Save defaults</button>
           </div>
         </div>

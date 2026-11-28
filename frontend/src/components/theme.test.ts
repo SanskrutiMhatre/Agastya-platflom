@@ -250,19 +250,25 @@ describe('the theme controls switch the theme live', () => {
     act(() => useUi.getState().setTheme('light'));
     const box = mount('light', h(ThemeToggle));
     const before = behind(document.body);
-    // UI redesign step 1: the top-bar control is the mockups' three-state switch (Follow system, Light, Dark)
-    act(() => { (box.querySelector('[data-testid="theme-dark"]') as HTMLButtonElement).click(); });
+    // owner rule 2026-11-28: two themes only, ONE icon button; it names (and shows the icon of) the theme it switches to
+    const btn = () => box.querySelector('[data-testid="theme-toggle"]') as HTMLButtonElement;
+    expect(box.querySelectorAll('button')).toHaveLength(1);
+    expect(btn().getAttribute('aria-label')).toBe('Switch to dark theme');
+    expect(btn().textContent).toBe('');
+    act(() => { btn().click(); });
     expect(document.documentElement.dataset.theme).toBe('dark');
     cache = new Map();
     const after = behind(document.body);
     expect(after === 'image' || before === 'image' ? '' : show(after)).not.toBe(before === 'image' ? '' : show(before));
-    expect(box.querySelector('[data-testid="theme-dark"]')!.getAttribute('aria-pressed')).toBe('true');
-    expect(box.querySelector('[data-testid="theme-light"]')!.getAttribute('aria-pressed')).toBe('false');
-    act(() => { (box.querySelector('[data-testid="theme-system"]') as HTMLButtonElement).click(); });
-    expect(useUi.getState().theme).toBe('system');
+    expect(btn().getAttribute('aria-label')).toBe('Switch to light theme');
+    act(() => { btn().click(); });
+    expect(document.documentElement.dataset.theme).toBe('light');
+    expect(useUi.getState().theme).toBe('light');
+    expect(localStorage.getItem('agastya.theme')).toBe('light');
   });
   it('ThemeChoiceControl marks the chosen theme and applies it', () => {
     const box = mount('light', h(ThemeChoiceControl));
+    expect(Array.from(box.querySelectorAll('[role="radio"]')).map((b) => b.textContent)).toEqual(['Light', 'Dark']);   // no "Follow the system"
     act(() => { (Array.from(box.querySelectorAll('[role="radio"]')).find((b) => b.textContent === 'Dark') as HTMLButtonElement).click(); });
     expect(document.documentElement.dataset.theme).toBe('dark');
     expect(box.querySelector('[aria-checked="true"]')!.textContent).toBe('Dark');

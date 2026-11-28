@@ -23,8 +23,8 @@ import { deriveAccent } from './accent';
 
 type Row = Record<string, any>;
 
-export interface AppSettings { appName: string; organisation: string; accent: string; compact: boolean; theme: 'system' | 'light' | 'dark' }
-export const DEFAULTS: AppSettings = { appName: 'Agastya', organisation: '', accent: '', compact: false, theme: 'system' };
+export interface AppSettings { appName: string; organisation: string; accent: string; compact: boolean; theme: 'light' | 'dark' }
+export const DEFAULTS: AppSettings = { appName: 'Agastya', organisation: '', accent: '', compact: false, theme: 'light' };
 
 export function readSettings(): AppSettings {
   const row = store.configGet('app-settings', 'main') ?? {};
@@ -33,7 +33,8 @@ export function readSettings(): AppSettings {
     organisation: typeof row.organisation === 'string' ? row.organisation : '',
     accent: /^#[0-9a-f]{6}$/i.test(row.accent ?? '') ? row.accent : '',
     compact: row.compact === true,
-    theme: row.theme === 'light' || row.theme === 'dark' ? row.theme : 'system',
+    // two themes only (owner rule 2026-11-28): a stored "system" (or nothing) reads as light
+    theme: row.theme === 'dark' ? 'dark' : 'light',
   };
 }
 
@@ -44,7 +45,7 @@ export function writeSettings(body: Partial<AppSettings>): AppSettings {
     organisation: body.organisation !== undefined ? String(body.organisation).trim().slice(0, 100) : cur.organisation,
     accent: body.accent !== undefined ? String(body.accent).trim() : cur.accent,
     compact: body.compact !== undefined ? !!body.compact : cur.compact,
-    theme: body.theme === 'light' || body.theme === 'dark' || body.theme === 'system' ? body.theme : cur.theme,
+    theme: body.theme === 'light' || body.theme === 'dark' ? body.theme : body.theme === 'system' ? 'light' : cur.theme,
   };
   if (!next.appName) throw bad('The application needs a name.', 'NAME_REQUIRED');
   if (next.accent && !/^#[0-9a-f]{6}$/i.test(next.accent)) throw bad('The accent colour must look like #1a73e8.', 'BAD_COLOUR');

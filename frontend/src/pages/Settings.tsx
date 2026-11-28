@@ -60,7 +60,7 @@ function Account() {
       <section className="card" data-testid="appearance" aria-labelledby="acct-look">
         <div className="card-head"><h3 id="acct-look"><Icon name="monitor" />Appearance</h3></div>
         <div className="card-body v2-stack">
-        <p className="v2-sub v2-m0">Theme on this computer. "Follow the system" uses your organisation's default, or else the Windows setting.</p>
+        <p className="v2-sub v2-m0">Theme on this computer. Until you pick one, your organisation's default is used (light unless the administrator chose dark).</p>
         <ThemeChoiceControl />
         </div>
       </section>

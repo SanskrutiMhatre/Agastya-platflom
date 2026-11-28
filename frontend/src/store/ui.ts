@@ -1,24 +1,30 @@
 import { create } from 'zustand';
 
-export type ThemeChoice = 'system' | 'light' | 'dark';
+/** Owner rule (2026-11-28): two themes only, light and dark; there is no "follow the system" state. */
+export type ThemeChoice = 'light' | 'dark';
 const KEY = 'agastya.theme';
+const DEFAULT_KEY = 'agastya.theme.default';
 
-function read(): ThemeChoice {
-  try { const v = localStorage.getItem(KEY); return v === 'light' || v === 'dark' ? v : 'system'; } catch { return 'system'; }
+/** The theme a page starts in: the person's own choice, else the organisation default (cached by store/appSettings.ts, TH-008), else light.
+ *  Anything else stored (an old "system", a typo) counts as no choice and is cleared. */
+export function initialTheme(): ThemeChoice {
+  try {
+    const own = localStorage.getItem(KEY);
+    if (own === 'light' || own === 'dark') return own;
+    if (own !== null) localStorage.removeItem(KEY);
+    return localStorage.getItem(DEFAULT_KEY) === 'dark' ? 'dark' : 'light';
+  } catch { return 'light'; }
 }
 
 export function applyTheme(choice: ThemeChoice): void {
-  // 'system' = the organisation default when the administrator set one (cached by store/appSettings.ts, TH-008), else the OS.
-  let fallback: string | null = null;
-  try { fallback = localStorage.getItem('agastya.theme.default'); } catch { /* private mode */ }
-  const dark = choice === 'dark' || (choice === 'system' && (fallback === 'dark' || (fallback !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches)));
-  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  document.documentElement.dataset.theme = choice === 'dark' ? 'dark' : 'light';
 }
 
 export interface Toast { id: number; kind: 'info' | 'error' | 'success'; text: string }
 
 interface UiState {
   theme: ThemeChoice;
+  /** The person picks a theme: it is remembered on this computer and applied at once. */
   setTheme: (t: ThemeChoice) => void;
   toasts: Toast[];
   toast: (text: string, kind?: Toast['kind']) => void;
@@ -27,11 +33,12 @@ interface UiState {
 
 let seq = 0;
 export const useUi = create<UiState>((set, get) => ({
-  theme: read(),
+  theme: initialTheme(),
   setTheme(t) {
-    try { if (t === 'system') localStorage.removeItem(KEY); else localStorage.setItem(KEY, t); } catch { /* private mode */ }
-    applyTheme(t);
-    set({ theme: t });
+    const v: ThemeChoice = t === 'dark' ? 'dark' : 'light';
+    try { localStorage.setItem(KEY, v); } catch { /* private mode */ }
+    applyTheme(v);
+    set({ theme: v });
   },
   toasts: [],
   toast(text, kind = 'info') {
