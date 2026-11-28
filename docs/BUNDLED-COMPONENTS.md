@@ -19,6 +19,13 @@ Phase 3 (P3-1, live co-editing) adds three npm packages, pinned exactly in `back
 lockfiles), MIT licence, pure JavaScript, no network use: **yjs 13.6.27** (the CRDT), **y-protocols 1.0.6** (awareness), **lib0 0.2.114**
 (their encoding helpers; pulls isomorphic.js 0.2.5). They are bundled into the client and run in the server; nothing is fetched at run time.
 
+Checked again 2026-11-28 (phase 8, `docs/phase3/cleanup-backend.md` item 6): those three are still pinned at the versions above in both
+`package.json` files. The other Phase 3 parts (PDF review, GitLab, build and validation caches, standalone accounts) added **no** package:
+the PDF review uses the pdf.js (`pdfjs-dist` 4.10.38, already shipped for the viewer) and `@xmldom/xmldom` already in use; GitLab is
+plain HTTPS from Node. Every runtime and development dependency of `backend/` and `frontend/` is imported somewhere except the unused
+`tailwindcss` devDependency, which was removed (it generated nothing; never part of the shipped bytes). `lib0` is listed as unreferenced
+by `npm run check:cleanup` because only yjs imports it; it stays pinned so yjs and y-protocols get the same copy.
+
 `node:sqlite` on Node 24: `backend/test/wp13-sqlite-contract.test.js` checks the behaviour the code relies on (the pragmas the server sets incl. WAL,
 prepared statements (`changes`, `lastInsertRowid`, plain rows), foreign keys with cascade, commit and rollback, large BLOB round trip,
 `VACUUM INTO` as the online backup, a second connection under WAL waiting for the write lock). It passes on Node 24.22.3 and on Node 22.23.2 (2026-11-27). `node:sqlite` stays behind the storage seam (WP-10),
