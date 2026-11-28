@@ -89,7 +89,8 @@ for (const theme of ['light', 'dark'] as const) {
     expect(ratio(c, b), `selected tab ${c} on ${b}`).toBeGreaterThanOrEqual(4.5);
     const navHead = page.locator('.jsg-nav h4').first();
     if (await navHead.count()) {
-      const [hc, hb] = await navHead.evaluate((el) => [getComputedStyle(el).color, getComputedStyle(el.closest('.jsg-nav')!).backgroundColor]);
+      // the colour actually behind the heading: the nearest ancestor with a background (the outline now sits in the editor's explorer pane, transparent itself)
+      const [hc, hb] = await navHead.evaluate((el) => { let n: Element | null = el.closest('.jsg-nav'); let bg = 'rgba(0, 0, 0, 0)'; while (n) { bg = getComputedStyle(n).backgroundColor; if (bg !== 'transparent' && !bg.replace(/ /g, '').endsWith(',0)')) break; n = n.parentElement; } return [getComputedStyle(el).color, bg]; });
       expect(ratio(hc, hb)).toBeGreaterThanOrEqual(4.5);
     }
     if (theme === 'dark') {
@@ -98,9 +99,12 @@ for (const theme of ['light', 'dark'] as const) {
         const [r, g, bl] = rgb(bg);
         if (!bg.includes('0, 0, 0, 0')) expect(r + g + bl, `${sel} background ${bg} should be dark`).toBeLessThan(250);
       }
-      // the sheet stays paper-white
-      const sheet = await page.locator('.jsg-sheet').first().evaluate((el) => getComputedStyle(el).backgroundColor);
-      expect(sheet).toBe('rgb(255, 255, 255)');
+      // owner, 2026-11-28 (UI round 2, item 5): the editing sheet follows the theme like the S1000D Studio page (dark page, light text);
+      // printing and the PDF stay white. Before this the sheet stayed paper-white in dark.
+      const [sheet, ink] = await page.locator('.jsg-sheet').first().evaluate((el) => [getComputedStyle(el).backgroundColor, getComputedStyle(el).color]);
+      const [sr, sg, sb] = rgb(sheet);
+      expect(sr + sg + sb, `sheet ${sheet} should be dark in the dark theme`).toBeLessThan(250);
+      expect(ratio(ink, sheet), `sheet text ${ink} on ${sheet}`).toBeGreaterThanOrEqual(4.5);
     }
   });
 }

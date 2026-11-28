@@ -54,7 +54,7 @@ export const BASE_CSS = `
 /* WP-19 (TH-001): one tokenised sheet. The chrome (outline, toolbar, status, find, menu) follows the theme; the sheet uses the themed --sheet-* tokens, like the S1000D Studio page (--doc-*): white with black ink in light, the dark page with light ink in dark (the PDF stays white). */
 .jsg-ed{display:flex;height:100%;min-height:0;background:var(--bg);color:var(--text);font-size:13px}
 .jsg-nav{flex:0 0 232px;overflow:auto;border-right:1px solid var(--border);background:var(--bg-elev);color:var(--text);padding:8px 6px;font-size:12px}
-.jsg-nav h4{margin:8px 4px 4px;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-faint)}
+.jsg-nav h4{margin:8px 4px 4px;font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--text-secondary)}
 .jsg-nav a{display:block;padding:2px 6px;border-radius:3px;color:var(--text);cursor:pointer;text-decoration:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .jsg-nav a:hover{background:var(--accent-soft)}.jsg-nav a.l2{padding-left:16px}.jsg-nav a.l3{padding-left:26px}
 .jsg-nav .jsg-find{margin:2px 4px;padding:3px 6px;border-radius:3px;font-size:11px;cursor:pointer}
