@@ -16,7 +16,7 @@ import { acquireWorkspaceLock, releaseWorkspaceLock } from './services/workspace
 import * as broadcast from './services/broadcast';
 import { reconcileRegistry, sweepPendingImports } from './services/projects';
 import { startRenderer, stopRenderer, rendererStatus } from './services/publisher';
-import { shutdownJobs } from './services/jobs';
+import { shutdownJobs, prewarmWorkers } from './services/jobs';
 import { loadTls, listen, hostCheckFor, setHostCheck, describeNetwork } from './services/network';
 import { installLogging } from './services/log';
 import { enableHostEventSink } from './services/securityEvents';
@@ -61,6 +61,8 @@ export async function start(port: number = config.port): Promise<number> {
   // WP-26: Mode A listens on loopback only, Mode B on the network with TLS only (services/network.ts; the certificate was checked above).
   const l = await listen(app, port, config, material, (s) => { tuneServer(s); broadcast.attach(s); });
   servers = l.servers;
+  // phase 7 (item 6): a job worker and its FOP JVM start now, in the background, so the first build or preview does not wait for a cold JVM
+  setTimeout(() => { prewarmWorkers(); }, 1500).unref();
   const r = rendererStatus();
   console.log(`Agastya Platform v2 running on ${l.scheme}://localhost:${l.port}  (listening on ${l.addresses.join(', ')})`);
   console.log(`  Network:   ${describeNetwork(config, material?.info ?? null)}`);

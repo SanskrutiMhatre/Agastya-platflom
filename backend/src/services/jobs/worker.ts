@@ -30,6 +30,11 @@ setBroadcastSink((projectId, msg) => send({ t: 'broadcast', projectId, msg: msg 
 
 let current: string | null = null;
 process.on('message', (m: ToWorker) => {
+  // phase 7: the pool's pre-warm (pool.prewarm): start the JVM and run the renderer's warm-up render now, off every request
+  if (m && m.t === 'warm') {
+    if (!current) void Promise.resolve().then(() => fopd.start()).then(() => fopd.warmup()).catch((e: Error) => console.warn('[job-worker] warm FOP renderer unavailable:', e?.message));
+    return;
+  }
   if (!m || m.t !== 'run') return;
   current = m.jobId;
   void runKind(m.kind, m.projectId, m.params ?? {}).then(

@@ -82,8 +82,7 @@ function fingerprintOf(projectId: string, opts: { reuse?: boolean; known?: DmSum
   return value;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function computeFingerprint(projectId: string, dir: string, project: any, opts: { reuse?: boolean; known?: DmSummary[] }): { fingerprint: string; sourceCount: number } {
+function computeFingerprint(projectId: string, dir: string, project: Record<string, unknown>, opts: { reuse?: boolean; known?: DmSummary[] }): { fingerprint: string; sourceCount: number } {
   const h = crypto.createHash('sha256');
   const digest = (abs: string): Buffer => crypto.createHash('sha256').update(fs.readFileSync(abs)).digest();
   // WP-17 (PERF-005): with `reuse`, a module the caller listed in this request is not statted a second time (its listing's stat is used)

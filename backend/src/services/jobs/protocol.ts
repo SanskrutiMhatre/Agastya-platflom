@@ -40,7 +40,9 @@ export function deserializeError(w: WireError): Error {
 }
 
 /** Server -> worker. */
-export type ToWorker = { t: 'run'; jobId: string; kind: JobKind; projectId: string | null; params: Record<string, unknown> };
+export type ToWorker = { t: 'run'; jobId: string; kind: JobKind; projectId: string | null; params: Record<string, unknown> }
+  /** phase 7: start the warm FOP renderer now, ahead of the first build (pool.prewarm) */
+  | { t: 'warm' };
 /** Worker -> server. */
 export type FromWorker =
   | { t: 'ready'; pid: number }

@@ -7,6 +7,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import { config } from '../config';
 import { projectDirFor } from '../context';
 import { bad } from './http';
 import { HEAD_BYTES, MAX_PROLOG, headOf, rootStart, readAttrs as attrs } from './xmlHead';
@@ -236,7 +237,7 @@ export function clearIdentityIndexes(): void { identIndexes.clear(); listings.cl
 */
 interface Listing { dirMtimeMs: number; checkedAt: number; byFile: Map<string, DmSummary>; sorted: DmSummary[] | null; version: number }
 const listings = new Map<string, Listing>();
-const LIST_MAX_AGE_MS = Math.max(0, Number(process.env.AGASTYA_CSDB_LIST_TTL_MS ?? 5000) || 0);
+const LIST_MAX_AGE_MS = config.perf.csdbListTtlMs;   // AGASTYA_CSDB_LIST_TTL_MS
 const LIST_MAX = 64;
 let listingScans = 0;
 /** How many full folder listings have run (tests and the perf report). */

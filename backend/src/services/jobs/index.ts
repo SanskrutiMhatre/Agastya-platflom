@@ -304,6 +304,16 @@ export function jobsStatus(): Record<string, unknown> {
   };
 }
 
+/**
+ * Phase 7 (item 6): at server start, one job worker is started ahead of the first job and starts its FOP JVM, off every request. Off with
+ * AGASTYA_PREWARM=0, and in the inline mode (the server warms its own renderer then). True when a worker was started.
+ */
+export function prewarmWorkers(): boolean {
+  if (!config.jobs.prewarm) return false;
+  if (!usesWorkers()) return false;
+  try { return getPool().prewarm(); } catch (e) { console.warn('[jobs] pre-warm failed:', (e as Error).message); return false; }
+}
+
 /** Ends every job and worker (server stop). Queued jobs end as interrupted. */
 export async function shutdownJobs(): Promise<void> {
   for (const j of [...queue]) finish(j, 'interrupted', null, { name: 'HttpError', status: 503, code: 'JOB_INTERRUPTED', message: 'The server is stopping; the job did not start.' });

@@ -149,6 +149,12 @@ export interface Config {
    * consistent after any crash; a power cut can lose only the last commits. AGASTYA_DB_SYNCHRONOUS=FULL syncs every commit. Migrations always run under FULL.
    */
   database: { synchronous: 'NORMAL' | 'FULL' };
+  /**
+   * Phase 7 (docs/phase3/performance.md): AGASTYA_SERVER_TIMING = admin (default: the Server-Timing database detail for administrators only,
+   * the total for everyone), full (the detail for everyone, as the bench measures) or off (no header). AGASTYA_CSDB_LIST_TTL_MS = how long a
+   * kept module listing is trusted for an edit made in place by hand, outside the platform, that does not change the folder (default 5000).
+   */
+  perf: { serverTiming: 'admin' | 'full' | 'off'; csdbListTtlMs: number };
 }
 
 function parseLogFormat(raw: string | undefined, nodeEnv: string | undefined): 'json' | 'text' {
@@ -156,6 +162,12 @@ function parseLogFormat(raw: string | undefined, nodeEnv: string | undefined): '
   if (v === '') return nodeEnv === 'production' ? 'json' : 'text';
   if (v === 'json' || v === 'text') return v;
   throw new ConfigError('AGASTYA_LOG_FORMAT', `"${raw}" is not a log format: use "json" or "text".`);
+}
+function parseServerTiming(raw: string | undefined): 'admin' | 'full' | 'off' {
+  const v = (raw ?? '').trim().toLowerCase();
+  if (v === '') return 'admin';
+  if (v === 'admin' || v === 'full' || v === 'off') return v;
+  throw new ConfigError('AGASTYA_SERVER_TIMING', `"${raw}" is not a Server-Timing mode: use "admin" (default), "full" or "off".`);
 }
 function parseOnOff(name: string, raw: string | undefined, fallback: boolean): boolean {
   const v = (raw ?? '').trim().toLowerCase();
@@ -243,6 +255,7 @@ function parseDirectory(env: Env, mode: DeploymentMode): DirectoryConfig | null 
  *   AGASTYA_FOP_HEAP_MB           -Xmx of the FOP JVM a worker starts (default 1536; 0 = the JVM's own default)
  *   AGASTYA_JOBS_PER_WORKER       a worker (and its JVM) is replaced after this many jobs (default 50)
  *   AGASTYA_WORKER_IDLE_MINUTES   an idle worker exits after this long (default 10)
+ *   AGASTYA_PREWARM               phase 7: start one worker and its FOP JVM at server start, off the request path (default on)
  *   AGASTYA_JOB_OBJECT            "0" = do not put workers into a Windows job object (default on, Windows only)
  *   AGASTYA_JOB_PROCESS_MB        job object: memory limit of each process (default half the RAM, 1-8 GB)
  *   AGASTYA_JOB_MEMORY_MB         job object: memory limit of all workers and their tools together (default 75 % of the RAM)
@@ -263,6 +276,8 @@ export interface JobsConfig {
   fopHeapMb: number;
   jobsPerWorker: number;
   idleMs: number;
+  /** Phase 7: one worker (and its FOP JVM) is started at server start (AGASTYA_PREWARM). */
+  prewarm: boolean;
   limits: { enabled: boolean; processMb: number; jobMb: number; cpuPercent: number; activeProcesses: number };
   validationCache: boolean;
   keepDays: number;
@@ -295,6 +310,7 @@ function parseJobs(env: Env): JobsConfig {
     fopHeapMb: envCount('AGASTYA_FOP_HEAP_MB', 1536, env),
     jobsPerWorker: envPositive('AGASTYA_JOBS_PER_WORKER', 50, env),
     idleMs: envPositive('AGASTYA_WORKER_IDLE_MINUTES', 10, env) * 60_000,
+    prewarm: parseOnOff('AGASTYA_PREWARM', env.AGASTYA_PREWARM, true),
     limits: {
       enabled: env.AGASTYA_JOB_OBJECT !== '0' && process.platform === 'win32',
       processMb: envPositive('AGASTYA_JOB_PROCESS_MB', Math.min(8192, Math.max(1024, Math.floor(ramMb / 2))), env),
@@ -506,6 +522,7 @@ export function buildConfig(env: Env = process.env): Config {
     },
     jobs: parseJobs(env),
     database: { synchronous: String(env.AGASTYA_DB_SYNCHRONOUS ?? '').trim().toUpperCase() === 'FULL' ? 'FULL' : 'NORMAL' },
+    perf: { serverTiming: parseServerTiming(env.AGASTYA_SERVER_TIMING), csdbListTtlMs: envCount('AGASTYA_CSDB_LIST_TTL_MS', 5000, env) },
     audit: {
       keyFile: defaultKeyFile(workspaceDir, env),
       checkpointHours: envCount('AGASTYA_AUDIT_CHECKPOINT_HOURS', 24, env),

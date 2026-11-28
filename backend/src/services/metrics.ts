@@ -23,6 +23,7 @@ import type { Request, Response, NextFunction } from 'express';
 import type { SqlDatabase, SqlStatement } from '../storage/sqlite';
 import { currentRequest } from './requestContext';
 import { routeOf } from './log';
+import { config } from '../config';
 
 export const SLOW_STATEMENT_MS = 50;
 const RING = 4096;
@@ -118,7 +119,7 @@ export function routeFigures(top = 20): { recentSlowest: RouteSample[]; routesBy
 }
 
 /** Server-Timing detail: `admin` (default: db detail for administrators only), `full` (everyone), `off` (no header). */
-const TIMING_MODE = ((): 'admin' | 'full' | 'off' => { const v = String(process.env.AGASTYA_SERVER_TIMING || '').toLowerCase(); return v === 'full' || v === 'off' ? v : 'admin'; })();
+const TIMING_MODE = config.perf.serverTiming;   // AGASTYA_SERVER_TIMING
 /** The session the authz layer resolved for this request (it caches it on req.auth); never resolves one itself. */
 function isAdminRequest(r: Request): boolean {
   const a = (r as Request & { auth?: { user?: { role?: string } } | null }).auth;

@@ -77,7 +77,7 @@ const importUpload: RequestHandler = (req, res, next) => {
 
 const view = (min: string, cap = 'project.read'): RequestHandler => requireProject(min, { from: 'param', cap });
 /** What a publish job answers (services/jobs/kinds.ts "publish"). */
-interface Built { pdf: string; totalMs?: number; releaseLabel: string; ruleBreaks?: string[] }
+interface Built { pdf: string; totalMs?: number; releaseLabel: string; ruleBreaks?: string[]; upToDate?: boolean }
 
 export function registerProjectContentRoutes(app: Express): void {
   const base = '/api/projects/:id';
@@ -475,7 +475,7 @@ export function registerProjectContentRoutes(app: Express): void {
     const out = await s.done as Built;
     record(out);
     // PUB-005: what the build said about the document (notes, image references, security confinements) comes back with the answer
-    res.set('X-Job-Id', s.id).json({ ok: true, ruleBreaks: out.ruleBreaks ?? [], totalMs: out.totalMs, bytes: fs.statSync(out.pdf).size, releaseLabel: out.releaseLabel, pdfUrl: `/api/projects/${req.project.id}/publish/pdf`, jobId: s.id, report: jobs.buildReport(req.project.id, s.id) });
+    res.set('X-Job-Id', s.id).json({ ok: true, ruleBreaks: out.ruleBreaks ?? [], totalMs: out.totalMs, upToDate: out.upToDate === true, bytes: fs.statSync(out.pdf).size, releaseLabel: out.releaseLabel, pdfUrl: `/api/projects/${req.project.id}/publish/pdf`, jobId: s.id, report: jobs.buildReport(req.project.id, s.id) });
   }));
 
   /*
