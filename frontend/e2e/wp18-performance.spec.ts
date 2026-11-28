@@ -9,6 +9,7 @@ import { test, expect, request as pwRequest, type Page, type APIRequestContext, 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { classicOnly } from './support/live';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const FIX = path.resolve(HERE, 'fixtures', 'dm21', '5-0');
@@ -16,6 +17,8 @@ const PW = 'Correct-Horse-9!';
 const BUDGET = { initialWireBytes: 180 * 1024, authMeOnLogin: 1, authMeOnNavigation: 0, getsPerSave: 2, rowsDrawn: 60, sidePanelNodes: 3000, firstPageWireBytes: 20 * 1024 };
 
 let admin: APIRequestContext; let ctx: BrowserContext; let page: Page; let api: APIRequestContext;
+/** the shared page (the B4 test's own page variable shadows it) */
+const pageLive = (): Page => page;
 let who = ''; let password = ''; let sample = ''; let big = '';
 
 test.describe.configure({ mode: 'serial' });
@@ -106,7 +109,13 @@ test('B2: signing in asks who is signed in once; moving between pages does not a
   page.removeAllListeners('request');
 });
 
-test('B4: one save of an existing data module is followed by at most 2 GETs (no /media, /settings or /explore)', async () => {
+// Phase 3 / Phase 8: the Studio opens a module live (co-editing): Ctrl+S writes it through the room (no PUT) and the budget counts the GETs after
+// the key press. classic (the fallback when the room cannot be joined, C24; a page whose joins are answered DISABLED): the save is a PUT and
+// the budget counts the GETs after it, as before.
+for (const mode of ['live', 'classic'] as const) test(`B4: one save of an existing data module is followed by at most 2 GETs (no /media, /settings or /explore) (${mode})`, async () => {
+  const page = mode === 'live' ? pageLive() : await ctx.newPage();
+  if (mode === 'classic') await classicOnly(page);
+  try {
   const file = (await (await page.request.get(`/api/projects/${sample}/dms`)).json()).dms[0].file as string;
   await page.goto(`/projects/${sample}/editor`);
   await expect(page.getByTestId('studio-host')).toBeVisible({ timeout: 60_000 });
@@ -125,15 +134,18 @@ test('B4: one save of an existing data module is followed by at most 2 GETs (no 
     if (r.method() === 'PUT' && u.pathname.includes('/dms/')) putAt = after.length;
     after.push({ method: r.method(), path: u.pathname });
   });
+  const pressAt = after.length;
   await page.keyboard.press('Control+s');
   await expect(page.locator('.toast', { hasText: 'Saved' }).first()).toBeVisible({ timeout: 15_000 });
   await page.waitForTimeout(2500);
   page.removeAllListeners('request');
-  expect(putAt).toBeGreaterThanOrEqual(0);
-  const gets = after.slice(putAt + 1).filter((r) => r.method === 'GET' && !/\/(unread-count|auth\/me|brex\/missing)$/.test(r.path));
-  console.log(`B4 follow-up GETs after one save: ${gets.length} ${JSON.stringify(gets.map((g) => g.path))}`);
+  if (mode === 'classic') expect(putAt).toBeGreaterThanOrEqual(0);
+  else expect(putAt).toBe(-1);                                                    // live: written through the room
+  const gets = after.slice(mode === 'classic' ? putAt + 1 : pressAt).filter((r) => r.method === 'GET' && !/\/(unread-count|auth\/me|brex\/missing)$/.test(r.path));
+  console.log(`B4 (${mode}) follow-up GETs after one save: ${gets.length} ${JSON.stringify(gets.map((g) => g.path))}`);
   expect(gets.length).toBeLessThanOrEqual(BUDGET.getsPerSave);
   expect(gets.some((g) => /\/(media|settings|explore)$/.test(g.path))).toBe(false);
+  } finally { if (mode === 'classic') await page.close(); }
 });
 
 test('B3: a 500-module project opens with a bounded list: at most 60 rows drawn, side panel under 3,000 nodes', async () => {
