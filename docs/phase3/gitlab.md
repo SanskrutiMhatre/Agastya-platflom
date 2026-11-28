@@ -92,6 +92,9 @@ parity dump is unchanged), `frontend/src/layouts/ProjectShell.tsx`, `frontend/sr
 
 Dependencies: none added. Migration: **030-gitlab** (written as 027, renumbered at the merges with main: 027-default-accounts,
 028-pdf-annotations, 029 reserved for collaboration). Additive: seven new tables, no existing table touched.
+**This branch does not start on its own until 029 exists:** `storage/schema.ts checkOrder` refuses a gap in the numbers. Merge the
+collaboration branch (029) first, or before it lands rename `030-gitlab` to `029-gitlab` (file, `name`, `index.js`, `wp10-seams.test.js`).
+The checks below were run with exactly that temporary rename, not committed.
 
 ## Decisions taken here
 
