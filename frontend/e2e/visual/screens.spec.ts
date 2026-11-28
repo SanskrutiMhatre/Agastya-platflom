@@ -103,7 +103,7 @@ test('design system: real :hover, :focus-visible and :disabled differ from the d
     const card = await page.locator('[data-c="buttons"]').evaluate((el) => getComputedStyle(el).backgroundColor);
     expect(ratio(f.outline.replace(/^solid 2px /, ''), card), `focus ring vs card (${theme})`).toBeGreaterThanOrEqual(3);
     // status colours: every badge, alert and toast reads in this theme
-    for (const sel of ['[data-c="badge"]', '[data-c="alert"]', '[data-c="toast"] .v2-toast-text', '[data-c="field"] .v2-error', '.v2-stat dd']) {
+    for (const sel of ['[data-c="badge"]', '[data-c="alert"]', '[data-c="toast"] .v2-toast-text', '[data-c="field"] .v2-error', '.stat .v']) {
       for (const el of await page.locator(sel).all()) {
         const [fg, bg] = await el.evaluate((x) => { let b = 'rgba(0, 0, 0, 0)'; for (let e: Element | null = x; e && /rgba\(0, 0, 0, 0\)/.test(b); e = e.parentElement) b = getComputedStyle(e).backgroundColor; return [getComputedStyle(x).color, b]; });
         expect(ratio(fg, bg), `${sel} "${(await el.textContent())?.trim()}" (${theme})`).toBeGreaterThanOrEqual(4.5);

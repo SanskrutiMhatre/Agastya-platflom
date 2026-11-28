@@ -58,10 +58,10 @@
         <button role="radio" aria-checked="false" data-c="seg" data-s="disabled" disabled>Off</button>
       </div>
     </div>
-    <div class="v2-tabs row" role="tablist">
-      <button class="v2-tab active" role="tab" aria-selected="true" data-c="tab" data-s="selected">Selected tab</button>
-      <button class="v2-tab" role="tab" aria-selected="false" data-c="tab" data-s="default">Tab</button>
-      <button class="v2-tab" role="tab" aria-selected="false" data-c="tab" data-s="hover">Hovered tab</button>
+    <div class="tabs row" role="tablist">
+      <button class="tab" role="tab" aria-selected="true" data-c="tab" data-s="selected">Selected tab</button>
+      <button class="tab" role="tab" aria-selected="false" data-c="tab" data-s="default">Tab</button>
+      <button class="tab" role="tab" aria-selected="false" data-c="tab" data-s="hover">Hovered tab</button>
     </div>
   </section>
 
@@ -110,19 +110,18 @@ of text</textarea></div>
 
   <section class="v2-card" data-c="structure" style="grid-column: 1 / -1">
     <h3>Page header, section, table</h3>
-    <header class="v2-ph" data-c="page-header" data-s="default">
-      <div class="v2-ph-main">
-        <span class="v2-ph-icon">&#9636;</span>
-        <div class="v2-ph-text"><h2>Publication</h2><p>Chapters, modules and the build of the manual.</p></div>
-        <div class="v2-ph-actions"><button class="btn btn-primary">Generate PDF</button></div>
-      </div>
-      <dl class="v2-ph-stats">
-        <div class="v2-stat"><dd>12</dd><dt>Modules</dt></div>
-        <div class="v2-stat ok"><dd>10</dd><dt>Valid</dt></div>
-        <div class="v2-stat warn"><dd>1</dd><dt>Warnings</dt></div>
-        <div class="v2-stat bad"><dd>1</dd><dt>Errors</dt></div>
-      </dl>
+    <!-- the mockup page head that components/PageHeader.tsx renders (.page-head; stats as .card.stat). The pp-* layout and stat tone colours
+         live in the lazily loaded styles/pages/project-pages.css, which this fixture (entry stylesheet only) does not load. -->
+    <header class="page-head" data-c="page-header" data-s="default">
+      <div><h2>Publication</h2><p>Chapters, modules and the build of the manual.</p></div>
+      <div class="row wrap"><button class="btn primary">Generate PDF</button></div>
     </header>
+    <dl class="row wrap" style="margin: 0 0 16px; padding: 0">
+      <div class="card stat"><dd class="v" style="margin:0">12</dd><dt class="l">Modules</dt></div>
+      <div class="card stat"><dd class="v" style="margin:0">10</dd><dt class="l">Valid</dt></div>
+      <div class="card stat"><dd class="v" style="margin:0">1</dd><dt class="l">Warnings</dt></div>
+      <div class="card stat"><dd class="v" style="margin:0">1</dd><dt class="l">Errors</dt></div>
+    </dl>
     <section class="v2-sec" data-open="1" data-c="section" data-s="default">
       <button type="button" class="v2-sec-head" aria-expanded="true"><span style="flex:1;min-width:0">Unplaced modules</span><span class="v2-badge warn">2</span></button>
       <div class="v2-sec-body">Two modules are in the project but not in the publication.</div>

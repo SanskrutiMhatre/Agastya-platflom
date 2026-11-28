@@ -42,7 +42,7 @@ export function ImportReportView({ scan, repairs, onToggle, locked }: { scan: Sc
 
   return (
     <div className="v2-stack" data-testid="import-report">
-      <div className="v2-card v2-card-pad v2-stack" style={{ gap: 10 }}>
+      <div className="card card-body pp-form">
         <div className="v2-row wrap" style={{ gap: 8 }}>
           <strong data-testid="report-flavour">{flavourLabel(r.flavour.id)}</strong>
           <span className="v2-hint" title={r.flavour.evidence.join('\n')}>{Math.round(r.flavour.confidence * 100)}% sure{r.flavour.evidence[0] ? `: ${r.flavour.evidence[0]}` : ''}</span>

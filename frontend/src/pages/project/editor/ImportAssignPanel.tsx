@@ -90,7 +90,7 @@ export function ImportAssignPanel({ projectId, data, error, loading, mayAssign, 
           </div>
 
           {mayAssign ? (
-            <div className="v2-card v2-card-pad v2-stack" style={{ gap: 10 }}>
+            <div className="card card-body pp-form">
               <Field label="Place the selected modules in">
                 <select className="v2-select" value={dest} onChange={(e) => setDest(e.target.value)} disabled={busy || !data.hasPublication} data-testid="assign-dest">
                   {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}

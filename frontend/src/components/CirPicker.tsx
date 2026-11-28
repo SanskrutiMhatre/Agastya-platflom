@@ -3,7 +3,9 @@
 
 import { useMemo, useState } from 'react';
 import { cirApi } from '../api';
-import { Alert, Badge, Empty, Loading, Modal, errText, useAsync } from './ui';
+import { Callout, EmptyState, Loading, Modal, Pill, errText, useAsync } from './ui';
+import { Icon } from './Icon';
+import '../styles/pages/project-pages.css';   // UI consistency pass: the dialog's list and footer (it opens in the editor, where no project page has loaded the sheet)
 import { useUi } from '../store/ui';
 
 export function CirPicker({ projectId, existing, onClose, onAdded }: { projectId: string; existing: Set<string>; onClose: () => void; onAdded: () => void }) {
@@ -29,26 +31,27 @@ export function CirPicker({ projectId, existing, onClose, onAdded }: { projectId
   };
 
   return (
-    <Modal title="Add from the common repository" onClose={onClose} width={640}
-      buttons={<><button className="btn" onClick={onClose}>Cancel</button><button className="btn btn-primary" disabled={busy || chosen.size === 0} onClick={add} data-testid="cir-pick-add">Add {chosen.size || ''} to this project</button></>}>
-      <div className="v2-stack">
-        <input className="v2-input" placeholder="Filter…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Filter common data modules" />
-        {list.loading && !list.data ? <Loading /> : list.error ? <Alert tone="bad">{list.error}</Alert> : rows.length === 0 ? <Empty title={q ? 'No module matches' : 'The repository is empty'} /> : (
-          <div style={{ maxHeight: '48vh', overflow: 'auto' }}>
-            {rows.map((m) => {
-              const have = existing.has(m.file);
-              return (
-                <label key={m.id} className="v2-row" style={{ gap: 10, padding: '6px 4px', borderBottom: '1px solid var(--border)', opacity: have ? .55 : 1 }} data-testid="cir-pick-row" data-file={m.file}>
-                  <input type="checkbox" disabled={have} checked={chosen.has(m.file)} onChange={() => toggle(m.file)} aria-label={`Select ${m.file}`} />
-                  <span style={{ flex: 1, minWidth: 0 }}><b>{m.title || m.file}</b><div className="v2-hint v2-trunc" title={m.file}>{m.dmc ?? m.file}{m.infoName ? ` · ${m.infoName}` : ''}</div></span>
-                  <Badge>{m.kind ?? 'Common module'}</Badge>
-                  {have ? <span className="v2-hint">already here</span> : null}
-                </label>
-              );
-            })}
+    <Modal title="Add from the common repository" onClose={onClose} width={680}
+      buttons={<><span className="faint pp-dlg-count">{chosen.size} chosen</span><button className="btn" onClick={onClose}>Cancel</button><button className="btn primary" disabled={busy || chosen.size === 0} aria-busy={busy || undefined} onClick={add} data-testid="cir-pick-add"><Icon name="plus" size={16} />Add {chosen.size || ''} to this project</button></>}>
+      <div className="pp-form">
+        <input className="input search" placeholder="Filter…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Filter common data modules" />
+        {list.loading && !list.data ? <Loading /> : list.error ? <Callout tone="danger" title="The repository could not be read">{list.error}</Callout> : rows.length === 0 ? <EmptyState icon="library" title={q ? 'No module matches' : 'The repository is empty'} /> : (
+          <div className="table-wrap pp-scroll-box pp-dlg-list">
+            <table className="table"><tbody>
+              {rows.map((m) => {
+                const have = existing.has(m.file);
+                return (
+                  <tr key={m.id} className={have ? 'pp-have' : undefined} data-testid="cir-pick-row" data-file={m.file} aria-selected={chosen.has(m.file)} onClick={() => { if (!have) toggle(m.file); }}>
+                    <td className="pp-tick"><input type="checkbox" disabled={have} checked={chosen.has(m.file)} onClick={(e) => e.stopPropagation()} onChange={() => toggle(m.file)} aria-label={`Select ${m.file}`} /></td>
+                    <td><strong>{m.title || m.file}</strong><div className="faint trunc" title={m.file}>{m.dmc ?? m.file}{m.infoName ? ` · ${m.infoName}` : ''}</div></td>
+                    <td className="num"><Pill>{m.kind ?? 'Common module'}</Pill>{have ? <span className="faint"> already here</span> : null}</td>
+                  </tr>
+                );
+              })}
+            </tbody></table>
           </div>
         )}
-        {problems.length ? <Alert tone="bad"><ul style={{ margin: 0, paddingLeft: 18 }}>{problems.map((p) => <li key={p}>{p}</li>)}</ul></Alert> : null}
+        {problems.length ? <Callout tone="danger" title="Not every module was added"><ul className="pp-list">{problems.map((p) => <li key={p}>{p}</li>)}</ul></Callout> : null}
       </div>
     </Modal>
   );
