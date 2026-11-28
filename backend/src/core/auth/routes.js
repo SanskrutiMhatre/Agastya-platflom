@@ -587,7 +587,9 @@ function registerAuthRoutes(deps) {
   }
 
   app.get('/api/admin/users', authz.requireGlobal('access.read'), (req, res) => {      // WP-27: administrators and read-only auditors (access review)
-    res.json({ users: store.listUsers().map(publicUser) });
+    // the administration page's "Last sign-in" column: the newest session each person started (null = never signed in)
+    const last = store.lastSignIns();
+    res.json({ users: store.listUsers().map((u) => ({ ...publicUser(u), lastSignInAt: last.get(u.id) || null })) });
   });
 
   /*
@@ -1071,7 +1073,8 @@ function registerAuthRoutes(deps) {
     res.json({ policy: out.policy });
   });
   app.get('/api/admin/health', requireAdmin(), (req, res) => {
-    res.json({ audit: deps.auditHealth ? deps.auditHealth() : null });
+    // the administration page's Service tile and Storage card: how long the server has run, and the disk that holds the data folder
+    res.json({ audit: deps.auditHealth ? deps.auditHealth() : null, system: deps.systemFigures ? deps.systemFigures() : null });
   });
 
   app.post('/api/admin/sessions/:id/revoke', requireAdmin(), (req, res) => {

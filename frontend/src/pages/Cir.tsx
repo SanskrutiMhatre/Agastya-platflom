@@ -9,7 +9,7 @@ import { cirApi, workspaceApi, type CirModule } from '../api';
 import { Icon } from '../components/Icon';
 import '../styles/pages/admin.css';   // UI redesign screen 6: the administration look of the global pages
 import { AdmHead } from './adminParts';
-import { Alert, Badge, ConfirmModal, Empty, Loading, Modal, ago, errText, fmtDate, useAsync } from '../components/ui';
+import { Alert, Callout, ConfirmModal, Empty, Loading, Modal, ago, errText, Pill, fmtDate, useAsync } from '../components/ui';
 import { useSession } from '../store/session';
 import { useUi } from '../store/ui';
 import { may } from '../lib/roles';
@@ -36,27 +36,27 @@ export function CirPage() {
 
   return (
     <div className="v2-page adm">
-      <AdmHead icon="library" title="Common information repository" sub={<>Data modules shared by everyone. Add one for others to reuse, or copy one into your project. <span className="faint" data-testid="cir-count">{modules.length} module{modules.length === 1 ? '' : 's'}</span></>}
+      <AdmHead title="Common information repository" sub={<>Data modules shared by everyone. Add one for others to reuse, or copy one into your project. <span className="faint" data-testid="cir-count">{modules.length} module{modules.length === 1 ? '' : 's'}</span></>}
         actions={<>
           <button className="btn" onClick={() => setAdding(true)} data-testid="cir-add"><Icon name="upload" />Upload data modules</button>
           <button className="btn btn-primary" disabled={!workspace} onClick={() => nav(`/projects/${workspace}/editor?create=1`)} data-testid="cir-create"><Icon name="plus" />Create data module</button>
         </>} />
-      {list.error ? <Alert tone="bad">{list.error}</Alert> : null}
+      {list.error ? <Callout tone="danger">{list.error}</Callout> : null}
       <section className="card" data-testid="cir-list" aria-labelledby="cir-h">
         <div className="card-head"><h3 id="cir-h"><Icon name="library" />Common data modules <span className="count">{rows.length}</span></h3>
-          <input className="v2-input v2-w-280" type="search" placeholder="Filter…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Filter common data modules" /></div>
+          <input className="input search adm-search" type="search" placeholder="Filter…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Filter common data modules" /></div>
         {list.loading && !list.data ? <Loading /> : rows.length === 0 ? <Empty title={q ? 'No module matches' : 'The repository is empty'}>{q ? undefined : 'Create a data module here, or upload one, for other people to reuse.'}</Empty> : (
-          <div className="v2-scroll-x"><table className="v2-table">
-            <thead><tr><th>Data module</th><th>Kind</th><th>Note</th><th>Added by</th><th /></tr></thead>
+          <div className="table-wrap"><table className="table">
+            <thead><tr><th>Data module</th><th>Kind</th><th>Note</th><th>Added by</th><th><span className="sr">Actions</span></th></tr></thead>
             <tbody>{rows.map((m) => (
               <tr key={m.id} data-testid="cir-row" data-file={m.file}>
-                <td><b>{m.title || m.file}</b><div className="v2-hint v2-mono" title={m.file}>{m.dmc ?? m.file}{m.infoName ? ` · ${m.infoName}` : ''}</div></td>
-                <td><Badge>{m.kind ?? 'Common module'}</Badge></td>
-                <td className="v2-hint">{m.note ?? ''}</td>
-                <td title={fmtDate(m.addedAt)}>{m.addedByName ?? '—'}<div className="v2-hint">{ago(m.addedAt)}</div></td>
-                <td className="v2-td-end">
-                  <button className="btn btn-sm" onClick={async () => { try { setLook(await cirApi.read(m.id)); } catch (e) { toast(errText(e), 'error'); } }}><Icon name="eye" size={13} />View</button>{' '}
-                  <button className="btn btn-sm" disabled={!workspace} onClick={() => nav(`/projects/${workspace}/editor?file=${encodeURIComponent(m.file)}`)} data-testid="cir-edit"><Icon name="edit" size={13} />Edit</button>{' '}
+                <td><div className="stack who"><span className="nm">{m.title || m.file}</span><span className="faint mono adm-xs" title={m.file}>{m.dmc ?? m.file}{m.infoName ? ` · ${m.infoName}` : ''}</span></div></td>
+                <td><Pill>{m.kind ?? 'Common module'}</Pill></td>
+                <td className="faint adm-xs adm-wrap">{m.note ?? ''}</td>
+                <td title={fmtDate(m.addedAt)}><div className="stack who"><span>{m.addedByName ?? '—'}</span><span className="faint adm-xs">{ago(m.addedAt)}</span></div></td>
+                <td className="adm-td-end">
+                  <button className="btn btn-sm" onClick={async () => { try { setLook(await cirApi.read(m.id)); } catch (e) { toast(errText(e), 'error'); } }}><Icon name="eye" size={13} />View</button>
+                  <button className="btn btn-sm" disabled={!workspace} onClick={() => nav(`/projects/${workspace}/editor?file=${encodeURIComponent(m.file)}`)} data-testid="cir-edit"><Icon name="edit" size={13} />Edit</button>
                   <button className="btn btn-sm btn-primary" onClick={() => setUse(m)} data-testid="cir-use"><Icon name="copy" size={13} />Add to project</button>
                   {mayDelete ? <>{' '}<button className="icon-btn" aria-label={`Remove ${m.file}`} title="Remove from the repository" onClick={() => setDel(m)}><Icon name="trash" size={14} /></button></> : null}
                 </td>
