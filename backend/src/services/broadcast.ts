@@ -22,6 +22,10 @@
 // past 100 in one window the connection is closed with 1008). Readers of a project get { type: 'presence' } when its set of people changes and
 // { type: 'leases', ... } when a check-out is taken, given back or broken. Limits: AGASTYA_WS_MAX_CLIENTS connections on the server (503 above
 // it) and 8 per session (429): a misbehaving page cannot exhaust the server for the rest of the team.
+//
+// Phase 3 (P3-1): the socket also carries live co-editing (services/collab/rooms.ts). Those messages are binary frames (shared/collab/protocol.ts);
+// they have their own limits (a change up to AGASTYA_COLLAB_MAX_UPDATE_BYTES, a rate window per connection) and every one is authorised
+// by the room it names. A text (JSON) message keeps its 4 KB limit: a larger one closes the connection with 1009, as before.
 // =============================================================================
 
 import type { Server as HttpServer, IncomingMessage } from 'http';
@@ -35,6 +39,20 @@ import { config } from '../config';
 import * as presence from './presence';
 import { registerGauge } from './metrics';
 
+/**
+ * P3-1: the live co-editing rooms (services/collab/rooms.ts) plug in here when they start, instead of being imported: the rooms reach the
+ * write path, which announces through this module, so an import would close a cycle (ARC-006).
+ */
+export interface CollabHooks {
+  connect(c: { id: number; ws: WebSocket; user: any; sessionId: string }): void;
+  disconnect(connId: number): void;
+  onMessage(connId: number, data: Uint8Array): Promise<void>;
+  refreshUser(userId: string | null): void;
+  refreshDocument(projectId: string, rel: string | null): void;
+}
+let collab: CollabHooks | null = null;
+export function setCollabHooks(h: CollabHooks | null): void { collab = h; }
+
 interface Client { id: number; ws: WebSocket; user: any; sessionId: string; can: Map<string, { ok: boolean; at: number }>; inbox: { start: number; n: number } }
 
 export const WS_CLOSE_SESSION_ENDED = 4401;
@@ -47,7 +65,8 @@ const MAX_INBOUND_BYTES = 4096;
 const INBOX_WINDOW_MS = 10_000;
 const INBOX_MAX = 20;
 
-const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_INBOUND_BYTES });
+// the frame limit is the co-editing one (a pasted figure-rich section is one change); a text message is still held to MAX_INBOUND_BYTES
+const wss = new WebSocketServer({ noServer: true, maxPayload: Math.max(MAX_INBOUND_BYTES, config.collab.maxUpdateBytes + 4096) });
 const clients = new Set<Client>();
 let nextId = 1;
 let sweep: NodeJS.Timeout | null = null;
@@ -59,6 +78,7 @@ registerGauge('presenceEntries', () => presence.size());
 /** A connection is gone: forget it, and tell its project when that removed someone from it. */
 function forget(c: Client): void {
   const had = clients.delete(c);
+  if (had) collab?.disconnect(c.id);
   const pid = presence.dropConnection(c.id);
   if (had && pid) announcePresence(pid);
 }
@@ -104,6 +124,7 @@ export function recheck(userId: string | null): void {
     const pid = presence.projectOf(c.id);
     if (pid && !mayRead(c, pid)) { presence.dropConnection(c.id); announcePresence(pid); }
   }
+  collab?.refreshUser(userId);          // P3-1: a changed role or membership changes what a live editor may do at once
 }
 
 export function attach(server: HttpServer): void {
@@ -129,7 +150,18 @@ export function attach(server: HttpServer): void {
     wss.handleUpgrade(req, socket, head, (ws) => {
       const client: Client = { id: nextId++, ws, user: auth.user, sessionId: auth.session.id, can: new Map(), inbox: { start: Date.now(), n: 0 } };
       clients.add(client);
-      ws.on('message', (data) => inbound(client, data));
+      collab?.connect({ id: client.id, ws, user: client.user, sessionId: client.sessionId });
+      ws.on('message', (data, isBinary) => {
+        if (isBinary) {
+          const buf = Buffer.isBuffer(data) ? data : Array.isArray(data) ? Buffer.concat(data) : Buffer.from(data as ArrayBuffer);
+          if (!collab) return;
+          void collab.onMessage(client.id, new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength));
+          return;
+        }
+        const size = Buffer.isBuffer(data) ? data.length : Array.isArray(data) ? data.reduce((n, b) => n + b.length, 0) : (data as ArrayBuffer).byteLength;
+        if (size > MAX_INBOUND_BYTES) { forget(client); try { ws.close(1009, 'message too big'); } catch { /* gone */ } return; }
+        inbound(client, data);
+      });
       ws.on('close', () => forget(client));
       ws.on('error', () => forget(client));
     });
@@ -149,7 +181,9 @@ export type BroadcastMessage =
   /** WP-14: a job changed state (queued, running, succeeded, failed, cancelled). No `message` field, so a progress pane ignores it. */
   | { type: 'job'; job: Record<string, unknown> }
   /** Phase 3 (P3-4): a PDF review thread of `fileKey` was created, changed, deleted, or the file's threads were re-anchored on a new version. */
-  | { type: 'pdf-annotations'; fileKey: string; change: 'created' | 'updated' | 'deleted' | 'reanchored'; id?: string; annotation?: Record<string, unknown> };
+  | { type: 'pdf-annotations'; fileKey: string; change: 'created' | 'updated' | 'deleted' | 'reanchored'; id?: string; annotation?: Record<string, unknown> }
+  /** P3-1: the review comments of a document changed (a comment added, answered, resolved); the comment panels reload */
+  | { type: 'comments'; path: string };
 
 /**
  * WP-14: in a job worker process there are no sockets; the worker hands every message to its server (services/jobs/worker.ts), which
@@ -174,6 +208,8 @@ export function broadcast(projectId: string, msg: BroadcastMessage): void {
 
 /** Send to the sockets of this process (the server side of a worker's relay calls this directly). */
 export function deliver(projectId: string, msg: BroadcastMessage, except?: Client): void {
+  // P3-1: a check-out taken or given back changes who may write in that document's live room, at once
+  if (msg.type === 'leases') { try { collab?.refreshDocument(projectId, msg.path); } catch { /* the rooms recheck within seconds anyway */ } }
   const payload = JSON.stringify({ ...msg, projectId });
   for (const c of clients) {
     if (c === except) continue;

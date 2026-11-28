@@ -4,7 +4,9 @@
  * source offsets for every node (used to synchronise Design and XML views).
  */
 import type { Grammar } from './grammar';
-import { isBlockName, isElementOnly, isPreserved } from './display';
+import * as form from '../../../../backend/src/shared/collab/xmlForm';
+import type { Doctype, DoctypeDecl } from '../../../../backend/src/shared/collab/xmlForm';
+import { findDoctype, parseDoctype } from '../../../../backend/src/shared/collab/xmlForm';
 
 export const NS = {
   xlink: 'http://www.w3.org/1999/xlink',
@@ -22,96 +24,10 @@ export interface ParseError {
 }
 
 // ------------------------------------------------------------------ doctype
-export interface DoctypeDecl {
-  kind: 'entity' | 'notation' | 'other';
-  name?: string;
-  systemId?: string;
-  publicId?: string;
-  notation?: string;
-  raw: string;
-}
-
-export interface Doctype {
-  rootName: string;
-  publicId?: string;
-  systemId?: string;
-  decls: DoctypeDecl[];
-}
-
-/** Locates the DOCTYPE declaration in raw XML text (handles internal subsets, quotes and comments). */
-export function findDoctype(text: string): { start: number; end: number; raw: string } | null {
-  // Walk the prolog the way a parser does: the XML declaration, processing instructions, comments and white space may come first
-  // (a comment that merely mentions "<!DOCTYPE" or "<root" is neither the DOCTYPE nor the root element).
-  let p = 0;
-  for (;;) {
-    while (p < text.length && /[\s﻿]/.test(text[p])) p++;
-    if (text.startsWith('<?', p)) {
-      const e = text.indexOf('?>', p + 2);
-      if (e < 0) return null;
-      p = e + 2;
-    } else if (text.startsWith('<!--', p)) {
-      const e = text.indexOf('-->', p + 4);
-      if (e < 0) return null;
-      p = e + 3;
-    } else break;
-  }
-  if (!text.startsWith('<!DOCTYPE', p) || !/\s/.test(text[p + 9] ?? '')) return null;
-  const start = p;
-  let i = start + 9;
-  let depth = 0;
-  let quote: string | null = null;
-  while (i < text.length) {
-    const c = text[i];
-    if (quote) {
-      if (c === quote) quote = null;
-    } else if (text.startsWith('<!--', i)) {
-      const e = text.indexOf('-->', i + 4);
-      if (e < 0) return null;
-      i = e + 3;
-      continue;
-    } else if (c === '"' || c === "'") quote = c;
-    else if (c === '[') depth++;
-    else if (c === ']') depth--;
-    else if (c === '>' && depth <= 0) return { start, end: i + 1, raw: text.slice(start, i + 1) };
-    i++;
-  }
-  return null;
-}
-
-export function parseDoctype(raw: string): Doctype {
-  const head = raw.match(/^<!DOCTYPE\s+([^\s[>]+)\s*(?:(PUBLIC)\s+("[^"]*"|'[^']*')\s*("[^"]*"|'[^']*')?|(SYSTEM)\s+("[^"]*"|'[^']*'))?/);
-  const dt: Doctype = { rootName: head?.[1] ?? 'dmodule', decls: [] };
-  const unq = (s?: string) => (s ? s.slice(1, -1) : undefined);
-  if (head?.[2]) {
-    dt.publicId = unq(head[3]);
-    dt.systemId = unq(head[4]);
-  } else if (head?.[5]) dt.systemId = unq(head[6]);
-  const lb = raw.indexOf('[');
-  const rb = raw.lastIndexOf(']');
-  if (lb >= 0 && rb > lb) {
-    const subset = raw.slice(lb + 1, rb);
-    const re = /<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<!(ENTITY|NOTATION|ELEMENT|ATTLIST)\b(?:[^>"']|"[^"]*"|'[^']*')*>|%[\w.-]+;/g;
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(subset))) {
-      const text = m[0];
-      if (m[1] === 'ENTITY') {
-        const em = text.match(/^<!ENTITY\s+(%\s+)?([^\s]+)\s+(?:SYSTEM\s+("[^"]*"|'[^']*')|PUBLIC\s+("[^"]*"|'[^']*')\s+("[^"]*"|'[^']*'))?(?:\s*NDATA\s+([^\s>]+))?/);
-        if (em && !em[1]) {
-          dt.decls.push({ kind: 'entity', name: em[2], systemId: unq(em[3] ?? em[5]), publicId: unq(em[4]), notation: em[6], raw: text });
-          continue;
-        }
-      } else if (m[1] === 'NOTATION') {
-        const nm = text.match(/^<!NOTATION\s+([^\s]+)/);
-        if (nm) {
-          dt.decls.push({ kind: 'notation', name: nm[1], raw: text });
-          continue;
-        }
-      }
-      dt.decls.push({ kind: 'other', raw: text });
-    }
-  }
-  return dt;
-}
+// Phase 3 (collaboration): the DOCTYPE reader and writer, the whitespace normaliser and the serializer are shared with the collaboration
+// server, which writes a live document back to its file in exactly the Studio's form (backend/src/shared/collab/xmlForm.ts, moved verbatim).
+export type { Doctype, DoctypeDecl } from '../../../../backend/src/shared/collab/xmlForm';
+export { findDoctype, parseDoctype, serializeDoctype, escapeText, escapeAttr } from '../../../../backend/src/shared/collab/xmlForm';
 
 /**
  * Names of the internal general entities (`<!ENTITY name "text">`) that the document body uses as `&name;`. A parser expands
@@ -124,18 +40,6 @@ export function internalEntityRefs(text: string, doctype: Doctype | null): strin
   const loc = findDoctype(text);
   const body = loc ? text.slice(loc.end) : text;
   return names.filter((n) => body.includes('&' + n + ';'));
-}
-
-export function serializeDoctype(dt: Doctype): string {
-  let s = '<!DOCTYPE ' + dt.rootName;
-  if (dt.publicId != null) s += ` PUBLIC "${dt.publicId}"` + (dt.systemId != null ? ` "${dt.systemId}"` : '');
-  else if (dt.systemId != null) s += ` SYSTEM "${dt.systemId}"`;
-  if (dt.decls.length) {
-    s += ' [\n';
-    for (const d of dt.decls) s += '  ' + d.raw + '\n';
-    s += ']';
-  }
-  return s + '>';
 }
 
 /** Well-known S1000D graphic notations. */
@@ -271,57 +175,7 @@ export function checkWellFormed(text: string): ParseError | null {
   }
 }
 
-// ------------------------------------------------------- whitespace handling
-const WS = /[ \t\r\n]+/g;
-
-function isBlockNode(n: Node | null): boolean {
-  return !!n && n.nodeType === 1 && isBlockName(n.nodeName);
-}
-
-/**
- * Normalises whitespace for editing:
- *  - removes whitespace-only text in element-only content;
- *  - collapses whitespace runs in mixed content (except preserved elements);
- *  - trims text at block boundaries.
- */
-export function normalizeWhitespace(root: Node, grammar: Grammar | null): void {
-  const walk = (el: Element) => {
-    if (isPreserved(el)) return;
-    const elementOnly = isElementOnly(el, grammar);
-    const kids = Array.from(el.childNodes);
-    if (elementOnly) {
-      for (const c of kids) {
-        if (c.nodeType === 3 && !/\S/.test(c.nodeValue || '')) el.removeChild(c);
-      }
-    } else {
-      for (const c of kids) if (c.nodeType === 3) c.nodeValue = (c.nodeValue || '').replace(WS, ' ');
-      // merge adjacent text nodes
-      el.normalize();
-      const blockParent = isBlockName(el.nodeName) || !grammar?.has(el.nodeName);
-      const list = Array.from(el.childNodes);
-      for (let i = 0; i < list.length; i++) {
-        const c = list[i];
-        if (c.nodeType !== 3) continue;
-        let v = c.nodeValue || '';
-        const prev = c.previousSibling;
-        const next = c.nextSibling;
-        const atStart = !prev || isBlockNode(prev);
-        const atEnd = !next || isBlockNode(next);
-        if ((atStart && (prev ? true : blockParent)) || (prev && isBlockNode(prev))) v = v.replace(/^ /, '');
-        if ((atEnd && (next ? true : blockParent)) || (next && isBlockNode(next))) v = v.replace(/ $/, '');
-        if (!v) el.removeChild(c);
-        else if (v !== c.nodeValue) c.nodeValue = v;
-      }
-    }
-    for (const c of Array.from(el.childNodes)) if (c.nodeType === 1) walk(c as Element);
-  };
-  if (root.nodeType === 9) {
-    const de = (root as Document).documentElement;
-    if (de) walk(de);
-  } else if (root.nodeType === 1) walk(root as Element);
-}
-
-// ---------------------------------------------------------------- serialising
+// ------------------------------------------------------- whitespace handling and serialising (shared, see above)
 export interface SerializeOptions {
   grammar?: Grammar | null;
   indent?: string;
@@ -336,150 +190,18 @@ export interface SerializeResult {
   spans: Map<Node, [number, number]> | null;
 }
 
-// Characters XML 1.0 cannot carry (not even as references) are dropped on output, so a document can always be read back; a bare
-// carriage return is written as a reference, because a parser would turn it into a line feed.
-const TEXT_SPECIAL = /[&<\r\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]|\]\]>/g;
-const ATTR_SPECIAL = /[&<"\t\n\r\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/g;
-
-export function escapeText(s: string): string {
-  return s.replace(TEXT_SPECIAL, (m) => (m === '&' ? '&amp;' : m === '<' ? '&lt;' : m === '\r' ? '&#13;' : m === ']]>' ? ']]&gt;' : ''));
-}
-
-export function escapeAttr(s: string): string {
-  return s.replace(ATTR_SPECIAL, (m) => (m === '&' ? '&amp;' : m === '<' ? '&lt;' : m === '"' ? '&quot;' : m === '\t' ? '&#9;' : m === '\n' ? '&#10;' : m === '\r' ? '&#13;' : ''));
-}
-
-/** Decides whether element children should be laid out on indented lines. */
-function indentChildren(el: Element, grammar: Grammar | null): boolean {
-  if (isPreserved(el)) return false;
-  if (isElementOnly(el, grammar)) return true;
-  // mixed element containing only block children (e.g. an entry with paras)
-  let hasEl = false;
-  for (const c of Array.from(el.childNodes)) {
-    if (c.nodeType === 3) {
-      if (/\S/.test(c.nodeValue || '')) return false;
-    } else if (c.nodeType === 4) return false;
-    else if (c.nodeType === 1) {
-      if (!isBlockName(c.nodeName)) return false;
-      hasEl = true;
-    }
-  }
-  return hasEl;
-}
-
-const ODD_WS = /^[ \t\r\n]|[ \t\r\n]$|[ \t\r\n]{2}|[\t\r\n]/;
-
 /**
- * The text a text node is written as. Mixed-content whitespace is written the way loading reads it (normalizeWhitespace): a run of
- * whitespace is one space, and whitespace at the very start or end of a text block is dropped. A space left behind by Enter, a deleted
- * word or a join, or a double space typed before saving, therefore reads back unchanged and a second save does not differ. Inside
- * preserved elements (`pretty` false) nothing is touched.
+ * Normalises whitespace for editing:
+ *  - removes whitespace-only text in element-only content;
+ *  - collapses whitespace runs in mixed content (except preserved elements);
+ *  - trims text at block boundaries.
  */
-function textAsWritten(t: Node, pretty: boolean, grammar: Grammar | null): string {
-  const v = t.nodeValue || '';
-  const el = t.parentNode;
-  if (!pretty || !el || el.nodeType !== 1 || !ODD_WS.test(v)) return v;
-  // a neighbouring empty text node is nothing (a parser would not create it); a neighbouring text node makes this one a middle part
-  const sibling = (dir: 'previousSibling' | 'nextSibling') => {
-    let s = t[dir];
-    while (s && s.nodeType === 3 && !s.nodeValue) s = s[dir];
-    return s;
-  };
-  const prev = sibling('previousSibling');
-  const next = sibling('nextSibling');
-  const blockParent = isBlockName(el.nodeName) || !grammar?.has(el.nodeName);
-  let s = v.replace(/[ \t\r\n]+/g, ' ');
-  if (prev ? isBlockNode(prev) || (prev.nodeType === 3 && /[ \t\r\n]$/.test(prev.nodeValue || '')) : blockParent) s = s.replace(/^ /, '');
-  if (next ? isBlockNode(next) : blockParent) s = s.replace(/ $/, '');
-  return s;
+export function normalizeWhitespace(root: Node, grammar: Grammar | null): void {
+  form.normalizeWhitespace(root as unknown as form.XNode, grammar);
 }
 
 export function serialize(node: Node, opts: SerializeOptions = {}): SerializeResult {
-  const grammar = opts.grammar ?? null;
-  const ind = opts.indent ?? '  ';
-  const parts: string[] = [];
-  let len = 0;
-  const spans = opts.map ? new Map<Node, [number, number]>() : null;
-  const out = (s: string) => {
-    parts.push(s);
-    len += s.length;
-  };
-
-  const writeAttrs = (el: Element) => {
-    for (const a of Array.from(el.attributes)) out(' ' + a.name + '="' + escapeAttr(a.value) + '"');
-  };
-
-  const writeNode = (n: Node, depth: number, pretty: boolean) => {
-    const start = len;
-    switch (n.nodeType) {
-      case 1: {
-        const el = n as Element;
-        out('<' + el.nodeName);
-        writeAttrs(el);
-        const kids = Array.from(el.childNodes);
-        const indent = pretty && indentChildren(el, grammar);
-        const childPretty = pretty && !isPreserved(el);
-        const visible = indent
-          ? kids.filter((k) => !(k.nodeType === 3 && !/\S/.test(k.nodeValue || '')))
-          : kids.filter((k) => k.nodeType !== 3 || textAsWritten(k, childPretty, grammar) !== '');
-        if (visible.length === 0) {
-          out('/>');
-        } else {
-          out('>');
-          if (indent) {
-            for (const k of visible) {
-              out('\n' + ind.repeat(depth + 1));
-              writeNode(k, depth + 1, true);
-            }
-            out('\n' + ind.repeat(depth));
-          } else {
-            for (const k of visible) writeNode(k, depth, childPretty);
-          }
-          out('</' + el.nodeName + '>');
-        }
-        break;
-      }
-      case 3:
-        out(escapeText(textAsWritten(n, pretty, grammar)));
-        break;
-      case 4:
-        out('<![CDATA[' + (n.nodeValue || '') + ']]>');
-        break;
-      case 7: {
-        const pi = n as ProcessingInstruction;
-        out('<?' + pi.target + (pi.data ? ' ' + pi.data : '') + '?>');
-        break;
-      }
-      case 8:
-        out('<!--' + (n.nodeValue || '') + '-->');
-        break;
-      case 9: {
-        const d = n as Document;
-        out(opts.xmlDecl ?? '<?xml version="1.0" encoding="UTF-8"?>');
-        let doctypeWritten = false;
-        for (const k of Array.from(d.childNodes)) {
-          if (k.nodeType === 10) continue;
-          if (k.nodeType === 1 && !doctypeWritten) {
-            if (opts.doctype) {
-              out('\n' + serializeDoctype(opts.doctype));
-            }
-            doctypeWritten = true;
-          }
-          out('\n');
-          writeNode(k, 0, true);
-        }
-        out('\n');
-        break;
-      }
-      case 11:
-        for (const k of Array.from(n.childNodes)) writeNode(k, depth, pretty);
-        break;
-    }
-    if (spans) spans.set(n, [start, len]);
-  };
-
-  writeNode(node, 0, true);
-  return { text: parts.join(''), spans };
+  return form.serialize(node as unknown as form.XNode, opts) as unknown as SerializeResult;
 }
 
 // ---------------------------------------------------------------- utilities

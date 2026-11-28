@@ -18,6 +18,10 @@ const VERIFY_HEAVY = ['src/studio/__tests__/verify/{rules,controls,editor,editor
 export default defineConfig({
   base: '/',
   plugins: [react()],
+  // Phase 3 (P3-1): the live co-editing schema and protocol are shared with the server (backend/src/shared/collab/), which imports Yjs too.
+  // One Yjs instance in the page: the shared files resolve yjs, lib0 and y-protocols from the frontend, never from backend/node_modules
+  // (two copies of Yjs break instanceof checks and Yjs warns about it). tsconfig.json "paths" says the same to the type checker.
+  resolve: { dedupe: ['yjs', 'lib0', 'y-protocols'] },
   define: { __AGASTYA_CLIENT_VERSION__: JSON.stringify(CLIENT_VERSION) },
   server: {
     port: 5174,

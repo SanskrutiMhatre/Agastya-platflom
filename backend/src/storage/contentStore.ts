@@ -37,6 +37,18 @@ export interface ContentStore {
   mkdir(projectId: string, relDir: string): void;
 }
 
+/**
+ * Phase 3 (P3-1): who wants to hear that a project file was written or removed. The live co-editing service listens, so a change that did
+ * not come from a room (an import, a conversion, a restore, a save by version from an older page) reaches the people in that document's
+ * room instead of being overwritten by the next write-back. A listener never fails the write; it is told the absolute path.
+ */
+export type ContentWriteListener = (projectId: string, absPath: string, kind: 'write' | 'remove') => void;
+const writeListeners = new Set<ContentWriteListener>();
+export function onContentWrite(l: ContentWriteListener): () => void { writeListeners.add(l); return () => { writeListeners.delete(l); }; }
+function told(projectId: string, absPath: string, kind: 'write' | 'remove'): void {
+  for (const l of writeListeners) { try { l(projectId, absPath, kind); } catch { /* a listener never fails a write */ } }
+}
+
 export class ContentPathError extends Error {
   constructor(rel: string) { super(`Path leaves the project folder: ${rel}`); this.name = 'ContentPathError'; }
 }
@@ -64,16 +76,16 @@ export class LocalFolderStore implements ContentStore {
 
   readBuffer(projectId: string, rel: string): Buffer { return fs.readFileSync(this.pathOf(projectId, rel)); }
 
-  writeText(projectId: string, rel: string, text: string): void { writeFileAtomic(this.pathOf(projectId, rel), text, 'utf8'); }
+  writeText(projectId: string, rel: string, text: string): void { const p = this.pathOf(projectId, rel); writeFileAtomic(p, text, 'utf8'); told(projectId, p, 'write'); }
 
-  writeBuffer(projectId: string, rel: string, data: Uint8Array): void { writeFileAtomic(this.pathOf(projectId, rel), data); }
+  writeBuffer(projectId: string, rel: string, data: Uint8Array): void { const p = this.pathOf(projectId, rel); writeFileAtomic(p, data); told(projectId, p, 'write'); }
 
   list(projectId: string, relDir: string): string[] {
     const abs = this.pathOf(projectId, relDir);
     return fs.existsSync(abs) ? fs.readdirSync(abs) : [];
   }
 
-  remove(projectId: string, rel: string): void { fs.unlinkSync(this.pathOf(projectId, rel)); }
+  remove(projectId: string, rel: string): void { const p = this.pathOf(projectId, rel); fs.unlinkSync(p); told(projectId, p, 'remove'); }
 
   mkdir(projectId: string, relDir: string): void { fs.mkdirSync(this.pathOf(projectId, relDir), { recursive: true }); }
 }

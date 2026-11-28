@@ -202,6 +202,13 @@ export function releaseOverview(projectId: string, canSubmit: boolean, opts: { s
   };
 }
 
+// Phase 3 (P3-1): a request made, withdrawn or decided changes whether the project's documents may be edited live (a pending request
+// locks them); the live co-editing rooms listen here (services/collab/rooms.ts) instead of being imported, so this module stays a leaf.
+type ReleaseListener = (projectId: string) => void;
+const releaseListeners = new Set<ReleaseListener>();
+export function onReleaseChange(l: ReleaseListener): () => void { releaseListeners.add(l); return () => { releaseListeners.delete(l); }; }
+function releaseChanged(projectId: string): void { for (const l of releaseListeners) { try { l(projectId); } catch { /* a listener never fails a release */ } } }
+
 export function requestRelease(projectId: string, userId: string, body: { scheduledAt?: string; note?: string }) {
   const pmDoc = pmDocument(projectId);
   if (!pmDoc) { const own = ownEngineFormatOf(projectId); throw bad(own ? `This project has no ${own.name} document to release.` : 'This project has no publication module to release.', 'NO_PUBLICATION'); }
@@ -217,6 +224,7 @@ export function requestRelease(projectId: string, userId: string, body: { schedu
     note: String(body.note || '').slice(0, 500) || null, requestedBy: userId, contentHash, now: nowIso(),
   });
   if (!r.created) throw conflict('This publication already has a release awaiting approval.');
+  releaseChanged(projectId);
   return { scheduledAt: when.toISOString(), contentHash };
 }
 
@@ -224,6 +232,7 @@ export function withdrawRelease(projectId: string, relId: string): void {
   const row = store.getRelease(relId);
   if (!row || row.project_id !== projectId) throw notFound();
   if (!store.withdrawRelease(row.id, row.document_id)) throw notFound();
+  releaseChanged(projectId);
 }
 
 export function decideRelease(projectId: string, relId: string, approve: boolean, adminId: string) {
@@ -231,5 +240,6 @@ export function decideRelease(projectId: string, relId: string, approve: boolean
   if (!row || row.project_id !== projectId) throw notFound();
   const out = approve ? store.approveRelease(row.id, adminId, nowIso()) : store.rejectRelease(row.id, adminId, nowIso());
   if (!out) throw conflict('That release request has already been decided.');
+  releaseChanged(projectId);
   return out;
 }

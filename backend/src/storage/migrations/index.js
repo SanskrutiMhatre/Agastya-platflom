@@ -33,6 +33,8 @@ const ORDER = [
   '026-jobs',                      // WP-14
   '027-default-accounts',          // Phase 3 P3-6 (standalone default accounts)
   '028-pdf-annotations',           // Phase 3 P3-4 PDF review
+  '029-gitlab',                    // Phase 3 (P3-5): GitLab integration
+  '030-collab-documents',          // Phase 3 (P3-1): live co-editing rooms
 ];
 
 const MIGRATIONS = ORDER.map((name) => require(`./${name}`));

@@ -38,6 +38,9 @@ export class DocumentEditor {
   plainPasteAt = -Infinity;
   xmlError: ParseError | null = null;
   private banner: HTMLElement;
+  /** Phase 3: why this live document cannot be changed by this person now (a check-out by someone else, review, role), or null */
+  private lockText: string | null = null;
+  private lockBanner: HTMLElement;
   private views: HTMLElement;
   private splitter: HTMLElement;
   private cache: { version: number; text: string; spans: Map<Node, [number, number]> } | null = null;
@@ -53,7 +56,8 @@ export class DocumentEditor {
     this.banner = h('div', { class: 'doc-banner', hidden: true });
     this.splitter = h('div', { class: 'split-handle', title: 'Drag to resize', role: 'separator', 'aria-orientation': 'vertical' });
     this.views = h('div', { class: 'doc-views' }, this.design.el, this.splitter, this.xml.el);
-    this.el = h('div', { class: 'doc-editor' }, this.banner, this.views);
+    this.lockBanner = h('div', { class: 'doc-banner doc-banner-lock', hidden: true, 'data-testid': 'collab-lock', role: 'status' });
+    this.el = h('div', { class: 'doc-editor' }, this.lockBanner, this.banner, this.views);
     this.bindSplitter();
     doc.addEventListener('change', (e) => this.onChange((e as CustomEvent<ChangeEvent>).detail));
     doc.addEventListener('saved', () => this.app.updateChrome());
@@ -265,7 +269,27 @@ export class DocumentEditor {
 
   readOnlyReason(): string | null {
     if (this.xmlError) return 'The XML source is not well-formed — fix it in the XML view first.';
-    return null;
+    return this.lockText;
+  }
+
+  /** Phase 3 (live co-editing): this person may not change the document now (null: they may). The canvas stays readable and selectable. */
+  setLock(reason: string | null) {
+    if (reason === this.lockText) return;
+    this.lockText = reason;
+    this.lockBanner.hidden = !reason;
+    this.lockBanner.replaceChildren(...(reason ? [h('span', { class: 'banner-text' }, reason)] : []));
+    this.el.classList.toggle('is-locked', !!reason);
+    this.app.updateChrome();
+  }
+  get locked(): boolean { return !!this.lockText; }
+
+  /** Phase 3: another person's change was applied; put this person's caret back where it was (the view's text nodes were rewritten). */
+  afterRemote() {
+    if (this.mode === 'xml') return;
+    const sel = this.doc.selection;
+    if (!sel || !sel.anchor.node.isConnected || !sel.focus.node.isConnected) return;
+    const active = document.activeElement;
+    if (active && this.design.page.contains(active)) this.design.applySelection(sel, false);
   }
 
   // ------------------------------------------------------------ selection
@@ -1284,7 +1308,11 @@ export class DocumentEditor {
     }
   }
 
+  /** Called when the editor is destroyed (a live document leaves its room). */
+  readonly onDestroy: Array<() => void> = [];
+
   destroy() {
+    for (const f of this.onDestroy.splice(0)) { try { f(); } catch { /* a listener's problem */ } }
     this.liveValidate.cancel();
     this.autosave.cancel();
     this.xml.destroy();

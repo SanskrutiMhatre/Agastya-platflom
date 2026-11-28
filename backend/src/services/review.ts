@@ -46,7 +46,7 @@ export const commentView = (c: Row) => ({
   at: c.created_at, resolved: !!c.resolved_at, resolvedAt: c.resolved_at ?? null, resolvedBy: c.resolved_by_username ?? null,
 });
 
-export interface Anchor { path: string; tag: string; text: string }
+export interface Anchor { path: string; tag: string; text: string; y?: { start: string; end: string } }
 function parseAnchor(raw: unknown): Anchor | null { try { return raw ? (JSON.parse(String(raw)) as Anchor) : null; } catch { return null; } }
 /** A pin is an element of one data module: its child-index path from the root, its tag and the words it carried when the comment was made (so a moved element can still be recognised). */
 function cleanAnchor(raw: any, dmFile: string | null): string | null {
@@ -55,7 +55,16 @@ function cleanAnchor(raw: any, dmFile: string | null): string | null {
   const path = String(raw.path ?? '');
   if (!/^\d+(\/\d+){0,40}$/.test(path)) throw bad('That is not a place in the data module.', 'BAD_ANCHOR');
   const tag = String(raw.tag ?? '').replace(/[^A-Za-z0-9_.:-]/g, '').slice(0, 60);
-  return JSON.stringify({ path, tag, text: clean(raw.text, 200) });
+  const out: { path: string; tag: string; text: string; y?: { start: string; end: string } } = { path, tag, text: clean(raw.text, 200) };
+  // Phase 3 (P3-1): a comment made in a live document also carries Yjs relative positions (base64), so it stays on the same words while
+  // others edit around it. Optional and additive: the path/tag/text anchor above still places it where the live position cannot.
+  const y = raw.y;
+  if (y != null) {
+    const ok = (v: unknown): v is string => typeof v === 'string' && v.length <= 400 && /^[A-Za-z0-9+/]+={0,2}$/.test(v);
+    if (typeof y !== 'object' || !ok((y as { start?: unknown }).start) || !ok((y as { end?: unknown }).end)) throw bad('That is not a place in the data module.', 'BAD_ANCHOR');
+    out.y = { start: (y as { start: string }).start, end: (y as { end: string }).end };
+  }
+  return JSON.stringify(out);
 }
 
 export const listComments = (projectId: string) => store.listReviewComments(projectId).map(commentView);
@@ -66,7 +75,8 @@ export function addComment(projectId: string, userId: string, body: { body?: str
   const text = clean(body.body, 4000);
   if (!text) throw bad('A comment cannot be empty.', 'COMMENT_EMPTY');
   const dmFile = clean(body.dmFile, 200) || null;
-  if (dmFile && !/^DMC-[A-Za-z0-9._-]+\.xml$/i.test(dmFile)) throw bad('That is not a data module file name.', 'BAD_FILE_NAME');
+  // P3-1: a comment in a live JSS or JSG document names that document by its room's kind and name ("jss/book"), as a data module is named by its file
+  if (dmFile && !/^DMC-[A-Za-z0-9._-]+\.xml$/i.test(dmFile) && !/^(jss|jsg)\/[A-Za-z0-9._-]{1,64}$/.test(dmFile)) throw bad('That is not a data module file name.', 'BAD_FILE_NAME');
   return store.addReviewComment({ projectId, releaseId: body.releaseId ?? null, userId, kind, body: text, dmFile, anchor: cleanAnchor(body.anchor, dmFile), now: nowIso() });
 }
 

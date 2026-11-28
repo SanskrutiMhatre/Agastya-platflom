@@ -386,3 +386,13 @@ button.fm-recent-item:hover { background: var(--bg-hover); }
    of the same specificity only by coming later; they are restated one step more specific so they still win. */
 .panel-filter:focus-visible, .attr-input:focus-visible, .find-input:focus-visible { outline: none; }
 .input.deflist-def { padding: 6px 8px; }
+
+/* Phase 3 (P3-1): live co-editing. A lock banner (someone else's check-out, a review, a reader's role), the other people's carets and
+   selections on the canvas (their colour is a theme token set per person: --collab-color), never catching the pointer. */
+.doc-banner-lock { background: var(--warning-soft); color: var(--text-primary); }
+.design-scroll { position: relative; }
+.collab-cursors { position: absolute; inset: 0 auto auto 0; width: 0; height: 0; pointer-events: none; z-index: 3; }
+.collab-caret { position: absolute; width: 0; border-left: 2px solid var(--collab-color, var(--accent)); }
+.collab-name { position: absolute; left: -2px; bottom: 100%; padding: 0 4px; border-radius: 3px 3px 3px 0; font: 600 10.5px/16px var(--font-ui, sans-serif); white-space: nowrap;
+  background: var(--collab-color, var(--accent)); color: var(--text-on-accent); }
+.collab-sel { position: absolute; background: var(--collab-color, var(--accent)); opacity: .18; border-radius: 2px; }

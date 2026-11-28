@@ -14,6 +14,7 @@ import { startScheduler, stopScheduler } from './services/dataProtection';
 import { startDirectorySync } from './services/directorySync';
 import { acquireWorkspaceLock, releaseWorkspaceLock } from './services/workspaceLock';
 import * as broadcast from './services/broadcast';
+import * as collabRooms from './services/collab/rooms';
 import { reconcileRegistry, sweepPendingImports } from './services/projects';
 import { startRenderer, stopRenderer, rendererStatus } from './services/publisher';
 import { shutdownJobs, prewarmWorkers } from './services/jobs';
@@ -61,6 +62,7 @@ export async function start(port: number = config.port): Promise<number> {
   // WP-26: Mode A listens on loopback only, Mode B on the network with TLS only (services/network.ts; the certificate was checked above).
   const l = await listen(app, port, config, material, (s) => { tuneServer(s); broadcast.attach(s); });
   servers = l.servers;
+  collabRooms.start();   // P3-1: live co-editing rooms (the file watch, the sweep, and the replay of changes a stop or crash left unwritten)
   // phase 7 (item 6): a job worker and its FOP JVM start now, in the background, so the first build or preview does not wait for a cold JVM
   setTimeout(() => { prewarmWorkers(); }, 1500).unref();
   const r = rendererStatus();
@@ -77,6 +79,7 @@ export function stop(): void {
   stopScheduler();
   stopRenderer();
   void shutdownJobs();
+  try { collabRooms.stopSync(); } catch { /* the next start replays the log */ }
   broadcast.close();
   for (const s of servers) s.close();
   servers = [];
@@ -100,11 +103,13 @@ export function shutdownGracefully(graceMs = 15000): Promise<void> {
       releaseWorkspaceLock();
       resolve();
     };
-    try { broadcast.close(); } catch { /* best effort */ }
-    if (!all.length) return finish();
+    // P3-1: every live document is written back (with a revision) before the sockets close; the log covers anything this misses
+    const collabDone = collabRooms.stop().catch((e) => { console.warn('[stop] co-editing write-back:', (e as Error).message); });
+    void collabDone.then(() => { try { broadcast.close(); } catch { /* best effort */ } });
+    if (!all.length) { void collabDone.then(finish); return; }
     let open = all.length;
     for (const s of all) {
-      s.close(() => { if (--open === 0) finish(); });
+      s.close(() => { if (--open === 0) void collabDone.then(finish); });
       s.closeIdleConnections?.();                   // keep-alive sockets with nothing running must not hold the stop
     }
     setTimeout(() => { console.warn('[stop] requests still running after the grace period; stopping anyway'); for (const s of all) s.closeAllConnections?.(); finish(); }, graceMs).unref();

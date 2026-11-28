@@ -39,10 +39,12 @@ import * as jobs from '../services/jobs';
 import { readProjectJson, updateProjectJson, csdbRel, mediaRel, isCirProject, assertNotCir, PROTECTED_PROJECT_KEYS, unsafeInputFields, sameSetting, unsafeArtwork } from '../services/projects';
 import * as cir from '../services/cir';
 import * as leases from '../services/leases';
+import { broadcast } from '../services/broadcast';
 import { versionGuard } from '../services/versionGuard';
 import { writeFileAtomic } from '../storage/atomicWrite';
 import { mayBreak } from './documentHistory';
 import { notify, approversOf, adminIds } from '../services/notifications';
+import { emitReleaseApproved, setReleaseDecider } from '../services/releaseEvents';
 
 const { CATALOGUE } = vendor('engine/frontMatterPages');
 // WP-11 (REL-007, PERF-010): uploads stream to disk with a cap on each file and on the whole request; the files are removed when the response is over.
@@ -394,9 +396,11 @@ export function registerProjectContentRoutes(app: Express): void {
     res.json({ ok: true });
   }));
   // A release only becomes real when the project's Project Manager (or an administrator) approves it.
-  const decide = (approve: boolean): RequestHandler[] => [view('manager', 'release.decide'), wrap(async (req, res) => {
+  // Phase 3 (P3-5): the decision is one function, so a GitLab merge-request approval that counts toward the Agastya approval
+  // (services/releaseEvents.ts decideReleaseAs) runs exactly these steps under the approver's own account.
+  const decision = async (req: Request, relId: string, approve: boolean, via?: string): Promise<void> => {
     if (!canApprove(req.auth.user, req.project.role)) throw forbidden('Only the Project Manager of this project, or an administrator, can decide a release.', 'APPROVER_ONLY');
-    const requester = store.getRelease(param(req, 'relId'))?.requested_by;
+    const requester = store.getRelease(relId)?.requested_by;
     if (approve) { const sod = securityPolicy.approverConflict(requester, req.auth.user.id); if (sod) throw forbidden(sod, 'SEPARATION_OF_DUTIES'); }   // before any side effect (D7)
     if (approve) pdfReview.assertReleasable(req.project.id);        // P3-4: the same rule at approval
     if (approve) await gate(req);                                    // never approve a release whose content is not valid now
@@ -404,16 +408,20 @@ export function registerProjectContentRoutes(app: Express): void {
     // The issuing happens BEFORE the decision is recorded (and only for a request that is still pending), so a failure leaves the release undecided and the
     // approval can simply be repeated - already-issued modules are not issued twice.
     let issued: Array<{ from: string; file: string }> = [];
-    if (approve && store.getRelease(param(req, 'relId'))?.status === 'pending') issued = await lifecycle.issueForRelease(req.project.id, publicationSources(req.project.id), actor(req));
+    if (approve && store.getRelease(relId)?.status === 'pending') issued = await lifecycle.issueForRelease(req.project.id, publicationSources(req.project.id), actor(req));
     // WP-29 (ENT-003, ENT-020): the decision, the fingerprint it covers and its audit row are one transaction; the row names the fingerprint.
-    const relId = param(req, 'relId');
     auditedTx(() => ({ actorId: req.auth.user.id, actorUsername: req.auth.user.username, action: approve ? 'release.approved' : 'release.rejected', projectId: req.project.id,
-      targetType: 'project', targetId: req.project.id, meta: { id: relId, fingerprint: store.getRelease(relId)?.content_hash ?? null } }), () => {
+      targetType: 'project', targetId: req.project.id, meta: { id: relId, fingerprint: store.getRelease(relId)?.content_hash ?? null, ...(via ? { via } : {}) } }), () => {
       release.decideRelease(req.project.id, relId, approve, req.auth.user.id);
       if (issued.length) store.setReleaseContentHash(relId, release.publicationFingerprint(req.project.id));
     });
     if (issued.length) log(req, 'release.issued', { issued });
     notify([requester], { kind: approve ? 'approval.approved' : 'approval.rejected', title: approve ? 'Release approved' : 'Release rejected', body: `${pname(req.project.id)}: ${approve ? 'approved' : 'rejected'} by ${req.auth.user.fullName ?? req.auth.user.full_name}.`, projectId: req.project.id, actorId: req.auth.user.id });
+    if (approve) emitReleaseApproved({ projectId: req.project.id, releaseId: relId, actor: actor(req) });
+  };
+  setReleaseDecider((projectId, releaseId, who, via) => decision({ auth: { user: who.user }, project: { id: projectId, role: who.projectRole } } as unknown as Request, releaseId, true, via));
+  const decide = (approve: boolean): RequestHandler[] => [view('manager', 'release.decide'), wrap(async (req, res) => {
+    await decision(req, param(req, 'relId'), approve);
     res.json({ ok: true });
   })];
   app.post(`${base}/release/:relId/approve`, ...decide(true));
@@ -440,11 +448,14 @@ export function registerProjectContentRoutes(app: Express): void {
     // The author hears about a comment made while the manual is in review.
     if (pending) notify([pending.requested_by], { kind: 'review.comment', title: 'New review comment', body: `${pname(req.project.id)}: ${req.auth.user.fullName ?? req.auth.user.full_name} commented.`, projectId: req.project.id, actorId: req.auth.user.id });
     log(req, 'review.comment', { id });
+    // P3-1: the comment panels of the people in this document reload at once (the live reviewer sees it as it is made)
+    broadcast(req.project.id, { type: 'comments', path: String(req.body?.dmFile ?? '') });
     res.status(201).json({ ok: true, id });
   }));
   app.post(`${base}/review/comments/:cid/resolve`, view('reviewer', 'review.comment'), wrap((req, res) => {
     review.setResolved(req.project.id, Number(param(req, 'cid')), req.auth.user.id, req.body?.resolved !== false);
     log(req, req.body?.resolved !== false ? 'review.comment.resolved' : 'review.comment.reopened', { id: Number(param(req, 'cid')) });   // WP-29 (G-SEC-5)
+    broadcast(req.project.id, { type: 'comments', path: '' });
     res.json({ ok: true });
   }));
 
