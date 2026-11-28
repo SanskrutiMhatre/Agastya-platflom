@@ -9,7 +9,7 @@
 import { PART_COLUMNS, newPara, newPart, newPlate, newView, newTable, parentRef, text, type Appendix, type Cell, type Inline, type JsgDoc, type Para, type Plate, type PlateView, type Table } from './model';
 import { inlineHtml, readInline } from './editor';
 import { plain as plainOf } from './model';
-import { BASE_CSS, button, injectCss, mk, pickGraphic, type JsgEditorLike, type JsgEditorOptions, type JsgFinding, type JsgHost } from './shared';
+import { BASE_CSS, button, injectCss, mk, pickGraphic, type JsgCollab, type JsgEditorLike, type JsgEditorOptions, type JsgFinding, type JsgHost, type JsgLiveSurface, type JsgSlot } from './shared';
 import { mountIsplPreview, type PreviewHandle } from './ispl-preview';
 import { serializeJsg } from './xml';
 import { confirmDialog, promptDialog } from '../lib/dialogs';
@@ -45,7 +45,7 @@ const CSS = `
 .jsg-pvpane.off{display:none}
 `;
 
-export class IsplEditor implements JsgEditorLike {
+export class IsplEditor implements JsgEditorLike, JsgLiveSurface {
   private readonly root: HTMLElement;
   private readonly doc: JsgDoc;
   private readonly host: JsgHost;
@@ -55,6 +55,10 @@ export class IsplEditor implements JsgEditorLike {
   private sel = -1;
   private nav!: HTMLElement; private bar!: HTMLElement; private sheet!: HTMLElement; private status!: HTMLElement;
   private pvPane!: HTMLElement; private preview!: PreviewHandle; private pvTimer = 0; private pvOn = true; private pvBtn!: HTMLButtonElement;
+  // Phase 3 (P3-1): live co-editing (collab/jsg.ts): changes are reported to the binding, "unsaved" is the room's, the fields drawn are listed (slots)
+  private collab: JsgCollab | null = null;
+  private slotList: JsgSlot[] = [];
+  private slot(el: HTMLElement, owner: object, key: string | number, kind: JsgSlot['kind'], show: () => void): void { this.slotList.push({ el, owner, key, kind, show }); }
   private onKey = (e: KeyboardEvent): void => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); this.host.onSaveRequested(); } };
 
   constructor(host: HTMLElement, opts: JsgEditorOptions) {
@@ -75,14 +79,20 @@ export class IsplEditor implements JsgEditorLike {
   }
 
   destroy(): void { window.clearTimeout(this.pvTimer); this.preview.destroy(); document.removeEventListener('keydown', this.onKey); this.root.innerHTML = ''; this.root.classList.remove('jsg-ed', 'jsg-ro'); }
-  isDirty(): boolean { return this.dirty; }
+  isDirty(): boolean { return this.collab ? this.collab.dirty() : this.dirty; }
+  // ── live co-editing (JsgLiveSurface) ──
+  setCollab(c: JsgCollab | null): void { this.collab = c; }
+  liveSlots(): JsgSlot[] { this.slotList = this.slotList.filter((s) => s.el.isConnected); return this.slotList; }
+  liveRedraw(): void { const keep = this.sheet.parentElement?.scrollTop ?? 0; this.render(); if (this.sheet.parentElement) this.sheet.parentElement.scrollTop = keep; }
+  afterRemote(): void { this.renderNav(); this.refreshStatus(); this.schedulePreview(); }
+  liveParts(): { root: HTMLElement; sheet: HTMLElement; scroll: HTMLElement; nav: HTMLElement } { return { root: this.root, sheet: this.sheet, scroll: this.sheet.parentElement as HTMLElement, nav: this.nav }; }
   markSaved(): void { this.dirty = false; this.host.onDirty(false); }
   /** A recovered draft was loaded (FE-006): it counts as unsaved until it is saved. */
   markDirty(): void { this.dirty = true; this.host.onDirty(true); }
   getXml(): string { return serializeJsg(this.doc); }
   getDoc(): JsgDoc { return this.doc; }
   setFindings(f: JsgFinding[]): void { this.findings = f; this.renderNav(); }
-  private touch(): void { if (!this.dirty) { this.dirty = true; this.host.onDirty(true); } this.refreshStatus(); this.schedulePreview(); }
+  private touch(typing = true): void { if (this.collab) this.collab.changed(typing); else if (!this.dirty) { this.dirty = true; this.host.onDirty(true); } this.refreshStatus(); this.schedulePreview(); }
   /** Redraw the preview shortly after the last edit (typing in the grid must not redraw on every key). */
   private schedulePreview(): void {
     if (!this.pvOn) return; window.clearTimeout(this.pvTimer);
@@ -111,7 +121,7 @@ export class IsplEditor implements JsgEditorLike {
   }
 
   private plate(): Plate | null { const p = this.doc.plates[this.sel]; if (!p) this.host.notify('Click a plate first.', 'info'); return p ?? null; }
-  private redraw(): void { this.touch(); const keep = this.sheet.parentElement?.scrollTop ?? 0; this.render(); if (this.sheet.parentElement) this.sheet.parentElement.scrollTop = keep; }
+  private redraw(): void { this.touch(false); const keep = this.sheet.parentElement?.scrollTop ?? 0; this.render(); if (this.sheet.parentElement) this.sheet.parentElement.scrollTop = keep; }
 
   private addPlate(under: boolean): void {
     const cur = this.doc.plates[this.sel]; let ref = '';
@@ -139,8 +149,9 @@ export class IsplEditor implements JsgEditorLike {
   // ── rendering ────────────────────────────────────────────────────────────────────────────────────────────────────────────────
   private card(title: string): HTMLElement { const c = mk('div', 'jsg-card'); c.append(mk('h3', '', title)); this.sheet.appendChild(c); return c; }
 
-  private rich(get: () => Inline[], set: (i: Inline[]) => void, ph = ''): HTMLElement {
+  private rich(get: () => Inline[], set: (i: Inline[]) => void, ph = '', owner?: object, key: string | number = 'inline'): HTMLElement {
     const e = mk('div', 'jsg-rich'); e.innerHTML = inlineHtml(get()); if (ph) e.dataset.ph = ph;
+    if (owner) this.slot(e, owner, key, 'rich', () => { e.innerHTML = inlineHtml(get()); });
     if (!this.readOnly) {
       e.setAttribute('contenteditable', 'true');
       e.addEventListener('input', () => { set(readInline(e)); this.touch(); });
@@ -150,7 +161,7 @@ export class IsplEditor implements JsgEditorLike {
   }
 
   private render(): void {
-    this.sheet.innerHTML = '';
+    this.sheet.innerHTML = ''; this.slotList = [];
     const note = this.card('Cover and ancillary pages');
     note.append(mk('div', 'jsg-note', 'The cover, certificate, preface, amendments, abbreviations, the list of equipment already supplied and the contents are edited under "Ancillary pages" in the project menu on the left. This editor holds the plates and the appendices.'));
 
@@ -183,8 +194,8 @@ export class IsplEditor implements JsgEditorLike {
     this.sheet.appendChild(mk('div', 'jsg-note', 'Each appendix prints on its own landscape page: APPX \u2018A\u2019 at the right, its title, a sentence, and a table. Press + Appendix to add one.'));
     apps.forEach((a, ai) => {
       const card = mk('div', 'jsg-plate'); card.id = `jsg-ap-${ai}`; const h = mk('header'); card.appendChild(h);
-      const inp = (cls: string, ph: string, get: () => string, set: (v: string) => void): HTMLInputElement => { const i = document.createElement('input'); i.type = 'text'; i.className = cls; i.placeholder = ph; i.value = get(); i.disabled = this.readOnly; i.addEventListener('input', () => { set(i.value); this.touch(); }); return i; };
-      h.append(mk('b', '', 'APPX \u2018'), inp('ref', 'A', () => a.label, (v) => { a.label = v; }), mk('b', '', '\u2019'), inp('ttl', 'LIST OF CARRIED SPARES', () => a.title, (v) => { a.title = v; }));
+      const inp = (cls: string, ph: string, get: () => string, set: (v: string) => void, key: string): HTMLInputElement => { const i = document.createElement('input'); i.type = 'text'; i.className = cls; i.placeholder = ph; i.value = get(); i.disabled = this.readOnly; i.addEventListener('input', () => { set(i.value); this.touch(); }); this.slot(i, a, key, 'input', () => { i.value = get(); }); return i; };
+      h.append(mk('b', '', 'APPX \u2018'), inp('ref', 'A', () => a.label, (v) => { a.label = v; }, 'label'), mk('b', '', '\u2019'), inp('ttl', 'LIST OF CARRIED SPARES', () => a.title, (v) => { a.title = v; }, 'title'));
       if (!this.readOnly) {
         h.append(button('\u2191', () => { if (ai) { [apps[ai - 1], apps[ai]] = [apps[ai], apps[ai - 1]]; this.redraw(); } }), button('\u2193', () => { if (ai < apps.length - 1) { [apps[ai + 1], apps[ai]] = [apps[ai], apps[ai + 1]]; this.redraw(); } }),
           button('Delete', () => {
@@ -195,7 +206,7 @@ export class IsplEditor implements JsgEditorLike {
       a.children.forEach((b, bi) => {
         if (b.k === 'para') {
           const box = mk('div', 'jsg-view'); box.append(mk('b', '', 'Sentence under the title'));
-          box.appendChild(this.rich(() => b.inline, (v) => { b.inline = v; })); card.appendChild(box);
+          box.appendChild(this.rich(() => b.inline, (v) => { b.inline = v; }, '', b)); card.appendChild(box);
         } else if (b.k === 'table') card.appendChild(this.appendixTable(b, () => a.children.splice(bi, 1)));
       });
       if (!this.readOnly) { const bar = mk('div', 'jsg-view'); bar.append(button('+ sentence', () => { a.children.unshift(newPara('', 2)); this.redraw(); }), button('+ table', () => { a.children.push(newTable(2, 4)); this.redraw(); })); card.appendChild(bar); }
@@ -216,7 +227,7 @@ export class IsplEditor implements JsgEditorLike {
         r.cells.forEach((c) => {
           const td = document.createElement(isHead ? 'th' : 'td'); if (c.colspan && c.colspan > 1) td.colSpan = c.colspan; if (c.rowspan && c.rowspan > 1) td.rowSpan = c.rowspan;
           const i = document.createElement('input'); i.value = this.cellText(c); i.disabled = this.readOnly; if (isHead) i.style.fontWeight = 'bold';
-          i.addEventListener('input', () => { c.parts = [{ k: 'text', inline: text(i.value) }]; this.touch(); }); td.appendChild(i); tr.appendChild(td);
+          i.addEventListener('input', () => { c.parts = [{ k: 'text', inline: text(i.value) }]; this.touch(); }); this.slot(i, c, 'parts', 'cell', () => { i.value = this.cellText(c); }); td.appendChild(i); tr.appendChild(td);
         });
         const act = mk('td', 'act'); if (!this.readOnly) { act.appendChild(button('\u00d7', () => { rows.splice(ri, 1); if (!isHead && !t.body.length) t.body.push({ cells: Array.from({ length: cols() }, () => ({ parts: [{ k: 'text' as const, inline: [] }] })) }); this.touch(); draw(); })); } tr.appendChild(act); tb.appendChild(tr);
       });
@@ -239,10 +250,10 @@ export class IsplEditor implements JsgEditorLike {
   private plateCard(p: Plate, index: number): void {
     const card = mk('div', `jsg-plate${index === this.sel ? ' sel' : ''}`); card.id = `jsg-pl-${index}`;
     const h = mk('header'); card.appendChild(h);
-    const inp = (cls: string, ph: string, get: () => string, set: (v: string) => void): HTMLInputElement => { const i = document.createElement('input'); i.type = 'text'; i.className = cls; i.placeholder = ph; i.value = get(); i.disabled = this.readOnly; i.addEventListener('input', () => { set(i.value); this.touch(); }); return i; };
-    const ref = inp('ref', 'Ref (I-A)', () => p.ref, (v) => { p.ref = v; });
+    const inp = (cls: string, ph: string, get: () => string, set: (v: string) => void, key: string): HTMLInputElement => { const i = document.createElement('input'); i.type = 'text'; i.className = cls; i.placeholder = ph; i.value = get(); i.disabled = this.readOnly; i.addEventListener('input', () => { set(i.value); this.touch(); }); this.slot(i, p, key, 'input', () => { i.value = get(); }); return i; };
+    const ref = inp('ref', 'Ref (I-A)', () => p.ref, (v) => { p.ref = v; }, 'ref');
     ref.addEventListener('change', () => this.redraw());
-    h.append(mk('b', '', 'PLATE –'), ref, inp('ttl', 'Title (Bridging System)', () => p.title, (v) => { p.title = v; }), inp('cap', 'Caption line (optional)', () => p.caption, (v) => { p.caption = v; }));
+    h.append(mk('b', '', 'PLATE –'), ref, inp('ttl', 'Title (Bridging System)', () => p.title, (v) => { p.title = v; }, 'title'), inp('cap', 'Caption line (optional)', () => p.caption, (v) => { p.caption = v; }, 'caption'));
     const chk = (label: string, get: () => boolean, set: (v: boolean) => void, title: string): void => { const l = document.createElement('label'); l.title = title; const c = document.createElement('input'); c.type = 'checkbox'; c.checked = get(); c.disabled = this.readOnly; c.addEventListener('change', () => { set(c.checked); this.redraw(); }); l.append(c, document.createTextNode(` ${label}`)); h.appendChild(l); };
     chk('divider page', () => p.divider, (v) => { p.divider = v; }, 'Print the big PLATE page and the index of the sub-plates');
     chk('"for 1 set" column', () => p.setColumn, (v) => { p.setColumn = v; }, 'The parts table has the extra column No. Off (For 1 Set)');
@@ -254,11 +265,11 @@ export class IsplEditor implements JsgEditorLike {
   private viewCard(p: Plate, v: PlateView, vi: number): HTMLElement {
     const box = mk('div', 'jsg-view'); box.append(mk('b', '', `View ${vi + 1}`));
     const cap = document.createElement('input'); cap.type = 'text'; cap.placeholder = 'Red caption under the picture (e.g. 100M INFANTRY FOOT BRIDGE FLOATING (ISOMETRIC VIEW 1))'; cap.value = v.caption; cap.disabled = this.readOnly; cap.style.cssText = 'width:100%;box-sizing:border-box;margin:4px 0;font:13px system-ui;padding:3px 6px;border:1px solid var(--sheet-jsg-line);border-radius:3px;background:var(--sheet);color:var(--sheet-ink)';
-    cap.addEventListener('input', () => { v.caption = cap.value; this.touch(); }); box.appendChild(cap);
+    cap.addEventListener('input', () => { v.caption = cap.value; this.touch(); }); this.slot(cap, v, 'caption', 'input', () => { cap.value = v.caption; }); box.appendChild(cap);
     const pics = mk('div', 'pics'); box.appendChild(pics);
     v.graphics.forEach((g, gi) => {
       const d = mk('div', 'pic'); const img = document.createElement('img'); img.src = this.host.imageUrl(g.src); img.alt = g.src; d.appendChild(img);
-      const lab = document.createElement('input'); lab.placeholder = 'label (I-B/1)'; lab.value = g.label ?? ''; lab.disabled = this.readOnly; lab.addEventListener('input', () => { g.label = lab.value || undefined; this.touch(); }); d.appendChild(lab);
+      const lab = document.createElement('input'); lab.placeholder = 'label (I-B/1)'; lab.value = g.label ?? ''; lab.disabled = this.readOnly; lab.addEventListener('input', () => { g.label = lab.value || undefined; this.touch(); }); this.slot(lab, g, 'label', 'input', () => { lab.value = g.label ?? ''; }); d.appendChild(lab);
       if (!this.readOnly) d.appendChild(button('remove', () => { v.graphics.splice(gi, 1); this.redraw(); }));
       pics.appendChild(d);
     });
@@ -272,7 +283,7 @@ export class IsplEditor implements JsgEditorLike {
       for (const c of cols) { const th = document.createElement('th'); th.textContent = c.label; th.style.minWidth = `${c.width}px`; hr.appendChild(th); } hr.appendChild(mk('th')); t.appendChild(hr);
       v.parts.forEach((row, ri) => {
         const tr = document.createElement('tr');
-        for (const c of cols) { const td = document.createElement('td'); const i = document.createElement('input'); i.value = row[c.key]; i.disabled = this.readOnly; if (c.align) i.style.textAlign = c.align; i.addEventListener('input', () => { row[c.key] = i.value; this.touch(); }); td.appendChild(i); tr.appendChild(td); }
+        for (const c of cols) { const td = document.createElement('td'); const i = document.createElement('input'); i.value = row[c.key]; i.disabled = this.readOnly; if (c.align) i.style.textAlign = c.align; i.addEventListener('input', () => { row[c.key] = i.value; this.touch(); }); this.slot(i, row, c.key, 'input', () => { i.value = row[c.key]; }); td.appendChild(i); tr.appendChild(td); }
         const act = mk('td', 'act'); act.style.width = '92px';
         if (!this.readOnly) act.append(button('\u2191', () => { if (ri) { [v.parts[ri - 1], v.parts[ri]] = [v.parts[ri], v.parts[ri - 1]]; this.touch(); draw(); } }), button('\u2193', () => { if (ri < v.parts.length - 1) { [v.parts[ri + 1], v.parts[ri]] = [v.parts[ri], v.parts[ri + 1]]; this.touch(); draw(); } }),
           button('\u2398', () => { v.parts.splice(ri + 1, 0, { ...row }); this.touch(); draw(); }), button('×', () => { v.parts.splice(ri, 1); this.touch(); draw(); }));
@@ -300,7 +311,7 @@ export class IsplEditor implements JsgEditorLike {
     const drawNotes = (): void => {
       notes.innerHTML = ''; notes.append(mk('b', '', 'Notes under the table'));
       (v.notes ??= []).forEach((n, ni) => {
-        const r = mk('div', 'jsg-row'); r.appendChild(this.rich(() => n, (x) => { v.notes[ni] = x; }, 'Note: Above mentioned quantity is for one ...'));
+        const r = mk('div', 'jsg-row'); r.appendChild(this.rich(() => v.notes[ni] ?? n, (x) => { v.notes[ni] = x; }, 'Note: Above mentioned quantity is for one ...', v.notes, ni));
         if (!this.readOnly) r.appendChild(button('×', () => { v.notes.splice(ni, 1); this.touch(); drawNotes(); })); notes.appendChild(r);
       });
       if (!this.readOnly) notes.appendChild(button('+ note', () => { v.notes.push(text('Note: ')); this.touch(); drawNotes(); }));

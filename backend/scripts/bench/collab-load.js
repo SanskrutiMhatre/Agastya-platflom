@@ -3,6 +3,7 @@
 //
 //   node backend/scripts/bench/collab-load.js [--clients 120] [--docs 40] [--typists 15] [--seconds 20] [--port 4311]
 //                                             [--jss 4] [--jss-clients 3] [--jss-typists 5]   (JSS books, readers in each, typists in one paragraph)
+//                                             [--jsg 4] [--jsg-clients 3] [--jsg-typists 5]   (JSG documents: handbooks and parts lists in turn)
 //
 // 120 headless Yjs clients (test/helpers-collab.js, the protocol the page speaks) over 16 accounts join 40 data modules; 15 of them type in
 // the SAME paragraph of one module (a character every 100 ms each, the way a person types); one more client in that module observes.
@@ -40,6 +41,8 @@ if (process.argv[2] === '--server') {
 const arg = (name, dflt) => { const i = process.argv.indexOf(`--${name}`); return i > 0 ? Number(process.argv[i + 1]) : dflt; };
 const CLIENTS = arg('clients', 120); const DOCS = arg('docs', 40); const TYPISTS = arg('typists', 15); const SECONDS = arg('seconds', 20); const PORT = arg('port', 4311);
 const JSS_BOOKS = arg('jss', 4); const JSS_CLIENTS = arg('jss-clients', 3); const JSS_TYPISTS = arg('jss-typists', 5);
+const JSG_DOCS = arg('jsg', 4); const JSG_CLIENTS = arg('jsg-clients', 3); const JSG_TYPISTS = arg('jsg-typists', 5);
+const JSG_SAMPLE = (k) => fs.readFileSync(path.resolve(ROOT, 'samples', `jsg-${k}`, 'jsg-document.xml'), 'utf8');
 const PW = 'Correct-Horse-9!';
 const SAMPLE = fs.readFileSync(path.resolve(ROOT, '..', 'frontend', 'public', 'samples', 'DMC-S1KSTUDIO-A-29-10-00-00A-040A-D_001-00_EN-US.XML'), 'utf8');
 
@@ -60,7 +63,8 @@ async function main() {
   if ((await admin.req('POST', '/api/auth/setup', { username: 'admin', password: PW, fullName: 'Admin' })).status !== 200) throw new Error('setup failed');
   // (a person may hold 8 sockets: the JSS readers and typists count too)
   const JSS_ALL = JSS_BOOKS ? Math.max(JSS_CLIENTS, JSS_TYPISTS + 1) + (JSS_BOOKS - 1) * JSS_CLIENTS : 0;
-  const ACCOUNTS = Math.max(2, Math.ceil((CLIENTS + JSS_ALL) / 8) + 1);
+  const JSG_ALL = JSG_DOCS ? Math.max(JSG_CLIENTS, JSG_TYPISTS + 1) + (JSG_DOCS - 1) * JSG_CLIENTS : 0;
+  const ACCOUNTS = Math.max(2, Math.ceil((CLIENTS + JSS_ALL + JSG_ALL) / 8) + 1);
   const users = [];
   for (let i = 0; i < ACCOUNTS; i++) {
     const name = `load${i}`;
@@ -96,6 +100,21 @@ async function main() {
     jssBooks.push(`${jpid}/jss/book`);
   }
 
+  // JSG (docs/phase3/collab-jsg.md): --jsg documents (the sample User Handbook and the sample parts list in turn, the first a handbook),
+  // --jsg-clients readers in each, --jsg-typists people typing in the SAME paragraph of the first handbook
+  const jsgDocs = [];
+  for (let b = 0; b < JSG_DOCS; b++) {
+    const kind = b % 2 ? 'ispl' : 'uhb';
+    const r = await owner.req('POST', '/api/projects', { name: `Collab load JSG ${b}`, format: 'jsg', domain: 'land', manualType: kind });
+    if (r.status !== 201) throw new Error(`create JSG project: ${r.status} ${JSON.stringify(r.json)}`);
+    const gpid = r.json.project.id;
+    const cur = await owner.req('GET', `/api/projects/${gpid}/jsg`);
+    const put = await owner.req('PUT', `/api/projects/${gpid}/jsg`, { xml: JSG_SAMPLE(kind), baseHash: cur.json.hash });
+    if (put.status !== 200) throw new Error(`seed JSG project: ${put.status} ${JSON.stringify(put.json)}`);
+    for (const u of users.slice(1)) await owner.req('POST', `/api/projects/${gpid}/assign`, { username: u.name, role: 'editor' });
+    jsgDocs.push(`${gpid}/jsg/document`);
+  }
+
   // the clients: the typists and the observer in the hot module, the rest spread over all modules
   const clients = [];
   const t0 = Date.now();
@@ -118,6 +137,17 @@ async function main() {
       jssClients.push({ c, name: jssBooks[b] });
     }
   }
+  const jsgClients = [];
+  for (let b = 0; b < jsgDocs.length; b++) {
+    const n = b === 0 ? Math.max(JSG_CLIENTS, JSG_TYPISTS + 1) : JSG_CLIENTS;
+    for (let i = 0; i < n; i++) {
+      const u = users[1 + ((CLIENTS + jssClients.length + jsgClients.length) % (users.length - 1))];
+      const c = new CollabClient(base, u.cookie); await c.open();
+      const j = await c.join(jsgDocs[b]);
+      if (j.error) throw new Error(`join ${jsgDocs[b]}: ${JSON.stringify(j.error)}`);
+      jsgClients.push({ c, name: jsgDocs[b] });
+    }
+  }
   const joinMs = Date.now() - t0;
   const observer = clients[0].c.room(HOT);
   // the hot JSS book: a paragraph in its first section (the stencil's sections start empty), then an observer and its typists
@@ -132,6 +162,15 @@ async function main() {
     for (const { c } of jssIn) await c.settled(JHOT, 15000);
     const jobs = jssIn[0].c.room(JHOT).doc;
     jobs.getMap('bench').observe((ev) => { const now = Date.now(); for (const k of ev.keysChanged) { const v = jobs.getMap('bench').get(k); if (typeof v === 'number') jlat.push(now - v); } });
+  }
+  // the hot JSG handbook: its first body paragraph (a paragraph of the first section of the first chapter)
+  const GHOT = jsgDocs[0];
+  const jsgIn = GHOT ? jsgClients.filter((x) => x.name === GHOT) : [];
+  const jsgPara = (doc) => findEl(findEl(doc.getXmlFragment('xml'), 'section'), 'para');
+  const glat = [];
+  if (GHOT) {
+    const gobs = jsgIn[0].c.room(GHOT).doc;
+    gobs.getMap('bench').observe((ev) => { const now = Date.now(); for (const k of ev.keysChanged) { const v = gobs.getMap('bench').get(k); if (typeof v === 'number') glat.push(now - v); } });
   }
   const lat = [];
   observer.doc.getMap('bench').observe((ev) => { const now = Date.now(); for (const k of ev.keysChanged) { const v = observer.doc.getMap('bench').get(k); if (typeof v === 'number') lat.push(now - v); } });
@@ -164,11 +203,24 @@ async function main() {
     setTimeout(tick, k * 11);
   }));
   timers.push(...jtimers);
+  let gtyped = 0;
+  const gtimers = jsgIn.slice(1, 1 + JSG_TYPISTS).map(({ c }, k) => new Promise((resolve) => {
+    const r = c.room(GHOT);
+    const tick = () => {
+      if (Date.now() >= end) { resolve(); return; }
+      const t = firstText(jsgPara(r.doc));
+      r.doc.transact(() => { t.insert(Math.floor(Math.random() * (t.length + 1)), String.fromCharCode(48 + (k % 10))); r.doc.getMap('bench').set(`g${k}`, Date.now()); });
+      gtyped++;
+      setTimeout(tick, 100);
+    };
+    setTimeout(tick, k * 13);
+  }));
+  timers.push(...gtimers);
   // the other clients move their cursors now and then (awareness traffic)
   const others = setInterval(() => { for (const { c, name } of clients.slice(1 + TYPISTS)) if (Math.random() < 0.1) c.setAwareness(name, null); }, 1000);
   await Promise.all(timers);
   clearInterval(others);
-  for (const { c, name } of [...clients, ...jssClients]) await c.settled(name, 15000);
+  for (const { c, name } of [...clients, ...jssClients, ...jsgClients]) await c.settled(name, 15000);
   await new Promise((r) => setTimeout(r, 1500));
   const after = await ask('usage');
 
@@ -197,11 +249,21 @@ async function main() {
     report.jss = { books: jssBooks.length, clients: jssClients.length, typistsInOneParagraph: Math.min(JSS_TYPISTS, jssIn.length - 1), keystrokes: jtyped, observed: jlat.length,
       latencyMs: { p50: jq(0.5), p95: jq(0.95), max: jlat[jlat.length - 1] }, converged: jsame, writtenBack: !!(jfl && jfl.info.hash) };
   }
+  let gsame = true;
+  if (GHOT) {
+    const gdocs = jsgIn.map((x) => x.c.room(GHOT).doc);
+    gsame = gdocs.every((d) => Y.encodeStateVector(d).toString() === Y.encodeStateVector(gdocs[0]).toString() && firstText(jsgPara(d)).toString() === firstText(jsgPara(gdocs[0])).toString());
+    const gfl = await jsgIn[1 % jsgIn.length].c.flush(GHOT, true);
+    glat.sort((a, b) => a - b);
+    const gq = (p) => glat.length ? glat[Math.min(glat.length - 1, Math.floor(p * glat.length))] : NaN;
+    report.jsg = { docs: jsgDocs.length, clients: jsgClients.length, typistsInOneParagraph: Math.min(JSG_TYPISTS, jsgIn.length - 1), keystrokes: gtyped, observed: glat.length,
+      latencyMs: { p50: gq(0.5), p95: gq(0.95), max: glat[glat.length - 1] }, converged: gsame, writtenBack: !!(gfl && gfl.info.hash) };
+  }
   console.log(JSON.stringify(report, null, 2));
-  for (const { c } of [...clients, ...jssClients]) c.close();
+  for (const { c } of [...clients, ...jssClients, ...jsgClients]) c.close();
   server.send('stop');
   await new Promise((r) => server.once('exit', r));
-  process.exit(same && jsame ? 0 : 1);
+  process.exit(same && jsame && gsame ? 0 : 1);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

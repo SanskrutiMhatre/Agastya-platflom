@@ -15,6 +15,7 @@ import { startDirectorySync } from './services/directorySync';
 import { acquireWorkspaceLock, releaseWorkspaceLock } from './services/workspaceLock';
 import * as broadcast from './services/broadcast';
 import * as collabRooms from './services/collab/rooms';
+import './services/collab/jsg';   // P3-1: the JSG document as a live room format (register() on load)
 import { reconcileRegistry, sweepPendingImports } from './services/projects';
 import { startRenderer, stopRenderer, rendererStatus } from './services/publisher';
 import { shutdownJobs } from './services/jobs';

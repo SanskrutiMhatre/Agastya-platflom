@@ -10,7 +10,7 @@ import { isClause, newClause, newFigure, newList, newNotice, newPara, newTable, 
   type Align, type Appendix, type Block, type Cell, type Chapter, type Clause, type Figure, type Graphic, type Inline, type JsgDoc, type List, type ListType, type Mark, type Notice, type Orientation, type Para, type Part, type Section, type Table } from './model';
 import { parseJsg, serializeJsg } from './xml';
 import { confirmDialog } from '../lib/dialogs';
-import { BASE_CSS, escH, injectCss, mk, openMenu, pickGraphic, tabbedBar, type BarTab, type GraphicInfo, type JsgEditorLike, type JsgEditorOptions, type JsgFinding, type JsgHost, type MenuItem, type SectionBadge } from './shared';
+import { BASE_CSS, escH, injectCss, mk, openMenu, pickGraphic, tabbedBar, type BarTab, type GraphicInfo, type JsgCollab, type JsgEditorLike, type JsgEditorOptions, type JsgFinding, type JsgHost, type JsgLiveSurface, type JsgSlot, type MenuItem, type SectionBadge } from './shared';
 
 export type { GraphicInfo, JsgFinding, JsgHost, JsgEditorOptions } from './shared';
 
@@ -52,7 +52,7 @@ export function readInline(el: Node): Inline[] {
   return out;
 }
 
-export class JsgEditor implements JsgEditorLike {
+export class JsgEditor implements JsgEditorLike, JsgLiveSurface {
   private readonly root: HTMLElement;
   private readonly doc: JsgDoc;
   private readonly host: JsgHost;
@@ -68,6 +68,11 @@ export class JsgEditor implements JsgEditorLike {
   private undoStack: string[] = []; private redoStack: string[] = []; private lastXml = ''; private histTimer: ReturnType<typeof setTimeout> | undefined; private restoring = false;
   private findBar!: HTMLElement; private findInput!: HTMLInputElement; private replaceInput!: HTMLInputElement; private matchCase!: HTMLInputElement; private findCount!: HTMLElement;
   private hits: Range[] = []; private hitAt = -1; private status!: HTMLElement;
+  // Phase 3 (P3-1): live co-editing (collab/jsg.ts). While live, each change is reported to the binding (which brings the room to the model),
+  // undo/redo are the room's per-person history, and "unsaved" is what the server has not acknowledged. The fields drawn are listed (slots)
+  // so another person's change is put into them in place.
+  private collab: JsgCollab | null = null;
+  private slotList: JsgSlot[] = [];
   private onKey = (e: KeyboardEvent): void => {
     const mod = e.ctrlKey || e.metaKey; const k = e.key.toLowerCase();
     if (mod && k === 's') { e.preventDefault(); this.host.onSaveRequested(); return; }
@@ -103,7 +108,13 @@ export class JsgEditor implements JsgEditorLike {
   }
 
   destroy(): void { document.removeEventListener('keydown', this.onKey); if (this.histTimer) clearTimeout(this.histTimer); this.clearHits(); this.root.innerHTML = ''; this.root.classList.remove('jsg-ed', 'jsg-ro'); }
-  isDirty(): boolean { return this.dirty; }
+  isDirty(): boolean { return this.collab ? this.collab.dirty() : this.dirty; }
+  // ── live co-editing (JsgLiveSurface) ──
+  setCollab(c: JsgCollab | null): void { this.collab = c; if (this.histTimer) { clearTimeout(this.histTimer); this.histTimer = undefined; } this.refreshHistory(); }
+  liveSlots(): JsgSlot[] { this.slotList = this.slotList.filter((s) => s.el.isConnected); return this.slotList; }
+  liveRedraw(): void { const keep = this.sheet.parentElement?.scrollTop ?? 0; this.selected = null; this.selectedEl = null; this.render(); if (this.sheet.parentElement) this.sheet.parentElement.scrollTop = keep; }
+  afterRemote(): void { this.renderNav(); this.refreshStatus(); this.refreshHistory(); if (this.findBar.classList.contains('open')) this.runFind(false); }
+  liveParts(): { root: HTMLElement; sheet: HTMLElement; scroll: HTMLElement; nav: HTMLElement } { return { root: this.root, sheet: this.sheet, scroll: this.sheet.parentElement as HTMLElement, nav: this.nav }; }
   /** Show (or stop showing) a code beside each section heading. The document is not touched; the sheet is drawn again where it stood. */
   setSectionBadge(fn: SectionBadge | undefined): void { this.badge = fn; const keep = this.sheet.parentElement?.scrollTop ?? 0; this.render(); if (this.sheet.parentElement) this.sheet.parentElement.scrollTop = keep; }
   private codeEl(s: { id?: string; title: string }, chapter: number): HTMLElement | null { const t = this.badge?.(s, chapter); if (!t) return null; const e = this.el('span', 'jsg-code', t); e.setAttribute('contenteditable', 'false'); e.title = 'Data module code of this section (kept in the backend, not in the document)'; return e; }
@@ -173,7 +184,8 @@ export class JsgEditor implements JsgEditorLike {
     return info;
   }
 
-  private touch(): void {
+  private touch(typing = true): void {
+    if (this.collab) { this.collab.changed(typing); this.refreshHistory(); return; }
     if (!this.dirty) { this.dirty = true; this.host.onDirty(true); }
     if (this.restoring) return;
     if (this.histTimer) clearTimeout(this.histTimer);
@@ -184,21 +196,25 @@ export class JsgEditor implements JsgEditorLike {
   /** Remember the document as it was before the edit that has just been made (nothing is remembered if nothing changed). */
   private checkpoint(): void {
     if (this.histTimer) { clearTimeout(this.histTimer); this.histTimer = undefined; }
-    if (this.restoring) return;
+    if (this.restoring || this.collab) return;
     const now = serializeJsg(this.doc);
     if (now === this.lastXml) return;
     this.undoStack.push(this.lastXml); if (this.undoStack.length > 100) this.undoStack.shift();
     this.redoStack = []; this.lastXml = now; this.refreshHistory(); this.refreshStatus();
   }
-  canUndo(): boolean { this.checkpoint(); return this.undoStack.length > 0; }
-  canRedo(): boolean { return this.redoStack.length > 0; }
+  canUndo(): boolean { if (this.collab) return this.collab.canUndo(); this.checkpoint(); return this.undoStack.length > 0; }
+  canRedo(): boolean { return this.collab ? this.collab.canRedo() : this.redoStack.length > 0; }
   undo(): void {
-    if (this.readOnly) return; this.checkpoint();
+    if (this.readOnly) return;
+    if (this.collab) { this.collab.undo(); return; }
+    this.checkpoint();
     const prev = this.undoStack.pop(); if (prev === undefined) return this.host.notify('Nothing to undo.', 'info');
     this.redoStack.push(this.lastXml); this.restore(prev);
   }
   redo(): void {
-    if (this.readOnly) return; this.checkpoint();
+    if (this.readOnly) return;
+    if (this.collab) { this.collab.redo(); return; }
+    this.checkpoint();
     const next = this.redoStack.pop(); if (next === undefined) return this.host.notify('Nothing to redo.', 'info');
     this.undoStack.push(this.lastXml); this.restore(next);
   }
@@ -213,7 +229,7 @@ export class JsgEditor implements JsgEditorLike {
   }
   private refreshHistory(): void {
     const u = this.buttons.get('undo'); const r = this.buttons.get('redo');
-    if (u) u.disabled = this.readOnly || !this.undoStack.length; if (r) r.disabled = this.readOnly || !this.redoStack.length;
+    if (u) u.disabled = this.readOnly || !(this.collab ? this.collab.canUndo() : this.undoStack.length); if (r) r.disabled = this.readOnly || !(this.collab ? this.collab.canRedo() : this.redoStack.length);
   }
 
   // ── find and replace ─────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -528,11 +544,11 @@ export class JsgEditor implements JsgEditorLike {
     else { if ((all[0]?.cells.length ?? 0) <= 1) return this.host.notify('A table keeps at least one column.', 'info'); for (const row of all) row.cells.splice(c, 1); }
     t.widths = undefined; this.afterEdit(t);
   }
-  private afterEdit(focus: unknown): void { this.touch(); this.checkpoint(); const keep = this.sheet.parentElement?.scrollTop ?? 0; this.render(focus); if (this.sheet.parentElement) this.sheet.parentElement.scrollTop = keep; }
+  private afterEdit(focus: unknown): void { this.touch(false); this.checkpoint(); const keep = this.sheet.parentElement?.scrollTop ?? 0; this.render(focus); if (this.sheet.parentElement) this.sheet.parentElement.scrollTop = keep; }
 
   // ── rendering ────────────────────────────────────────────────────────────────────────────────────────────────────────────────
   private render(focus?: unknown): void {
-    this.sheet.innerHTML = ''; this.slots = new WeakMap(); this.figures = 0; this.tables = 0;
+    this.sheet.innerHTML = ''; this.slots = new WeakMap(); this.figures = 0; this.tables = 0; this.slotList = [];
     const s = this.sheet; let focusEl: HTMLElement | null = null;
     this.ancillaryNote();
     this.doc.chapters.forEach((ch, ci) => {
@@ -573,13 +589,15 @@ export class JsgEditor implements JsgEditorLike {
   /** A plain-text title that edits one string property of the model. */
   private titleEl<T extends Record<string, any>>(obj: T, key: keyof T & string, ph: string): HTMLElement {
     const e = this.el('span', 't'); e.dataset.ph = ph; e.textContent = String(obj[key] ?? '');
+    this.slotList.push({ el: e, owner: obj, key, kind: 'title', show: () => { e.textContent = String(obj[key] ?? ''); } });
     if (!this.readOnly) { e.setAttribute('contenteditable', 'plaintext-only'); e.addEventListener('input', () => { (obj as any)[key] = (e.textContent ?? '').replace(/\s+/g, ' '); this.touch(); }); e.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') ev.preventDefault(); }); }
     return e;
   }
 
   /** A run of rich text that edits an Inline[] of the model. */
-  private richEl(tag: string, cls: string, get: () => Inline[], set: (i: Inline[]) => void, onEnter?: () => void, ph = ''): HTMLElement {
+  private richEl(tag: string, cls: string, get: () => Inline[], set: (i: Inline[]) => void, onEnter?: () => void, ph = '', owner?: object): HTMLElement {
     const e = this.el(tag, cls); e.innerHTML = inlineHtml(get()); if (ph) e.dataset.ph = ph;
+    if (owner) this.slotList.push({ el: e, owner, key: 'inline', kind: 'rich', show: () => { e.innerHTML = inlineHtml(get()); } });
     if (!this.readOnly) {
       e.setAttribute('contenteditable', 'true');
       e.addEventListener('input', () => { set(readInline(e)); this.touch(); });
@@ -611,15 +629,15 @@ export class JsgEditor implements JsgEditorLike {
   }
 
   private paraEl(p: Para, slot: Slot): HTMLElement {
-    const e = this.richEl('div', 'jsg-p', () => p.inline, (i) => { p.inline = i; }, () => this.insert2(slot, newPara('', p.indent), p), 'Paragraph');
+    const e = this.richEl('div', 'jsg-p', () => p.inline, (i) => { p.inline = i; }, () => this.insert2(slot, newPara('', p.indent), p), 'Paragraph', p);
     e.style.marginLeft = `${[0, 0, 22.7, 58.7, 65.2, 73.7][p.indent] ?? 22.7}pt`; if (p.align) e.style.textAlign = p.align;
     return e;
   }
   private insert2(slot: Slot, block: Block, after: unknown): void { const i = slot.list.indexOf(after); slot.list.splice(i + 1, 0, block); this.afterEdit(block); }
 
   private partEl(p: Part): HTMLElement {
-    if (p.k === 'text') return this.richEl('div', '', () => p.inline, (i) => { p.inline = i; });
-    if (p.k === 'para') return this.richEl('div', '', () => p.inline, (i) => { p.inline = i; });
+    if (p.k === 'text') return this.richEl('div', '', () => p.inline, (i) => { p.inline = i; }, undefined, '', p);
+    if (p.k === 'para') return this.richEl('div', '', () => p.inline, (i) => { p.inline = i; }, undefined, '', p);
     if (p.k === 'graphic') return this.imgEl(p.graphic);
     return this.listEl(p);
   }
@@ -654,7 +672,7 @@ export class JsgEditor implements JsgEditorLike {
 
   private noticeEl(n: Notice): HTMLElement {
     const e = this.el('div', 'jsg-notice'); e.append(this.el('b', '', n.k));
-    n.paras.forEach((p) => e.appendChild(this.richEl('div', 'jsg-p', () => p.inline, (i) => { p.inline = i; }, undefined, 'Text')));
+    n.paras.forEach((p) => e.appendChild(this.richEl('div', 'jsg-p', () => p.inline, (i) => { p.inline = i; }, undefined, 'Text', p)));
     return e;
   }
 
