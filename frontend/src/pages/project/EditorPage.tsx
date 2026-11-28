@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import '../../styles/pages/editor-host.css';   // WP-35 second pass: the editor page's columns, panel and import dialog styles
+import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Icon } from '../../components/Icon';
 import { Alert, errText } from '../../components/ui';
@@ -49,6 +50,7 @@ export function EditorPage() {
   const [conflict, setConflict] = useState<(StudioConflict & { theirs: string; hash: string }) | null>(null);
   // the header slot that holds Quick preview and Generate while the PDF pane is closed
   const [slot, setSlot] = useState<HTMLSpanElement | null>(null);
+  const [statusSlot, setStatusSlot] = useState<HTMLElement | null>(null);
   const reload = ctx.reload;
   // With both previews in their own windows the editor takes the whole width.
   // On a narrow window two panes side by side are unusable: show one at a time.
@@ -116,6 +118,9 @@ export function EditorPage() {
         await studio.setProject(ctx.id);
         if (!alive || !hostRef.current) return;
         await studio.mount(hostRef.current);
+        // UI redesign: the save state sits at the start of the Studio's status bar (a slot the page owns; the Studio's own items are untouched)
+        const bar = hostRef.current.querySelector<HTMLElement>('.status-bar');
+        if (bar) { let slot = bar.querySelector<HTMLElement>(':scope > .ed-status-slot'); if (!slot) { slot = document.createElement('span'); slot.className = 'ed-status-slot'; bar.prepend(slot); } setStatusSlot(slot); }
         setReady(true);
         // (not ?new=1: the Studio's own startup reads that one and opens the wizard itself)
         if (params.get('create') === '1') { setParams({}, { replace: true }); studio.newDocument(); }
@@ -141,12 +146,15 @@ export function EditorPage() {
   const teamDoc = dmFile ? { kind: 'dm' as const, path: dmFile, title: activeDoc?.title || undefined, leases: `/api/projects/${ctx.id}/dms/${encodeURIComponent(dmFile)}/checkout`, checkout: `/api/projects/${ctx.id}/dms/${encodeURIComponent(dmFile)}/checkout` } : null;
   const canBreak = ctx.role === 'owner' || ctx.role === 'manager' || me?.role === 'admin';
 
+  const chip = ready && writable ? <SaveStateChip state={{ saving, dirty: dirtyCount > 0, savedAt, dirtyCount }} ids={S1000D_STATE} /> : null;
+  // the chip is in the Studio's status bar while the Studio is on screen, in the header when only the PDF is
+  const chipInStatus = !!statusSlot && shown !== 'pdf';
   return (
     <>
       <EditorHeader layout={layout} title={ctx.summary.project.name}
         lead={<button className="icon-btn" onClick={() => setSide(!sideOpen)} title={sideOpen ? 'Hide the data module panel' : 'Show the data module panel'} aria-label={sideOpen ? 'Hide the data module panel' : 'Show the data module panel'} aria-pressed={sideOpen} data-testid="toggle-side"><Icon name="panel" size={17} /></button>}
         crumb={activeDoc ? <span className="v2-hint v2-trunc v2-crumb" title={activeDoc.file ?? activeDoc.title}>/ {activeDoc.title || activeDoc.file}</span> : null}
-        state={ready && writable ? <SaveStateChip state={{ saving, dirty: dirtyCount > 0, savedAt, dirtyCount }} ids={S1000D_STATE} /> : null}
+        state={chipInStatus ? null : chip}
         actions={<span className="v2-edactions">
           {ready && writable && dirtyCount > 0
             ? <button className="btn btn-sm btn-primary" onClick={() => void saveNow()} disabled={saving || !activeDoc} title="Save the open data module (Ctrl+S)" data-testid="save-now"><Icon name="check" size={12} />{saving ? 'Saving…' : `Save${dirtyCount > 1 ? ` (${dirtyCount} unsaved)` : ''}`}</button>
@@ -158,11 +166,11 @@ export function EditorPage() {
       <CommentsPanel projectId={ctx.id} state={comments} activeFile={activeDoc?.file} onOpen={(c) => { if (c.dmFile) openAt(c.dmFile); }} />
       {!writable ? <Alert tone="warn">You have {ctx.role} access to this project: you can read and proof data modules, but changes cannot be saved.</Alert> : null}
       {error ? <Alert tone="bad">{error}</Alert> : null}
-      <div className={`v2-split${focus ? ' is-focus' : ''}`} data-testid="editor-split" ref={splitRef} style={dragging || listDrag ? { userSelect: 'none' } : undefined}>
+      <div className={`v2-split ed-s1000d${focus ? ' is-focus' : ''}`} data-density="compact" data-testid="editor-split" ref={splitRef} style={dragging || listDrag ? { userSelect: 'none' } : undefined}>
         {side ? <EditorSide ctx={ctx} refreshKey={sideKey} treeKey={treeKey} width={listW} onCollapse={() => setSide(false)} /> : null}
-        {side ? <div className={`v2-divider ${listDrag ? 'drag' : ''}`} role="separator" aria-orientation="vertical" aria-label="Resize data module list" tabIndex={0} aria-valuenow={listW} aria-valuemin={180} aria-valuemax={480}
+        {side ? <div className={`v2-divider panel-resize rz1 ${listDrag ? 'drag' : ''}`} role="separator" aria-orientation="vertical" aria-label="Resize data module list" tabIndex={0} aria-valuenow={listW} aria-valuemin={180} aria-valuemax={480}
           onPointerDown={startListDrag} onKeyDown={(e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { const w = Math.min(480, Math.max(180, listW + (e.key === 'ArrowRight' ? 16 : -16))); setListW(w); localStorage.setItem('agastya.editor.listw', String(w)); studio.relayout(); } }} /> : null}
-        <div className="a" style={{ display: shown === 'pdf' ? 'none' : 'flex', flex: shown === 'edit' ? '1 1 0' : `0 0 calc((100% - ${side ? listW + 5 : 0}px) * ${pct / 100})` }}>
+        <div className="a" style={{ display: shown === 'pdf' ? 'none' : 'flex', flex: shown === 'edit' ? '1 1 0' : `0 0 calc((100% - ${side ? listW + 1 : 0}px) * ${pct / 100})` }}>
           <div ref={hostRef} className="v2-studio-host" data-testid="studio-host" />
         </div>
         {shown === 'split' ? <div className={`v2-divider ${dragging ? 'drag' : ''}`} role="separator" aria-orientation="vertical" aria-label="Resize editor and PDF" aria-valuenow={Math.round(pct)} aria-valuemin={layout.splitRange[0]} aria-valuemax={layout.splitRange[1]} tabIndex={0} onPointerDown={startDrag} onKeyDown={dividerKey} /> : null}
@@ -170,6 +178,7 @@ export function EditorPage() {
           <PdfPane ctx={ctx} savedTick={savedTick} onOpenAt={openAt} onPopped={setBothPopped} slot={shown === 'edit' && !focus ? slot : null} onReveal={layout.reveal} />
         </div>
       </div>
+      {chipInStatus && chip ? createPortal(<span className="item">{chip}</span>, statusSlot!) : null}
       {conflict ? <ConflictDialog base={conflict.base} mine={conflict.mine} theirs={conflict.theirs} onClose={() => setConflict(null)}
         check={(xml) => studio.checkText(xml, conflict.file)}
         save={async (xml) => { const ok = await studio.saveMerged(conflict.file, xml, conflict.hash); if (ok) toast('Saved: the merged data module replaced both versions.', 'success'); return ok; }} /> : null}

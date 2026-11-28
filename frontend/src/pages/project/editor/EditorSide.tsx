@@ -2,7 +2,7 @@
 // hierarchy (as saved in Publication) or as a flat list of every module. Project-level
 // functions (release, watermark, publication settings) are intentionally NOT here.
 
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, type CSSProperties } from 'react';
 import { contentApi, IMPORT_MAX_FILES, type DmSummary, type ExploreNode } from '../../../api';
 import { Icon } from '../../../components/Icon';
 import { ConfirmModal, Modal, errText, useAsync } from '../../../components/ui';
@@ -97,13 +97,14 @@ export function EditorSide({ ctx, refreshKey, treeKey, width, onCollapse }: { ct
     const o = openMap.get(file);
     const locked = byFile.get(file)?.locked;
     return (
-      <div key={file} className="v2-row" style={{ gap: 0, paddingLeft: indent * 14 }}>
-        <button className={`v2-dm ${o?.active ? 'active' : ''}`} style={{ flex: 1, minWidth: 0 }} onClick={() => open(file)} title={`${sub}\n${file}`} data-file={file} data-testid="dm-row">
-          <span className={`v2-dot ${o ? (o.dirty ? 'dirty' : 'open') : ''}`} />
-          <span className="t"><b>{title || file}</b><span>{sub}{locked ? ' · locked' : ''}</span></span>
+      <div key={file} className="node ed-node" style={{ '--depth': indent } as CSSProperties} aria-selected={o?.active || undefined}>
+        <button className={`v2-dm ed-node-btn ${o?.active ? 'active' : ''}`} onClick={() => open(file)} title={`${title || file}\n${sub}${locked ? ' · locked' : ''}\n${file}`} data-file={file} data-testid="dm-row">
+          <span className="twist" /><Icon name="file" size={14} />
+          <span className="t label"><b>{title || file}</b><span>{sub}{locked ? ' · locked' : ''}</span></span>
         </button>
         {locked ? <Icon name="lock" size={13} /> : null}
-        {writable && mayDelete ? <button className="icon-btn" style={{ opacity: .55 }} aria-label={`Delete ${file}`} title="Delete" onClick={() => setDel(file)}><Icon name="trash" size={13} /></button> : null}
+        {o ? <span className={`dot ${o.dirty ? 'warning' : 'accent'}`} title={o.dirty ? 'Open, unsaved changes' : 'Open in the editor'} /> : null}
+        {writable && mayDelete ? <button className="icon-btn ed-node-del" aria-label={`Delete ${file}`} title="Delete" onClick={() => setDel(file)}><Icon name="trash" size={13} /></button> : null}
       </div>
     );
   };
@@ -115,14 +116,14 @@ export function EditorSide({ ctx, refreshKey, treeKey, width, onCollapse }: { ct
   const renderItems = (items: TreeItem[]): React.ReactNode[] => items.map((it) => {
     if (it.kind === 'chapter') return (
       <div key={it.key} data-testid="chapter-node">
-        <button className="v2-chap" style={{ paddingLeft: 4 + it.depth * 14 }} onClick={() => toggle(it.key)} aria-expanded={!it.shut}>
-          <Icon name={it.shut ? 'right' : 'down'} size={13} /><Icon name="folder" size={14} /><span className="v2-trunc">{it.title || 'Untitled chapter'}</span><span className="v2-hint">{it.dmCount}</span>
+        <button className="v2-chap node group" style={{ '--depth': it.depth } as CSSProperties} onClick={() => toggle(it.key)} aria-expanded={!it.shut}>
+          <span className="twist"><Icon name={it.shut ? 'right' : 'down'} size={13} /></span><Icon name={it.shut ? 'folder' : 'folderOpen'} size={14} /><span className="label trunc">{it.title || 'Untitled chapter'}</span><span className="meta">{it.dmCount}</span>
         </button>
         {it.shut ? null : renderItems(it.children)}
       </div>
     );
-    if (it.kind === 'dm') return row({ file: it.node.file, title: byFile.get(it.node.file)?.techName || it.node.title, sub: it.node.infoName || it.node.dmc, indent: it.depth + 0.5 });
-    return <div key={it.key} className="v2-hint" style={{ padding: `2px 8px 2px ${12 + it.depth * 14}px` }} title="Listed in the publication but not in the project">Missing: {it.ref}</div>;
+    if (it.kind === 'dm') return row({ file: it.node.file, title: byFile.get(it.node.file)?.techName || it.node.title, sub: it.node.infoName || it.node.dmc, indent: it.depth + 1 });
+    return <div key={it.key} className="node ed-node-missing" style={{ '--depth': it.depth + 1 } as CSSProperties} title="Listed in the publication but not in the project"><span className="twist" /><Icon name="warn" size={13} /><span className="label trunc">Missing: {it.ref}</span></div>;
   });
 
   const rows: DmSummary[] = (list.data ?? []).filter(match);
@@ -136,23 +137,26 @@ export function EditorSide({ ctx, refreshKey, treeKey, width, onCollapse }: { ct
   const treeShown = progressive.limit;
 
   return (
-    <aside className="v2-dmpanel" aria-label="Data modules" style={{ flex: `0 0 ${width}px`, width }}>
-      <div className="v2-dmpanel-head v2-row v2-spread">
-        <h2 title={ctx.summary.project.name}>{ctx.summary.project.name}</h2>
-        <button className="icon-btn" onClick={onCollapse} title="Hide this panel" aria-label="Hide the data module panel" data-testid="collapse-side"><Icon name="panel" size={15} /></button>
+    <aside className="v2-dmpanel pane tree-pane" aria-label="Data modules" style={{ flex: `0 0 ${width}px`, width }}>
+      {/* UI redesign (mockup editor.html): the Explorer: its head carries the panel's commands, the project's name is its tooltip */}
+      <div className="pane-head" title={ctx.summary.project.name}>
+        <span>Explorer</span>
+        <span className="grow" />
+        {writable ? <>
+          <button className="icon-btn" title="Write a new data module" aria-label="New data module" data-testid="new-dm" onClick={() => studio.newDocument()}><Icon name="plus" size={14} /></button>
+        </> : null}
+        <button className="icon-btn" onClick={onCollapse} title="Hide this panel" aria-label="Hide the data module panel" data-testid="collapse-side"><Icon name="panel" size={14} /></button>
       </div>
-      <section className="v2-pside-section" style={{ flex: 1, minHeight: 120, borderTop: 0 }} aria-label="Data module list">
+      <section className="v2-pside-section ed-explorer" aria-label="Data module list">
         {/* WP-07 (UX-019): the row wraps instead of cutting the switch to "Publica" in a narrow panel */}
-        <header style={{ gap: 4, flexWrap: 'wrap', rowGap: 6 }}>
-          {isCir ? <b className="v2-trunc" style={{ fontSize: 12.5 }}>{list.data?.length ?? 0} common data modules</b> : (
-            <div className="v2-seg" role="group" aria-label="Show" style={{ flexShrink: 0 }}>
+        <header className="ed-explorer-tools">
+          {isCir ? <b className="v2-trunc">{list.data?.length ?? 0} common data modules</b> : (
+            <div className="v2-seg seg" role="group" aria-label="Show">
               <button className={view === 'tree' ? 'on' : ''} onClick={() => setView('tree')} aria-pressed={view === 'tree'} data-testid="view-tree">Publication</button>
               <button className={view === 'all' ? 'on' : ''} onClick={() => setView('all')} aria-pressed={view === 'all'} data-testid="view-all" title={`${list.data?.length ?? 0} data modules`}>All</button>
             </div>)}
           <span className="spacer" />
           {writable ? <>
-            <button className="btn btn-sm btn-primary" title="Write a new data module" aria-label="New data module" data-testid="new-dm" onClick={() => studio.newDocument()}><Icon name="plus" size={13} />New</button>
-            <span className="v2-vsep" aria-hidden="true" />
             <button className="icon-btn" title="Import data modules (.xml) and graphics" aria-label="Import data modules and graphics" onClick={() => fileInput.current?.click()}><Icon name="upload" size={14} /></button>
             <button className="icon-btn" title="Import without validation: brings in every file as it is (enterprise and content checks skipped)" aria-label="Import without validation" data-testid="import-raw" onClick={() => rawInput.current?.click()}><Icon name="warn" size={14} /></button>
             {canImportPackage(ctx.can) && !isCir ? <button className="icon-btn" title="Import a package: a folder, a .zip or files from another S1000D tool, scanned and repaired first" aria-label="Import package" data-testid="import-package" onClick={() => setPackageOpen(true)}><Icon name="package" size={14} /></button> : null}
@@ -162,16 +166,12 @@ export function EditorSide({ ctx, refreshKey, treeKey, width, onCollapse }: { ct
           </> : null}
           <button className="icon-btn" title="Refresh" aria-label="Refresh list" onClick={() => { list.reload(); explore.reload(); }}><Icon name="refresh" size={14} /></button>
         </header>
-        <div className="v2-filter">
+        <div className="v2-filter search-box">
           <Icon name="search" size={13} />
           <input className="v2-input" placeholder="Search by title, code or file…" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Escape') setQ(''); }} aria-label="Filter data modules" />
           {q ? <button className="icon-btn" aria-label="Clear the filter" title="Clear (Esc)" onClick={() => setQ('')}><span aria-hidden="true">×</span></button> : null}
         </div>
-        <div className="v2-hint v2-dmcount" aria-live="polite">
-          {q ? `${rows.length} of ${list.data?.length ?? 0} data modules match` : `${list.data?.length ?? 0} data module${(list.data?.length ?? 0) === 1 ? '' : 's'}`}
-          {docs.some((d) => d.dirty) ? <> · <span style={{ color: 'var(--warning)' }}>{docs.filter((d) => d.dirty).length} unsaved</span></> : null}
-        </div>
-        <div className="v2-dmlist" data-testid="dm-list" ref={listBox}>
+        <div className="v2-dmlist tree-scroll tree" data-testid="dm-list" ref={listBox}>
           {untitled.map((d) => (
             <button key={d.key} className={`v2-dm ${d.active ? 'active' : ''}`} onClick={() => studio.focusEditor()}>
               <span className={`v2-dot ${d.dirty ? 'dirty' : 'open'}`} /><span className="t"><b>{d.title}</b><span>New, not saved to the project yet</span></span>
@@ -185,8 +185,8 @@ export function EditorSide({ ctx, refreshKey, treeKey, width, onCollapse }: { ct
               {tree}
               {unplaced.length ? (
                 <div data-testid="unplaced-group">
-                  <div className="v2-chap static" title="Not placed in the publication yet. Add them from the Publication tab.">Not in the publication <span className="v2-hint">{unplaced.length}</span></div>
-                  {unplacedShown.map((d) => row({ file: d.file, title: d.techName, sub: d.infoName || d.dmc, indent: 0.5 }))}
+                  <div className="v2-chap static node group" title="Not placed in the publication yet. Add them from the Publication tab.">Not in the publication <span className="v2-hint">{unplaced.length}</span></div>
+                  {unplacedShown.map((d) => row({ file: d.file, title: d.techName, sub: d.infoName || d.dmc, indent: 1 }))}
                 </div>
               ) : null}
               <MoreRows shown={treeShown} total={treeTotal} onMore={progressive.more} onAll={progressive.all} />
@@ -200,6 +200,11 @@ export function EditorSide({ ctx, refreshKey, treeKey, width, onCollapse }: { ct
           )}
         </div>
       </section>
+      <div className="tree-foot v2-dmcount" aria-live="polite">
+        <span>{q ? `${rows.length} of ${list.data?.length ?? 0} data modules match` : `${list.data?.length ?? 0} data module${(list.data?.length ?? 0) === 1 ? '' : 's'}`}</span>
+        {docs.some((d) => d.dirty) ? <span className="ed-foot-warn">{docs.filter((d) => d.dirty).length} unsaved</span> : null}
+        {docs.filter((d) => d.file).length ? <span>{docs.filter((d) => d.file).length} open</span> : null}
+      </div>
       {picking ? <CirPicker projectId={ctx.id} existing={new Set((list.data ?? []).map((d) => d.file))} onClose={() => setPicking(false)} onAdded={() => { list.reload(); explore.reload(); void studio.refreshProjectData(); ctx.reload(); }} /> : null}
       {packageOpen ? <ImportPackageDialog projectId={ctx.id} can={ctx.can} onClose={() => setPackageOpen(false)} onChanged={onPackageChanged} /> : null}
       {refused ? (

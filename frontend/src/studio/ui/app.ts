@@ -216,9 +216,11 @@ export class App {
     this.statusLeft = h('div', { class: 'status-left', 'aria-label': 'Element path' });
     this.statusMsg = h('div', { class: 'status-msg', 'aria-live': 'polite' });
     this.statusRight = h('div', { class: 'status-right' });
-    const status = h('footer', { class: 'status-bar' }, this.statusLeft, this.statusMsg, this.statusRight);
+    // UI redesign (owner-approved mockup 2026-11-28): inside the platform the element path is its own bar under the toolbar, as in the mockup
+    const pathbar = this.host ? h('div', { class: 'pathbar studio-pathbar' }, this.statusLeft) : null;
+    const status = h('footer', { class: 'status-bar' }, ...(pathbar ? [] : [this.statusLeft]), this.statusMsg, this.statusRight);
     this.toasts = h('div', { class: 'toasts', 'aria-live': 'polite' });
-    this.root.append(header, ribbon, middle, this.bottomPane, status, this.toasts);
+    this.root.append(header, ribbon, ...(pathbar ? [pathbar] : []), middle, this.bottomPane, status, this.toasts);
     this.buildRibbon();
     this.setRightTab(this.layout.rightTab);
     this.applyLayout();

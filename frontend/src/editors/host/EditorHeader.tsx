@@ -41,7 +41,7 @@ export interface EditorHeaderProps {
 export function EditorHeader({ layout, title, lead, crumb, state, actions, extra, onPalette, onShortcuts, canSplit = true }: EditorHeaderProps) {
   const { view, setView, narrow, focus, toggleFocus } = layout;
   return (
-    <header className={`v2-top v2-edhead${focus ? ' is-focus' : ''}`} data-testid="editor-header">
+    <header className={`v2-top v2-edhead ed-bar${focus ? ' is-focus' : ''}`} data-testid="editor-header">
       {focus ? null : lead}
       <h1 className="v2-trunc v2-edtitle" title={title}>{title}</h1>
       {crumb}
@@ -49,13 +49,13 @@ export function EditorHeader({ layout, title, lead, crumb, state, actions, extra
       <span className="spacer" />
       {focus ? null : actions}
       {extra}
-      <button className="btn btn-sm v2-edcmd" onClick={onPalette} data-testid="chrome-palette" title="Command palette: every command of this editor by name (Ctrl+K)" aria-keyshortcuts="Control+K">
-        <Icon name="command" size={12} /><span className="v2-edcmd-label">Commands</span><kbd className="v2-kbd">Ctrl K</kbd>
+      <button className="btn btn-sm v2-edcmd search-trigger" onClick={onPalette} data-testid="chrome-palette" title="Command palette: every command of this editor by name (Ctrl+K)" aria-keyshortcuts="Control+K">
+        <Icon name="command" size={12} /><span className="v2-edcmd-label">Commands</span><span className="kbd-group"><kbd className="v2-kbd">Ctrl</kbd><kbd className="v2-kbd">K</kbd></span>
       </button>
       <button className="icon-btn" onClick={onShortcuts} data-testid="chrome-shortcuts" title="Keyboard shortcuts (F1)" aria-label="Keyboard shortcuts" aria-keyshortcuts="F1"><Icon name="keyboard" size={16} /></button>
       <button className={`icon-btn${focus ? ' is-on' : ''}`} onClick={toggleFocus} data-testid="chrome-focus" aria-pressed={focus} aria-keyshortcuts="Control+Period"
         title={focus ? 'Leave focus mode (Ctrl+. or Esc)' : 'Focus mode: only the document (Ctrl+.)'} aria-label={focus ? 'Leave focus mode' : 'Focus mode'}><Icon name={focus ? 'unfocus' : 'focus'} size={16} /></button>
-      {focus ? null : <div className="v2-seg" role="group" aria-label="Editor layout">
+      {focus ? null : <div className="v2-seg seg" role="group" aria-label="Editor layout">
         <button className={view === 'edit' ? 'on' : ''} onClick={() => setView('edit')} aria-pressed={view === 'edit'} title="Write only">Editor</button>
         {narrow || !canSplit ? null : <button className={view === 'split' ? 'on' : ''} onClick={() => setView('split')} aria-pressed={view === 'split'} title="Write and see the PDF side by side">Split</button>}
         <button className={view === 'pdf' ? 'on' : ''} onClick={() => setView('pdf')} aria-pressed={view === 'pdf'} title="PDF only">PDF</button>

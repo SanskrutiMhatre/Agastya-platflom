@@ -125,6 +125,8 @@ export function JsgEditorPage() {
     <DocEditorShell kind="jsg" projectId={id} can={can} role={ctx.role} shortcuts={loaded && parseKind(loaded.xml) === 'ispl' ? 'jsg-ispl' : 'jsg'} layout={layout} title={summary.project.name} hostRef={hostRef} loaded={!!loaded} find={false} readOnly={!writable}
       crumb={loaded ? <span className="v2-badge accent" title={`JSG document type ${loaded.docType}, from the stencil ${loaded.stencil}`}>JSG · {loaded.label}</span> : null}
       saveState={host.saveState} guard={host.guard} banners={host.banners(recover)}
+      docName={loaded?.label ?? undefined} findings={host.findings}
+      meta={loaded ? [['Type', `JSG · ${loaded.label}`], ['Type code', <span className="mono">{loaded.docType}</span>], ['Stencil', <span className="mono">{loaded.stencil}</span>], ['Auto-save', writable ? (autosave ? 'On' : 'Off') : 'Not available']] : []}
       actions={<>
         {loaded?.docType === 'uhb' && writable ? <>
           <input ref={wordInput} type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden data-testid="jsg-word-input" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setWordFile(f); }} />
