@@ -15,6 +15,10 @@ S14, S15); re-check them at each patch window.
 | Apache Batik | **1.18** | `fop-2.10/fop/lib/batik-*-1.18.jar` | Batik 1.20 | **inside advisory ranges**: SSRF/XXE/DoS fixes "through 1.19.0". SVG reaches Batik from author uploads, so this is the more relevant of the two |
 | libxslt / libxml2 / libexslt | **1.1.28 / 2.9.3 / 0.8.17**, 32-bit (`win32-x86`) | `backend/vendor/tools/libxslt-1.1.28-win32-x86` (`xsltproc --version`: libxml 20903, libxslt 10128, libexslt 817) | upstream no longer maintains these lines; no current win32 build is published | **unpatched, 2013 era** (ARC-009) |
 
+Phase 3 (P3-1, live co-editing) adds three npm packages, pinned exactly in `backend/package.json` and `frontend/package.json` (and both
+lockfiles), MIT licence, pure JavaScript, no network use: **yjs 13.6.27** (the CRDT), **y-protocols 1.0.6** (awareness), **lib0 0.2.114**
+(their encoding helpers; pulls isomorphic.js 0.2.5). They are bundled into the client and run in the server; nothing is fetched at run time.
+
 `node:sqlite` on Node 24: `backend/test/wp13-sqlite-contract.test.js` checks the behaviour the code relies on (the pragmas the server sets incl. WAL,
 prepared statements (`changes`, `lastInsertRowid`, plain rows), foreign keys with cascade, commit and rollback, large BLOB round trip,
 `VACUUM INTO` as the online backup, a second connection under WAL waiting for the write lock). It passes on Node 24.22.3 and on Node 22.23.2 (2026-11-27). `node:sqlite` stays behind the storage seam (WP-10),

@@ -604,6 +604,9 @@ class AuthStore {
         cirLinks: n('DELETE FROM cir_links WHERE project_id = ?'),
         extensions: n('DELETE FROM project_ext WHERE project_id = ?'),
         notifications: n('DELETE FROM notifications WHERE project_id = ?'),
+        // Phase 3 (P3-1): the live co-editing rooms of the project (their updates first: they carry no project id of their own)
+        collabUpdates: n('DELETE FROM collab_updates WHERE room IN (SELECT room FROM collab_docs WHERE project_id = ?)'),
+        collabDocs: n('DELETE FROM collab_docs WHERE project_id = ?'),
       };
       this.stmt('DELETE FROM project_missing WHERE project_id = ?').run(projectId);
       this.stmt('INSERT OR REPLACE INTO project_tombstones (id, name, deleted_at, deleted_by) VALUES (?, ?, ?, ?)').run(projectId, name, now, by);

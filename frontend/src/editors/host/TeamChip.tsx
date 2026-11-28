@@ -26,9 +26,11 @@ export interface TeamChipProps {
   canBreak: boolean;
   /** the document has unsaved changes: announced as "editing" */
   editing: boolean;
+  /** Phase 3: the document is edited live; a check-out is then an exclusive lock: the others read and comment ("Locked by") */
+  live?: boolean;
 }
 
-export function TeamChip({ projectId, doc, writable, canBreak, editing }: TeamChipProps) {
+export function TeamChip({ projectId, doc, writable, canBreak, editing, live = false }: TeamChipProps) {
   const toast = useUi((s) => s.toast);
   const [leases, setLeases] = useState<Lease[]>([]);
   const [busy, setBusy] = useState(false);
@@ -88,11 +90,11 @@ export function TeamChip({ projectId, doc, writable, canBreak, editing }: TeamCh
         whole.mine
           ? <span className="v2-badge accent" data-testid="lease-mine" title={`You hold this document ${untilText(whole.expiresAt)}: other people cannot save it.`}>Checked out by you
               {writable ? <button className="btn btn-xs" onClick={() => void act('give')} disabled={busy} data-testid="lease-checkin">Check in</button> : null}</span>
-          : <span className="v2-badge warn" data-testid="lease-other" title={`Your saves of this document are refused while ${whole.holder ?? 'another author'} holds it.`}>Checked out by {whole.holder ?? 'another author'} {untilText(whole.expiresAt)}
+          : <span className="v2-badge warn" data-testid="lease-other" title={live ? `${whole.holder ?? 'Another author'} checked this document out: you see their changes as they make them and can comment, but not edit.` : `Your saves of this document are refused while ${whole.holder ?? 'another author'} holds it.`}>{live ? 'Locked by' : 'Checked out by'} {whole.holder ?? 'another author'} {untilText(whole.expiresAt)}
               {canBreak ? <button className="btn btn-xs" onClick={() => void act('break')} disabled={busy} data-testid="lease-break">Break</button> : null}</span>
       ) : doc && writable ? (
         <button className="btn btn-sm" onClick={() => void act('take')} disabled={busy} data-testid="lease-checkout"
-          title="Check the document out: other people cannot save it until you check it in (or it runs out after an hour).">Check out</button>
+          title={live ? 'Lock the document for yourself: the others keep reading and commenting while you edit, until you check it in (or after an hour without work).' : 'Check the document out: other people cannot save it until you check it in (or it runs out after an hour).'}>Check out</button>
       ) : null}
       {doc && parts.length ? <span className="v2-badge" data-testid="lease-parts" title={parts.map((l) => `${l.part}: ${l.mine ? 'you' : l.holder ?? 'another author'} ${untilText(l.expiresAt)}`).join('\n')}>{parts.length} part{parts.length === 1 ? '' : 's'} checked out</span> : null}
     </span>

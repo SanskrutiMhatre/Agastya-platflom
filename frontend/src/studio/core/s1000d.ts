@@ -2,7 +2,8 @@
  * S1000D domain knowledge: schema/issue detection, data module code
  * formatting/parsing, identification metadata access.
  */
-import { NS, elementChildren, textOf } from './xml';
+import { textOf } from './xml';
+import { detectSchemaOf, type XRoot } from '../../../../backend/src/shared/collab/xmlForm';
 
 export const ISSUES = ['4-1', '4-2', '5-0', '6', '7'] as const;
 export type Issue = (typeof ISSUES)[number];
@@ -43,40 +44,9 @@ export interface SchemaRef {
   url: string | null;
 }
 
-/** Detects S1000D issue + schema from xsi:noNamespaceSchemaLocation (or root element heuristics). */
+/** Detects S1000D issue + schema from xsi:noNamespaceSchemaLocation (or root element heuristics). Phase 3: shared with the collaboration server. */
 export function detectSchema(doc: Document): SchemaRef | null {
-  const root = doc.documentElement;
-  if (!root) return null;
-  const loc = root.getAttributeNS(NS.xsi, 'noNamespaceSchemaLocation') || root.getAttribute('xsi:noNamespaceSchemaLocation');
-  if (loc) {
-    const m = loc.match(/S1000D_([0-9]+(?:-[0-9]+)?(?:-[0-9A-Z]+)?)\/xml_schema_(?:flat|master)\/([a-zA-Z]+)\.xsd/);
-    if (m) {
-      let issue = m[1];
-      if (issue === '4-1-A') issue = '4-1';
-      if (/^\d+-0$/.test(issue) && issue !== '5-0') issue = issue.replace(/-0$/, '');
-      return { issue, schema: m[2], url: loc };
-    }
-    const f = loc.match(/([a-zA-Z]+)\.xsd$/);
-    if (f) return { issue: '5-0', schema: f[1], url: loc };
-  }
-  // heuristics on content
-  const name = root.nodeName;
-  if (name === 'pm') return { issue: '5-0', schema: 'pm', url: null };
-  if (name === 'dml') return { issue: '5-0', schema: 'dml', url: null };
-  if (name === 'dmodule') {
-    const content = elementChildren(root).find((e) => e.nodeName === 'content');
-    const first = content ? elementChildren(content).find((e) => !['refs', 'referencedApplicGroup', 'referencedApplicGroupRef', 'warningsAndCautions', 'warningsAndCautionsRef'].includes(e.nodeName)) : null;
-    const map: Record<string, string> = {
-      description: 'descript', procedure: 'proced', faultIsolation: 'fault', faultReporting: 'fault', illustratedPartsCatalog: 'ipd',
-      crew: 'crew', brex: 'brex', commonRepository: 'comrep', checkList: 'checklist', learning: 'learning', process: 'process',
-      maintPlanning: 'schedul', serviceBulletin: 'sb', wiringData: 'wrngdata', wiringFields: 'wrngflds', container: 'container',
-      frontMatter: 'frontmatter', applicCrossRefTable: 'appliccrossreftable', condCrossRefTable: 'condcrossreftable',
-      productCrossRefTable: 'prdcrossreftable', brDoc: 'brdoc', scoContent: 'scocontent',
-    };
-    const schema = first ? map[first.nodeName] : undefined;
-    if (schema) return { issue: '5-0', schema, url: null };
-  }
-  return null;
+  return detectSchemaOf(doc.documentElement as unknown as XRoot | null);
 }
 
 export function schemaUrl(issue: string, schema: string): string {

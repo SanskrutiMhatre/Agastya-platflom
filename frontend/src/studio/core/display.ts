@@ -3,47 +3,12 @@
  * normaliser, the XML pretty-printer and the WYSIWYG renderer.
  */
 import type { Grammar } from './grammar';
+import * as form from '../../../../backend/src/shared/collab/xmlForm';
 
 export type Display = 'block' | 'inline' | 'atomic' | 'none' | 'table-part';
 
-/** Elements that are always laid out as blocks. */
-export const BLOCK = new Set<string>([
-  // structure
-  'dmodule', 'identAndStatusSection', 'dmAddress', 'dmIdent', 'dmAddressItems', 'dmStatus', 'dmTitle', 'content',
-  'description', 'procedure', 'faultIsolation', 'faultReporting', 'crew', 'illustratedPartsCatalog', 'brex', 'comment',
-  'commentContent', 'checkList', 'learning', 'process', 'schedul', 'wiringData', 'container', 'frontMatter', 'refs',
-  'referencedApplicGroup', 'warningsAndCautions', 'commonInfo', 'commonInfoDescrPara', 'responsiblePartnerCompany',
-  'originator', 'applic', 'brexDmRef', 'qualityAssurance', 'reasonForUpdate', 'remarks', 'security', 'techName', 'infoName',
-  'issueDate', 'language', 'issueInfo', 'dmCode', 'skillLevel', 'productSafety', 'applicCrossRefTableRef', 'dataRestrictions',
-  // text blocks
-  'para', 'simplePara', 'title', 'levelledPara', 'levelledParaAlts', 'notePara', 'warningAndCautionPara', 'attentionListItemPara',
-  'warning', 'caution', 'note', 'captionGroup', 'caption', 'legend', 'footnoteRemarks', 'displayText',
-  // lists
-  'randomList', 'sequentialList', 'listItem', 'definitionList', 'definitionListItem', 'definitionListHeader', 'listItemTerm',
-  'listItemDefinition', 'attentionRandomList', 'attentionSequentialList', 'attentionRandomListItem', 'attentionSequentialListItem',
-  'termTitle', 'definitionTitle',
-  // figures / tables
-  'figure', 'figureAlts', 'graphic', 'multimedia', 'multimediaObject', 'table', 'tgroup', 'thead', 'tbody', 'tfoot', 'row', 'entry',
-  'colspec', 'spanspec', 'hotspot',
-  // procedures
-  'preliminaryRqmts', 'mainProcedure', 'closeRqmts', 'proceduralStep', 'proceduralStepAlts', 'reqCondGroup', 'reqCondNoRef',
-  'reqCondDm', 'reqCondPm', 'reqCondExternalPub', 'reqCondCircuitBreaker', 'reqPersons', 'person', 'personnel', 'reqTechInfoGroup',
-  'reqSupportEquips', 'reqSupplies', 'reqSpares', 'reqSafety', 'safetyRqmts', 'supportEquipDescrGroup', 'supportEquipDescr',
-  'supplyDescrGroup', 'supplyDescr', 'spareDescrGroup', 'spareDescr', 'noConds', 'noSupportEquips', 'noSupplies', 'noSpares',
-  'noSafety', 'reqCond', 'estimatedTime', 'reqQuantity', 'personCategory', 'personSkill', 'trade', 'reqTechInfo',
-  'isolationProcedure', 'isolationStep', 'isolationMainProcedure', 'isolationProcedureEnd', 'action', 'isolationStepQuestion',
-  'isolationStepAnswer', 'yesNoAnswer', 'yesAnswer', 'noAnswer', 'listOfChoices', 'choice', 'faultDescr', 'descr', 'fault',
-  'detectionInfo', 'isolateDetectedFault', 'locateAndRepair', 'locateAndRepairLruItem', 'crewRefCard', 'crewDrill', 'crewDrillStep',
-  'challengeAndResponse', 'challenge', 'response', 'case', 'caseCond', 'if', 'elseIf',
-  // brex
-  'contextRules', 'structureObjectRuleGroup', 'structureObjectRule', 'objectPath', 'objectUse', 'objectValue', 'snsRules',
-  'notationRuleList', 'notationRule', 'nonContextRules', 'nonContextRule', 'brDecisionRef', 'brexDmRef',
-  // ipd
-  'catalogSeqNumber', 'itemSeqNumber', 'figureRef',
-  // comment
-  'commentAddress', 'commentAddressItems', 'commentStatus', 'commentIdent', 'commentTitle', 'commentRefs', 'commentResponse',
-  'attachmentRef',
-]);
+/** Elements that are always laid out as blocks (Phase 3: the list lives in the shared written-form module, used by the collaboration server too). */
+export const BLOCK = form.BLOCK;
 
 /** Elements rendered as non-editable chips (edited through dialogs / attributes). */
 export const ATOMIC = new Set<string>([
@@ -69,7 +34,7 @@ export const ATOMIC_BLOCK = new Set<string>(['graphic', 'multimediaObject', 'hot
 export const FORCE_INLINE = new Set<string>(['acronymTerm', 'acronymDefinition']);
 
 /** Elements whose content is whitespace-preserving. */
-export const PRESERVE = new Set<string>(['verbatimText']);
+export const PRESERVE = form.PRESERVE;
 
 /** Never rendered in the design view (still visible in XML view / tree). */
 export const HIDDEN = new Set<string>(['colspec', 'spanspec', 'rdf:Description']);
@@ -79,7 +44,7 @@ export const HIDDEN = new Set<string>(['colspec', 'spanspec', 'rdf:Description']
  * mixed content; treated as blocks so lists inside paragraphs lay out correctly.
  */
 export function isBlockName(name: string): boolean {
-  return BLOCK.has(name);
+  return form.isBlockName(name);
 }
 
 export function elementDisplay(el: Element, grammar: Grammar | null): Display {
@@ -107,25 +72,9 @@ export function elementDisplay(el: Element, grammar: Grammar | null): Display {
 
 /** Whether an element's content is element-only (whitespace insignificant). */
 export function isElementOnly(el: Element, grammar: Grammar | null): boolean {
-  const name = el.nodeName;
-  if (PRESERVE.has(name) || el.getAttribute('xml:space') === 'preserve') return false;
-  if (grammar && grammar.has(name)) return !grammar.allowsText(name);
-  for (const c of Array.from(el.childNodes)) {
-    if ((c.nodeType === 3 && /\S/.test(c.nodeValue || '')) || c.nodeType === 4) return false;
-    // without a schema, an element that holds inline elements ("<emphasis>a</emphasis> <emphasis>b</emphasis>") is mixed content:
-    // the space between them is text and must survive
-    if (c.nodeType === 1 && !BLOCK.has(c.nodeName)) return false;
-  }
-  return true;
+  return form.isElementOnly(el as unknown as form.XElement, grammar);
 }
 
 export function isPreserved(el: Element): boolean {
-  for (let n: Node | null = el; n && n.nodeType === 1; n = n.parentNode) {
-    const e = n as Element;
-    if (PRESERVE.has(e.nodeName)) return true;
-    const sp = e.getAttribute('xml:space');
-    if (sp === 'preserve') return true;
-    if (sp === 'default') return false;
-  }
-  return false;
+  return form.isPreserved(el as unknown as form.XElement);
 }

@@ -13,6 +13,9 @@
 //   - ICN artwork is supplied from the project's graphics
 //   - quick preview formats with the project's own publication settings
 //   - open/dirty state is published to React for the sidebar
+//   - Phase 3 (P3-1): a data module opens LIVE by default: co-edited with everyone else in it (frontend/src/collab), saved continuously;
+//     Save asks the server to write the file and record a revision now. When live editing is not available (switched off on the server,
+//     an old server) the module opens the classic way, saved by version.
 // =============================================================================
 
 import { create } from 'zustand';
@@ -31,15 +34,27 @@ import { formatDmc } from '../studio/core/s1000d';
 import type { DocumentEditor } from '../studio/ui/editor';
 import { toPublicationSettings } from './publicationSettings';
 import type { PublicationSettings } from '../studio/export/pdf-settings';
+// Phase 3: the live co-editing code (Yjs) loads with the first data module opened live, not with the editor page (bundle budget)
+import type { LiveDocument } from '../collab/studio';
+import type { LiveStatus } from '../collab/client';
+const collab = () => import('../collab/studio');
 
-export interface OpenDoc { key: string; file: string | null; title: string; dirty: boolean; active: boolean }
+export interface OpenDoc {
+  key: string; file: string | null; title: string; dirty: boolean; active: boolean;
+  /** Phase 3: the document is live; its save state */
+  live?: LiveStatus;
+  /** Phase 3: why this person cannot change it now (someone else's check-out, review), or null */
+  locked?: string | null;
+  /** Phase 3: the other people in the document now */
+  people?: string[];
+}
 
 /** `panes`: whether the Studio's Properties (right) and Problems (bottom) panes are open (the editor page's top-bar toggles show it). */
 interface StudioState { docs: OpenDoc[]; ready: boolean; projectId: string | null; panes: { right: boolean; bottom: boolean } }
 export const useStudio = create<StudioState>(() => ({ docs: [], ready: false, projectId: null, panes: { right: true, bottom: true } }));
 
 /** `object` = a CSDB object (comment, update file, ICN metadata, SCORM package) rather than a data module: saved through the objects API. */
-interface Ref { file: string; hash: string; object?: boolean; /** WP-21 (PRD-004): the text the hash stands for, the base of a compare-and-merge */ base?: string }
+interface Ref { file: string; hash: string; object?: boolean; /** WP-21 (PRD-004): the text the hash stands for, the base of a compare-and-merge */ base?: string; /** Phase 3: the module's live room */ live?: LiveDocument }
 
 /** WP-21 (PRD-004): a refused save the author chose to compare: their text, the text both started from, and the module. */
 export interface StudioConflict { file: string; base: string; mine: string }
@@ -86,7 +101,7 @@ class StudioSession {
     this.themeObserver?.disconnect(); this.themeObserver = null;
     if (app) {
       const u = useSession.getState().user;
-      if (discardDrafts && u) await app.discardDraftsOf(u.id).catch(() => undefined);
+      if (discardDrafts && u) { await app.discardDraftsOf(u.id).catch(() => undefined); await (await import('../collab/pending')).discardPendingOf(u.id); }
       for (const icn of app.images.names()) await app.images.remove(icn).catch(() => undefined);
       app.dispose();
     }
@@ -325,8 +340,33 @@ class StudioSession {
     let ed = this.editorFor(file);
     if (!ed) {
       const pid = this.projectId;
-      const doc = await read(pid);
-      if (this.projectId !== pid) return;                 // the author switched project while it loaded: never open it into the other one
+      // Phase 3: a data module is edited live with the others in it; the room holds the newest content (the file may be seconds behind)
+      const user = useSession.getState().user as { id: string; username: string; fullName?: string | null; full_name?: string | null } | null;
+      let room: Awaited<ReturnType<Awaited<ReturnType<typeof collab>>['joinRoom']>> | null = null;
+      const live$ = !object && user && DM_FILE.test(file) ? await collab().catch(() => null) : null;
+      if (live$ && user) {
+        try { room = await live$.joinRoom(pid, file, { id: user.id, name: user.fullName || user.full_name || user.username }); }
+        catch (e) { const code = (e as { code?: string }).code; if (code && !['DISABLED', 'NOT_SUPPORTED', 'TIMEOUT', 'BUSY'].includes(code)) console.warn('[live] not opened live:', code, (e as Error).message); room = null; }
+      }
+      const doc = await read(pid).catch((e) => { room?.close(false); throw e; });
+      if (this.projectId !== pid) { room?.close(false); return; }   // the author switched project while it loaded: never open it into the other one
+      if (room && user && live$) {
+        const liveEd = await app.openText(doc.xml, file, null);
+        if (!liveEd) { room.close(false); return; }
+        // the room's content replaces the file's in the open document (the binding pairs them and takes the room's form)
+        const live = new live$.LiveDocument(liveEd, room, { id: user.id, name: user.fullName || user.full_name || user.username }, {
+          changed: () => { this.publish(); app.updateChrome(); },
+          toast: (msg, kind) => app.toast(msg, kind),
+        });
+        liveEd.onDestroy.push(() => live.close());
+        this.refs.set(liveEd.doc, { file, hash: doc.hash ?? '', base: doc.xml, live });
+        await app.discardDrafts(this.draftScope() ?? undefined, file).catch(() => undefined);
+        await this.linkArtwork(doc.xml);
+        app.updateChrome();
+        if (line) app.gotoLine(liveEd, line);
+        this.publish();
+        return;
+      }
       // FE-006 / S1K-004: unsaved changes this person made to this module (a crash, a closed tab, an ended session) are offered back.
       const scope = this.draftScope();
       const draft = scope ? await app.draftFor(scope, file) : null;
@@ -393,6 +433,14 @@ class StudioSession {
     if (!id) return false;
     const ref = this.refs.get(ed.doc);
     try {
+      if (ref?.live) {
+        // Phase 3: everything is already in the room; Save makes the server write the file and record a revision now
+        const hash = await ref.live.save();
+        this.refs.set(ed.doc, { ...ref, hash: hash ?? ref.hash });
+        void this.refreshProjectData({ dmsOnly: true });
+        this.onSaved(false);
+        return true;
+      }
       if (ref?.object) {
         const out = await csdbApi.saveObject(id, ref.file, text, ref.hash);       // WP-11: saved over the version that was opened
         this.refs.set(ed.doc, { ...ref, hash: out.hash });
@@ -461,16 +509,52 @@ class StudioSession {
   private publish(): void {
     const app = this.app;
     if (!app) return;
-    const docs: OpenDoc[] = app.editors.map((ed, i) => ({
-      key: `${i}:${ed.doc.id}`,
-      file: this.refs.get(ed.doc)?.file ?? null,
-      title: ed.doc.fileName,
-      dirty: ed.doc.dirty,
-      active: ed === app.active,
-    }));
+    const docs: OpenDoc[] = app.editors.map((ed, i) => {
+      const live = this.refs.get(ed.doc)?.live;
+      return {
+        key: `${i}:${ed.doc.id}`,
+        file: this.refs.get(ed.doc)?.file ?? null,
+        title: ed.doc.fileName,
+        dirty: ed.doc.dirty,
+        active: ed === app.active,
+        ...(live ? { live: live.status, locked: live.state && !live.state.writable ? live.state.reason : null, people: live.people().map((p) => p.name) } : {}),
+      };
+    });
     const prev = useStudio.getState().docs;
-    if (prev.length === docs.length && prev.every((d, i) => d.key === docs[i].key && d.dirty === docs[i].dirty && d.active === docs[i].active && d.file === docs[i].file)) return;
+    if (prev.length === docs.length && prev.every((d, i) => d.key === docs[i].key && d.dirty === docs[i].dirty && d.active === docs[i].active && d.file === docs[i].file
+      && d.live === docs[i].live && d.locked === docs[i].locked && (d.people ?? []).join('|') === (docs[i].people ?? []).join('|'))) return;
     useStudio.setState({ docs });
+  }
+
+  /** Phase 3: the comment anchor of the active document's selection (Y relative positions when it is live), and the module it is in. */
+  selectionAnchor(): { file: string; anchor: { path: string; tag: string; text: string; y?: { start: string; end: string } } } | null {
+    const ed = this.app?.active; const ref = ed ? this.refs.get(ed.doc) : undefined;
+    if (!ed || !ref || ref.object) return null;
+    const sel = ed.doc.selection;
+    let el: Node | null = ed.elementSelection ?? sel?.focus.node ?? null;
+    while (el && el.nodeType !== 1) el = el.parentNode;
+    if (!el || el === ed.doc.root) return null;
+    const parts: number[] = [];
+    for (let n: Element | null = el as Element; n && n !== ed.doc.root; n = n.parentElement) {
+      const p = n.parentElement; if (!p) return null;
+      parts.unshift(Array.from(p.children).indexOf(n));
+    }
+    const text = (el.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 200);
+    const y = ref.live?.selectionAnchor() ?? undefined;
+    return { file: ref.file, anchor: { path: parts.join('/'), tag: (el as Element).tagName, text, ...(y ? { y } : {}) } };
+  }
+
+  /** Phase 3: show where a live comment is (its words, followed through other people's edits) and put the caret there. */
+  revealAnchor(file: string, y: { start: string; end: string }): boolean {
+    const ed = this.editorFor(file); const live = ed ? this.refs.get(ed.doc)?.live : undefined;
+    if (!ed || !live) return false;
+    const a = live.binding.posOf(y.start); const b = live.binding.posOf(y.end);
+    if (!a || !b) return false;
+    this.app?.activate(ed);
+    ed.design.highlight([[a, b]], 0);
+    ed.doc.selection = { anchor: a, focus: b };
+    ed.design.applySelection(ed.doc.selection, true);
+    return true;
   }
 
   /** Reflect a module deleted or renamed elsewhere. */

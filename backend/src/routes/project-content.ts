@@ -39,6 +39,7 @@ import * as jobs from '../services/jobs';
 import { readProjectJson, updateProjectJson, csdbRel, mediaRel, isCirProject, assertNotCir, PROTECTED_PROJECT_KEYS, unsafeInputFields, sameSetting, unsafeArtwork } from '../services/projects';
 import * as cir from '../services/cir';
 import * as leases from '../services/leases';
+import { broadcast } from '../services/broadcast';
 import { versionGuard } from '../services/versionGuard';
 import { writeFileAtomic } from '../storage/atomicWrite';
 import { mayBreak } from './documentHistory';
@@ -437,11 +438,14 @@ export function registerProjectContentRoutes(app: Express): void {
     // The author hears about a comment made while the manual is in review.
     if (pending) notify([pending.requested_by], { kind: 'review.comment', title: 'New review comment', body: `${pname(req.project.id)}: ${req.auth.user.fullName ?? req.auth.user.full_name} commented.`, projectId: req.project.id, actorId: req.auth.user.id });
     log(req, 'review.comment', { id });
+    // P3-1: the comment panels of the people in this document reload at once (the live reviewer sees it as it is made)
+    broadcast(req.project.id, { type: 'comments', path: String(req.body?.dmFile ?? '') });
     res.status(201).json({ ok: true, id });
   }));
   app.post(`${base}/review/comments/:cid/resolve`, view('reviewer', 'review.comment'), wrap((req, res) => {
     review.setResolved(req.project.id, Number(param(req, 'cid')), req.auth.user.id, req.body?.resolved !== false);
     log(req, req.body?.resolved !== false ? 'review.comment.resolved' : 'review.comment.reopened', { id: Number(param(req, 'cid')) });   // WP-29 (G-SEC-5)
+    broadcast(req.project.id, { type: 'comments', path: '' });
     res.json({ ok: true });
   }));
 

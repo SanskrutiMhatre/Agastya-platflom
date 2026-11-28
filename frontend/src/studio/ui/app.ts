@@ -1226,6 +1226,8 @@ export class App {
 
   async saveDraft(ed: DocumentEditor) {
     if (!this.settings.drafts || !this.editors.includes(ed)) return;
+    // Phase 3: a live document keeps its unacknowledged changes in the co-editing store (frontend/src/collab/pending.ts), not as a draft
+    if (ed.doc.collab) { await storage.del('drafts', ed.doc.id).catch(() => undefined); return; }
     if (!ed.doc.dirty && !ed.xml.error) {
       await storage.del('drafts', ed.doc.id);
       return;

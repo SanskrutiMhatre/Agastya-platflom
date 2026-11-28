@@ -22,10 +22,11 @@ import { SqliteAuditRepository, type AuditRepository } from './auditRepository';
 import { SqliteLeaseRepository, type LeaseRepository, type LeaseRow } from './leaseRepository';
 import { SqliteAccessRepository, type AccessRepository } from './accessRepository';
 import { SqliteJobRepository, type JobRepository, type JobRow, type JobLogRow, type JobState } from './jobRepository';
+import { SqliteCollabRepository, type CollabRepository, type CollabDocRow, type CollabUpdateRow, type CollabUpdateIn } from './collabRepository';
 import { SqlitePdfAnnotationRepository, type PdfAnnotationRepository } from './pdfAnnotationRepository';
 import { SqliteGitlabRepository, type GitlabRepository } from './gitlabRepository';
 
-export type { ProjectRegistry, SnsRepository, ProjectConfigRepository, ReferenceRepository, ActivityRepository, CirLinkRepository, ExtensionRepository, LifecycleRepository, RetentionRepository, AuditRepository, AccessRepository, UnitOfWork, LeaseRepository, LeaseRow, JobRepository, JobRow, JobLogRow, JobState, PdfAnnotationRepository, GitlabRepository };
+export type { ProjectRegistry, SnsRepository, ProjectConfigRepository, ReferenceRepository, ActivityRepository, CirLinkRepository, ExtensionRepository, LifecycleRepository, RetentionRepository, AuditRepository, AccessRepository, UnitOfWork, LeaseRepository, LeaseRow, JobRepository, JobRow, JobLogRow, JobState, PdfAnnotationRepository, GitlabRepository, CollabRepository, CollabDocRow, CollabUpdateRow, CollabUpdateIn };
 
 export interface Repositories extends UnitOfWork {
   /** The engine behind these repositories ('sqlite'); a contract test and the migration runner use it to pick a dialect. */
@@ -56,6 +57,8 @@ export interface Repositories extends UnitOfWork {
   pdfAnnotations: PdfAnnotationRepository;
   /** Phase 3 (P3-5): the GitLab integration's configuration, accounts, links, sync base, releases and merge requests. */
   gitlab: GitlabRepository;
+  /** Phase 3 (P3-1): live co-editing rooms and their Yjs update logs. */
+  collab: CollabRepository;
 }
 
 export function createSqliteRepositories(db: SqlDatabase): Repositories {
@@ -81,5 +84,6 @@ export function createSqliteRepositories(db: SqlDatabase): Repositories {
     jobs: new SqliteJobRepository(db),
     pdfAnnotations: new SqlitePdfAnnotationRepository(db),
     gitlab: new SqliteGitlabRepository(db),
+    collab: new SqliteCollabRepository(db),
   };
 }

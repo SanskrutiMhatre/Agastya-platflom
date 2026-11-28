@@ -7,7 +7,7 @@
 // shortcut keys (the Studio's own, reached from the header too), focus mode and conflict comparison as the JSS and JSG pages. A new session
 // starts in Write (no PDF pane, the ribbon folded to its tabs): Quick preview and Generate then sit in the header and open the PDF pane.
 
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import '../../styles/pages/editor-host.css';   // WP-35 second pass: the editor page's columns, panel and import dialog styles
 import { createPortal } from 'react-dom';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -177,7 +177,7 @@ export function EditorPage() {
   const teamDoc = dmFile ? { kind: 'dm' as const, path: dmFile, title: activeDoc?.title || undefined, leases: `/api/projects/${ctx.id}/dms/${encodeURIComponent(dmFile)}/checkout`, checkout: `/api/projects/${ctx.id}/dms/${encodeURIComponent(dmFile)}/checkout` } : null;
   const canBreak = ctx.role === 'owner' || ctx.role === 'manager' || me?.role === 'admin';
 
-  const chip = ready && writable ? <SaveStateChip state={{ saving, dirty: dirtyCount > 0, savedAt, dirtyCount }} ids={S1000D_STATE} /> : null;
+  const chip = ready && writable ? <SaveStateChip state={{ saving, dirty: dirtyCount > 0, savedAt, dirtyCount, live: activeDoc?.live }} ids={S1000D_STATE} /> : null;
   // UI redesign (mockup editor.html): the Studio's status bar is the window's status bar, under the activity bar and the workspace: it is moved
   // into the page's status bar (a shell slot) while the page is shown, and back into the Studio when the page goes (the Studio outlives it)
   const [statusHost, setStatusHost] = useState<HTMLElement | null>(null);
@@ -191,6 +191,11 @@ export function EditorPage() {
   // the review comments: the Properties panel's Comments tab (its badge is the number still open)
   useEffect(() => { if (ready) studio.setCommentCount(comments.open.length); }, [ready, comments.open.length]);
   const chipInStatus = !!statusSlot;
+  // Phase 3: comments pinned to the selected words (live: Yjs positions that follow the words) and shown again from the panel
+  const pinning = useMemo(() => ({
+    anchor: () => studio.selectionAnchor(),
+    reveal: (file: string, anchor: { y?: { start: string; end: string } }) => !!anchor.y && studio.revealAnchor(file, anchor.y),
+  }), []);
   // the top bar's crumbs: the project, the module's system and sub-system ("29-10"), the data module code, its state
   const m = activeDoc?.file?.match(/^(DMC-[^_]+?)(?:_(\d{3})-(\d{2}))?(?:_[A-Z]{2}-[A-Z]{2})?\.xml$/i);
   const sns = activeDoc?.file?.match(/^DMC-[^-]+-[^-]+-([^-]+)-([^-]+)-/i);
@@ -211,10 +216,10 @@ export function EditorPage() {
             : null}
           <span className="ed-actions" ref={setSlot} data-testid="chrome-preview-slot" />
         </>}
-        extra={<><TeamChip projectId={ctx.id} doc={teamDoc} writable={ready && writable} canBreak={canBreak} editing={!!activeDoc?.dirty} /><CommentsButton state={comments} /></>}
+        extra={<><TeamChip projectId={ctx.id} doc={teamDoc} writable={ready && writable} canBreak={canBreak} editing={!!activeDoc?.dirty || (!!activeDoc?.live && !activeDoc.locked)} live={!!activeDoc?.live} /><CommentsButton state={comments} always={!!activeDoc?.live && comments.canComment} /></>}
         onPalette={() => studio.run('tools.palette')} onShortcuts={() => studio.run('tools.shortcuts')} />
-      <CommentsPanel projectId={ctx.id} state={comments} activeFile={activeDoc?.file} onOpen={(c) => { if (c.dmFile) openAt(c.dmFile); }} />
-      {ready && studio.commentsEl ? createPortal(<CommentsPanel inline projectId={ctx.id} state={comments} activeFile={activeDoc?.file} onOpen={(c) => { if (c.dmFile) openAt(c.dmFile); }} />, studio.commentsEl) : null}
+      <CommentsPanel projectId={ctx.id} state={comments} activeFile={activeDoc?.file} onOpen={(c) => { if (c.dmFile) openAt(c.dmFile); }} pinning={pinning} />
+      {ready && studio.commentsEl ? createPortal(<CommentsPanel inline projectId={ctx.id} state={comments} activeFile={activeDoc?.file} onOpen={(c) => { if (c.dmFile) openAt(c.dmFile); }} pinning={pinning} />, studio.commentsEl) : null}
       {!writable ? <Alert tone="warn">You have {ctx.role} access to this project: you can read and proof data modules, but changes cannot be saved.</Alert> : null}
       {error ? <Alert tone="bad">{error}</Alert> : null}
       <div className={`v2-split ed ed-s1000d${focus ? ' is-focus' : ''}${shown !== 'edit' ? ' is-split' : ''}`} data-density="compact" data-testid="editor-split" ref={splitRef} style={dragging || listDrag ? { userSelect: 'none' } : undefined}>

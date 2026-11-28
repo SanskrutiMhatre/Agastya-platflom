@@ -69,6 +69,17 @@ export interface Config {
    * with a few tabs each). One session may hold at most 8 (services/broadcast.ts). A refused upgrade answers 503 / 429.
    */
   wsMaxClients: number;
+  /**
+   * Phase 3 (P3-1): live co-editing (services/collab). `enabled` (AGASTYA_COLLAB, default on; 0 = every editor saves by version as before);
+   * `maxUpdateBytes` (AGASTYA_COLLAB_MAX_UPDATE_BYTES, default 2 MiB) the largest single change a client may send; `writeBackMs` /
+   * `writeBackMaxMs` (AGASTYA_COLLAB_WRITEBACK_MS 2000 / AGASTYA_COLLAB_WRITEBACK_MAX_MS 10000): the project file is written this long after
+   * the last change, and at the latest this long after the first unwritten one; `revisionMinutes` (AGASTYA_COLLAB_REVISION_MINUTES, default
+   * 10): a write-back cuts a revision in the history at most this often (and always when the room closes, at Save and at server stop);
+   * `idleUnloadMs` (AGASTYA_COLLAB_IDLE_MS, default 60000): a room nobody is in is written back and unloaded after this long; `maxRooms`
+   * (AGASTYA_COLLAB_MAX_ROOMS, default 2000) rooms in memory at once; `persistMs` (AGASTYA_COLLAB_PERSIST_MS, default 100): updates are
+   * stored in batches this often, one transaction per batch.
+   */
+  collab: { enabled: boolean; maxUpdateBytes: number; writeBackMs: number; writeBackMaxMs: number; revisionMinutes: number; idleUnloadMs: number; maxRooms: number; persistMs: number };
   /** The packaged launcher asks for a clean stop by closing standard input (AGASTYA_SHUTDOWN_ON_STDIN_CLOSE=1). */
   shutdownOnStdinClose: boolean;
   /** A pdfjs-dist folder to use for structure recovery before the bundled candidates (AGASTYA_PDFJS_DIR). */
@@ -485,6 +496,16 @@ export function buildConfig(env: Env = process.env): Config {
     baseHashCompat: env.AGASTYA_BASEHASH_COMPAT === '1',
     leaseMinutes: envPositive('AGASTYA_LEASE_MINUTES', 60, env),
     wsMaxClients: envPositive('AGASTYA_WS_MAX_CLIENTS', 1000, env),
+    collab: {
+      enabled: env.AGASTYA_COLLAB !== '0',
+      maxUpdateBytes: envPositive('AGASTYA_COLLAB_MAX_UPDATE_BYTES', 2 * 1024 ** 2, env),
+      writeBackMs: envPositive('AGASTYA_COLLAB_WRITEBACK_MS', 2000, env),
+      writeBackMaxMs: envPositive('AGASTYA_COLLAB_WRITEBACK_MAX_MS', 10_000, env),
+      revisionMinutes: envPositive('AGASTYA_COLLAB_REVISION_MINUTES', 10, env),
+      idleUnloadMs: envPositive('AGASTYA_COLLAB_IDLE_MS', 60_000, env),
+      maxRooms: envPositive('AGASTYA_COLLAB_MAX_ROOMS', 2000, env),
+      persistMs: envPositive('AGASTYA_COLLAB_PERSIST_MS', 100, env),
+    },
     shutdownOnStdinClose: env.AGASTYA_SHUTDOWN_ON_STDIN_CLOSE === '1',
     pdfjsDir: env.AGASTYA_PDFJS_DIR || undefined,
     initialAdmin: { INITIAL_ADMIN_USERNAME: env.INITIAL_ADMIN_USERNAME, INITIAL_ADMIN_PASSWORD: env.INITIAL_ADMIN_PASSWORD },
