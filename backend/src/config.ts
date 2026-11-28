@@ -81,6 +81,14 @@ export interface Config {
    * non-loopback address serves TLS only (AGASTYA_TLS_*), so a Mode B server without a certificate stops at start naming the variable.
    */
   mode: DeploymentMode;
+  /**
+   * Phase 3 P3-6 (docs/phase3/standalone.md): how accounts begin (AGASTYA_DEPLOYMENT). `standalone` = the single-computer EXE: the first start
+   * of a fresh data folder creates one default account per role with fixed credentials, each forced to change its password at the first
+   * sign-in (core/auth/defaultAccounts.js); needs Mode A (loopback). `server` (the default, also of a developer run that does not say) = a
+   * common server: no default accounts, the first administrator is created at first start (the setup screen), everyone else through user
+   * management. Written by the installer (agastya.ini [server] Deployment=), shown read-only on the administration page.
+   */
+  deployment: AccountDeployment;
   /** The certificate files of the TLS listener (null = plain HTTP, allowed on loopback only). Read and checked at start by services/network.ts. */
   tls: TlsFiles | null;
   /**
@@ -310,6 +318,8 @@ function parseJobs(env: Env): JobsConfig {
 }
 
 export type DeploymentMode = 'local' | 'server';
+/** P3-6: how the accounts of an installation begin (AGASTYA_DEPLOYMENT); see Config.deployment. */
+export type AccountDeployment = 'standalone' | 'server';
 /** PEM certificate + key, or one PKCS#12 (.pfx) file; the passphrase of either comes from a file, never from the environment itself. */
 export interface TlsFiles { certFile?: string; keyFile?: string; pfxFile?: string; passphraseFile?: string }
 
@@ -375,6 +385,20 @@ function parseMode(raw: string | undefined): DeploymentMode {
   if (v === '' || v === 'local' || v === 'a') return 'local';
   if (v === 'server' || v === 'b') return 'server';
   throw new ConfigError('AGASTYA_MODE', `"${raw}" is not a deployment mode: use "local" (Mode A, this computer only) or "server" (Mode B, TLS on the network).`);
+}
+
+/** P3-6: AGASTYA_DEPLOYMENT. Unset = `server` (no default accounts: the behaviour before P3-6). A standalone installation serves this computer only. */
+function parseDeployment(raw: string | undefined, mode: DeploymentMode): AccountDeployment {
+  const v = (raw ?? '').trim().toLowerCase();
+  if (v === '' || v === 'server') return 'server';
+  if (v === 'standalone') {
+    if (mode !== 'local') {
+      throw new ConfigError('AGASTYA_DEPLOYMENT', 'standalone is the single-computer installation (Mode A, loopback only) and has accounts with published default '
+        + 'passwords: it cannot run as a network server (AGASTYA_MODE=server). Use AGASTYA_DEPLOYMENT=server for a common server.');
+    }
+    return 'standalone';
+  }
+  throw new ConfigError('AGASTYA_DEPLOYMENT', `"${raw}" is not an account deployment: use "standalone" (this computer, default accounts) or "server" (a common server, administrator created at first start).`);
 }
 
 function parseTls(env: Env): TlsFiles | null {
@@ -465,6 +489,7 @@ export function buildConfig(env: Env = process.env): Config {
     pdfjsDir: env.AGASTYA_PDFJS_DIR || undefined,
     initialAdmin: { INITIAL_ADMIN_USERNAME: env.INITIAL_ADMIN_USERNAME, INITIAL_ADMIN_PASSWORD: env.INITIAL_ADMIN_PASSWORD },
     mode,
+    deployment: parseDeployment(env.AGASTYA_DEPLOYMENT, mode),
     tls,
     serverNames: parseServerNames(env.AGASTYA_SERVER_NAMES),
     hstsMaxAge: parseHsts(env.AGASTYA_HSTS_MAX_AGE),

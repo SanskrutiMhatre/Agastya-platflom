@@ -123,6 +123,7 @@ export function createApp(): express.Express {
     onAccess: notifyAccess,
     securityPolicy, auditHealth, authProvider, systemFigures: () => systemFigures(defaultContext()),
     auditedTx, onSignInThrottled: signInThrottled,       // WP-29: critical actions in one transaction with their audit row; event 4111
+    deployment: config.deployment,                       // P3-6: standalone default accounts or the common server's setup screen
   });
   registerJssGuard(app);                 // before every S1000D-side writer: a JSS document project's publication.xml is never replaced by them
   registerWorkspaceRoutes(app);

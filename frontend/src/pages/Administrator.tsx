@@ -156,12 +156,36 @@ function StorageCard({ f }: { f: Figures }) {
   );
 }
 
+/**
+ * P3-6: how this installation's accounts began - read-only (the installer sets it in agastya.ini) - and, on a standalone installation, the
+ * default accounts that still have their published default password. Always under Access > Security; on the overview only for a standalone
+ * installation (a common server's overview is as before).
+ */
+type Deployment = NonNullable<Awaited<ReturnType<typeof platformApi.health>>['deployment']>;
+function DeploymentNote({ d, standaloneOnly = false }: { d: Deployment | undefined; standaloneOnly?: boolean }) {
+  if (!d || (standaloneOnly && d.mode !== 'standalone')) return null;
+  const unchanged = d.defaultAccounts.filter((a) => a.defaultPassword && !a.disabled);
+  const mode = d.mode === 'standalone'
+    ? 'This computer only. The default accounts were created at installation; each must choose its own password at its first sign-in.'
+    : 'No default accounts. The administrator was created at the first start; everyone else is added here.';
+  return (
+    <div className="adm-deploy"><Callout tone={unchanged.length ? 'warning' : 'info'} testId="admin-deployment"
+      title={<>Deployment: <span data-testid="admin-deployment-mode">{d.mode === 'standalone' ? 'Standalone' : 'Common server'}</span></>}>
+      <p>{mode} Set by the installer; it is not changed here.</p>
+      {unchanged.length
+        ? <p data-testid="admin-default-passwords">Still on the default password (they work on this computer only): {unchanged.map((a, i) => <span key={a.id}>{i ? ', ' : ''}<code>{a.username}</code></span>)}.</p>
+        : d.mode === 'standalone' && d.defaultAccounts.length ? <p data-testid="admin-default-passwords">Every default account has chosen its own password.</p> : null}
+    </Callout></div>
+  );
+}
+
 /** Users and roles: the mockup's overview (health, users, newest audit entries, appearance defaults, storage). */
 function Overview({ createTick, startCreating }: { createTick: number; startCreating: boolean }) {
   const f = useFigures();
   return (
     <>
       <HealthTiles f={f} />
+      <DeploymentNote d={f.health?.deployment} standaloneOnly />
       <div className="adm-cols">
         <div className="stack adm-gap">
           <Users limit={6} createTick={createTick} startCreating={startCreating} inlineNew={false} rolesHref="/administrator/roles" />
@@ -377,6 +401,7 @@ function SecuritySection() {
         </div>
       </section>
       <aside className="stack adm-gap" aria-label="Audit log state">
+        <DeploymentNote d={data.data?.[1].deployment} />
         {audit && audit.failures > 0 ? <Callout tone="danger" title="Not every action was recorded">The audit log could not record {audit.failures} action{audit.failures === 1 ? '' : 's'} since the server started (last: {audit.last?.action} at {audit.last?.at}: {audit.last?.error}). The details are in workspace\logs\audit-failures.log.</Callout> : null}
         {audit?.lastVerification
           ? <Callout tone={audit.lastVerification.ok ? 'success' : 'danger'} title="Audit chain"><span data-testid="sec-audit-verify">Audit chain, last checked {fmtDate(audit.lastVerification.at)}: {audit.lastVerification.summary}.</span>{audit.lastVerification.ok ? null : ' See Audit logs > Verify chain, and docs/OPERATIONS.md section 13.'}</Callout>

@@ -81,6 +81,9 @@
 /* health tiles (mockup .hh) and the two-column body (mockup .adm-cols) */
 .adm .hh { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); margin-bottom: var(--space-4); }
 .adm .hh.hh-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+/* P3-6: the read-only deployment note under the health tiles */
+.adm .adm-deploy { margin-bottom: var(--space-4); }
+.adm .adm-deploy p { margin: 0; }
 .adm .hh .stat .v { font-size: var(--fs-xl); }
 .adm .adm-cols { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: var(--space-4); align-items: start; }
 @media (max-width: 1280px) { .adm .adm-cols { grid-template-columns: minmax(0, 1fr); } .adm .hh, .adm .hh.hh-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

@@ -31,7 +31,8 @@ const ORDER = [
   '024-directory-groups-permissions',
   '025-audit-chain',               // WP-29
   '026-jobs',                      // WP-14
-  '027-gitlab',                    // Phase 3 (P3-5): GitLab integration
+  '027-default-accounts',          // Phase 3 P3-6 (standalone default accounts)
+  '028-gitlab',                    // Phase 3 (P3-5): GitLab integration
 ];
 
 const MIGRATIONS = ORDER.map((name) => require(`./${name}`));
