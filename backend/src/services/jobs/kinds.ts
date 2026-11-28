@@ -9,7 +9,7 @@ import { spawn } from 'child_process';
 import { config } from '../../config';
 import { broadcast } from '../broadcast';
 import { HttpError } from '../http';
-import { runValidation, lastRun } from '../validation';
+import { runValidation, lastRun, previousRun, swapRuns } from '../validation';
 import { assertPublishable, type GateScope, type GateOptions } from '../publishGate';
 import * as publisher from '../publisher';
 import { buildHtmlPublication } from '../htmlPublish';
@@ -35,6 +35,10 @@ export async function runKind(kind: JobKind, projectId: string | null, p: Record
       const hash = config.jobs.validationCache ? validationFingerprint(pid(), opts) : null;
       const prev = hash && p.fresh !== true ? lastRun(pid()) : null;
       if (hash && prev && prev.inputHash === hash) return { result: { run: { ...prev, cached: true } }, inputHash: hash };
+      // phase 7: the run before the last one is kept too (`.validation.prev.json`), so switching between two option sets (BREX on and off, or
+      // the package export's own BREX-less run) does not throw the other answer away; it becomes the last run again when it still holds
+      const older = hash && p.fresh !== true ? previousRun(pid()) : null;
+      if (hash && older && older.inputHash === hash) { swapRuns(pid(), prev, older); return { result: { run: { ...older, cached: true } }, inputHash: hash }; }
       const run = await runValidation(pid(), { ...opts, inputHash: hash ?? undefined });
       return { result: { run }, inputHash: hash };
     }
@@ -44,7 +48,7 @@ export async function runKind(kind: JobKind, projectId: string | null, p: Record
       return { result: { validatedAt: g.validatedAt, files: g.files, warnings: g.warnings, ruleBreaks: g.ruleBreaks } };
     }
     case 'publish': {
-      const out = await publisher.buildPublication(pid(), { compression: p.compression === undefined ? undefined : Number(p.compression), allowRuleBreaks: p.allowRuleBreaks === true });
+      const out = await publisher.buildPublication(pid(), { compression: p.compression === undefined ? undefined : Number(p.compression), allowRuleBreaks: p.allowRuleBreaks === true, force: p.force === true });
       return { result: { ...out, bytes: fs.statSync(out.pdf).size } };
     }
     case 'preview': return { result: await publisher.buildPreview(pid(), String(p.file)) };

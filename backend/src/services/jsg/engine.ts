@@ -25,6 +25,7 @@ import { releaseStateOf } from '../release';
 import { injectPdfInfo, firstText, type PdfInfo } from '../pdfInfo';
 import { assertJsgPublishable, jsgTypeOfProject, JSG_ENGINE_DIR, SOURCE_NAME, readSource } from './service';
 import { tempNameFor, commitFile, discardTemp } from '../../storage/atomicWrite';
+import { buildKeys, pdfSignature } from '../buildCache';
 
 const paths = vendor('engine/paths');
 const fontConf = vendor('engine/fontconf');
@@ -112,7 +113,12 @@ export function lastJsgBuildState(projectId: string): JsgBuildState | null {
   try { return JSON.parse(fs.readFileSync(path.join(projectDirFor(projectId), BUILD_STATE), 'utf8')); } catch { return null; }
 }
 
-export interface JsgBuild { pdf: string; totalMs: number; pages?: number; warnings: string[]; releaseLabel: string; released: boolean; warmFop: boolean }
+export interface JsgBuild { pdf: string; totalMs: number; pages?: number; warnings: string[]; releaseLabel: string; released: boolean; warmFop: boolean; /** phase 7: the last build's PDF, nothing changed */ upToDate?: boolean }
+
+// phase 7: the Quick preview's own record (leading underscore: generated, out of a project archive and of every input key)
+const QUICK_PREVIEW_STATE = '_quick-preview.state.json';
+interface KeptBuild { inputKey?: string; pdfSig?: string | null; gateWarnings?: string[]; warnings?: string[]; releaseLabel?: string; released?: boolean; warmFop?: boolean }
+function readState(abs: string): KeptBuild | null { try { return JSON.parse(fs.readFileSync(abs, 'utf8')); } catch { return null; } }
 
 /** The JSG editor's Quick preview: the same build, kept beside the document's PDF as a draft (the leading underscore keeps it out of a project archive). */
 export const QUICK_PREVIEW_PDF = '_quick-preview.pdf';
@@ -129,6 +135,17 @@ export function buildJsgPdf(projectId: string, opts: { preview?: boolean } = {})
   return serial(`${projectId}:jsg`, async () => {
     const log = (message: string, extra: Record<string, unknown> = {}): void => { console.log(`[jsg:${projectId}] ${message}`); broadcast(projectId, { type: 'progress', message, ...extra, ...(preview ? { preview: true } : {}) } as any); };
     const t0 = Date.now();
+    // Phase 7 (PERF-012, services/buildCache.ts): nothing this build reads changed since the last one of the same kind, and its PDF is still
+    // the file it wrote: that PDF is the answer (two FOP passes for a handbook whose certificate cites the page count otherwise)
+    const statePath = path.join(projectDirFor(projectId), preview ? QUICK_PREVIEW_STATE : BUILD_STATE);
+    const keys = buildKeys(projectId, preview ? 'jsg-preview' : 'jsg'); const key = keys?.key ?? null;
+    const kept = readState(statePath);
+    const outAbs = path.join(projectDirFor(projectId), PDF_OUT);
+    if (key && kept?.inputKey === key && kept.pdfSig && kept.pdfSig === pdfSignature(outAbs)) {
+      for (const w of kept.gateWarnings ?? []) log(`Note: ${w}`);
+      log(`Done (up to date: nothing changed since the last ${preview ? 'preview' : 'build'})`, { done: true });
+      return { pdf: outAbs, totalMs: 0, warnings: kept.warnings ?? [], releaseLabel: kept.releaseLabel ?? '', released: !!kept.released, warmFop: !!kept.warmFop, upToDate: true };
+    }
     log(preview ? 'Quick preview: validating the JSG document against its schema...' : 'Validating the JSG document against its schema...');
     let gate;
     try { gate = await assertJsgPublishable(projectId); }
@@ -208,7 +225,10 @@ export function buildJsgPdf(projectId: string, opts: { preview?: boolean } = {})
     const abs = path.join(dir, PDF_OUT);
     if (!fs.existsSync(pdfTmp) || fs.statSync(pdfTmp).size === 0) { discardTemp(pdfTmp); throw new HttpError(500, 'Build failed: FOP wrote no PDF.', 'BUILD_FAILED'); }
     commitFile(pdfTmp, abs);
-    if (!preview) try { fs.writeFileSync(path.join(dir, BUILD_STATE), JSON.stringify({ fingerprint: rendered.fingerprint, released: rendered.released, builtAt: new Date().toISOString() }), 'utf8'); } catch { /* the PDF is then reported as stale */ }
+    // phase 7: the input key (taken before this build) and the PDF's signature, for the next build's "up to date" check
+    const cacheFields = keys ? { inputKey: keys.record(), pdfSig: pdfSignature(abs), gateWarnings: gate.warnings, warnings, releaseLabel, warmFop } : {};
+    if (!preview) try { fs.writeFileSync(path.join(dir, BUILD_STATE), JSON.stringify({ fingerprint: rendered.fingerprint, released: rendered.released, builtAt: new Date().toISOString(), ...cacheFields }), 'utf8'); } catch { /* the PDF is then reported as stale */ }
+    else if (key) try { fs.writeFileSync(statePath, JSON.stringify({ released: false, ...cacheFields }), 'utf8'); } catch { /* the next preview renders */ }
     const totalMs = Date.now() - t0;
     log(`Done in ${(totalMs / 1000).toFixed(1)}s (${warmFop ? 'warm FOP' : 'FOP via java'})`, { done: true });
     if (!preview) broadcast(projectId, { type: 'reload', kind: 'pdf' } as any);

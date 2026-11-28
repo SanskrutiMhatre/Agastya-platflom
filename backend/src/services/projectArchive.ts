@@ -37,7 +37,7 @@ export const ARCHIVE_VERSION = 1;
 export const ARCHIVE_GENERATOR = 'Agastya';
 
 /** What a build writes again, at the top of a project: the PDF and its intermediates, the driver stylesheets, generated pictures and logos (`_...`), the validation and publish state. */
-const GENERATED = /^(jss-output\.(pdf|fo)|jss-preview\.pdf|jss-run\.xsl|s1000dtofo-run\.xsl|_.*|\.publish-state\.json|\.validation\.json|\.import-reports|.*\.bak)$/i;
+const GENERATED = /^(jss-output\.(pdf|fo)|jss-preview\.pdf|jss-run\.xsl|s1000dtofo-run\.xsl|_.*|\.publish-state\.json|\.validation(\.prev)?\.json|\.import-reports|.*\.bak)$/i;
 
 export interface ArchiveFile { abs: string; rel: string }
 

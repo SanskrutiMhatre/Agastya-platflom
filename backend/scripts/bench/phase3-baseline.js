@@ -52,7 +52,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---- the server under test --------------------------------------------------------------------------------------------------------
 function startServer() {
-  const env = { ...process.env, PORT: String(PORT), AGASTYA_HOST: '127.0.0.1', AGASTYA_WORKSPACE_DIR: WS_DIR, AGASTYA_SHUTDOWN_ON_STDIN_CLOSE: '1' };
+  const env = { ...process.env, PORT: String(PORT), AGASTYA_HOST: '127.0.0.1', AGASTYA_WORKSPACE_DIR: WS_DIR, AGASTYA_SHUTDOWN_ON_STDIN_CLOSE: '1',
+    // phase 7: the db detail of Server-Timing is for administrators only by default; the bench measures as authors, so it asks for all
+    AGASTYA_SERVER_TIMING: process.env.AGASTYA_SERVER_TIMING || 'full' };
   const dist = path.join(ROOT, 'frontend', 'dist'); if (fs.existsSync(path.join(dist, 'index.html'))) env.AGASTYA_CLIENT_DIST = dist;
   const prof = CPUPROF ? ['--cpu-prof', `--cpu-prof-dir=${path.resolve(CPUPROF)}`] : [];
   const child = spawn(process.execPath, [...prof, path.join(BACKEND, 'dist', 'index.js')], { cwd: BACKEND, env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
@@ -281,8 +283,12 @@ const S1K = { pipeline: 's1000dtofo', s1000d: { mic: 'EXAMPLE', issue: '5.0', re
         const runOne = async () => { const t = now(); const r = must(await w.post(url, {}), `build ${label}`); return { wallMs: Math.round(msSince(t)), totalMs: r.json.totalMs, bytes: r.json.bytes, jobId: r.json.jobId ?? r.headers['x-job-id'] }; };
         const first = await sampled(runOne);
         const second = await sampled(runOne);                              // warm: the worker's JVM and the stylesheets are loaded
-        const s1 = await stagesOf(pid, first.value.jobId); const s2 = await stagesOf(pid, second.value.jobId);
-        return { first: { ...first.value, peak: first.peak, stages: s1.stages }, warm: { ...second.value, peak: second.peak, stages: s2.stages }, timelineWarm: s2.timeline };
+        // phase 7: with the build cache (services/buildCache.ts) an unchanged rebuild answers from the last build; `rebuilt` is a real build
+        // in the warm worker, after a change that alters no page (a trailing newline in project.json)
+        try { fs.appendFileSync(path.join(WS_DIR, 'projects', pid, 'project.json'), '\n'); } catch { /* the third run is then cached too */ }
+        const third = await sampled(runOne);
+        const s1 = await stagesOf(pid, first.value.jobId); const s2 = await stagesOf(pid, second.value.jobId); const s3 = await stagesOf(pid, third.value.jobId);
+        return { first: { ...first.value, peak: first.peak, stages: s1.stages }, warm: { ...second.value, peak: second.peak, stages: s2.stages }, rebuilt: { ...third.value, peak: third.peak, stages: s3.stages }, timelineWarm: s2.timeline, timelineRebuilt: s3.timeline };
       }
       const res = {};
       await resetWindow();
@@ -394,7 +400,7 @@ function markdown(o) {
     L.push('## PDF builds', '', '| Build | run | wall ms | job ms | validate | xslt | fop | engine xslt | engine fop | peak server RSS MB | peak JVM MB | PDF KB |', '|---|---|---|---|---|---|---|---|---|---|---|---|');
     for (const [k, b] of Object.entries(p)) {
       if (!b || !b.first) continue;
-      for (const [run, x] of [['first', b.first], ['warm', b.warm]]) L.push(`| ${k} | ${run} | ${x.wallMs} | ${x.stages.jobMs} | ${x.stages.validate} | ${x.stages.xslt} | ${x.stages.fop} | ${x.stages.engineXslt ?? '-'} | ${x.stages.engineFop ?? '-'} | ${x.peak.rssMb} | ${x.peak.jvmWorkingSetMb} | ${Math.round((x.bytes ?? 0) / 1024)} |`);
+      for (const [run, x] of [['first', b.first], ['warm', b.warm], ['rebuilt', b.rebuilt]].filter((e) => e[1])) L.push(`| ${k} | ${run} | ${x.wallMs} | ${x.stages.jobMs} | ${x.stages.validate} | ${x.stages.xslt} | ${x.stages.fop} | ${x.stages.engineXslt ?? '-'} | ${x.stages.engineFop ?? '-'} | ${x.peak.rssMb} | ${x.peak.jvmWorkingSetMb} | ${Math.round((x.bytes ?? 0) / 1024)} |`);
     }
     L.push('');
   }

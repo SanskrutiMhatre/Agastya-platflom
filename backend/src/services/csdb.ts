@@ -134,11 +134,12 @@ export async function writeDm(projectId: string, file: string, xml: string, base
  * Create a data module. `fromRepository`: the module is a copy out of the shared Common Information Repository, which holds modules of every model
  * code and issue by design, so the project's own MIC/issue/SNS rules do not apply to it (XSD and BREX still judge it).
  */
-export async function createDm(projectId: string, file: string, xml: string, actor: Actor, lenient = false, opts: { fromRepository?: boolean; revisionOf?: string } = {}) {
+export async function createDm(projectId: string, file: string, xml: string, actor: Actor, lenient = false, opts: { fromRepository?: boolean; revisionOf?: string; contentChecked?: boolean } = {}) {
   const abs = resolveDmFile(projectId, file); const at = inProject(projectId, abs);
   const rel = `${csdbRel(readProjectJson(projectId))}/${file}`;
   if (!lenient) assertModuleSize(xml);
-  validateContent(rel, xml, lenient);
+  // phase 7: the package import has just run validateContent(rel, xml, lenient) on this very text (its judge step); not twice
+  if (!opts.contentChecked) validateContent(rel, xml, lenient);
   assertUnique(projectId, file, xml);
   if (content.exists(projectId, at)) throw conflict(`A data module named ${file} already exists in this project.`, 'ALREADY_EXISTS');
   // A NEW module must fit the project's S1000D configuration (MIC, issue, offered types and codes, SNS). The server decides this, not the form.

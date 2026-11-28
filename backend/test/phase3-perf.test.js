@@ -29,13 +29,18 @@ const timing = (res) => {
   return { raw: v, db: part('db'), total: part('total') };
 };
 
-test('every API answer carries Server-Timing with the total and the database time of that request', async () => {
+test('every API answer carries Server-Timing with the total; the database time only for administrators (phase 7 item 8)', async () => {
   const r = await author.get(`/api/projects/${pid}/summary`);
   assert.equal(r.status, 200);
   const t = timing(r);
   assert.ok(t.total && t.total.dur >= 0, `total in ${t.raw}`);
-  assert.ok(t.db && t.db.dur >= 0 && t.db.n > 0, `a summary reads the database: ${t.raw}`);
-  assert.ok(t.db.dur <= t.total.dur + 1, 'the database time is part of the total');
+  assert.equal(t.db, null, `a non-administrator sees no database detail: ${t.raw}`);
+  const ra = await admin.get(`/api/projects/${pid}/summary`);
+  assert.equal(ra.status, 200);
+  const ta = timing(ra);
+  assert.ok(ta.total && ta.total.dur >= 0, `total in ${ta.raw}`);
+  assert.ok(ta.db && ta.db.dur >= 0 && ta.db.n > 0, `a summary reads the database: ${ta.raw}`);
+  assert.ok(ta.db.dur <= ta.total.dur + 1, 'the database time is part of the total');
   // an error answer carries it too, and a refused request that never reached the database says 0 statements or a few (session lookup)
   const no = await author.get('/api/admin/perf');
   assert.equal(no.status, 403);

@@ -19,7 +19,7 @@ import { store, docIndex, projectDirFor } from '../context';
 import { bad, conflict, notFound } from './http';
 import { readProjectJson, updateProjectJson, pmRel } from './projects';
 import { csdbRel } from './projectRecord';
-import { listedStat } from './csdbIndex';
+import { listedStat, listDms, listingToken } from './csdbIndex';
 import { publicationSources } from './pm';
 import { FileMemo } from './fileMemo';
 import { ownEngineFormatOf } from './ownEngines';
@@ -46,18 +46,55 @@ export function publicationFingerprint(projectId: string, opts: { reuse?: boolea
   return fingerprintOf(projectId, opts).fingerprint;
 }
 
+/*
+  Phase 7 (docs/phase3/performance.md, item 2): the DISPLAY fingerprint (`reuse`) of a project is kept whole while nothing it depends on
+  changed: the kept CSDB listing (its token changes with any module written, added, removed, or edited in place once the listing has seen
+  it), the publication module's file version, the front-matter files' versions, and project.json's text. A dashboard visit then costs a
+  few stats instead of 1,000 path joins and memo look-ups plus the publication walk. Decisions (`reuse` off) never use it.
+*/
+const displayMemo = new Map<string, { sig: string; value: { fingerprint: string; sourceCount: number } }>();
+const DISPLAY_MAX = 512;
+const statSig = (abs: string): string => { try { const s = fs.statSync(abs); return `${s.size}:${s.mtimeMs}:${s.ctimeMs}:${s.ino}`; } catch { return '-'; } };
+function dirSig(abs: string): string {
+  let names: string[]; try { names = fs.readdirSync(abs).filter((f) => /\.xml$/i.test(f)).sort(); } catch { return '-'; }
+  return names.map((f) => `${f}=${statSig(path.join(abs, f))}`).join(',');
+}
+function displaySignature(projectId: string, dir: string, project: unknown): string | null {
+  const token = listingToken(projectId);
+  if (token === null) return null;
+  return [token, statSig(path.join(dir, pmRel(project))), dirSig(path.join(dir, 's1000d', 'frontmatter')), dirSig(path.join(dir, 'jss', 'frontmatter')), JSON.stringify(project)].join('|');
+}
+
 function fingerprintOf(projectId: string, opts: { reuse?: boolean; known?: DmSummary[] }): { fingerprint: string; sourceCount: number } {
   const dir = projectDirFor(projectId);
   const project = readProjectJson(projectId);
+  const memoable = !!opts.reuse && !ownEngineFormatOf(projectId);
+  const sig = memoable ? displaySignature(projectId, dir, project) : null;
+  if (sig !== null) {
+    const hit = displayMemo.get(projectId);
+    if (hit && hit.sig === sig) return hit.value;
+  }
+  const value = computeFingerprint(projectId, dir, project, opts);
+  if (sig !== null) {
+    displayMemo.delete(projectId); displayMemo.set(projectId, { sig, value });
+    if (displayMemo.size > DISPLAY_MAX) { const first = displayMemo.keys().next().value; if (first !== undefined) displayMemo.delete(first); }
+  }
+  return value;
+}
+
+function computeFingerprint(projectId: string, dir: string, project: Record<string, unknown>, opts: { reuse?: boolean; known?: DmSummary[] }): { fingerprint: string; sourceCount: number } {
   const h = crypto.createHash('sha256');
   const digest = (abs: string): Buffer => crypto.createHash('sha256').update(fs.readFileSync(abs)).digest();
   // WP-17 (PERF-005): with `reuse`, a module the caller listed in this request is not statted a second time (its listing's stat is used)
   const listed = new Map<string, fs.Stats>();
-  if (opts.reuse && opts.known) {
+  // phase 7: a DISPLAY fingerprint without a module list of the caller uses the kept CSDB listing (csdbIndex: current with every platform
+  // write; its stats stand in for one stat per module). A decision (`reuse` off) still reads every file.
+  const known = opts.known ?? (opts.reuse && !ownEngineFormatOf(projectId) ? listDms(projectId) : undefined);
+  if (opts.reuse && known) {
     const csdb = csdbRel(project);
-    for (const d of opts.known) { const st = listedStat(d); if (st) listed.set(`${csdb}/${d.file}`, st); }
+    for (const d of known) { const st = listedStat(d); if (st) listed.set(`${csdb}/${d.file}`, st); }
   }
-  const sources = releaseSources(projectId, opts.known);
+  const sources = releaseSources(projectId, known);
   for (const rel of sources) {
     h.update(rel, 'utf8');
     h.update('\0');

@@ -18,7 +18,9 @@
 
 import fs from 'fs';
 import path from 'path';
-import { nowIso, vendor } from '../config';
+import { nowIso, vendor, config } from '../config';
+import { sha256 } from '../lib/hash';
+import { buildInfo } from './version';
 import { projectDirFor } from '../context';
 import { readProjectJson, updateProjectJson, csdbRel, mediaRel, pmRel, isS1000dProject } from './projects';
 import { explore } from './pm';
@@ -29,7 +31,7 @@ import { analyse as analyseExt, usesForeign } from './extensions';
 
 const paths = vendor('engine/paths');
 const { validateProjectXml } = vendor('engine/validateXml');
-const { validateProjectSchema, installedIssues } = vendor('engine/validateSchema');
+const { validateProjectSchema, installedIssues, declaredSchema } = vendor('engine/validateSchema');
 import { getConfigRow } from './projectConfig';
 import { validateProject as validateApplicability } from './applicability';
 import { ISSUE_LABEL } from './s1000dRef';
@@ -57,8 +59,125 @@ export interface ValidationRun {
 
 const reportFile = (projectId: string): string => path.join(projectDirFor(projectId), '.validation.json');
 
+/*
+  Phase 7 (docs/phase3/performance.md, item 4): the schema verdict of a data module, kept by CONTENT. A module's XSD result depends only on its
+  own text and the schema set it is judged by (each module is validated against its own declared schema, never against the other modules), so
+  the same text under the same issue and the same program build gives the same verdict. The schema stage was nearly all of a validation run and
+  of the publish gate (600 ms for the 3-module sample: the validator thread, the WebAssembly and the schema set are set up on every call); now a
+  run validates only the modules whose text changed. "Fresh" in the publish gate's sense still holds: the gate reads and hashes every file it
+  publishes in that request; only the verdict on identical bytes is reused. A module the validator could not judge (memory, too large, a failure)
+  is never kept, so it is tried again next time.
+  Kept in memory (bounded) and on disk (`<workspace>/.agastya-cache/validation-xsd`, one small file per verdict, no fsync: a lost entry is only
+  validated again), so every job worker and a restarted server share it. The platform backup leaves the folder out.
+*/
+interface SchemaFinding { rel: string; line: number; sev?: string; title?: string; [k: string]: unknown }
+interface XsdVerdict { issues: SchemaFinding[]; notes: SchemaFinding[]; checked: number }
+const xsdMemo = new Map<string, XsdVerdict>();
+const XSD_MEMO_MAX = 8000;
+export const xsdCacheDir = (): string => path.join(config.workspaceDir, '.agastya-cache', 'validation-xsd');
+const xsdKey = (text: string, issue: string): string => sha256(`${buildInfo().version}\0${issue}\0`).slice(0, 16) + sha256(text);
+function xsdCached(key: string): XsdVerdict | null {
+  const hit = xsdMemo.get(key);
+  if (hit) return hit;
+  try {
+    const v = JSON.parse(fs.readFileSync(path.join(xsdCacheDir(), key.slice(0, 2), `${key}.json`), 'utf8')) as XsdVerdict;
+    if (v && Array.isArray(v.issues) && Array.isArray(v.notes)) { remember(key, v); return v; }
+  } catch { /* not kept */ }
+  return null;
+}
+function remember(key: string, v: XsdVerdict): void {
+  xsdMemo.delete(key); xsdMemo.set(key, v);
+  if (xsdMemo.size > XSD_MEMO_MAX) { const first = xsdMemo.keys().next().value; if (first !== undefined) xsdMemo.delete(first); }
+}
+// once per process, verdicts not written for 30 days are removed (an unchanged module is then validated once more), so the folder stays bounded
+let pruned = false;
+function pruneOld(): void {
+  if (pruned) return; pruned = true;
+  const cut = Date.now() - 30 * 86400000;
+  setImmediate(() => {
+    let subs: string[] = []; try { subs = fs.readdirSync(xsdCacheDir()); } catch { return; }
+    for (const s of subs) {
+      const d = path.join(xsdCacheDir(), s);
+      try { for (const f of fs.readdirSync(d)) { const p = path.join(d, f); try { if (fs.statSync(p).mtimeMs < cut) fs.unlinkSync(p); } catch { /* in use */ } } } catch { /* not a folder */ }
+    }
+  }).unref();
+}
+function keep(key: string, v: XsdVerdict): void {
+  remember(key, v); pruneOld();
+  try {
+    const d = path.join(xsdCacheDir(), key.slice(0, 2)); fs.mkdirSync(d, { recursive: true });
+    const f = path.join(d, `${key}.json`); const t = `${f}.${process.pid}.tmp`;
+    fs.writeFileSync(t, JSON.stringify(v)); fs.renameSync(t, f);
+  } catch { /* the cache is a convenience */ }
+}
+/** Forget every kept schema verdict (tests; an administrator may also delete the folder at any time). */
+export function clearSchemaVerdicts(): void { xsdMemo.clear(); try { fs.rmSync(xsdCacheDir(), { recursive: true, force: true }); } catch { /* busy */ } }
+
+/**
+ * `validateProjectSchema(dir, files, opts)` with the verdict of each module kept by content (see above). Same result shape: the issues sorted
+ * by file and line followed by the notes sorted by file (when included), and `checked` = the modules actually judged.
+ */
+async function schemaByContent(dir: string, files: string[], opts: { issue: string; includeNotes?: boolean }): Promise<{ issues: SchemaFinding[]; checked: number; notes?: SchemaFinding[] }> {
+  const includeNotes = opts.includeNotes !== false;
+  const per = new Map<string, XsdVerdict>(); const miss: string[] = []; const keyOf = new Map<string, string>(); const textOf = new Map<string, string>();
+  for (const rel of files) {
+    let text: string; try { text = fs.readFileSync(path.join(dir, rel), 'utf8'); } catch { miss.push(rel); continue; }
+    const key = xsdKey(text, opts.issue); keyOf.set(rel, key); textOf.set(rel, text);
+    const hit = xsdCached(key);
+    if (hit) per.set(rel, hit); else miss.push(rel);
+  }
+  if (miss.length) {
+    const fresh = await validateProjectSchema(dir, miss, { issue: opts.issue, includeNotes: true });
+    const byRel = new Map<string, XsdVerdict>(miss.map((r) => [r, { issues: [], notes: [], checked: 0 }]));
+    for (const i of fresh.issues as SchemaFinding[]) {
+      const v = byRel.get(i.rel); if (!v) continue;
+      (i.sev === 'crit' ? v.issues : v.notes).push(i);
+    }
+    for (const rel of miss) {
+      const v = byRel.get(rel)!;
+      const text = textOf.get(rel);
+      // judged = it declares an issue and nothing says it was not checked (the vendored rule for `checked`)
+      v.checked = text !== undefined && declaredSchema(text)?.issue && !v.notes.length ? 1 : 0;
+      per.set(rel, v);
+      const key = keyOf.get(rel);
+      const couldNotRun = v.notes.some((n) => /could not run/i.test(String(n.title ?? '')));
+      if (key && !couldNotRun) keep(key, v);
+    }
+  }
+  const issues: SchemaFinding[] = []; const notes: SchemaFinding[] = []; let checked = 0;
+  for (const rel of files) { const v = per.get(rel); if (!v) continue; issues.push(...v.issues); notes.push(...v.notes); checked += v.checked; }
+  issues.sort((a, b) => a.rel.localeCompare(b.rel) || a.line - b.line);
+  notes.sort((a, b) => a.rel.localeCompare(b.rel));
+  return { issues: [...issues, ...(includeNotes ? notes : [])], checked };
+}
+
 export function lastRun(projectId: string): ValidationRun | null {
   try { return JSON.parse(fs.readFileSync(reportFile(projectId), 'utf8')); } catch { return null; }
+}
+
+// Phase 7: the Validation page run before the last one, so a page run with other options (or a gate run in between) does not discard it.
+const prevFile = (projectId: string): string => path.join(projectDirFor(projectId), '.validation.prev.json');
+/** The fingerprinted page run kept before the last run, or null. */
+export function previousRun(projectId: string): ValidationRun | null {
+  try { return JSON.parse(fs.readFileSync(prevFile(projectId), 'utf8')); } catch { return null; }
+}
+/** `older` (from previousRun) becomes the last run again, and `last` (when it was a fingerprinted page run) the previous one. */
+export function swapRuns(projectId: string, last: ValidationRun | null, older: ValidationRun): void {
+  try {
+    fs.writeFileSync(reportFile(projectId), JSON.stringify(older));
+    if (last?.inputHash) fs.writeFileSync(prevFile(projectId), JSON.stringify(last)); else fs.rmSync(prevFile(projectId), { force: true });
+  } catch { /* the report is a convenience */ }
+}
+/** Before a new run replaces the report: keep it as the previous one when it is a fingerprinted page run (its last key is `inputHash`). */
+function keepAsPrevious(projectId: string): void {
+  const f = reportFile(projectId);
+  let fd: number | undefined;
+  try {
+    const size = fs.statSync(f).size; fd = fs.openSync(f, 'r');
+    const n = Math.min(size, 200); const buf = Buffer.alloc(n); fs.readSync(fd, buf, 0, n, size - n);
+    fs.closeSync(fd); fd = undefined;
+    if (/"inputHash":"[0-9a-f]{64}"\}$/.test(buf.toString('utf8'))) fs.renameSync(f, prevFile(projectId));
+  } catch { /* nothing kept */ } finally { if (fd !== undefined) try { fs.closeSync(fd); } catch { /* closed */ } }
 }
 
 export function installedSchemaIssues(): string[] { return installedIssues(); }
@@ -239,7 +358,7 @@ export async function runValidation(projectId: string, opts: { issue?: string; b
     for (const f of a.findings) extIssues.push(norm('xsd', { sev: f.severity === 'error' ? 'error' : 'info', title: `Extension: ${f.rule}`, rel, line: f.line, loc: f.location, detail: `${f.message} Fix: ${f.fix}` }));
     const dest = path.join(hostDir, rel); fs.mkdirSync(path.dirname(dest), { recursive: true }); fs.writeFileSync(dest, a.host, 'utf8'); hostFiles.push(rel);
   }
-  const schema = await validateProjectSchema(dir, direct, { issue: issueUsed });
+  const schema = await schemaByContent(dir, direct, { issue: issueUsed });           // phase 7: unchanged modules keep their verdict
   if (hostFiles.length) {
     try {
       const hs = await validateProjectSchema(hostDir, hostFiles, { issue: issueUsed, includeNotes: false });
@@ -267,6 +386,7 @@ export async function runValidation(projectId: string, opts: { issue?: string; b
   for (const n of [...(schema.notes ?? []), ...(schema.issues ?? [])]) if (n.rel && /Not checked|could not run/i.test(String(n.title ?? ''))) { unchecked.add(String(n.rel)); uncheckedWhy[String(n.rel)] = String(n.detail ?? n.title ?? '').slice(0, 300); }
   const run: ValidationRun = { ranAt: nowIso(), issueUsed, checked: xml.checked, schemaChecked: schema.checked, brexChecked, summary, issues, notes, unchecked: [...unchecked], uncheckedWhy };
   if (opts.inputHash) run.inputHash = opts.inputHash;
+  keepAsPrevious(projectId);                                             // phase 7: a fingerprinted page run is kept as the previous one
   try { fs.writeFileSync(reportFile(projectId), JSON.stringify(run)); } catch { /* the report is a convenience */ }
   return run;
 }

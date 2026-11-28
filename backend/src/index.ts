@@ -18,7 +18,7 @@ import * as collabRooms from './services/collab/rooms';
 import './services/collab/jsg';   // P3-1: the JSG document as a live room format (register() on load)
 import { reconcileRegistry, sweepPendingImports } from './services/projects';
 import { startRenderer, stopRenderer, rendererStatus } from './services/publisher';
-import { shutdownJobs } from './services/jobs';
+import { shutdownJobs, prewarmWorkers } from './services/jobs';
 import { loadTls, listen, hostCheckFor, setHostCheck, describeNetwork } from './services/network';
 import { installLogging } from './services/log';
 import { enableHostEventSink } from './services/securityEvents';
@@ -64,6 +64,8 @@ export async function start(port: number = config.port): Promise<number> {
   const l = await listen(app, port, config, material, (s) => { tuneServer(s); broadcast.attach(s); });
   servers = l.servers;
   collabRooms.start();   // P3-1: live co-editing rooms (the file watch, the sweep, and the replay of changes a stop or crash left unwritten)
+  // phase 7 (item 6): a job worker and its FOP JVM start now, in the background, so the first build or preview does not wait for a cold JVM
+  setTimeout(() => { prewarmWorkers(); }, 1500).unref();
   const r = rendererStatus();
   console.log(`Agastya Platform v2 running on ${l.scheme}://localhost:${l.port}  (listening on ${l.addresses.join(', ')})`);
   console.log(`  Network:   ${describeNetwork(config, material?.info ?? null)}`);

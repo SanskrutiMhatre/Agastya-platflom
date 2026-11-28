@@ -6,8 +6,10 @@
 // everything here, so existing imports keep working. project.json is read and written through the ContentStore.
 // =============================================================================
 
+import fs from 'fs';
 import { content } from '../context';
 import { HttpError } from './http';
+import { FileMemo } from './fileMemo';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { safeRelPath, safeArtworkRef } = require('../core/auth/xmlGuard');
@@ -17,8 +19,17 @@ export function projectJsonPath(id: string): string {
   return content.pathOf(id, 'project.json');
 }
 
+// Phase 7: project.json is read many times per request (every csdbDir / pmPath / setting lookup). Its TEXT is kept per file version (size,
+// times, file id: every write is an atomic rename, so a new version is a new file id), and parsed on each call, so every caller still gets
+// its own object to change. One stat instead of open + read + close.
+const projectJsonMemo = new FileMemo<string>(4096);
 export function readProjectJson(id: string): any {
-  try { return JSON.parse(content.readText(id, 'project.json')) || {}; } catch { return {}; }
+  try {
+    const abs = content.pathOf(id, 'project.json');
+    let st: fs.Stats | null = null; try { st = fs.statSync(abs); } catch { /* read through the store below */ }
+    const text = st ? projectJsonMemo.get(abs, st, () => content.readText(id, 'project.json')) : content.readText(id, 'project.json');
+    return JSON.parse(text) || {};
+  } catch { return {}; }
 }
 
 /** Read-modify-write so every setting the caller does not touch survives. */

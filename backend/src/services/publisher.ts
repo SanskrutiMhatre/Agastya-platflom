@@ -42,6 +42,7 @@ import { unwrapChapterFolders } from './jssdm/unwrap';
 import { injectPdfInfo, firstText, firstAttr, type PdfInfo } from './pdfInfo';
 import { ownEngineFormatOf } from './ownEngines';
 import { tempNameFor, commitFile, copyFileAtomic, discardTemp } from '../storage/atomicWrite';
+import { buildKeys, pdfSignature } from './buildCache';
 
 export const PDF_NAME = 'jss-output.pdf';
 export const PREVIEW_NAME = 'jss-preview.pdf';
@@ -349,7 +350,7 @@ function refuseOwnEngine(projectId: string): void {
   if (own) throw new HttpError(409, own.refusal.message, own.refusal.code);
 }
 
-export interface BuildResult { pdf: string; totalMs?: number; releaseLabel: string }
+export interface BuildResult { pdf: string; totalMs?: number; releaseLabel: string; /** phase 7: answered from the last build (nothing changed) */ upToDate?: boolean }
 
 function failure(projectId: string, err: any): never {
   const why = explainBuildFailure(err, { workDir: projectDirFor(projectId) });
@@ -363,7 +364,11 @@ function failure(projectId: string, err: any): never {
  * download uses this to know whether the file on disk still matches the project's release state.
  */
 const BUILD_STATE = '.publish-state.json';
-export interface BuildState { fingerprint: string; released: boolean }
+export interface BuildState {
+  fingerprint: string; released: boolean;
+  /** phase 7 (services/buildCache.ts): the input key of the build that wrote the PDF, the PDF's file signature, and what that build reported */
+  inputKey?: string; pdfSig?: string | null; warnings?: string[]; ruleBreaks?: string[]; releaseLabel?: string;
+}
 function writeBuildState(projectId: string, st: BuildState): void {
   try { fs.writeFileSync(path.join(projectDirFor(projectId), BUILD_STATE), JSON.stringify(st), 'utf8'); } catch { /* the next download simply rebuilds */ }
 }
@@ -371,10 +376,21 @@ export function lastBuildState(projectId: string): BuildState | null {
   try { return JSON.parse(fs.readFileSync(path.join(projectDirFor(projectId), BUILD_STATE), 'utf8')); } catch { return null; }
 }
 
-export function buildPublication(projectId: string, opts: { compression?: number; allowRuleBreaks?: boolean } = {}): Promise<BuildResult> {
+export function buildPublication(projectId: string, opts: { compression?: number; allowRuleBreaks?: boolean; /** phase 7: build even when nothing changed (the administrator's rebuild of every PDF) */ force?: boolean } = {}): Promise<BuildResult> {
   refuseOwnEngine(projectId);
   return serial(`${projectId}:full`, async () => {
     const log = (m: string) => { console.log(`[build:${projectId}] ${m}`); broadcast(projectId, { type: 'progress', message: m }); };
+    // Phase 7 (PERF-012, services/buildCache.ts): nothing the build reads changed since the last full build, and its PDF is still the file it
+    // wrote: that PDF is the answer (it was validated, rendered and recorded from exactly these inputs). The notes it had are repeated.
+    const keys = buildKeys(projectId, 'full', { compression: opts.compression ?? null, allowRuleBreaks: !!opts.allowRuleBreaks }); const key = keys?.key ?? null;
+    const prev = lastBuildState(projectId);
+    const pdfAbs = path.join(projectDirFor(projectId), PDF_NAME);
+    if (key && !opts.force && prev?.inputKey === key && prev.pdfSig && prev.pdfSig === pdfSignature(pdfAbs)) {
+      for (const w of prev.warnings ?? []) log(`Note: ${w}`);
+      log('Up to date: nothing changed since the last build, so its PDF is used.');
+      broadcast(projectId, { type: 'progress', message: 'Done (up to date)', done: true });
+      return { pdf: pdfAbs, totalMs: 0, releaseLabel: prev.releaseLabel ?? '', ruleBreaks: prev.ruleBreaks ?? [], upToDate: true };
+    }
     // A PDF is only built from modules that have JUST been checked against their schema (a draft that does not match blocks it).
     log(isJssAuthored(projectId) ? 'Validating the JSS document against its schema and stencil rules...' : 'Validating the publication against the S1000D schemas...');
     let gate;
@@ -384,6 +400,11 @@ export function buildPublication(projectId: string, opts: { compression?: number
     for (const w of gate.warnings) log(`Note: ${w}`);              // what the gate let through: a recorded waiver, a BREX rule this engine cannot run
     if (gate.ruleBreaks.length) log(`Building anyway: ${gate.ruleBreaks.length} business rule break${gate.ruleBreaks.length === 1 ? '' : 's'} not fixed.`);
     const built = await renderFull(projectId, gate, log, opts);
+    // phase 7: what the next build compares with (the key was taken BEFORE this build, so a change made while it ran is a change next time)
+    if (key) {
+      const st = lastBuildState(projectId);
+      if (st) writeBuildState(projectId, { ...st, inputKey: keys ? keys.record() : key, pdfSig: pdfSignature(built.pdf), warnings: gate.warnings, ruleBreaks: gate.ruleBreaks, releaseLabel: built.releaseLabel });
+    }
     return Object.assign(built, { ruleBreaks: gate.ruleBreaks });
   });
 }
@@ -456,6 +477,31 @@ async function renderFull(projectId: string, gate: GatePass, log: (m: string) =>
   }
 }
 
+// Phase 7 (PERF-012, services/buildCache.ts): a preview asked for again with nothing changed is the preview already on disk. Each kind keeps
+// its own record (leading underscore: generated, outside every input key and the project archive).
+const DOC_PREVIEW_STATE = '_quick-preview.state.json';
+const DM_PREVIEW_STATE = '_preview.state.json';
+interface KeptPreview { inputKey: string; pdfSig: string | null; warnings: string[]; releaseLabel: string }
+function previewKey(projectId: string, kind: string, extra: Record<string, unknown>): ReturnType<typeof buildKeys> {
+  return buildKeys(projectId, kind, extra);
+}
+function keptPreview(projectId: string, stateName: string, keys: ReturnType<typeof buildKeys>, pdfName: string, log: (m: string) => void): BuildResult | null {
+  if (!keys) return null;
+  const dir = projectDirFor(projectId);
+  let kept: KeptPreview | null = null;
+  try { kept = JSON.parse(fs.readFileSync(path.join(dir, stateName), 'utf8')); } catch { return null; }
+  const pdf = path.join(dir, pdfName);
+  if (!kept || kept.inputKey !== keys.key || !kept.pdfSig || kept.pdfSig !== pdfSignature(pdf)) return null;
+  for (const w of kept.warnings ?? []) log(`Note: ${w}`);
+  log('Done (up to date: nothing changed since the last preview)');
+  return { pdf, totalMs: 0, releaseLabel: kept.releaseLabel ?? '', upToDate: true };
+}
+function keepPreview(projectId: string, stateName: string, keys: ReturnType<typeof buildKeys>, built: BuildResult, warnings: string[]): void {
+  if (!keys) return;
+  const rec: KeptPreview = { inputKey: keys.record(), pdfSig: pdfSignature(built.pdf), warnings, releaseLabel: built.releaseLabel };
+  try { fs.writeFileSync(path.join(projectDirFor(projectId), stateName), JSON.stringify(rec), 'utf8'); } catch { /* the next preview renders */ }
+}
+
 /**
  * The JSS editor's Quick preview: the whole document rendered exactly as Generate renders it (the same gate, engine and frame), as a draft
  * kept beside the publication (_quick-preview.pdf). It never claims a release, writes no build state and does not replace the publication's
@@ -466,12 +512,17 @@ export function buildDocumentPreview(projectId: string): Promise<BuildResult> {
   refuseOwnEngine(projectId);
   return serial(`${projectId}:full`, async () => {
     const log = (m: string) => { console.log(`[preview:${projectId}] ${m}`); broadcast(projectId, { type: 'progress', message: m, preview: true }); };
+    const key = previewKey(projectId, 'doc-preview', {});
+    const kept = keptPreview(projectId, DOC_PREVIEW_STATE, key, QUICK_PREVIEW_NAME, (m) => broadcast(projectId, { type: 'progress', message: m, preview: true, ...(m.startsWith('Done') ? { done: true } : {}) }));
+    if (kept) return kept;
     log(isJssAuthored(projectId) ? 'Quick preview: validating the JSS document against its schema and stencil rules...' : 'Quick preview: validating the publication...');
     let gate;
     try { gate = await assertPublishable(projectId, 'publication', { waivable: !releaseStateOf(projectId).released }); }
     catch (e) { broadcast(projectId, { type: 'progress', message: (e as Error).message, error: true, done: true, preview: true }); throw e; }
     for (const w of gate.warnings) log(`Note: ${w}`);
-    return renderFull(projectId, gate, log, { preview: true, compression: 0 });
+    const built = await renderFull(projectId, gate, log, { preview: true, compression: 0 });
+    keepPreview(projectId, DOC_PREVIEW_STATE, key, built, gate.warnings);
+    return built;
   });
 }
 
@@ -505,6 +556,9 @@ const minimalPm = (href: string, cls: string): string => `<?xml version="1.0"?>
 export function buildPreview(projectId: string, dmFile: string): Promise<BuildResult> {
   return serial(`${projectId}:preview`, async () => {
     const log = (m: string) => broadcast(projectId, { type: 'progress', message: m, preview: true });
+    const key = previewKey(projectId, 'dm-preview', { file: dmFile });
+    const kept = keptPreview(projectId, DM_PREVIEW_STATE, key, PREVIEW_NAME, log);
+    if (kept) return kept;
     const gate = await assertPublishable(projectId, { file: dmFile }, { waivable: !releaseStateOf(projectId).released });   // the server renders only a module that is valid right now
     for (const w of gate.warnings) log(`Note: ${w}`);
     const dir = projectDirFor(projectId);
@@ -543,7 +597,9 @@ export function buildPreview(projectId: string, dmFile: string): Promise<BuildRe
             stage1Out: '_preview-book.xml', isS1000D: true,
             stage1Params: [...engineConfig.stage1Params(effective), ['frontmatter.order', '_preview-order.xml']] });
       commitFile(pdfTmp, path.join(dir, PREVIEW_NAME));
-      return { pdf: path.join(dir, PREVIEW_NAME), totalMs: result?.totalMs, releaseLabel };
+      const built = { pdf: path.join(dir, PREVIEW_NAME), totalMs: result?.totalMs, releaseLabel };
+      keepPreview(projectId, DM_PREVIEW_STATE, key, built, gate.warnings);
+      return built;
     } catch (e) { discardTemp(pdfTmp); return failure(projectId, e); }
   });
 }

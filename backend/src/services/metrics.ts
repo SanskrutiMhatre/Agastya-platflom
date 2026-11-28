@@ -23,6 +23,7 @@ import type { Request, Response, NextFunction } from 'express';
 import type { SqlDatabase, SqlStatement } from '../storage/sqlite';
 import { currentRequest } from './requestContext';
 import { routeOf } from './log';
+import { config } from '../config';
 
 export const SLOW_STATEMENT_MS = 50;
 const RING = 4096;
@@ -67,14 +68,18 @@ export function instrumentDatabase(handle: SqlDatabase): SqlDatabase {
   if (h.__timed) return handle;
   const prepare = handle.prepare.bind(handle);
   const exec = handle.exec.bind(handle);
-  const wrapStatement = (sql: string, s: SqlStatement): SqlStatement => new Proxy(s, {
-    get(target, prop) {
-      const v = Reflect.get(target, prop, target);
-      if (typeof v !== 'function') return v;
-      if (prop === 'run' || prop === 'get' || prop === 'all') return (...args: unknown[]) => timed(sql, () => v.apply(target, args));
-      return v.bind(target);
-    },
-  });
+  // Phase 7 (docs/phase3/performance.md, item 7): the three timed methods are wrapped ONCE per prepared statement, as own properties of the
+  // statement object. The Proxy this replaces allocated a bound function or a closure on every property access (2.4 s self time in the
+  // baseline profile). Statements the repositories cache (sqliteBase) therefore cost nothing extra per call beyond timed() itself.
+  const wrapStatement = (sql: string, s: SqlStatement): SqlStatement => {
+    const st = s as SqlStatement & Record<string, unknown>;
+    for (const name of ['run', 'get', 'all'] as const) {
+      const fn = st[name] as (...a: unknown[]) => unknown;
+      if (typeof fn !== 'function') continue;
+      Object.defineProperty(st, name, { value: (...args: unknown[]) => timed(sql, () => fn.apply(st, args)), configurable: true, writable: true });
+    }
+    return st;
+  };
   Object.defineProperty(h, 'prepare', { value: (sql: string) => wrapStatement(sql, prepare(sql)), configurable: true, writable: true });
   Object.defineProperty(h, 'exec', { value: (sql: string) => timed(sql, () => exec(sql)), configurable: true, writable: true });
   Object.defineProperty(h, '__timed', { value: true });
@@ -113,6 +118,14 @@ export function routeFigures(top = 20): { recentSlowest: RouteSample[]; routesBy
   return { recentSlowest: xs, routesByMean: routes, tracked: byRoute.size, dropped: routesDropped, ring: Math.min(recentN, ROUTE_RING) };
 }
 
+/** Server-Timing detail: `admin` (default: db detail for administrators only), `full` (everyone), `off` (no header). */
+const TIMING_MODE = config.perf.serverTiming;   // AGASTYA_SERVER_TIMING
+/** The session the authz layer resolved for this request (it caches it on req.auth); never resolves one itself. */
+function isAdminRequest(r: Request): boolean {
+  const a = (r as Request & { auth?: { user?: { role?: string } } | null }).auth;
+  return !!a && a.user?.role === 'admin';
+}
+
 /** Express middleware: request time of every /api request into the ring buffers, and the Server-Timing header of its answer. */
 export function requestMetrics(r: Request, res: Response, next: NextFunction): void {
   if (!r.path.startsWith('/api/')) { next(); return; }
@@ -125,8 +138,13 @@ export function requestMetrics(r: Request, res: Response, next: NextFunction): v
   res.writeHead = function (this: Response, ...args: unknown[]) {
     ctx = ctx ?? currentRequest();
     if (!res.headersSent && !res.getHeader('Server-Timing')) {
-      const dbMs = ctx?.dbMs ?? 0; const dbN = ctx?.dbN ?? 0;
-      res.setHeader('Server-Timing', `db;dur=${dbMs.toFixed(1)};desc="${dbN} statements", total;dur=${(performance.now() - t0).toFixed(1)}`);
+      const total = `total;dur=${(performance.now() - t0).toFixed(1)}`;
+      // Phase 7 item 8: the database detail (time and statement count) only for administrators, or for everyone when
+      // AGASTYA_SERVER_TIMING=full; everyone else gets `total` only (=off: no header at all).
+      if (TIMING_MODE === 'off') { /* no header */ } else if (TIMING_MODE === 'full' || isAdminRequest(r)) {
+        const dbMs = ctx?.dbMs ?? 0; const dbN = ctx?.dbN ?? 0;
+        res.setHeader('Server-Timing', `db;dur=${dbMs.toFixed(1)};desc="${dbN} statements", ${total}`);
+      } else res.setHeader('Server-Timing', total);
     }
     return (writeHead as (...a: unknown[]) => Response).apply(this, args);
   } as typeof res.writeHead;

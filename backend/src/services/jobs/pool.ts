@@ -140,6 +140,23 @@ export class WorkerPool {
     w.idle.unref();
   }
 
+  /**
+   * Phase 7 (docs/phase3/performance.md, item 6): start one worker ahead of the first job and let it start its FOP JVM (and the renderer's
+   * warm-up), so the first build or preview after a server start does not pay the cold JVM (4-5 s). Off the request path; the worker is an
+   * ordinary idle worker afterwards (preferred by builds, ended after the idle time like any other, which releases its JVM's memory).
+   * Does nothing when a worker already exists or the pool is stopped.
+   */
+  prewarm(): boolean {
+    if (this.stopped || !this.available() || this.workers.size > 0 || this.o.max < 1) return false;
+    const w = this.spawnWorker();
+    w.warmBuild = true;
+    void w.ready.then(() => { if (!w.ending && !w.current) { try { w.child.send({ t: 'warm' }); } catch { /* gone */ } } }, () => undefined);
+    if (w.idle) clearTimeout(w.idle);
+    w.idle = setTimeout(() => this.end(w), this.o.idleMs);
+    w.idle.unref();
+    return true;
+  }
+
   /** Ends an idle worker: closing the channel makes it stop its JVM and exit; a worker that does not is killed after 10 s. */
   private end(w: Worker): void {
     if (w.ending) return;

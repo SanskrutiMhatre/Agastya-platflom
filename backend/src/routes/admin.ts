@@ -130,7 +130,7 @@ export function registerAdminRoutes(app: Express): void {
     void (async () => {
       let ok = 0; const failed: string[] = [];
       // WP-14: each rebuild is a build job (the build slots bound how many run at once; authors' own builds queue beside them)
-      await Promise.all(ids.map((id) => jobs.run({ kind: 'publish', projectId: id, params: {}, actor: { id: req.auth.user.id, username: req.auth.user.username } }).then(() => { ok++; }, () => { failed.push(id); })));
+      await Promise.all(ids.map((id) => jobs.run({ kind: 'publish', projectId: id, params: { force: true }, actor: { id: req.auth.user.id, username: req.auth.user.username } }).then(() => { ok++; }, () => { failed.push(id); })));
       audit({ actorId: req.auth.user.id, actorUsername: req.auth.user.username, action: 'maintenance.rebuild-pdfs.finished', targetType: 'admin', meta: { rebuilt: ok, failed } });
     })();
     res.status(202).json({ queued: ids.length });

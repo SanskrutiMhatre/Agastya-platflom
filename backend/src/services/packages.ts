@@ -43,9 +43,50 @@ const { checkXmlSafety } = require('../core/auth/xmlGuard');
 export { MAX_UPLOAD_BYTES } from './uploads';
 import { MAX_UPLOAD_BYTES } from './uploads';
 import { config as appConfig } from '../config';
-import { sha256File } from '../lib/hash';
+import { sha256File, sha256 } from '../lib/hash';
+import { performance } from 'perf_hooks';
+import { broadcast } from './broadcast';
 import { readAttrs } from './xmlHead';
 export const importLimits = (): ExtractLimits => ({ ...DEFAULT_LIMITS, maxEntryBytes: MAX_UPLOAD_BYTES, maxTotalBytes: appConfig.limits.maxExpandedBytes });
+
+/*
+  Phase 7 (docs/phase3/performance.md, item 1): the import's file loops used to run without one real yield (1,000 modules: the event loop
+  blocked 8-14 s, every other author waited that long). Now:
+    * both loops (judge, apply) give the event loop a turn whenever IMPORT_SLICE_MS of work has passed (`slicer`), so other requests are
+      answered between files;
+    * imports into ONE project run one after another (`importChains`): with the yields another import could otherwise interleave its
+      judge and apply steps with this one's; other writers are still caught by the checks of createDm / writeDm (identity, version) at apply;
+    * each staged file is read once (hash and text from the same bytes; the apply step reuses the text) instead of three times;
+    * progress goes out over the project's WebSocket channel (`progress` lines, at most every 500 ms).
+  The per-file fsync of the atomic write (storage/atomicWrite.ts, owned by the storage work) is unchanged: see the record for the lead.
+*/
+export const IMPORT_SLICE_MS = 15;
+/** A function to await inside a long loop: it yields to the event loop (setImmediate) once `ms` of synchronous work has passed. */
+export function slicer(ms = IMPORT_SLICE_MS): () => Promise<void> {
+  let last = performance.now();
+  return async () => {
+    if (performance.now() - last < ms) return;
+    await new Promise<void>((r) => setImmediate(r));
+    last = performance.now();
+  };
+}
+const importChains = new Map<string, Promise<unknown>>();
+function oneImportAtATime<T>(projectId: string, fn: () => Promise<T>): Promise<T> {
+  const prev = importChains.get(projectId) ?? Promise.resolve();
+  const run = prev.catch(() => undefined).then(fn);
+  const tail = run.catch(() => undefined);
+  importChains.set(projectId, tail);
+  void tail.then(() => { if (importChains.get(projectId) === tail) importChains.delete(projectId); });
+  return run;
+}
+function progressTicker(projectId: string): (message: string, force?: boolean) => void {
+  let at = 0;
+  return (message, force = false) => {
+    const t = Date.now(); if (!force && t - at < 500) return; at = t;
+    try { broadcast(projectId, { type: 'progress', message }); } catch { /* progress is a convenience */ }
+  };
+}
+const KEEP_TEXT_BYTES = 256 * 1048576;          // the texts kept from the judge step for the apply step (beyond it, the file is read again)
 
 export type FileKind = 'dm' | 'pm' | 'object' | 'asset' | 'manifest' | 'other';
 export interface PackageFile { path: string; abs: string; kind: FileKind; size: number; sha256: string }
@@ -174,8 +215,14 @@ export type ItemStatus = 'accepted' | 'unchanged' | 'skipped' | 'rejected';
 export interface ImportItem { path: string; as: FileKind; status: ItemStatus; message: string; schema?: string; xsdErrors?: number; xsdFirst?: string[]; sha256?: string; action?: 'create' | 'replace' }
 export interface ImportReport { source: string; startedAt: string; finishedAt: string; applied: boolean; counts: Record<ItemStatus, number>; items: ImportItem[]; notes: string[]; manifest: { present: boolean; checked: number; mismatches: string[] } }
 
-export async function importPackage(projectId: string, zipPath: string, sourceName: string, o: ImportOptions, actor: ObjectActor, role: string): Promise<ImportReport> {
+export function importPackage(projectId: string, zipPath: string, sourceName: string, o: ImportOptions, actor: ObjectActor, role: string): Promise<ImportReport> {
+  return oneImportAtATime(projectId, () => importPackageNow(projectId, zipPath, sourceName, o, actor, role));
+}
+
+async function importPackageNow(projectId: string, zipPath: string, sourceName: string, o: ImportOptions, actor: ObjectActor, role: string): Promise<ImportReport> {
   const startedAt = nowIso(); const d = dirs(projectId); const notes: string[] = []; const items: ImportItem[] = [];
+  const turn = slicer(); const tell = progressTicker(projectId);
+  const texts = new Map<string, string>(); let keptBytes = 0;     // phase 7: the text of each staged file, read once in the judge step
   let reader: ZipFileReader;
   try { reader = ZipFileReader.open(zipPath, importLimits()); } catch (e) { if (e instanceof ZipError) throw new HttpError(400, `Package refused: ${e.message}`, 'PACKAGE_REFUSED', { reason: e.code }); throw e; }
   const staging = fs.mkdtempSync(path.join(os.tmpdir(), 'agastya-import-'));
@@ -200,18 +247,27 @@ export async function importPackage(projectId: string, zipPath: string, sourceNa
     // PLAN 2: judge each file
     const cfg = getConfig(projectId); const seen = new Map<string, { rel: string; sha: string }>(); const toCheck: Array<{ it: ImportItem; xml: string }> = []; let unregistered = 0;
     const known = new Map(csdb.listDms(projectId).map((m) => [csdb.identityKey(m), m.file]));
+    let judged = 0;
     for (const s of staged) {
+      await turn(); judged++; tell(`Package import: checking ${judged} of ${staged.length} files`);
       const kind = classify(s.rel); const base = path.basename(s.rel); const it: ImportItem = { path: s.rel, as: kind, status: 'accepted', message: '' };
       items.push(it);
       if (kind === 'manifest') { it.status = 'skipped'; it.message = 'Package manifest (used for the integrity check).'; continue; }
       if (kind === 'other') { it.status = 'skipped'; it.message = 'Not an S1000D CSDB object, graphic or multimedia file; ignored.'; continue; }
-      const sha = sha256File(s.abs); it.sha256 = sha;
+      // phase 7: a text file (module, object, publication) is read ONCE: its hash and its text come from the same bytes
+      let sha: string; let text: string | undefined;
+      if (kind === 'dm' || kind === 'object' || kind === 'pm') {
+        const bytes = fs.readFileSync(s.abs); sha = sha256(bytes); text = bytes.toString('utf8');
+        if (keptBytes + bytes.length <= KEEP_TEXT_BYTES) { texts.set(s.rel, text); keptBytes += bytes.length; }
+      } else sha = sha256File(s.abs);
+      it.sha256 = sha;
+      const readStaged = (): string => text ?? fs.readFileSync(s.abs, 'utf8');
       const key = (kind === 'pm' ? 'PM' : base).toLowerCase(); const twin = seen.get(key);
       if (twin) { if (twin.sha === sha) { it.status = 'skipped'; it.message = `Same name and identical content as ${twin.rel}; counted once.`; } else { it.status = 'rejected'; it.message = `Same file name as ${twin.rel} but different content.`; } continue; }
       seen.set(key, { rel: s.rel, sha });
       try {
         if (kind === 'dm') {
-          const xml = fs.readFileSync(s.abs, 'utf8'); const target = csdb.resolveDmFile(projectId, base); const exists = fs.existsSync(target);
+          const xml = readStaged(); const target = csdb.resolveDmFile(projectId, base); const exists = fs.existsSync(target);
           csdb.validateContent(`${csdbRel(d.pj)}/${base}`, xml, !!o.skipChecks);
           const mine = csdb.parseIdent(headOf(xml), base); const clash = known.get(csdb.identityKey(mine));
           if (clash && clash.toLowerCase() !== base.toLowerCase()) throw new Error(`same data module (code, issue, language) as ${clash}, held under another file name`);
@@ -222,7 +278,7 @@ export async function importPackage(projectId: string, zipPath: string, sourceNa
           it.schema = mine.schema || undefined;
           if (o.validate !== false) toCheck.push({ it, xml });                                    // this module against ITS schema only (batched below)
         } else if (kind === 'object') {
-          const xml = fs.readFileSync(s.abs, 'utf8'); const target = path.join(d.csdb, base);
+          const xml = readStaged(); const target = path.join(d.csdb, base);
           const g = checkXmlSafety(xml); if (!g.ok) throw new Error(g.error);
           validateObject(base, xml, !!o.skipChecks); const exists = fs.existsSync(target);
           if (exists && sha256File(target) === sha) { it.status = 'unchanged'; it.message = 'Already in the project with identical content.'; continue; }
@@ -230,7 +286,7 @@ export async function importPackage(projectId: string, zipPath: string, sourceNa
           it.action = exists ? 'replace' : 'create'; it.message = `${kindOfFile(base)} object.`;
           if (o.validate !== false) toCheck.push({ it, xml });
         } else if (kind === 'pm') {
-          const xml = fs.readFileSync(s.abs, 'utf8'); const g = checkXmlSafety(xml); if (!g.ok) throw new Error(g.error);
+          const xml = readStaged(); const g = checkXmlSafety(xml); if (!g.ok) throw new Error(g.error);
           if (rootStart(xml, 'pm') < 0) throw new Error('no <pm> root element');
           const exists = fs.existsSync(d.pm);
           if (exists && sha256File(d.pm) === sha) { it.status = 'unchanged'; it.message = 'Same publication module.'; continue; }
@@ -256,10 +312,14 @@ export async function importPackage(projectId: string, zipPath: string, sourceNa
     const applied = !integrity && (rejected === 0 || !!o.partial);
     if (applied) {
       try {
-        for (const it of items.filter((i) => i.status === 'accepted' && i.action)) {
+        const toApply = items.filter((i) => i.status === 'accepted' && i.action); let written = 0;
+        for (const it of toApply) {
+          await turn(); written++; tell(`Package import: writing ${written} of ${toApply.length} files`);
           const src = path.join(staging, it.path); const base = path.basename(it.path);
-          if (it.as === 'dm') { const xml = fs.readFileSync(src, 'utf8'); if (it.action === 'replace') await csdb.writeDm(projectId, base, xml, undefined, actor, role, !!o.skipChecks); else { await csdb.createDm(projectId, base, xml, actor, !!o.skipChecks); created.push(path.join(d.csdb, base)); } }
-          else if (it.as === 'object') { const r = await writeObject(projectId, base, fs.readFileSync(src, 'utf8'), actor, { overwrite: true, lenient: !!o.skipChecks }); if (r.created) created.push(path.join(d.csdb, base)); }
+          const textOf = (): string => texts.get(it.path) ?? fs.readFileSync(src, 'utf8');
+          // contentChecked: the judge step ran the same content rules on this same text (validateContent with the same leniency)
+          if (it.as === 'dm') { const xml = textOf(); if (it.action === 'replace') await csdb.writeDm(projectId, base, xml, undefined, actor, role, !!o.skipChecks); else { await csdb.createDm(projectId, base, xml, actor, !!o.skipChecks, { contentChecked: true }); created.push(path.join(d.csdb, base)); } }
+          else if (it.as === 'object') { const r = await writeObject(projectId, base, textOf(), actor, { overwrite: true, lenient: !!o.skipChecks }); if (r.created) created.push(path.join(d.csdb, base)); }
           else if (it.as === 'pm') { if (fs.existsSync(d.pm)) fs.copyFileSync(d.pm, `${d.pm}.bak`); else created.push(d.pm); fs.copyFileSync(src, d.pm); }
           else if (it.as === 'asset') { const dest = path.join(/^ICN-/i.test(base) ? d.csdb : d.media, base); fs.mkdirSync(path.dirname(dest), { recursive: true }); if (!fs.existsSync(dest)) created.push(dest); fs.copyFileSync(src, dest); }
         }
@@ -269,6 +329,7 @@ export async function importPackage(projectId: string, zipPath: string, sourceNa
     const counts: Record<ItemStatus, number> = { accepted: 0, unchanged: 0, skipped: 0, rejected: 0 }; for (const i of items) counts[i.status]++;
     const report: ImportReport = { source: sourceName, startedAt, finishedAt: nowIso(), applied, counts, items, notes, manifest: mm };
     try { const rd = path.join(d.root, '.import-reports'); fs.mkdirSync(rd, { recursive: true }); fs.writeFileSync(path.join(rd, `${startedAt.replace(/[:.]/g, '-')}.json`), JSON.stringify(report, null, 1)); } catch { /* the report is still returned */ }
+    tell(`Package import: ${applied ? 'applied' : 'not applied'} (${counts.accepted} accepted, ${counts.unchanged} unchanged, ${counts.skipped} skipped, ${counts.rejected} rejected)`, true);
     return report;
   } finally { reader.close(); fs.rmSync(staging, { recursive: true, force: true }); }
 }
