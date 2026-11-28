@@ -16,11 +16,6 @@
 .v2-twist { width: 16px; display: inline-grid; place-items: center; color: var(--text-faint); flex: none; }
 
 /* ------------------------------------------------------------ validation */
-.v2-issue { display: flex; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--border); cursor: pointer; align-items: flex-start; }
-.v2-issue:hover { background: var(--bg-hover); }
-.v2-issue.sel { background: var(--accent-soft); }
-.v2-sev { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex: none; }
-.v2-sev.error { background: var(--danger); } .v2-sev.warn { background: var(--warning); } .v2-sev.info { background: var(--info); }
 
 /* ------------------------------------------------------------ publication
    UI redesign 2026-11-28 (owner-approved mockup 4, docs/audit/mockups/publication.html): three panes. Structure on the left, the built PDF on
@@ -29,7 +24,7 @@
    component sheet carries them; the space fallbacks are the mockup's own values. */
 .pub { flex: 1; min-height: 0; height: 100%; display: grid; grid-template-columns: 300px minmax(0, 1fr) 300px; background: var(--surface-panel); position: relative; }
 .pub-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-.pub .pane.viewer { background: var(--viewer-canvas); }
+.pub .pane.viewer { background: var(--viewer-canvas-themed); }
 .pub .pane-head { min-height: 32px; height: auto; flex: none; }
 .pub .pane-head .icon-btn { width: 26px; height: 26px; }
 .pub .pane-count { color: var(--text-tertiary); font-weight: var(--fw-medium); letter-spacing: 0; text-transform: none; font-variant-numeric: tabular-nums; }
@@ -37,7 +32,7 @@
 .pub .pub-flip { transform: scaleX(-1); }
 .pub .pub-idgrid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
 .pub .pub-idgrid .v2-input { width: 100%; }
-.pub .pub-empty { text-align: center; padding: var(--space-4); color: var(--viewer-ink-70); }
+.pub .pub-empty { text-align: center; padding: var(--space-4); color: var(--text-secondary); }
 
 /* the tabs and the build panel (mockup: Build / History, sticky build footer); .tabs/.tab/.card-head/.badge/.progress/.field are the shared classes */
 .pub .tabs { padding: 0 var(--space-2); flex: none; }

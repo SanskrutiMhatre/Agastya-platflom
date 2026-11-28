@@ -1,49 +1,61 @@
-// The main dashboard frame. The navigation depends on the role:
-//   administrator    Overview, Projects, Graphics, CIR, Backup, Activity, Administrator, Settings   (oversees; creates people, not projects)
-//   project manager  Overview, Workspace, Projects, Graphics, CIR, Backup, Activity, Settings
+// The main dashboard frame, drawn as the owner-approved mockups' global shell (docs/audit/mockups/workspace.html, admin.html; UI redesign
+// step 1): a full-width top bar (brand, breadcrumb, search/command trigger, offline mark, notifications, theme switch, account) over a left
+// navigation in groups, with the page beside it. The navigation depends on the role:
+//   administrator    Overview, Projects, Graphics, CIR, Activity, Backup, Administrator, Settings   (oversees; creates people, not projects)
+//   project manager  Overview, Workspace, Projects, Graphics, CIR, Activity, Backup, Settings
 //   author           Overview, Workspace, Projects, Graphics, CIR, Backup, Settings
-// Notifications and the account menu sit together at the right of the top bar, icons only.
+// Notifications and the account menu sit at the right of the top bar, icons only; the account menu names the role, never the person.
 
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { HeadingLevel, MAIN_ID, SkipLink, useDocumentTitle } from '../components/a11y';
 import { Icon, type IconName } from '../components/Icon';
 import { ThemeToggle } from '../components/ThemeToggle';
+import { AccountMenu } from '../components/AccountMenu';
 import { useSession } from '../store/session';
 import { useInbox } from '../store/inbox';
 import { useApp } from '../store/appSettings';
-import { globalLabel } from '../lib/roles';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { JumpButton, QuickSwitcher, useQuickSwitcher } from '../components/QuickSwitcher';
 
-// WP-35 (group 2, mockup workspace.html): the same items, labels and order, in three groups (work, library, manage) with a heading each.
-type Item = { to: string; label: string; icon: IconName; roles?: string[]; group: 'work' | 'library' | 'manage'; hint?: string };
+// The mockup's groups: the work pages without a heading, then Library, Operations and Platform. Items, labels and roles are the app's.
+type Group = 'work' | 'library' | 'operations' | 'platform';
+type Item = { to: string; label: string; icon: IconName; roles?: string[]; group: Group; hint?: string };
 const NAV: Item[] = [
   { to: '/overview', label: 'Overview', icon: 'dashboard', group: 'work' },
   { to: '/workspace', label: 'Workspace', icon: 'folderOpen', roles: ['project_manager', 'author'], group: 'work' },
-  { to: '/projects', label: 'Projects', icon: 'projects', group: 'work' },
+  { to: '/projects', label: 'Projects', icon: 'folder', group: 'work' },
   { to: '/graphics', label: 'Graphics', icon: 'image', group: 'library' },
-  { to: '/cir', label: 'CIR', icon: 'library', group: 'library', hint: 'Common information repository: shared data modules' },
-  { to: '/backup', label: 'Backup', icon: 'download', group: 'manage' },
-  { to: '/activity', label: 'Activity', icon: 'activity', roles: ['admin', 'project_manager'], group: 'manage' },
-  { to: '/administrator', label: 'Administrator', icon: 'shield', roles: ['admin'], group: 'manage' },
-  { to: '/settings', label: 'Settings', icon: 'settings', group: 'manage' },
+  { to: '/cir', label: 'CIR', icon: 'book2', group: 'library', hint: 'Common information repository: shared data modules' },
+  { to: '/activity', label: 'Activity', icon: 'activity', roles: ['admin', 'project_manager'], group: 'operations' },
+  { to: '/backup', label: 'Backup', icon: 'archive', group: 'operations' },
+  { to: '/administrator', label: 'Administrator', icon: 'shield', roles: ['admin'], group: 'platform' },
+  { to: '/settings', label: 'Settings', icon: 'settings', group: 'platform' },
 ];
-const GROUP_HEAD: Record<Item['group'], string | null> = { work: null, library: 'Library', manage: 'Manage' };
+const GROUP_HEAD: Record<Group, string | null> = { work: null, library: 'Library', operations: 'Operations', platform: 'Platform' };
 // Notifications is not in the sidebar: the bell in the top bar opens it.
 const TITLES: Record<string, string> = { '/notifications': 'Notifications' };
 const NAV_REUSE_MS = 30_000;
+const VERSION = typeof __AGASTYA_CLIENT_VERSION__ === 'string' ? __AGASTYA_CLIENT_VERSION__ : '';
+
+/** The offline / server mark of the top bars: the product works without a network; it shows a warning while the server does not answer. */
+export function NetState() {
+  const unreachable = useSession((s) => s.unreachable);
+  const text = unreachable ? 'The server is not answering' : 'Offline, on-premises';
+  return (
+    <span className={`icon-btn net-state${unreachable ? ' is-down' : ''}`} role="img" tabIndex={0} data-testid="net-state" aria-label={text} title={unreachable ? text : 'Offline · on-premises'}>
+      <Icon name={unreachable ? 'warn' : 'offline'} />
+    </span>
+  );
+}
 
 export function AppShell() {
-  const { user, pendingInvitations, adminQueues, logout, load } = useSession();
+  const { user, pendingInvitations, adminQueues, load } = useSession();
   const unread = useInbox((s) => s.unread);
   const appName = useApp((s) => s.settings.appName);
   const loadApp = useApp((s) => s.load);
   const refreshCount = useInbox((s) => s.refreshCount);
   const loc = useLocation();
-  const nav = useNavigate();
-  const [menu, setMenu] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
   const switcher = useQuickSwitcher();          // WP-22 (UX-021): Ctrl+K, Jump to…
 
   // Keep the badges (invitations, queues, unread notifications) fresh as the user moves around, and every half minute.
@@ -52,80 +64,50 @@ export function AppShell() {
   useEffect(() => { void load({ ttl: NAV_REUSE_MS }); void refreshCount({ ttl: NAV_REUSE_MS }); }, [loc.pathname, load, refreshCount]);
   useEffect(() => { void loadApp(); }, [loadApp]);
   useEffect(() => { const t = setInterval(() => void refreshCount(), 30_000); return () => clearInterval(t); }, [refreshCount]);
-  useEffect(() => {
-    const close = (e: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenu(false); };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, []);
 
   const queued = adminQueues ? adminQueues.resets + adminQueues.releases : 0;
   const items = NAV.filter((n) => !n.roles || (user && n.roles.includes(user.role)));
   const current = items.find((n) => loc.pathname.startsWith(n.to));
   const title = current?.label ?? TITLES[loc.pathname] ?? appName;
+  const groupHead = current ? GROUP_HEAD[current.group] : null;
   useDocumentTitle(title, appName);
 
-  // WP-23 (UX-005 d): the account menu behaves as a menu: opening it puts focus on the first item, Up/Down/Home/End move between the items,
-  // Escape closes it and returns focus to the button, Tab closes it and moves on. Down on the closed button opens it.
-  const menuButton = useRef<HTMLButtonElement>(null);
-  const menuItems = () => Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
-  useEffect(() => { if (menu) menuItems()[0]?.focus(); }, [menu]);
-  const menuKeys = (e: ReactKeyboardEvent) => {
-    if (!menu) { if (e.key === 'ArrowDown' && e.target === menuButton.current) { e.preventDefault(); setMenu(true); } return; }
-    const items = menuItems();
-    const at = items.indexOf(document.activeElement as HTMLElement);
-    if (e.key === 'Escape') { e.preventDefault(); setMenu(false); menuButton.current?.focus(); }
-    else if (e.key === 'Tab') setMenu(false);
-    else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); items[(at + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length]?.focus(); }
-    else if (e.key === 'Home' || e.key === 'End') { e.preventDefault(); items[e.key === 'Home' ? 0 : items.length - 1]?.focus(); }
-  };
-
   return (
-    <div className="v2-shell">
+    <div className="app v2-shell" data-density="comfortable">
       <SkipLink />
-      <aside className="v2-side" aria-label="Sidebar">
-        <div className="v2-brand"><span className="v2-brand-mark"><Icon name="book" size={16} /></span><span className="v2-trunc">{appName}</span></div>
-        <nav className="v2-nav" aria-label="Main navigation">
-          {items.map((n, i) => [
-            GROUP_HEAD[n.group] && items[i - 1]?.group !== n.group ? <div key={`h-${n.group}`} className="v2-nav-head" aria-hidden="true">{GROUP_HEAD[n.group]}</div> : null,
-            <NavLink key={n.to} to={n.to} title={n.hint ?? n.label} className={({ isActive }) => (isActive ? 'active' : '')}>
-              <Icon name={n.icon} />{n.label}
-              {n.to === '/overview' && pendingInvitations > 0 ? <span className="v2-count" title="Pending project invitations">{pendingInvitations}</span> : null}
-              {n.to === '/settings' && queued > 0 ? <span className="v2-count" title="Items waiting for an administrator">{queued}</span> : null}
-            </NavLink>,
-          ])}
+      <header className="topbar v2-top" data-testid="global-topbar">
+        <div className="brand v2-brand"><span className="brand-mark"><Icon name="book" size={20} /></span><span className="trunc brand-name">{appName}</span></div>
+        <nav className="crumbs" aria-label="Breadcrumb">
+          <span className="sep" aria-hidden="true">/</span>
+          {groupHead ? <><span className="crumb-group">{groupHead}</span><span className="sep" aria-hidden="true">/</span></> : null}
+          <h1 className="crumb-current trunc" aria-current="page">{title}</h1>
         </nav>
-        <div className="v2-side-foot"><div className="v2-hint v2-side-note">Offline · on-premises</div></div>
-      </aside>
+        <span className="grow" />
+        <JumpButton onClick={() => switcher.setOpen(true)} />
+        <NetState />
+        <NavLink to="/notifications" className="icon-btn v2-bell" aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'} title="Notifications" data-testid="bell">
+          <Icon name="bell" />
+          {unread > 0 ? <span className="v2-bell-count" data-testid="unread-count">{unread > 99 ? '99+' : unread}</span> : null}
+        </NavLink>
+        <ThemeToggle />
+        <AccountMenu />
+      </header>
 
-      <div className="v2-main">
-        <header className="v2-top">
-          <h1>{title}</h1>
-          <span className="spacer" />
-          <JumpButton onClick={() => switcher.setOpen(true)} />
-          <ThemeToggle />
-          <NavLink to="/notifications" className="icon-btn v2-bell" aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'} title="Notifications" data-testid="bell">
-            <Icon name="bell" size={17} />
-            {unread > 0 ? <span className="v2-count v2-bell-count" data-testid="unread-count">{unread > 99 ? '99+' : unread}</span> : null}
-          </NavLink>
-          <div ref={menuRef} className="v2-pop-anchor" onKeyDown={menuKeys}>
-            <button ref={menuButton} className="icon-btn" onClick={() => setMenu((m) => !m)} aria-haspopup="menu" aria-expanded={menu} aria-label="Account menu" title="Account" data-testid="account-menu">
-              <Icon name="user" size={20} />
-            </button>
-            {menu ? (
-              <div className="v2-card v2-acct-menu" role="menu" aria-label="Account">
-                <div className="v2-acct-who"><span className="v2-hint">{globalLabel(user?.role)}</span></div>   {/* owner rule (00-platform): the menu names neither the person nor the username, only the role */}
-                <div className="v2-nav v2-nav-flush">
-                  <button className="v2-navbtn" role="menuitem" tabIndex={-1} onClick={() => { setMenu(false); nav('/settings'); }}><Icon name="settings" />Account settings</button>
-                  <button className="v2-navbtn" role="menuitem" tabIndex={-1} onClick={() => void logout()}><Icon name="logout" />Sign out</button>
-                </div>
-              </div>
-            ) : null}
-          </div>
-        </header>
-        <main id={MAIN_ID} className="v2-main-region" tabIndex={-1}>
-          <HeadingLevel level={2}><ErrorBoundary resetKey={loc.pathname} where="platform page"><Outlet /></ErrorBoundary></HeadingLevel>
-        </main>
-      </div>
+      <nav className="sidenav" aria-label="Main navigation">
+        {items.map((n, i) => [
+          GROUP_HEAD[n.group] && items[i - 1]?.group !== n.group ? <div key={`h-${n.group}`} className="nav-group" aria-hidden="true">{GROUP_HEAD[n.group]}</div> : null,
+          <NavLink key={n.to} to={n.to} title={n.hint ?? n.label} className="nav-item">
+            <Icon name={n.icon} /><span className="nav-label">{n.label}</span>
+            {n.to === '/overview' && pendingInvitations > 0 ? <span className="count" title="Pending project invitations">{pendingInvitations}</span> : null}
+            {n.to === '/settings' && queued > 0 ? <span className="count" title="Items waiting for an administrator">{queued}</span> : null}
+          </NavLink>,
+        ])}
+        <div className="sidenav-foot faint">Offline · on-premises{VERSION ? <><br />v{VERSION}</> : null}</div>
+      </nav>
+
+      <main id={MAIN_ID} className="main v2-main-region" tabIndex={-1}>
+        <HeadingLevel level={2}><ErrorBoundary resetKey={loc.pathname} where="platform page"><Outlet /></ErrorBoundary></HeadingLevel>
+      </main>
       {switcher.open ? <QuickSwitcher pages={[...items.map((n) => ({ to: n.to, label: n.label })), { to: '/notifications', label: 'Notifications' }]} onClose={() => switcher.setOpen(false)} /> : null}
     </div>
   );

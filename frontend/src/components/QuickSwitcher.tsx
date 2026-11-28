@@ -34,10 +34,11 @@ export function useQuickSwitcher(): { open: boolean; setOpen: (v: boolean) => vo
 }
 
 /** The header button that opens the switcher (it names the key). */
-export function JumpButton({ onClick }: { onClick: () => void }) {
+export function JumpButton({ onClick, compact }: { onClick: () => void; /** the project shell's shorter trigger ("Jump to…") */ compact?: boolean }) {
+  // UI redesign step 1: the mockups' `.search-trigger` in the top bar (a well with the hint and the Ctrl K keys)
   return (
-    <button className="btn btn-sm v2-jump" onClick={onClick} data-testid="jump-open" title="Jump to a project, a page or a data module (Ctrl+K)" aria-keyshortcuts="Control+K">
-      <Icon name="search" size={13} /><span className="v2-jump-label">Jump to…</span><kbd className="v2-kbd">Ctrl K</kbd>
+    <button type="button" className={`search-trigger v2-jump${compact ? ' compact' : ''}`} onClick={onClick} data-testid="jump-open" title="Jump to a project, a page or a data module (Ctrl+K)" aria-keyshortcuts="Control+K">
+      <Icon name="search" /><span className="v2-jump-label trunc">{compact ? 'Jump to…' : 'Jump to a project, page or data module…'}</span><span className="kbd-group"><kbd>Ctrl</kbd><kbd>K</kbd></span>
     </button>
   );
 }

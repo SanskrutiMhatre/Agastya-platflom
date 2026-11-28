@@ -2494,3 +2494,73 @@ The status of every gate is in `docs/audit/RELEASE-EVIDENCE.md` (PASS / FAIL / E
     * G-Q-2: 76 of 94 P0/P1 ids are named in tests.
     * QA-006a: the base-14 fonts are not embedded.
     * G-REL-2: no kill case during release approval (the other sites reach n = 100).
+
+
+## UI redesign step 1 (owner-approved mockups)
+
+Date 2026-11-28. Specification: the six mockups in `docs/audit/mockups/`, approved by the owner on 2026-11-28. Step 1 is the design
+system, the two shells and screen 1. Screens 2-6 were built in parallel by other agents on top of the design-system commit.
+
+**Design system (commit d216069; fixes 7ffe644).**
+* `tokens.json` holds every colour of the mockup `tokens.css`, in both themes. The new semantic tokens are: surface-chrome,
+  surface-selected-hover and -inactive, text-link, focus-ring, accent-pressed, the status -border/-solid/-subtle sets,
+  text-on-warning-solid, tooltip-*, shadow-3, scrollbar-*, border-subtle and viewer-canvas-themed. It also holds the scale: space-*,
+  fs-*, lh-*, fw-*, radius-md/xl, the layout sizes, dur-* and ease. Density adds control-h, row-h, table-row-h, icon-btn and pad-ctl.
+* `--accent` is a fill now, with white text in both themes. Accent-coloured text uses `--text-link` and focus outlines use
+  `--focus-ring` (47 places moved). The administrator accent drives accent, text-link and focus-ring.
+* Contrast: 298 checks, 0 failing. Colour literals: 0.
+* `styles/components.css` has the mockup components with the mockup class names. It also has the shared page pieces: .pane,
+  .pane-head, .toolbar, .vsep, .chip(s), .switch, .toggle, .kv, .sec-h, .tile-ic, .scroll, .empty-state, .kpis.
+* `components/ui.tsx` adds Card, StatTile, Pill, Dot, Progress, Callout, Seg, EmptyState and initialsOf. `Icon` adds the mockup icons.
+* Fixes found by the e2e runs:
+  * The mockup `.app` grid also matched the S1000D Studio root, which is also `.app`. This moved the build log out of the editor
+    pane. The Studio root is now `.app.s1k-studio`, and the shell rules skip it. `.brand`, `.pane` and `.toast` skip the Studio too.
+  * `.btn` from components.css overrode `.btn-primary`, `.btn-sm`, `.btn-danger` and `.btn-danger-solid`, because it loads later.
+    These four are now aliases of the mockup modifiers.
+  * `.btn` no longer animates its fill.
+
+**Global shell (`layouts/AppShell.tsx`, `styles/shell.css`; mockups workspace.html and admin.html).**
+* The top bar holds:
+  * the brand;
+  * the breadcrumb (group / page, the page name is the h1);
+  * the search trigger (Ctrl+K, the existing quick switcher);
+  * the offline/server mark (`net-state`);
+  * the bell (`bell`, `unread-count`);
+  * the three-state theme switch;
+  * the icon-only account menu (`components/AccountMenu.tsx`, role only).
+* The side navigation uses the mockup groups (Library, Operations, Platform). It has the same items, roles and test ids as before,
+  and a footer with "Offline · on-premises" and the version.
+
+**Project shell (`layouts/ProjectShell.tsx`, `layouts/shellSlots.tsx`).**
+* The activity bar (`.activity` / `.act-btn`) holds the back link, the project initial, the areas with their badges, Settings at the
+  foot and the pin. Its landmarks, `v2-rail*` classes, `rail-pin` and data-tip labels are kept.
+* The top bar shows "Projects / project / page" with the role, then the page actions slot (`<TopbarActions>`), "Jump to…", the theme
+  switch and the account menu. It keeps the test ids `project-bar` and `project-bar-name`.
+* A status bar (`project-status-bar`) holds the page items (`<StatusItems>`), or by default the server state, engine and module count.
+* The editor page keeps its own header and status bar, in the compact density, with no shell top bar (the owner rule asserted in
+  wp22-navigation).
+
+**Screen 1 (`pages/Overview.tsx`, `Projects.tsx`, `Workspace.tsx`, `components/Oversight.tsx`, `styles/pages/dashboard.css`).**
+* The Overview for each role has: the greeting and page actions, four stat tiles, then two columns.
+  * Left: "Continue where you left off", the Projects card with the release-status filter, and the team.
+  * Right: "Needs your attention" (approvals, invitations, admin queues, with their actions), "Recent activity" and "System" (server,
+    network, version; for the administrator also the last backup and the audit log).
+* Projects and Workspace use the same page head and cards. Every route, action and test id is kept.
+
+**Owner-rule assertions changed.**
+1. 00-platform: "the theme is one icon button" became "the theme is an icon-only switch", because the mockups draw a three-state
+   switch. The renamed test is in parity-explanations.json.
+2. wp35-redesign: the nav group heading "Manage" is now the mockup's "Operations".
+
+visual/screens.spec.ts now clicks `theme-dark` / `theme-light` instead of toggling.
+
+**Cleanup.** Removed the CSS the new shell made dead: v2-nav*, v2-side-note, v2-osec*, v2-page-head, v2-kpi, cols-4, v2-feed-line,
+v2-theme-toggle, the old rail and breadcrumb-bar rules, and v2-issue/v2-sev from structure.css. The mockup library classes that no
+page uses yet, and the two slot exports, are in the cleanup allow-list for screens 2-6. `adm-cols` (from the screen 6 merge) is also
+there, for the screen 6 owner to use or drop.
+
+**Not done in step 1.**
+* The account menu keeps the existing items (Account settings, Sign out).
+* The dashboard's "Modules complete" and "Validation" columns are not drawn. The oversight API has no per-project validation or
+  completion figure, so the table shows Data modules and People instead.
+* No new backend endpoint.

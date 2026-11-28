@@ -137,11 +137,11 @@ test('the theme really applies: dark pictures are dark, light pictures are light
     if (theme === 'dark') expect(l, 'mean luminance of the dark workspace').toBeLessThan(0.35);
     else expect(l, 'mean luminance of the light workspace').toBeGreaterThan(0.6);
     const before = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-    await page.getByTestId('theme-toggle').click();
     const other = theme === 'dark' ? 'light' : 'dark';
+    await page.getByTestId(`theme-${other}`).click();              // UI redesign step 1: the mockups' three-state theme switch
     await expect(page.locator('html')).toHaveAttribute('data-theme', other);
     expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), 'the page repaints without a reload').not.toBe(before);
-    await page.getByTestId('theme-toggle').click();
+    await page.getByTestId(`theme-${theme}`).click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
   } finally { await ctx.close(); }
 });

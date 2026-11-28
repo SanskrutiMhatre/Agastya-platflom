@@ -250,12 +250,16 @@ describe('the theme controls switch the theme live', () => {
     act(() => useUi.getState().setTheme('light'));
     const box = mount('light', h(ThemeToggle));
     const before = behind(document.body);
-    act(() => { (box.querySelector('[data-testid="theme-toggle"]') as HTMLButtonElement).click(); });
+    // UI redesign step 1: the top-bar control is the mockups' three-state switch (Follow system, Light, Dark)
+    act(() => { (box.querySelector('[data-testid="theme-dark"]') as HTMLButtonElement).click(); });
     expect(document.documentElement.dataset.theme).toBe('dark');
     cache = new Map();
     const after = behind(document.body);
     expect(after === 'image' || before === 'image' ? '' : show(after)).not.toBe(before === 'image' ? '' : show(before));
-    expect(box.querySelector('button')!.getAttribute('aria-label')).toBe('Switch to light mode');
+    expect(box.querySelector('[data-testid="theme-dark"]')!.getAttribute('aria-pressed')).toBe('true');
+    expect(box.querySelector('[data-testid="theme-light"]')!.getAttribute('aria-pressed')).toBe('false');
+    act(() => { (box.querySelector('[data-testid="theme-system"]') as HTMLButtonElement).click(); });
+    expect(useUi.getState().theme).toBe('system');
   });
   it('ThemeChoiceControl marks the chosen theme and applies it', () => {
     const box = mount('light', h(ThemeChoiceControl));

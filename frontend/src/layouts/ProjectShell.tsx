@@ -1,7 +1,9 @@
-// The frame around one project: a slim, icon-only rail (names appear on hover and on keyboard focus, or beside the icons when the rail is
-// pinned open) with the project's areas. Opening a project lands in the Editor, because that is where work happens; WP-22 added the Project
-// Home (first in the rail: the state of the manual and what is next), a breadcrumb bar with the project name on every page that is not an
-// editor (the editors carry the name in their own header), the quick switcher (Ctrl+K) and an error boundary around the page.
+// The frame around one project, drawn as the owner-approved mockups' project shell (docs/audit/mockups/project.html, editor.html,
+// publication.html, validation.html; UI redesign step 1): a slim activity bar on the left (the project's areas, icons only; names on hover
+// and keyboard focus, or beside the icons when it is pinned open), a top bar with the breadcrumb (Projects / project / page), the page's own
+// actions (shellSlots.tsx: <TopbarActions>), the command trigger, the theme switch and the account menu, and a status bar at the foot
+// (<StatusItems>). Opening a project lands in the Editor, because that is where work happens (the owner's rule); the editors draw their own
+// header and status bar (editors/host), so on the editor page the shell shows only the activity bar, in the compact density.
 
 import { useCallback, useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom';
@@ -15,6 +17,11 @@ import { MissingBrex } from '../components/MissingBrex';
 import { may, type Can } from '../lib/roles';
 import { MAIN_ID, SkipLink, useDocumentTitle } from '../components/a11y';
 import { useApp } from '../store/appSettings';
+import { useSession } from '../store/session';
+import { ThemeToggle } from '../components/ThemeToggle';
+import { AccountMenu } from '../components/AccountMenu';
+import { formatLabel, RoleBadge } from '../components/project';
+import { ShellSlotsContext } from './shellSlots';
 
 export interface ProjectCtx {
   id: string;
@@ -46,6 +53,9 @@ function ProjectShellFor({ id }: { id: string }) {
   // WP-22 (06 section 6.5): the rail can be pinned open with its names; and Ctrl+K jumps to a project, page or data module
   const [pinned, setPinned] = useState(() => { try { return localStorage.getItem(PIN_KEY) === '1'; } catch { return false; } });
   const switcher = useQuickSwitcher();
+  const [actionsEl, setActionsEl] = useState<HTMLElement | null>(null);
+  const [statusEl, setStatusEl] = useState<HTMLElement | null>(null);
+  const unreachable = useSession((s) => s.unreachable);
 
   const load = useCallback(() => {
     // A reply for another project (the shell was replaced meanwhile) is ignored by the unmount; one for an older request of this one is
@@ -70,52 +80,80 @@ function ProjectShellFor({ id }: { id: string }) {
   const isCir = summary.project.type === 'CIR';
   const s1000d = (summary.project.format ?? 's1000d') === 's1000d';           // validation (schemas, BREX) belongs to S1000D only
   const items = projectRailItems(id, summary);                                // WP-34: the rail per project kind lives in projectRail.ts
+  const settings = items.find((i) => i.to.endsWith('/settings'));
+  const areas = items.filter((i) => i !== settings);
 
   const ctx: ProjectCtx = { id, summary, role: summary.role, can: (summary.project.can ?? {}) as Can, reload: load };
-  // WP-22 (UX-007): every project page names the project. The editors carry it in their own header; the other pages get a breadcrumb bar
+  // WP-22 (UX-007): every project page names the project. The editors carry it in their own header; the other pages get the shell's top bar
   // (Projects / project / page) with the quick switcher, so the editing area keeps all its height.
   const inEditor = /\/editor\/?$/.test(loc.pathname);
   const togglePin = () => setPinned((p) => { try { localStorage.setItem(PIN_KEY, p ? '0' : '1'); } catch { /* private mode */ } return !p; });
+  const back = isCir ? { to: '/cir', label: 'Back to the repository', short: 'Repository' } : { to: '/workspace', label: 'Back to workspace', short: 'Workspace' };
+  const railLink = (i: (typeof items)[number]) => (
+    <NavLink key={i.to} to={i.to} className={({ isActive }) => `act-btn v2-rail-item${isActive ? ' active' : ''}`} data-tip={pinned ? undefined : i.label} aria-label={i.label}>
+      <Icon name={i.icon} size={20} />
+      {pinned ? <span className="v2-rail-label">{i.label}</span> : null}
+      {i.badge ? <span className={`pip v2-rail-badge ${i.badge.tone}`}>{i.badge.text}</span> : null}
+    </NavLink>
+  );
   return (
-    <div className={`v2-pshell${pinned ? ' rail-pinned' : ''}`}>
-      <SkipLink />
-      <aside className={`v2-rail${pinned ? ' is-pinned' : ''}`} aria-label="Project navigation">
-        <NavLink to={isCir ? '/cir' : '/workspace'} className="v2-rail-item v2-rail-back" data-tip={pinned ? undefined : isCir ? 'Back to the repository' : 'Back to workspace'} aria-label={isCir ? 'Back to the repository' : 'Back to workspace'}><Icon name="back" size={18} />{pinned ? <span className="v2-rail-label">{isCir ? 'Repository' : 'Workspace'}</span> : null}</NavLink>
-        <div className="v2-rail-project" data-tip={`${summary.project.name} · ${summary.role}`} aria-label={`Project ${summary.project.name}`}>
-          {summary.project.name.trim().charAt(0).toUpperCase()}
-        </div>
-        <nav className="v2-rail-nav" aria-label="Project sections">
-          {items.map((i) => (
-            <NavLink key={i.to} to={i.to} className={({ isActive }) => `v2-rail-item ${isActive ? 'active' : ''}`} data-tip={pinned ? undefined : i.label} aria-label={i.label}>
-              <Icon name={i.icon} size={20} />
-              {pinned ? <span className="v2-rail-label">{i.label}</span> : null}
-              {i.badge ? <span className={`v2-rail-badge ${i.badge.tone}`}>{i.badge.text}</span> : null}
-            </NavLink>
-          ))}
-        </nav>
-        <span className="spacer" />
-        <button type="button" className="v2-rail-item v2-rail-pin" onClick={togglePin} aria-pressed={pinned} data-testid="rail-pin"
-          aria-label={pinned ? 'Show icons only' : 'Show the names beside the icons'} data-tip={pinned ? undefined : 'Show the names beside the icons'}>
-          <Icon name={pinned ? 'collapse' : 'panel'} size={16} />{pinned ? <span className="v2-rail-label">Icons only</span> : null}
-        </button>
-      </aside>
-      <main id={MAIN_ID} className="v2-main" style={{ minWidth: 0 }} tabIndex={-1}>
+    <ShellSlotsContext.Provider value={{ actions: actionsEl, status: statusEl }}>
+      <div className={`app project v2-pshell${pinned ? ' rail-pinned' : ''}${inEditor ? ' in-editor' : ''}`} data-density={inEditor ? 'compact' : 'comfortable'}>
+        <SkipLink />
         {inEditor ? null : (
-          <nav className="v2-pbar" aria-label="Breadcrumb" data-testid="project-bar">
-            <ol>
-              <li><Link to={isCir ? '/cir' : '/projects'}>{isCir ? 'Repository' : 'Projects'}</Link></li>
-              <li><Link to={isCir ? 'editor' : 'home'} className="v2-pbar-name" data-testid="project-bar-name" title={summary.project.name}>{summary.project.name}</Link></li>
-              {section ? <li aria-current="page">{section}</li> : null}
-            </ol>
-            <span className="spacer" />
-            <JumpButton onClick={() => switcher.setOpen(true)} />
-          </nav>
+          <header className="topbar" data-testid="project-bar">
+            <Link to="/overview" className="brand" aria-label={`${appName} home`} title={`${appName} home`}><span className="brand-mark"><Icon name="book" size={20} /></span></Link>
+            <nav className="crumbs" aria-label="Breadcrumb">
+              <Link to={isCir ? '/cir' : '/projects'}>{isCir ? 'Repository' : 'Projects'}</Link>
+              <span className="sep" aria-hidden="true">/</span>
+              <Link to={isCir ? 'editor' : 'home'} className="v2-pbar-name trunc" data-testid="project-bar-name" title={summary.project.name}>{summary.project.name}</Link>
+              {section ? <><span className="sep" aria-hidden="true">/</span><strong aria-current="page">{section}</strong></> : null}
+              <span className="crumb-meta"><RoleBadge role={summary.role} /></span>
+            </nav>
+            <span className="grow" />
+            <span className="topbar-actions row" ref={setActionsEl} />
+            <JumpButton compact onClick={() => switcher.setOpen(true)} />
+            <ThemeToggle />
+            <AccountMenu />
+          </header>
         )}
-        {s1000d ? <MissingBrex projectId={id} canCreate={canWrite(ctx.can)} /> : null}
-        <ErrorBoundary resetKey={loc.pathname} where="project page"><Outlet context={ctx} /></ErrorBoundary>
-      </main>
+        <aside className={`activity v2-rail${pinned ? ' is-pinned' : ''}`} aria-label="Project navigation">
+          <NavLink to={back.to} className="act-btn v2-rail-item v2-rail-back" data-tip={pinned ? undefined : back.label} aria-label={back.label}>
+            <Icon name="back" size={18} />{pinned ? <span className="v2-rail-label">{back.short}</span> : null}
+          </NavLink>
+          <span className="act-sep" aria-hidden="true" />
+          <span className="act-project" data-tip={pinned ? undefined : `${summary.project.name} · ${summary.role}`} role="img" aria-label={`Project ${summary.project.name}, your role ${summary.role}`} tabIndex={0}>
+            {summary.project.name.trim().charAt(0).toUpperCase()}
+          </span>
+          <nav className="v2-rail-nav" aria-label="Project sections">
+            {areas.map(railLink)}
+            <span className="spacer" aria-hidden="true" />
+            {settings ? railLink(settings) : null}
+          </nav>
+          <button type="button" className="act-btn v2-rail-item v2-rail-pin" onClick={togglePin} aria-pressed={pinned} data-testid="rail-pin"
+            aria-label={pinned ? 'Show icons only' : 'Show the names beside the icons'} data-tip={pinned ? undefined : 'Show the names beside the icons'}>
+            <Icon name={pinned ? 'collapse' : 'panel'} size={16} />{pinned ? <span className="v2-rail-label">Icons only</span> : null}
+          </button>
+        </aside>
+        <main id={MAIN_ID} className="main v2-main" tabIndex={-1}>
+          {s1000d ? <MissingBrex projectId={id} canCreate={canWrite(ctx.can)} /> : null}
+          <ErrorBoundary resetKey={loc.pathname} where="project page"><Outlet context={ctx} /></ErrorBoundary>
+        </main>
+        {inEditor ? null : (
+          <footer className="statusbar" data-testid="project-status-bar">
+            <span className="page-status" ref={setStatusEl} />
+            <span className="default-status">
+              <span className="item"><span className={`dot ${unreachable ? 'danger' : 'success'}`} />{unreachable ? 'Server not answering' : 'Server connected'}</span>
+              <span className="item">{formatLabel(summary.project)}</span>
+              <span className="item">{summary.dataModules.total} data module{summary.dataModules.total === 1 ? '' : 's'}</span>
+              <span className="grow" />
+              <span className="item">Offline · on-premises</span>
+            </span>
+          </footer>
+        )}
+      </div>
       {switcher.open ? <QuickSwitcher pages={switcherPages} project={{ id, summary }} onClose={() => switcher.setOpen(false)} /> : null}
-    </div>
+    </ShellSlotsContext.Provider>
   );
 }
 

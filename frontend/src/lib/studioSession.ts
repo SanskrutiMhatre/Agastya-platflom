@@ -62,7 +62,7 @@ class StudioSession {
   onConflict: ((c: StudioConflict) => void) | null = null;
 
   constructor() {
-    this.root.className = 'app';
+    this.root.className = 'app s1k-studio';   // s1k-studio: the platform shell's .app grid (styles/components.css) is not the Studio's
     this.root.style.height = '100%';
     // FE-024: the next person at this computer finds nothing of the previous one: no open document, no cached artwork and, after a
     // sign-out they chose, no draft. When the session merely ended, the drafts stay under the person who wrote them (FE-006).
