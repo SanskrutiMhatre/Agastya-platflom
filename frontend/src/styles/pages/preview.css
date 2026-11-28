@@ -4,5 +4,7 @@
    ========================================================================= */
 
 /* ------------------------------------------------ WP-35 second pass: moved from platform.css unchanged (used only in this chunk) */
-.v2-popout { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--bg); }
-.v2-popout-bar { display: flex; align-items: center; gap: 10px; padding: 8px 12px; background: var(--bg-elev); border-bottom: 1px solid var(--border); }
+/* UI redesign 2026-11-28 (mockup 4): the pop-out is the same viewer as the Publication page: a panel-coloured bar over the themed canvas */
+.v2-popout { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--viewer-canvas); }
+.v2-popout-bar { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px; background: var(--surface-panel); border-bottom: 1px solid var(--border-default); flex: none; }
+.v2-popout-bar strong { font-size: var(--fs-sm); }
