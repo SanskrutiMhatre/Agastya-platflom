@@ -64,3 +64,32 @@
 .textLayer .endOfContent.active {
   top: 0;
 }
+
+/* =============================================================================
+   UI redesign 2026-11-28 (mockup 4 "Publication and PDF preview"): the viewer chrome.
+   A themed canvas with a panel-coloured toolbar; the pages themselves stay white
+   paper in both themes (--viewer-page); the canvas is --viewer-canvas until --viewer-canvas-themed has a contrast pair. The
+   shared classes (.icon-btn, .vsep, .btn.sm.subtle, .input) do the rest.
+   ============================================================================= */
+.pdfv { height: 100%; display: flex; flex-direction: column; min-height: 0; background: var(--viewer-canvas); }
+.pdfv .vbar { display: flex; align-items: center; gap: var(--space-1); min-height: 40px; padding: 0 var(--space-3); background: var(--surface-panel); border-bottom: 1px solid var(--border-default); flex: none; flex-wrap: wrap; }
+.pdfv.compact .vbar { padding: 0 var(--space-2); gap: 2px; }
+.pdfv .vbar .icon-btn[aria-pressed="true"] { background: var(--surface-selected); color: var(--text-link); }
+.pdfv .vbar .pg { display: inline-flex; align-items: center; gap: var(--space-1h); font-variant-numeric: tabular-nums; font-size: var(--fs-xs); }
+.pdfv .vbar .pg .input { width: 48px; height: 28px; text-align: center; padding: 0 4px; }
+.pdfv .vbar .vsep { margin: 0 var(--space-2); }
+.pdfv.compact .vbar .vsep { margin: 0 2px; }
+.pdfv .vbar .zoom { min-width: 48px; text-align: center; color: var(--text-secondary); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.pdfv .vbar .grow { flex: 1; }
+.pdfv .vbar .faint { color: var(--text-tertiary); font-size: var(--fs-xs); white-space: nowrap; }
+.pdfv .vbar .find { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--text-tertiary); }
+.pdfv .vbar .find .input { width: 140px; height: 28px; font-size: var(--fs-xs); }
+.pdfv.compact .vbar .find .input { width: 60px; }
+/* the compact viewer (the editor's narrow PDF pane) keeps its bar on one line: tighter controls, no separators, no find icon */
+.pdfv.compact .vbar { min-height: 36px; }
+.pdfv.compact .vbar .vsep, .pdfv.compact .vbar .find > svg { display: none; }
+.pdfv.compact .vbar .icon-btn { width: 24px; height: 24px; }
+.pdfv.compact .vbar .pg .input { width: 36px; height: 24px; }
+.pdfv.compact .vbar .zoom { min-width: 36px; }
+.pdfv.compact .vbar .btn.sm { padding: 0 var(--space-1h); }
+.pdfv.compact .vbar .find .input { height: 24px; }

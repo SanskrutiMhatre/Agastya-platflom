@@ -12,7 +12,7 @@ import { contentApi, type DmSummary } from '../../api';
 import { onlyRuleBreaks } from '../../lib/ruleBreaks';
 import { confirmDialog } from '../../lib/dialogs';
 import { Icon } from '../../components/Icon';
-import { PageHeader } from '../../components/PageHeader';
+import { LazyPdfViewer } from '../../components/pdf/LazyPdfViewer';
 import { PublishRefusal } from '../../components/PublishRefusal';
 import { Alert, Badge, Empty, Loading, PromptModal, Spinner, ago, errText, useAsync } from '../../components/ui';
 import { canWrite, useProject } from '../../layouts/ProjectShell';
@@ -148,6 +148,8 @@ export function PublicationPage() {
   };
 
   const guard = useLeaveGuard(dirty, { what: 'changes to the publication', save });
+  const [side, setSide] = useState<'build' | 'history'>('build');
+  const rel = useAsync(async () => (side === 'history' ? contentApi.release(id) : null), [id, side]);   // the release history, read when the History tab opens
 
   if (data.loading && !data.data) return <Loading />;
   if (data.error || !data.data) return <div className="v2-page"><Alert tone="bad">{data.error || 'Could not read the publication.'}</Alert></div>;
@@ -211,79 +213,120 @@ export function PublicationPage() {
   };
 
   const built = summary.build;
+  const released = summary.review?.state === 'approved';
+  const notPlaced = dms.length - placed.size;
+  const pdfSrc = built ? `${contentApi.pdfUrl(id)}?t=${Date.parse(built.builtAt) || 0}` : null;
+  // UI redesign 2026-11-28 (mockup 4): structure on the left, the built PDF on a themed canvas in the middle, build settings and history on the right
   return (
-    <div className="v2-page">
-      <PageHeader icon="book" title="Publication" sub={data.data.pm.meta?.pmTitle ? `“${data.data.pm.meta.pmTitle}”: arrange the chapters, then build the manual.` : 'Arrange data modules into chapters, then build the manual.'}
-        actions={<>
+    <div className="pub" data-testid="pub-layout">
+      <h1 className="pub-sr">Publication</h1>
+      <aside className="pane" aria-label="Publication structure">
+        <div className="pane-head">
+          <span className="trunc" title={data.data.pm.meta?.pmTitle || undefined}>Structure</span>
+          <span className="pane-count">{counts.folders} ch · {counts.dms} DM</span>
+          <span className="grow" />
           {writable ? <>
-            <button className="btn" onClick={() => setNaming(true)} data-testid="add-chapter"><Icon name="plus" />Add chapter</button>
-            <button className="btn" onClick={() => undo && (setEntries(undo), setUndo(null), setDirty(true))} disabled={!undo}>Undo</button>
+            <button className="icon-btn" onClick={() => setNaming(true)} data-testid="add-chapter" aria-label="Add chapter" title="Add chapter"><Icon name="plus" size={15} /></button>
+            <button className="icon-btn" onClick={() => undo && (setEntries(undo), setUndo(null), setDirty(true))} disabled={!undo} aria-label="Undo" title="Undo"><Icon name="undo" size={15} /></button>
           </> : null}
-          <button className="btn btn-primary" onClick={() => void build(false)} disabled={busy !== null || !writable} data-testid="build-publication">{busy === 'build' ? <Spinner /> : <Icon name="rocket" />}Build publication</button>
-        </>}
-        stats={[
-          { label: 'Chapters', value: counts.folders },
-          { label: 'In the publication', value: counts.dms, tone: 'accent' },
-          { label: 'Not placed', value: dms.length - placed.size, tone: dms.length - placed.size ? 'warn' : undefined },
-          { label: 'Missing', value: missing, tone: missing ? 'bad' : undefined },
-          { label: 'Last build', value: built ? ago(built.builtAt) : 'never', tone: built ? 'ok' : undefined },
-        ]} />
-
-      {dirty ? (
-        <div className="v2-savebar" role="status" data-testid="unsaved-bar">
-          <span><Icon name="alert" size={15} /> You have unsaved changes to the publication.</span>
-          <span className="spacer" />
-          <button className="btn btn-sm" onClick={() => data.reload()}>Discard</button>
-          <button className="btn btn-sm btn-primary" onClick={() => void save()} disabled={busy !== null} data-testid="save-publication">{busy === 'save' ? <Spinner /> : null}Save changes</button>
         </div>
-      ) : null}
-      {error ? <div style={{ marginBottom: 12 }}><Alert tone="bad">{error}</Alert>{rulesOnly ? <p className="v2-hint" style={{ margin: '6px 0 0' }}>Only business rules (BREX) are broken. You can still generate the PDF to look at it; it stays stamped NOT RELEASED and cannot be approved until the rules are met. <button className="btn btn-sm btn-primary" disabled={busy !== null} onClick={() => void build(true)} data-testid="generate-anyway">Generate anyway</button></p> : null}</div> : null}
-      {refusal ? <div style={{ marginBottom: 12 }}><PublishRefusal refusal={refusal} projectId={id} can={can} mode="draft" onDismiss={() => setRefusal(null)} onRecorded={() => { setWaiverTick((t) => t + 1); void build(); }} /></div> : null}
-      {missing > 0 ? <div style={{ marginBottom: 12 }}><Alert tone="warn"><strong>{missing} entr{missing === 1 ? 'y points' : 'ies point'} at data modules this project does not have</strong> — nothing is published for {missing === 1 ? 'it' : 'them'} until you import the module or remove the entry.</Alert></div> : null}
-      {!writable ? <div style={{ marginBottom: 12 }}><Alert tone="warn">You have {role} access: you can look at the publication, but only editors, managers and owners can change or build it.</Alert></div> : null}
+        {dirty ? (
+          <div className="v2-savebar" role="status" data-testid="unsaved-bar">
+            <span><Icon name="alert" size={14} /> Unsaved changes</span>
+            <span className="spacer" />
+            <button className="btn btn-sm" onClick={() => data.reload()}>Discard</button>
+            <button className="btn btn-sm btn-primary" onClick={() => void save()} disabled={busy !== null} data-testid="save-publication">{busy === 'save' ? <Spinner /> : null}Save changes</button>
+          </div>
+        ) : null}
+        <div className="scroll">
+          <div className="v2-pub-main" data-testid="pub-tree">
+            {entries.length === 0 ? (
+              <Empty title="The publication is empty">{writable ? <>Add a chapter, then place data modules in it from the list below.<div style={{ marginTop: 12 }}><button className="btn btn-primary btn-sm" onClick={() => setNaming(true)}><Icon name="plus" />Add the first chapter</button></div></> : 'Nothing has been placed in it yet.'}</Empty>
+            ) : entries.map((e, i) => renderEntry(e, [i], 0, String(i + 1)))}
+            {writable && entries.length > 0 ? <button className="v2-add-chapter" onClick={() => setNaming(true)}><Icon name="plus" size={14} />Add chapter</button> : null}
+          </div>
 
-      <div className="v2-pub-grid">
-        <div className="v2-pub-main" data-testid="pub-tree">
-          {entries.length === 0 ? (
-            <div className="v2-card"><Empty title="The publication is empty">{writable ? <>Add a chapter, then place data modules in it from the list on the right.<div style={{ marginTop: 12 }}><button className="btn btn-primary" onClick={() => setNaming(true)}><Icon name="plus" />Add the first chapter</button></div></> : 'Nothing has been placed in it yet.'}</Empty></div>
-          ) : entries.map((e, i) => renderEntry(e, [i], 0, String(i + 1)))}
-          {writable && entries.length > 0 ? <button className="v2-add-chapter" onClick={() => setNaming(true)}><Icon name="plus" size={15} />Add chapter</button> : null}
-        </div>
-
-        <aside className="v2-pub-side">
-          <div className="v2-card" data-testid="pub-pool">
-            <div className="v2-card-head"><span>Data modules not placed <Badge tone={dms.length - placed.size ? 'warn' : undefined}>{dms.length - placed.size}</Badge></span></div>
-            <div style={{ padding: '10px 12px 4px' }}><input className="v2-input" placeholder="Search data modules…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search data modules not placed" /></div>
-            {writable ? <div className="v2-hint" style={{ padding: '2px 14px 8px' }}>Adding to: <strong>{selected && getAt(entries, pathOf(selected))?.type === 'folder' ? (getAt(entries, pathOf(selected)) as { title: string }).title : 'select a chapter first'}</strong></div> : null}
+          <div className="pub-pool" data-testid="pub-pool">
+            <div className="pane-head"><span>Not placed</span><Badge tone={notPlaced ? 'warn' : undefined}>{notPlaced}</Badge></div>
+            <div className="pub-pool-search"><input className="v2-input" placeholder="Search data modules…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search data modules not placed" /></div>
+            {writable ? <div className="v2-hint pub-pool-target">Adding to: <strong>{selected && getAt(entries, pathOf(selected))?.type === 'folder' ? (getAt(entries, pathOf(selected)) as { title: string }).title : 'select a chapter first'}</strong></div> : null}
             <div className="v2-pool">
-              {pool.length === 0 ? <div className="v2-hint" style={{ padding: 14 }}>{dms.length - placed.size === 0 ? 'Every data module is in the publication.' : 'No data module matches.'}</div> : pool.slice(0, poolDrawn.limit).map((d) => (
+              {pool.length === 0 ? <div className="v2-hint" style={{ padding: 12 }}>{notPlaced === 0 ? 'Every data module is in the publication.' : 'No data module matches.'}</div> : pool.slice(0, poolDrawn.limit).map((d) => (
                 <div key={d.file} className="v2-pool-item" draggable={writable} data-testid="pool-item" onDragStart={(ev) => { ev.dataTransfer.effectAllowed = 'copy'; setDrag({ from: null, pool: d, over: null, where: null }); }} onDragEnd={() => setDrag(null)}>
-                  <div style={{ minWidth: 0, flex: 1 }}><div className="v2-mod-title">{d.techName || d.file}</div><div className="v2-hint v2-trunc">{d.infoName}</div><div className="v2-mono v2-hint">{d.dmc}</div></div>
+                  <div style={{ minWidth: 0, flex: 1 }}><div className="v2-mod-title">{d.techName || d.file}</div><div className="v2-hint v2-trunc">{d.infoName}</div><div className="v2-mono v2-hint v2-trunc" title={d.dmc}>{d.dmc}</div></div>
                   {writable ? <button className="btn btn-sm" onClick={() => addModule(d)} aria-label={`Add ${d.techName || d.file} to the selected chapter`}><Icon name="plus" size={13} />Add</button> : null}
                 </div>
               ))}
               <MoreRows shown={poolDrawn.limit} total={pool.length} onMore={poolDrawn.more} onAll={poolDrawn.all} />
             </div>
           </div>
+        </div>
+        {missing > 0 ? <div className="pub-note"><Alert tone="warn"><strong>{missing} entr{missing === 1 ? 'y points' : 'ies point'} at data modules this project does not have</strong> — nothing is published for {missing === 1 ? 'it' : 'them'} until you import the module or remove the entry.</Alert></div> : null}
+        {!writable ? <div className="pub-note"><Alert tone="warn">You have {role} access: you can look at the publication, but only editors, managers and owners can change or build it.</Alert></div> : null}
+      </aside>
 
-          <div className="v2-card v2-card-pad v2-stack">
-            <strong>Output</strong>
-            <div className="v2-hint">{built ? <>Last built {ago(built.builtAt)} · {(built.size / 1048576).toFixed(1)} MB</> : 'Not built yet.'}</div>
-            <div className="v2-row wrap">
-              {built ? <a className="btn btn-sm" href={contentApi.pdfUrl(id, true)}><Icon name="download" size={13} />Download PDF</a> : null}
-              <button className="btn btn-sm" onClick={() => nav('../editor')}><Icon name="editor" size={13} />View in editor</button>
-              <a className="btn btn-sm" href={pmcApi.exportUrl(id, 'pdf')}>Export PM</a>
-              {writable ? <button className="btn btn-sm" onClick={() => importRef.current?.click()}><Icon name="upload" size={13} />Import PM…</button> : null}
-              <input ref={importRef} type="file" accept=".xml,.XML" hidden onChange={(e) => void importPm(e.target.files?.[0])} />
+      <section className="pane viewer" aria-label="PDF preview" data-testid="pub-preview">
+        <LazyPdfViewer src={pdfSrc} downloadName="publication.pdf"
+          placeholder={<div className="pub-empty"><Icon name="pdf" size={30} /><p>{writable ? 'Not built yet. Press Build publication to make the PDF.' : 'Not built yet.'}</p></div>} />
+      </section>
+
+      <aside className="pane" aria-label="Build settings">
+        <div className="tabs" role="tablist" aria-label="Build">
+          <button className="tab" role="tab" aria-selected={side === 'build'} onClick={() => setSide('build')}>Build</button>
+          <button className="tab" role="tab" aria-selected={side === 'history'} onClick={() => setSide('history')}>History</button>
+        </div>
+        <div className="scroll">
+          {side === 'build' ? <>
+            <div className="opt">
+              {error ? <div><Alert tone="bad">{error}</Alert>{rulesOnly ? <p className="v2-hint" style={{ margin: '6px 0 0' }}>Only business rules (BREX) are broken. You can still generate the PDF to look at it; it stays stamped NOT RELEASED and cannot be approved until the rules are met. <button className="btn btn-sm btn-primary" disabled={busy !== null} onClick={() => void build(true)} data-testid="generate-anyway">Generate anyway</button></p> : null}</div> : null}
+              {refusal ? <PublishRefusal refusal={refusal} projectId={id} can={can} mode="draft" onDismiss={() => setRefusal(null)} onRecorded={() => { setWaiverTick((t) => t + 1); void build(); }} /> : null}
+              <div className="field"><span className="field-label">Publication</span><div className="pub-value">{data.data.pm.meta?.pmTitle || summary.project.name}</div></div>
+              <div className="field"><span className="field-label">Watermark</span><div className="pub-value">{released ? 'Release settings (project released)' : 'NOT RELEASED (project not released)'}</div><span className="hint">{released ? 'Set on Review and release.' : 'Added automatically until the project is released.'}</span></div>
+              <div className="field"><span className="field-label">Output</span>
+                <div className="v2-row wrap">
+                  {built ? <a className="btn btn-sm" href={contentApi.pdfUrl(id, true)}><Icon name="download" size={13} />Download PDF</a> : null}
+                  <button className="btn btn-sm" onClick={() => nav('../editor')}><Icon name="editor" size={13} />View in editor</button>
+                  <a className="btn btn-sm" href={pmcApi.exportUrl(id, 'pdf')}>Export PM</a>
+                  {writable ? <button className="btn btn-sm" onClick={() => importRef.current?.click()}><Icon name="upload" size={13} />Import PM…</button> : null}
+                  <input ref={importRef} type="file" accept=".xml,.XML" hidden onChange={(e) => void importPm(e.target.files?.[0])} />
+                </div>
+              </div>
             </div>
-            {busy === 'build' && progress.lines.length ? <div className="v2-log" style={{ borderRadius: 8, border: '1px solid var(--border)' }}>{progress.lines.slice(-5).map((l, i) => <div key={i}>{l}</div>)}</div> : null}
-          </div>
-        </aside>
-      </div>
+            <div className="card-head"><h3>Last build</h3>{built ? <span className="badge success"><Icon name="ok" size={12} />Built</span> : <span className="badge">Never</span>}</div>
+            <ul className="hist">
+              {built ? <li><Icon name="ok" size={14} /><div><strong>Publication PDF</strong><div className="faint">{(built.size / 1048576).toFixed(1)} MB</div></div><span className="faint" title={built.builtAt}>{ago(built.builtAt)}</span></li>
+                : <li><Icon name="clock" size={14} /><div><strong>Not built yet</strong></div><span /></li>}
+            </ul>
+            <div className="pub-waivers"><PublishWaivers projectId={id} can={can} refreshKey={waiverTick} /></div>
+          </> : (
+            <div data-testid="pub-history">
+              <div className="card-head"><h3>Builds</h3></div>
+              <ul className="hist">
+                {built ? <li><Icon name="ok" size={14} /><div><strong>Last build</strong><div className="faint">{(built.size / 1048576).toFixed(1)} MB</div></div><span className="faint" title={built.builtAt}>{ago(built.builtAt)}</span></li>
+                  : <li><Icon name="clock" size={14} /><div><strong>Not built yet</strong></div><span /></li>}
+              </ul>
+              <div className="card-head"><h3>Releases</h3></div>
+              {rel.loading && !rel.data ? <Loading /> : rel.error ? <div className="opt"><Alert tone="bad">{rel.error}</Alert></div> : (
+                <ul className="hist">
+                  {(rel.data?.history ?? []).length === 0 ? <li><Icon name="clock" size={14} /><div className="faint">Nothing submitted yet</div><span /></li> : (rel.data?.history ?? []).map((h) => (
+                    <li key={h.id}><Icon name={h.status === 'approved' ? 'ok' : h.status === 'rejected' ? 'xcircle' : 'clock'} size={14} />
+                      <div><strong>{h.releaseNumber ? `Release ${h.releaseNumber}` : 'Review request'}</strong><div className="faint">{h.status === 'rejected' ? 'changes requested' : h.status === 'pending' ? 'in review' : h.status}{h.requestedBy ? ` · ${h.requestedBy}` : ''}</div></div>
+                      <span className="faint" title={h.requestedAt}>{ago(h.requestedAt)}</span></li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="build">
+          <div className={`progress${busy === 'build' ? ' busy' : ''}`} role="progressbar" aria-label="Build progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={busy === 'build' ? undefined : built ? 100 : 0}><i style={{ width: busy === 'build' ? '40%' : built ? '100%' : '0%' }} /></div>
+          {busy === 'build' && progress.lines.length ? <div className="v2-log">{progress.lines.slice(-5).map((l, i) => <div key={i}>{l}</div>)}</div> : null}
+          <button className="btn primary" onClick={() => void build(false)} disabled={busy !== null || !writable} data-testid="build-publication">{busy === 'build' ? <Spinner /> : <Icon name="play" />}Build publication</button>
+          <button className="btn" onClick={() => nav('../release')}><Icon name="external" size={14} />Review and release</button>
+        </div>
+      </aside>
 
-      <PublishWaivers projectId={id} can={can} refreshKey={waiverTick} />
       {guard}
-
       {naming ? <PromptModal title="New chapter" label="Chapter title" confirmLabel="Add chapter" onClose={() => setNaming(false)} onSubmit={async (t) => { addChapter(t); }} /> : null}
       {rename ? <PromptModal title="Rename" label="Title" initial={rename.title} onClose={() => setRename(null)} onSubmit={async (t) => { apply(updateAt(entries, pathOf(rename.key), (x) => ({ ...x, title: t }) as PmEntry)); }} /> : null}
     </div>
