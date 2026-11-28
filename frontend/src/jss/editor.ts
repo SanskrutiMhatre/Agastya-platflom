@@ -151,6 +151,9 @@ export class JssEditor {
     for (const row of Array.from(this.outlineEl.querySelectorAll<HTMLElement>('.jss-ol'))) if (this.elNode.get(row) === node) return row;
     return null;
   }
+  /** Called each time the outline is drawn again (the live binding puts the faces of the people back on its rows). */
+  onOutlineDrawn(fn: (() => void) | null): void { this.outlineDrawn = fn; }
+  private outlineDrawn: (() => void) | null = null;
   /** The chapter or section a model node is in (itself for one). */
   sectionOf(node: object): Chapter | Section | null { return this.sectionOwner(node); }
 
@@ -800,6 +803,7 @@ export class JssEditor {
     };
     const walk = (children: Children, indent: number) => { for (const c of children) if (isSection(c)) { add(c, c.title || '(untitled)', this.numbers.heading.get(c) ?? '', ''); (this.outlineEl.lastElementChild as HTMLElement).style.paddingLeft = `${12 + indent * 12}px`; walk(c.children, indent + 1); } };
     for (const ch of this.doc.chapters) { add(ch, ch.title, `Ch ${ch.number}`, 'ch'); walk(ch.children, 1); }
+    this.outlineDrawn?.();
   }
 
   private scrollToNode(node: object): void {

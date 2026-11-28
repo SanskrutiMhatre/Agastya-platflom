@@ -45,6 +45,7 @@ export async function joinJss(projectId: string, user: LiveUser): Promise<LiveRo
 }
 
 type Pos = { slot: TextSlot; offset: number };
+type Anchor = { path: string; tag: string; text: string; y?: { start: string; end: string } };
 
 export class LiveJss {
   readonly maps = yj.newMaps();
@@ -58,7 +59,12 @@ export class LiveJss {
   private applying = false;
   private presenceTimer: number | null = null;
   private lastPresence = '';
-  private readonly onSelection = (): void => this.publishSoon();
+  private lastAnchor: Anchor | null = null;
+  private readonly onSelection = (): void => {
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed) { const a = this.anchorNow(); if (a) this.lastAnchor = a; }
+    this.publishSoon();
+  };
   private readonly observer = (events: Array<Y.YEvent<Y.AbstractType<unknown>>>, txn: Y.Transaction): void => this.onY(events, txn);
 
   constructor(readonly room: LiveRoom, private readonly user: LiveUser, private readonly events: LiveJssEvents) {
@@ -262,9 +268,19 @@ export class LiveJss {
     return { ...domPoint(el, p.offset), el };
   }
 
-  /** The comment anchor of the selection: the Y relative positions of its ends, the element's place, tag and words. */
-  selectionAnchor(): { path: string; tag: string; text: string; y?: { start: string; end: string } } | null {
+  /**
+   * The comment anchor of the selection: the Y relative positions of its ends, the element's place, tag and words. Writing the comment moves
+   * the focus to the comment box, so the last selection made on the sheet is the one used (kept as relative positions, it follows edits).
+   */
+  selectionAnchor(): Anchor | null {
+    const now = this.anchorNow();
+    return now ?? this.lastAnchor;
+  }
+
+  private anchorNow(): Anchor | null {
     const sel = window.getSelection(); if (!sel || !sel.rangeCount || !this.editor) return null;
+    const paper = this.editor.paperEl();
+    if (!sel.anchorNode || !paper.contains(sel.anchorNode)) return null;
     const start = this.relOfDom(sel.anchorNode, sel.anchorOffset); const end = this.relOfDom(sel.focusNode, sel.focusOffset);
     if (!start || !end) return null;
     const host = (sel.anchorNode?.nodeType === 1 ? (sel.anchorNode as Element) : sel.anchorNode?.parentElement)?.closest('[data-edit]') ?? null;
@@ -403,6 +419,7 @@ class JssCursors {
     host.addEventListener('scroll', this.redraw, { passive: true });
     live.room.awareness.on('change', this.redraw);
     if (typeof ResizeObserver !== 'undefined') { this.ro = new ResizeObserver(this.redraw); this.ro.observe(host); }
+    ed.onOutlineDrawn(this.redraw);                              // the outline is drawn again after edits: its faces with it
   }
 
   schedule(): void { if (!this.frame) this.frame = requestAnimationFrame(() => { this.frame = 0; this.draw(); }); }
@@ -412,6 +429,7 @@ class JssCursors {
     this.ed.scrollHost().removeEventListener('scroll', this.redraw);
     this.live.room.awareness.off('change', this.redraw);
     this.ro?.disconnect();
+    this.ed.onOutlineDrawn(null);
     for (const f of this.faces) f.remove();
     this.el.remove();
   }
