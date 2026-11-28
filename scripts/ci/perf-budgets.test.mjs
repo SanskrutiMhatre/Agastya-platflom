@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { check, valueAt } from './perf-budgets.mjs';
+import { check, median, valueAt } from './perf-budgets.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -19,6 +19,23 @@ test('a value above max fails, between target and max is over target, a missing 
   ] };
   const rows = Object.fromEntries(check(budgets, { backend: { x: { ms: 90 }, rate: 15 } }).map((r) => [r.id, r.status]));
   assert.deepEqual(rows, { a: 'over-target', b: 'fail', c: 'ok', d: 'missing', e: 'missing', f: 'over-target' });
+});
+
+test('phase 8: repeated runs are judged by their median: one slow run does not fail, two do; a budget one run missed is still measured', () => {
+  const budgets = { budgets: [
+    { id: 'lat', source: 'backend', path: 'p95', max: 100, target: 50 },
+    { id: 'rate', source: 'backend', path: 'rate', better: 'higher', max: 10 },
+    { id: 'some', source: 'backend', path: 'only', max: 5 },
+  ] };
+  const by = (results) => Object.fromEntries(check(budgets, results).map((r) => [r.id, r]));
+  const oneSlow = by({ backend: [{ p95: 40, rate: 12, only: 1 }, { p95: 400, rate: 2 }, { p95: 45, rate: 11 }] });
+  assert.equal(oneSlow.lat.status, 'ok'); assert.equal(oneSlow.lat.value, 45); assert.deepEqual(oneSlow.lat.runs, [40, 400, 45]);
+  assert.equal(oneSlow.rate.status, 'ok', 'higher-is-better: one low run does not fail');
+  assert.equal(oneSlow.some.status, 'ok'); assert.equal(oneSlow.some.value, 1);
+  assert.equal(by({ backend: [{ p95: 140 }, { p95: 400 }, { p95: 45 }] }).lat.status, 'fail', 'two of three over max fail');
+  assert.equal(by({ backend: [{ p95: 60 }, { p95: 80 }] }).lat.value, 70, 'an even count takes the mean of the middle two');
+  assert.equal(by({ backend: { p95: 101 } }).lat.status, 'fail', 'one run (not an array) behaves as before');
+  assert.equal(median([]), undefined);
 });
 
 test('dotted paths reach into arrays and ignore non-numbers', () => {

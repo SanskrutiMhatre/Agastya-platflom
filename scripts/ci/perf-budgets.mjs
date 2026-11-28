@@ -2,6 +2,7 @@
 // Phase 3: compare a benchmark result with the performance budgets (docs/phase3/perf-budgets.json).
 //
 //   node scripts/ci/perf-budgets.mjs --backend FILE.json [--frontend FILE.json] [--budgets FILE] [--report FILE.md] [--strict]
+//   (--backend / --frontend may be given several times, or as a,b,c: repeated runs, judged by their median; phase 8)
 //
 // Each budget names a value in one of the results (`source`: backend = backend/scripts/bench/phase3-baseline.js, frontend =
 // frontend/scripts/perf/phase3-frontend.mjs) by a dotted path, and two limits:
@@ -22,21 +23,36 @@ export function valueAt(obj, dotted) {
   return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
 }
 
-/** -> [{ id, value, max, target, status: ok | over-target | fail | missing }] */
+/** The median of the numbers (the middle one, or the mean of the two middle ones); undefined for none. */
+export function median(xs) {
+  const s = xs.filter((x) => typeof x === 'number' && Number.isFinite(x)).sort((a, b) => a - b);
+  if (!s.length) return undefined;
+  const m = s.length >> 1;
+  return s.length % 2 ? s[m] : Math.round(((s[m - 1] + s[m]) / 2) * 1000) / 1000;
+}
+
+/**
+ * -> [{ id, value, runs, max, target, status: ok | over-target | fail | missing }]
+ * Phase 8 (noise-tolerant rule): a source may be one result or an array of results of repeated runs (`--backend a.json --backend b.json
+ * --backend c.json`). The value judged is the MEDIAN of the runs that measured it, so one slow run on a busy host (a virus scan, the indexer,
+ * a GC pause in the one sample) does not fail a budget: with three runs, two have to be over `max`. One run behaves exactly as before.
+ * A budget is missing only when no run measured it.
+ */
 export function check(budgets, results) {
   return budgets.budgets.map((b) => {
     const src = results[b.source];
-    const value = src ? valueAt(src, b.path) : undefined;
+    const runs = src ? (Array.isArray(src) ? src : [src]).map((r) => valueAt(r, b.path)).filter((v) => v !== undefined) : [];
+    const value = median(runs);
     const lower = b.better === 'higher';
     const beyond = (lim) => lim != null && value !== undefined && (lower ? value < lim : value > lim);
     const status = value === undefined ? 'missing' : beyond(b.max) ? 'fail' : beyond(b.target) ? 'over-target' : 'ok';
-    return { id: b.id, what: b.what, unit: b.unit, value, max: b.max, target: b.target ?? null, baseline: b.baseline ?? null, status };
+    return { id: b.id, what: b.what, unit: b.unit, value, runs, max: b.max, target: b.target ?? null, baseline: b.baseline ?? null, status };
   });
 }
 
 export function report(rows) {
   const L = ['| Budget | value | max (fail) | target | baseline | status |', '|---|---|---|---|---|---|'];
-  for (const r of rows) L.push(`| ${r.id} | ${r.value ?? '-'} ${r.unit ?? ''} | ${r.max ?? '-'} | ${r.target ?? '-'} | ${r.baseline ?? '-'} | ${r.status.toUpperCase()} |`);
+  for (const r of rows) L.push(`| ${r.id} | ${r.value ?? '-'} ${r.unit ?? ''}${r.runs && r.runs.length > 1 ? ` (median of ${r.runs.join(', ')})` : ''} | ${r.max ?? '-'} | ${r.target ?? '-'} | ${r.baseline ?? '-'} | ${r.status.toUpperCase()} |`);
   const n = (s) => rows.filter((r) => r.status === s).length;
   L.push('', `${rows.length} budgets: ${n('ok')} ok, ${n('over-target')} over target, ${n('fail')} FAIL, ${n('missing')} MISSING.`);
   return L.join('\n');
@@ -45,10 +61,12 @@ export function report(rows) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const argv = process.argv.slice(2);
   const opt = (k) => { const i = argv.indexOf(`--${k}`); return i >= 0 ? argv[i + 1] : undefined; };
+  const opts = (k) => argv.flatMap((a, i) => (a === `--${k}` && argv[i + 1] ? argv[i + 1].split(',') : [])).filter(Boolean);
   const strict = argv.includes('--strict');
   const budgets = JSON.parse(fs.readFileSync(path.resolve(opt('budgets') ?? path.join(ROOT, 'docs', 'phase3', 'perf-budgets.json')), 'utf8'));
   const results = {};
-  for (const s of ['backend', 'frontend']) if (opt(s)) results[s] = JSON.parse(fs.readFileSync(path.resolve(opt(s)), 'utf8'));
+  // a source given more than once (or as a,b,c) is several runs: the median is judged (see check)
+  for (const s of ['backend', 'frontend']) { const files = opts(s); if (files.length) results[s] = files.map((f) => JSON.parse(fs.readFileSync(path.resolve(f), 'utf8'))); }
   if (!Object.keys(results).length) { console.error('perf-budgets: give --backend FILE.json and/or --frontend FILE.json'); process.exit(2); }
   // only the budgets of the results given are checked (a run of the backend bench alone is not "missing" every frontend budget)
   const rows = check({ budgets: budgets.budgets.filter((b) => results[b.source]) }, results);
