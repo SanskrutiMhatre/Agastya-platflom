@@ -108,7 +108,7 @@ for (const book of Object.keys(BOOKS)) {
   test(`${book}: builds; every font embedded; every link and bookmark resolves; pages, fonts and links as the baseline`, { skip: skipOf(book), timeout: 900000 }, async (t) => {
     if (NO_RENDERER) throw new Error(NO_RENDERER);
     const buf = await BOOKS[book](); const doc = await R.openPdf(buf); built[book] = doc;
-    const fonts = await R.fontsOf(doc); const links = await R.linksOf(doc);
+    const fonts = await R.fontsOf(buf); const links = await R.linksOf(doc);
     t.diagnostic(`${book}: ${doc.numPages} pages; fonts ${fonts.fonts.map((f) => f.name).join(', ')}; ${links.internal} internal links, ${links.external} external, ${links.outline} bookmarks`);
     const notEmbedded = fonts.notEmbedded.map((f) => f.name);
     assert.deepEqual(notEmbedded.filter((n) => !BASE14.has(n)), [], `every font other than the 14 standard PDF fonts is embedded (${JSON.stringify(fonts.notEmbedded)})`);

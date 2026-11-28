@@ -9,7 +9,7 @@
 //                                            the printing stamp in the margin, the month/year of a cover, the issue date of a module
 //   compare(a, b, masks)                  -> { differing, total, ratio, diffPng } pixels whose largest channel difference exceeds PIXEL_DELTA,
 //                                            outside the masks
-//   await fontsOf(doc)                    -> { fonts: [{ name, embedded, pages }], notEmbedded: [...] }  every font a page selects (setFont)
+//   await fontsOf(pdfBuffer)              -> { fonts: [{ name, embedded, pages }], notEmbedded: [...] }  every font a page selects (setFont)
 //   await linksOf(doc)                    -> { internal, external, outline, unresolved: [...] }  every Link annotation and outline entry; an
 //                                            internal destination counts as resolved only when it names a page that exists in this document
 //
@@ -50,14 +50,14 @@ function lib() {
   return libP;
 }
 
-async function openPdf(src) {
+async function openPdf(src, { standardFonts = true } = {}) {
   const { m, dir } = await lib();
   const buf = Buffer.isBuffer(src) ? src : fs.readFileSync(src);
   if (buf.subarray(0, 5).toString('latin1') !== '%PDF-') throw new Error('not a PDF');
   const data = new Uint8Array(buf.length); data.set(buf);
   // standardFontDataUrl is a PLAIN path: in Node pdf.js reads it with fs.readFile (a file: URL string is not found, and the unembedded standard
   // fonts - QA-006a - would then render as nothing); these are the faces pdf.js substitutes, as any viewer does for an unembedded font
-  return m.getDocument({ data, standardFontDataUrl: path.join(dir, 'standard_fonts') + path.sep, disableFontFace: true, useSystemFonts: false,
+  return m.getDocument({ data, ...(standardFonts ? { standardFontDataUrl: path.join(dir, 'standard_fonts') + path.sep } : {}), disableFontFace: true, useSystemFonts: false,
     isEvalSupported: false, fontExtraProperties: true, verbosity: 0 }).promise;
 }
 
@@ -114,8 +114,12 @@ async function compare(a, b, masks = []) {
 
 const baseName = (n) => String(n || '').replace(/^[A-Z]{6}\+/, '');
 
-async function fontsOf(doc) {
+/** Fonts used, and which are not embedded. `src` is the PDF itself (Buffer or path), NOT a document opened for rendering: with standard font
+ *  data loaded, pdf.js fills an unembedded base-14 face from its own copy and reports it with a file (missingFile false), which hid exactly
+ *  the defect this check is for (found in WP-30 itself). So the fonts are read from a second document opened without standard font data. */
+async function fontsOf(src) {
   const { m } = await lib(); const by = new Map();
+  const doc = await openPdf(src, { standardFonts: false });
   for (let n = 1; n <= doc.numPages; n++) {
     const page = await doc.getPage(n); const ops = await page.getOperatorList();
     const ids = new Set(); for (let i = 0; i < ops.fnArray.length; i++) if (ops.fnArray[i] === m.OPS.setFont) ids.add(ops.argsArray[i][0]);
@@ -129,6 +133,7 @@ async function fontsOf(doc) {
     }
     page.cleanup();
   }
+  await doc.destroy();
   const fonts = [...by.values()].sort((x, y) => x.name.localeCompare(y.name));
   return { fonts, notEmbedded: fonts.filter((f) => !f.embedded) };
 }
