@@ -1,0 +1,3902 @@
+{
+ "kind": "agastya-phase3-perf-baseline",
+ "at": "2026-11-28T11:00:31.594Z",
+ "commit": "a9ee0fb",
+ "how": "backend: node backend/scripts/bench/phase3-baseline.js --port 4301 (no profiler); frontend: node frontend/scripts/perf/phase3-frontend.mjs --port 4302 after npx vite build --manifest; cpuProfile: a second backend run with --cpuprof (server main thread), summarised by backend/scripts/bench/cpuprofile-top.js",
+ "backend": {
+  "kind": "agastya-phase3-baseline",
+  "version": 1,
+  "at": "2026-11-28T11:00:31.594Z",
+  "node": "v22.23.2",
+  "platform": "win32 10.0.26100",
+  "cpus": 8,
+  "cpu": "Intel(R) Core(TM) i7-6820HQ CPU @ 2.70GHz",
+  "totalMemMB": 48974,
+  "freeMemMB": 24343,
+  "params": {
+   "port": 4301,
+   "dms": 1000,
+   "val": 200,
+   "pdfdms": 100,
+   "seq": 20,
+   "conc": 10,
+   "rounds": 5,
+   "sockets": 50,
+   "only": [
+    "api",
+    "validation",
+    "pdf",
+    "ws"
+   ]
+  },
+  "server": {
+   "bootMs": 2341
+  },
+  "results": {
+   "apiSmall": {
+    "project": "S1000D sample",
+    "modules": 3,
+    "overview": {
+     "seq": {
+      "n": 20,
+      "median": 5.45,
+      "p95": 8.31,
+      "max": 8.31,
+      "min": 4.56,
+      "mean": 5.71
+     },
+     "conc": {
+      "n": 50,
+      "median": 27.41,
+      "p95": 45.83,
+      "max": 49.69,
+      "min": 5.06,
+      "mean": 26.6
+     },
+     "concBatchWall": {
+      "n": 5,
+      "median": 46.45,
+      "p95": 50.27,
+      "max": 50.27,
+      "min": 46.21,
+      "mean": 47.88
+     },
+     "serverDbMs": {
+      "n": 20,
+      "median": 0.5,
+      "p95": 0.6,
+      "max": 0.6,
+      "min": 0.4,
+      "mean": 0.46
+     },
+     "bytes": 1902,
+     "eventLoop": {
+      "p99": 50.2,
+      "max": 50.2
+     }
+    },
+    "workspace": {
+     "seq": {
+      "n": 20,
+      "median": 2.92,
+      "p95": 3.54,
+      "max": 3.54,
+      "min": 2.69,
+      "mean": 2.98
+     },
+     "conc": {
+      "n": 50,
+      "median": 15.58,
+      "p95": 27.86,
+      "max": 29.82,
+      "min": 3.16,
+      "mean": 15.34
+     },
+     "concBatchWall": {
+      "n": 5,
+      "median": 28.5,
+      "p95": 30.43,
+      "max": 30.43,
+      "min": 25.25,
+      "mean": 27.95
+     },
+     "serverDbMs": {
+      "n": 20,
+      "median": 0.2,
+      "p95": 0.3,
+      "max": 0.3,
+      "min": 0.2,
+      "mean": 0.21
+     },
+     "bytes": 1163,
+     "eventLoop": {
+      "p99": 28.8,
+      "max": 28.8
+     }
+    },
+    "projects": {
+     "seq": {
+      "n": 20,
+      "median": 2.04,
+      "p95": 2.99,
+      "max": 2.99,
+      "min": 1.82,
+      "mean": 2.09
+     },
+     "conc": {
+      "n": 50,
+      "median": 10.36,
+      "p95": 21.57,
+      "max": 25.69,
+      "min": 2.1,
+      "mean": 10.49
+     },
+     "concBatchWall": {
+      "n": 5,
+      "median": 16.84,
+      "p95": 26.29,
+      "max": 26.29,
+      "min": 16.01,
+      "mean": 18.76
+     },
+     "serverDbMs": {
+      "n": 20,
+      "median": 0.2,
+      "p95": 0.3,
+      "max": 0.3,
+      "min": 0.2,
+      "mean": 0.21
+     },
+     "bytes": 1149,
+     "eventLoop": {
+      "p99": 26.2,
+      "max": 26.2
+     }
+    },
+    "summary": {
+     "seq": {
+      "n": 20,
+      "median": 4.68,
+      "p95": 6.11,
+      "max": 6.11,
+      "min": 4.11,
+      "mean": 4.74
+     },
+     "conc": {
+      "n": 50,
+      "median": 27.13,
+      "p95": 50,
+      "max": 56.23,
+      "min": 5.19,
+      "mean": 27.49
+     },
+     "concBatchWall": {
+      "n": 5,
+      "median": 50.63,
+      "p95": 57.01,
+      "max": 57.01,
+      "min": 47.69,
+      "mean": 51.2
+     },
+     "serverDbMs": {
+      "n": 20,
+      "median": 0.4,
+      "p95": 0.5,
+      "max": 0.5,
+      "min": 0.3,
+      "mean": 0.37
+     },
+     "bytes": 1574,
+     "eventLoop": {
+      "p99": 56.3,
+      "max": 56.3
+     }
+    },
+    "release": {
+     "seq": {
+      "n": 20,
+      "median": 5.35,
+      "p95": 7.75,
+      "max": 7.75,
+      "min": 3.67,
+      "mean": 5.36
+     },
+     "conc": {
+      "n": 50,
+      "median": 19.14,
+      "p95": 33.4,
+      "max": 35.94,
+      "min": 3.38,
+      "mean": 18.59
+     },
+     "concBatchWall": {
+      "n": 5,
+      "median": 33.97,
+      "p95": 36.39,
+      "max": 36.39,
+      "min": 30.87,
+      "mean": 33.4
+     },
+     "serverDbMs": {
+      "n": 20,
+      "median": 0.4,
+      "p95": 0.5,
+      "max": 0.5,
+      "min": 0.2,
+      "mean": 0.37
+     },
+     "bytes": 376,
+     "eventLoop": {
+      "p99": 34.2,
+      "max": 34.2
+     }
+    },
+    "dms": {
+     "seq": {
+      "n": 20,
+      "median": 1.89,
+      "p95": 2.19,
+      "max": 2.19,
+      "min": 1.8,
+      "mean": 1.93
+     },
+     "conc": {
+      "n": 50,
+      "median": 10.24,
+      "p95": 18,
+      "max": 19.52,
+      "min": 2.18,
+      "mean": 9.97
+     },
+     "concBatchWall": {
+      "n": 5,
+      "median": 18.56,
+      "p95": 19.98,
+      "max": 19.98,
+      "min": 16.84,
+      "mean": 18.32
+     },
+     "serverDbMs": {
+      "n": 20,
+      "median": 0.1,
+      "p95": 0.2,
+      "max": 0.2,
+      "min": 0.1,
+      "mean": 0.13
+     },
+     "bytes": 2297,
+     "eventLoop": {
+      "p99": 18.9,
+      "max": 18.9
+     }
+    },
+    "explore": {
+     "seq": {
+      "n": 20,
+      "median": 2.1,
+      "p95": 2.37,
+      "max": 2.37,
+      "min": 1.96,
+      "mean": 2.12
+     },
+     "conc": {
+      "n": 50,
+      "median": 11.37,
+      "p95": 19.04,
+      "max": 19.92,
+      "min": 2.34,
+      "mean": 10.85
+     },
+     "concBatchWall": {
+      "n": 5,
+      "median": 19.5,
+      "p95": 20.38,
+      "max": 20.38,
+      "min": 19.14,
+      "mean": 19.57
+     },
+     "serverDbMs": {
+      "n": 20,
+      "median": 0.1,
+      "p95": 0.2,
+      "max": 0.2,
+      "min": 0.1,
+      "mean": 0.11
+     },
+     "bytes": 1448,
+     "eventLoop": {
+      "p99": 20.3,
+      "max": 20.3
+     }
+    },
+    "pmc": {
+     "seq": {
+      "n": 20,
+      "median": 2.35,
+      "p95": 2.63,
+      "max": 2.63,
+      "min": 2.27,
+      "mean": 2.37
+     },
+     "conc": {
+      "n": 50,
+      "median": 13.36,
+      "p95": 23.85,
+      "max": 29.5,
+      "min": 2.92,
+      "mean": 13.5
+     },
+     "concBatchWall": {
+      "n": 5,
+      "median": 24.14,
+      "p95": 29.97,
+      "max": 29.97,
+      "min": 21.83,
+      "mean": 24.74
+     },
+     "serverDbMs": {
+      "n": 20,
+      "median": 0.1,
+      "p95": 0.1,
+      "max": 0.1,
+      "min": 0.1,
+      "mean": 0.1
+     },
+     "bytes": 2038,
+     "eventLoop": {
+      "p99": 30.1,
+      "max": 30.1
+     }
+    },
+    "save": {
+     "seq": {
+      "n": 20,
+      "median": 20.43,
+      "p95": 50.12,
+      "max": 50.12,
+      "min": 14.38,
+      "mean": 22.84
+     },
+     "conc": {
+      "n": 15,
+      "median": 31.27,
+      "p95": 57.85,
+      "max": 57.85,
+      "min": 15.8,
+      "mean": 32.4
+     },
+     "concBatchWall": {
+      "n": 5,
+      "median": 42.79,
+      "p95": 58.71,
+      "max": 58.71,
+      "min": 42.08,
+      "mean": 46.25
+     },
+     "concModules": 3,
+     "eventLoop": {
+      "p99": 50.4,
+      "max": 50.4
+     }
+    },
+    "create": {
+     "seq": {
+      "n": 20,
+      "median": 39.87,
+      "p95": 74.7,
+      "max": 74.7,
+      "min": 27.91,
+      "mean": 45.51
+     },
+     "conc": {
+      "n": 50,
+      "median": 217.53,
+      "p95": 530.04,
+      "max": 601.68,
+      "min": 23.31,
+      "mean": 234.35
+     },
+     "concBatchWall": {
+      "n": 5,
+      "median": 364.94,
+      "p95": 602.78,
+      "max": 602.78,
+      "min": 294.3,
+      "mean": 421.56
+     },
+     "eventLoop": {
+      "p99": 447.2,
+      "max": 447.2
+     }
+    },
+    "eventLoopDuring": {
+     "p50": 41.9,
+     "p99": 447.2,
+     "max": 447.2
+    },
+    "slowestRoutes": [
+     {
+      "route": "POST /api/projects/:id/dms",
+      "count": 70,
+      "meanMs": 42.7,
+      "maxMs": 154.2,
+      "meanDbMs": 1.4,
+      "errors5xx": 0
+     },
+     {
+      "route": "GET /api/admin/perf",
+      "count": 1,
+      "meanMs": 3.3,
+      "maxMs": 3.3,
+      "meanDbMs": 0.1,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/admin/metrics/reset",
+      "count": 1,
+      "meanMs": 2.2,
+      "maxMs": 2.2,
+      "meanDbMs": 0.3,
+      "errors5xx": 0
+     }
+    ]
+   },
+   "import": {
+    "modules": 1000,
+    "importMs": 18194
+   },
+   "apiLarge": {
+    "project": "1000 modules",
+    "modules": 1000,
+    "overview": {
+     "seq": {
+      "n": 20,
+      "median": 165.18,
+      "p95": 231.76,
+      "max": 231.76,
+      "min": 90.11,
+      "mean": 161.87
+     },
+     "conc": {
+      "n": 50,
+      "median": 566.1,
+      "p95": 1441.7,
+      "max": 1723.19,
+      "min": 65.57,
+      "mean": 610.89
+     },
+     "concBatchWall": {
+      "n": 5,
+      "median": 830.09,
+      "p95": 1724.31,
+      "max": 1724.31,
+      "min": 707.23,
+      "mean": 1049.1
+     },
+     "serverDbMs": {
+      "n": 20,
+      "median": 1.8,
+      "p95": 5.6,
+      "max": 5.6,
+      "min": 1.2,
+      "mean": 2.13
+     },
+     "bytes": 5561,
+     "eventLoop": {
+      "p99": 1709.2,
+      "max": 1709.2
+     }
+    },
+    "workspace": {
+     "seq": {
+      "n": 20,
+      "median": 4.88,
+      "p95": 8.04,
+      "max": 8.04,
+      "min": 4.4,
+      "mean": 5.29
+     },
+     "conc": {
+      "n": 50,
+      "median": 26.68,
+      "p95": 45.55,
+      "max": 48.35,
+      "min": 5.04,
+      "mean": 25.75
+     },
+     "concBatchWall": {
+      "n": 5,
+      "median": 46.1,
+      "p95": 48.83,
+      "max": 48.83,
+      "min": 45.14,
+      "mean": 46.77
+     },
+     "serverDbMs": {
+      "n": 20,
+      "median": 0.3,
+      "p95": 0.5,
+      "max": 0.5,
+      "min": 0.2,
+      "mean": 0.33
+     },
+     "bytes": 2264,
+     "eventLoop": {
+      "p99": 46.1,
+      "max": 46.1
+     }
+    },
+    "projects": {
+     "seq": {
+      "n": 20,
+      "median": 4.06,
+      "p95": 6.56,
+      "max": 6.56,
+      "min": 3.49,
+      "mean": 4.32
+     },
+     "conc": {
+      "n": 50,
+      "median": 22.08,
+      "p95": 41.8,
+      "max": 54.22,
+      "min": 4.28,
+      "mean": 22.27
+     },
+     "concBatchWall": {
+      "n": 5,
+      "median": 37.9,
+      "p95": 54.78,
+      "max": 54.78,
+      "min": 37.55,
+      "mean": 41.24
+     },
+     "serverDbMs": {
+      "n": 20,
+      "median": 0.3,
+      "p95": 1.3,
+      "max": 1.3,
+      "min": 0.2,
+      "mean": 0.35
+     },
+     "bytes": 2250,
+     "eventLoop": {
+      "p99": 54.8,
+      "max": 54.8
+     }
+    },
+    "summary": {
+     "seq": {
+      "n": 20,
+      "median": 61.15,
+      "p95": 114.66,
+      "max": 114.66,
+      "min": 54.58,
+      "mean": 68.54
+     },
+     "conc": {
+      "n": 50,
+      "median": 388.27,
+      "p95": 686.87,
+      "max": 760.39,
+      "min": 62.37,
+      "mean": 377.17
+     },
+     "concBatchWall": {
+      "n": 5,
+      "median": 671.41,
+      "p95": 760.92,
+      "max": 760.92,
+      "min": 611.16,
+      "mean": 682.31
+     },
+     "serverDbMs": {
+      "n": 20,
+      "median": 0.4,
+      "p95": 1,
+      "max": 1,
+      "min": 0.3,
+      "mean": 0.44
+     },
+     "bytes": 1516,
+     "eventLoop": {
+      "p99": 759.7,
+      "max": 759.7
+     }
+    },
+    "release": {
+     "seq": {
+      "n": 20,
+      "median": 63.78,
+      "p95": 83.91,
+      "max": 83.91,
+      "min": 47.82,
+      "mean": 63.32
+     },
+     "conc": {
+      "n": 50,
+      "median": 428.21,
+      "p95": 790.71,
+      "max": 905.08,
+      "min": 55.27,
+      "mean": 412.21
+     },
+     "concBatchWall": {
+      "n": 5,
+      "median": 774.11,
+      "p95": 905.89,
+      "max": 905.89,
+      "min": 681.93,
+      "mean": 770.3
+     },
+     "serverDbMs": {
+      "n": 20,
+      "median": 0.3,
+      "p95": 0.4,
+      "max": 0.4,
+      "min": 0.2,
+      "mean": 0.31
+     },
+     "bytes": 378,
+     "eventLoop": {
+      "p99": 832,
+      "max": 832
+     }
+    },
+    "dms": {
+     "seq": {
+      "n": 20,
+      "median": 49.48,
+      "p95": 102.64,
+      "max": 102.64,
+      "min": 39,
+      "mean": 54.29
+     },
+     "conc": {
+      "n": 50,
+      "median": 266.81,
+      "p95": 491.64,
+      "max": 525.54,
+      "min": 40.86,
+      "mean": 266.18
+     },
+     "concBatchWall": {
+      "n": 5,
+      "median": 497.43,
+      "p95": 531.8,
+      "max": 531.8,
+      "min": 448.58,
+      "mean": 496.8
+     },
+     "serverDbMs": {
+      "n": 20,
+      "median": 0.5,
+      "p95": 0.6,
+      "max": 0.6,
+      "min": 0.3,
+      "mean": 0.43
+     },
+     "bytes": 794795,
+     "eventLoop": {
+      "p99": 470,
+      "max": 470
+     }
+    },
+    "explore": {
+     "seq": {
+      "n": 20,
+      "median": 48.69,
+      "p95": 100.44,
+      "max": 100.44,
+      "min": 42.02,
+      "mean": 51.89
+     },
+     "conc": {
+      "n": 50,
+      "median": 248.5,
+      "p95": 530.1,
+      "max": 593.62,
+      "min": 37.4,
+      "mean": 256.33
+     },
+     "concBatchWall": {
+      "n": 5,
+      "median": 416.25,
+      "p95": 595.68,
+      "max": 595.68,
+      "min": 404.43,
+      "mean": 472.64
+     },
+     "serverDbMs": {
+      "n": 20,
+      "median": 0.2,
+      "p95": 0.2,
+      "max": 0.2,
+      "min": 0.1,
+      "mean": 0.17
+     },
+     "bytes": 230377,
+     "eventLoop": {
+      "p99": 518,
+      "max": 518
+     }
+    },
+    "pmc": {
+     "seq": {
+      "n": 20,
+      "median": 56.91,
+      "p95": 72.72,
+      "max": 72.72,
+      "min": 40.36,
+      "mean": 56.15
+     },
+     "conc": {
+      "n": 50,
+      "median": 331.88,
+      "p95": 620.87,
+      "max": 778.8,
+      "min": 47.53,
+      "mean": 323.29
+     },
+     "concBatchWall": {
+      "n": 5,
+      "median": 535.34,
+      "p95": 783.79,
+      "max": 783.79,
+      "min": 476.67,
+      "mean": 575.45
+     },
+     "serverDbMs": {
+      "n": 20,
+      "median": 0.2,
+      "p95": 0.2,
+      "max": 0.2,
+      "min": 0.1,
+      "mean": 0.16
+     },
+     "bytes": 271376,
+     "eventLoop": {
+      "p99": 704.1,
+      "max": 704.1
+     }
+    },
+    "save": {
+     "seq": {
+      "n": 20,
+      "median": 20.15,
+      "p95": 26.85,
+      "max": 26.85,
+      "min": 10.36,
+      "mean": 19.78
+     },
+     "conc": {
+      "n": 50,
+      "median": 83.73,
+      "p95": 150.42,
+      "max": 171.01,
+      "min": 12.08,
+      "mean": 81.19
+     },
+     "concBatchWall": {
+      "n": 5,
+      "median": 132.3,
+      "p95": 172.42,
+      "max": 172.42,
+      "min": 123.96,
+      "mean": 139.79
+     },
+     "concModules": 10,
+     "eventLoop": {
+      "p99": 142,
+      "max": 142
+     }
+    },
+    "create": {
+     "seq": {
+      "n": 20,
+      "median": 94.99,
+      "p95": 147.22,
+      "max": 147.22,
+      "min": 81.35,
+      "mean": 97.9
+     },
+     "conc": {
+      "n": 50,
+      "median": 575.84,
+      "p95": 1009.89,
+      "max": 1086.35,
+      "min": 94.05,
+      "mean": 556.92
+     },
+     "concBatchWall": {
+      "n": 5,
+      "median": 1010.69,
+      "p95": 1087.68,
+      "max": 1087.68,
+      "min": 940.9,
+      "mean": 1007.42
+     },
+     "eventLoop": {
+      "p99": 956.3,
+      "max": 956.3
+     }
+    },
+    "eventLoopDuring": {
+     "p50": 98.6,
+     "p99": 956.3,
+     "max": 956.3
+    },
+    "slowestRoutes": [
+     {
+      "route": "POST /api/projects/:id/dms",
+      "count": 70,
+      "meanMs": 99.5,
+      "maxMs": 145.6,
+      "meanDbMs": 1.3,
+      "errors5xx": 0
+     },
+     {
+      "route": "GET /api/admin/perf",
+      "count": 1,
+      "meanMs": 2.4,
+      "maxMs": 2.4,
+      "meanDbMs": 0.1,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/admin/metrics/reset",
+      "count": 1,
+      "meanMs": 1.4,
+      "maxMs": 1.4,
+      "meanDbMs": 0.2,
+      "errors5xx": 0
+     }
+    ]
+   },
+   "validation": {
+    "modules": 200,
+    "coldFirstRun": {
+     "ms": 6786,
+     "summary": {
+      "error": 0,
+      "warn": 200,
+      "info": 4
+     },
+     "cached": false
+    },
+    "warmFresh": [
+     {
+      "ms": 1331,
+      "summary": {
+       "error": 0,
+       "warn": 200,
+       "info": 4
+      },
+      "cached": false
+     },
+     {
+      "ms": 1276,
+      "summary": {
+       "error": 0,
+       "warn": 200,
+       "info": 4
+      },
+      "cached": false
+     },
+     {
+      "ms": 1253,
+      "summary": {
+       "error": 0,
+       "warn": 200,
+       "info": 4
+      },
+      "cached": false
+     }
+    ],
+    "warmNoBrexFresh": {
+     "ms": 989,
+     "summary": {
+      "error": 0,
+      "warn": 200,
+      "info": 4
+     },
+     "cached": false
+    },
+    "cached": {
+     "ms": 1256,
+     "summary": {
+      "error": 0,
+      "warn": 200,
+      "info": 4
+     },
+     "cached": false
+    },
+    "afterOneEdit": {
+     "ms": 1330,
+     "summary": {
+      "error": 0,
+      "warn": 200,
+      "info": 4
+     },
+     "cached": false
+    },
+    "warmFreshMedianMs": 1276,
+    "eventLoopDuring": {
+     "p50": 15.8,
+     "p99": 23.7,
+     "max": 25.6
+    }
+   },
+   "pdf": {
+    "s1000dSample": {
+     "first": {
+      "wallMs": 6156,
+      "totalMs": 4973,
+      "bytes": 429339,
+      "jobId": "e79c3f33-a173-4f44-8763-35d74de932c0",
+      "peak": {
+       "rssMb": 98.9,
+       "jvmWorkingSetMb": 128,
+       "workerMb": 315
+      },
+      "stages": {
+       "queueMs": 0,
+       "jobMs": 6143,
+       "validate": 1105,
+       "xslt": 247,
+       "fop": 4707,
+       "other": 56,
+       "engineFop": 4710,
+       "engineXslt": 205,
+       "engineBreakdown": {
+        "in": 4970,
+        "fo": 205,
+        "pdf": 4710
+       },
+       "done": "Done in 4.97s — fo 205ms · pdf 4.71s (warm FOP)"
+      }
+     },
+     "warm": {
+      "wallMs": 2191,
+      "totalMs": 1248,
+      "bytes": 429339,
+      "jobId": "07b1dcdc-8767-48c7-92f6-8ec069a7b789",
+      "peak": {
+       "rssMb": 98.9,
+       "jvmWorkingSetMb": 189,
+       "workerMb": 353
+      },
+      "stages": {
+       "queueMs": 0,
+       "jobMs": 2178,
+       "validate": 889,
+       "xslt": 174,
+       "fop": 1074,
+       "other": 19,
+       "engineFop": 1070,
+       "engineXslt": 138,
+       "engineBreakdown": {
+        "in": 1250,
+        "fo": 138,
+        "pdf": 1070
+       },
+       "done": "Done in 1.25s — fo 138ms · pdf 1.07s (warm FOP)"
+      }
+     },
+     "timelineWarm": [
+      {
+       "t": 2,
+       "dur": 889,
+       "message": "Validating the publication against the S1000D schemas..."
+      },
+      {
+       "t": 891,
+       "dur": 9,
+       "message": "Engine: direct S1000D -> FO"
+      },
+      {
+       "t": 900,
+       "dur": 4,
+       "message": "Watermark: NOT RELEASED (diagonal)"
+      },
+      {
+       "t": 904,
+       "dur": 0,
+       "message": "Added 13 front-matter pages from settings"
+      },
+      {
+       "t": 904,
+       "dur": 7,
+       "message": "Resolved 3 dmRef entries to xi:include"
+      },
+      {
+       "t": 911,
+       "dur": 8,
+       "message": "Indexed 1 image for sizing"
+      },
+      {
+       "t": 919,
+       "dur": 0,
+       "message": "Applied 145 layout settings"
+      },
+      {
+       "t": 919,
+       "dur": 138,
+       "message": "Rendering XSL-FO (direct S1000D)..."
+      },
+      {
+       "t": 1057,
+       "dur": 27,
+       "message": "Rendering XSL-FO (direct S1000D) — 138ms"
+      },
+      {
+       "t": 1084,
+       "dur": 1074,
+       "message": "Generating PDF (FOP)..."
+      },
+      {
+       "t": 2158,
+       "dur": 0,
+       "message": "Generating PDF (FOP) — 1.07s"
+      },
+      {
+       "t": 2158,
+       "dur": 20,
+       "message": "Done in 1.25s — fo 138ms · pdf 1.07s (warm FOP)"
+      },
+      {
+       "t": 2178,
+       "dur": 0,
+       "message": "Done in 1.2s"
+      }
+     ]
+    },
+    "jssLandSample": {
+     "first": {
+      "wallMs": 2705,
+      "totalMs": 2200,
+      "bytes": 614274,
+      "jobId": "5ab35dc7-3020-4dc1-b634-ce78a80990a6",
+      "peak": {
+       "rssMb": 109.5,
+       "jvmWorkingSetMb": 301,
+       "workerMb": 129
+      },
+      "stages": {
+       "queueMs": 1,
+       "jobMs": 2692,
+       "validate": 400,
+       "xslt": 230,
+       "fop": 1956,
+       "other": 85,
+       "engineFop": 1960,
+       "engineXslt": 201,
+       "engineBreakdown": {
+        "in": 2200,
+        "front": 14,
+        "img": 11,
+        "fo": 176,
+        "pdf": 1960
+       },
+       "done": "Done in 2.20s — front 14ms · img 11ms · fo 176ms · pdf 1.96s (warm FOP)"
+      }
+     },
+     "warm": {
+      "wallMs": 2089,
+      "totalMs": 1758,
+      "bytes": 614274,
+      "jobId": "fd17be2e-3f5a-447a-aa1c-b86f7c482d3d",
+      "peak": {
+       "rssMb": 103.6,
+       "jvmWorkingSetMb": 377,
+       "workerMb": 133
+      },
+      "stages": {
+       "queueMs": 0,
+       "jobMs": 2062,
+       "validate": 235,
+       "xslt": 173,
+       "fop": 1582,
+       "other": 44,
+       "engineFop": 1580,
+       "engineXslt": 137,
+       "engineBreakdown": {
+        "in": 1760,
+        "front": 11,
+        "img": 3,
+        "fo": 123,
+        "pdf": 1580
+       },
+       "done": "Done in 1.76s — front 11ms · img 3ms · fo 123ms · pdf 1.58s (warm FOP)"
+      }
+     },
+     "timelineWarm": [
+      {
+       "t": 3,
+       "dur": 235,
+       "message": "Validating the JSS document against its schema and stencil rules..."
+      },
+      {
+       "t": 238,
+       "dur": 1,
+       "message": "Engine: S1000D -> JSS book -> FO"
+      },
+      {
+       "t": 239,
+       "dur": 17,
+       "message": "Default artwork from the stencil: the emblem, the logo of L&T Defence, the first-aid figures (the project has no such file in its Media fold"
+      },
+      {
+       "t": 256,
+       "dur": 19,
+       "message": "Watermark: NOT RELEASED (diagonal)"
+      },
+      {
+       "t": 275,
+       "dur": 4,
+       "message": "JSS document (uhb): added 15 frame pages from Settings; the body is rendered as written"
+      },
+      {
+       "t": 279,
+       "dur": 9,
+       "message": "Generating front matter..."
+      },
+      {
+       "t": 288,
+       "dur": 2,
+       "message": "Generated 9 front-matter pages from config"
+      },
+      {
+       "t": 290,
+       "dur": 1,
+       "message": "Generating front matter — 11ms"
+      },
+      {
+       "t": 291,
+       "dur": 0,
+       "message": "Source is already a JSS book; skipping S1000D mapping"
+      },
+      {
+       "t": 291,
+       "dur": 3,
+       "message": "Stamping image dimensions..."
+      },
+      {
+       "t": 294,
+       "dur": 0,
+       "message": "Stamping image dimensions — 3ms"
+      },
+      {
+       "t": 294,
+       "dur": 1,
+       "message": "Stamped image dimensions on 10 graphics"
+      },
+      {
+       "t": 295,
+       "dur": 122,
+       "message": "Rendering XSL-FO..."
+      },
+      {
+       "t": 417,
+       "dur": 38,
+       "message": "Rendering XSL-FO — 123ms"
+      },
+      {
+       "t": 455,
+       "dur": 1581,
+       "message": "Generating PDF (FOP)..."
+      },
+      {
+       "t": 2036,
+       "dur": 1,
+       "message": "Generating PDF (FOP) — 1.58s"
+      },
+      {
+       "t": 2037,
+       "dur": 25,
+       "message": "Done in 1.76s — front 11ms · img 3ms · fo 123ms · pdf 1.58s (warm FOP)"
+      },
+      {
+       "t": 2062,
+       "dur": 0,
+       "message": "Done in 1.8s"
+      }
+     ]
+    },
+    "jsgUhbSample": {
+     "first": {
+      "wallMs": 7269,
+      "totalMs": 7256,
+      "bytes": 673170,
+      "jobId": "3a1283fe-3da1-429e-bc32-05fb155117b3",
+      "peak": {
+       "rssMb": 103.9,
+       "jvmWorkingSetMb": 571,
+       "workerMb": 137
+      },
+      "stages": {
+       "queueMs": 0,
+       "jobMs": 7258,
+       "validate": 343,
+       "xslt": 252,
+       "fop": 6658,
+       "other": 2,
+       "engineBreakdown": {
+        "in": 7300
+       },
+       "done": "Done in 7.3s (warm FOP)"
+      }
+     },
+     "warm": {
+      "wallMs": 6439,
+      "totalMs": 6419,
+      "bytes": 673170,
+      "jobId": "1f95ee5d-fe27-425a-9ec6-4f0212147110",
+      "peak": {
+       "rssMb": 104.2,
+       "jvmWorkingSetMb": 546,
+       "workerMb": 140
+      },
+      "stages": {
+       "queueMs": 1,
+       "jobMs": 6427,
+       "validate": 304,
+       "xslt": 383,
+       "fop": 5731,
+       "other": 1,
+       "engineBreakdown": {
+        "in": 6400
+       },
+       "done": "Done in 6.4s (warm FOP)"
+      }
+     },
+     "timelineWarm": [
+      {
+       "t": 1,
+       "dur": 304,
+       "message": "Validating the JSG document against its schema..."
+      },
+      {
+       "t": 305,
+       "dur": 1,
+       "message": "Watermark: NOT RELEASED (diagonal)"
+      },
+      {
+       "t": 306,
+       "dur": 194,
+       "message": "Rendering XSL-FO (JSG engine)..."
+      },
+      {
+       "t": 500,
+       "dur": 2799,
+       "message": "Generating PDF (FOP)..."
+      },
+      {
+       "t": 3299,
+       "dur": 1,
+       "message": "The certificate cites the page count: 104 pages. Rendering again..."
+      },
+      {
+       "t": 3300,
+       "dur": 188,
+       "message": "Rendering XSL-FO (JSG engine)..."
+      },
+      {
+       "t": 3488,
+       "dur": 2932,
+       "message": "Generating PDF (FOP)..."
+      },
+      {
+       "t": 6420,
+       "dur": 7,
+       "message": "Done in 6.4s (warm FOP)"
+      }
+     ]
+    },
+    "s1000d100": {
+     "first": {
+      "wallMs": 11165,
+      "totalMs": 7323,
+      "bytes": 1534583,
+      "jobId": "9f4582ed-8b27-4a7e-9600-30833a2a66be",
+      "peak": {
+       "rssMb": 109.7,
+       "jvmWorkingSetMb": 583,
+       "workerMb": 180
+      },
+      "stages": {
+       "queueMs": 0,
+       "jobMs": 11155,
+       "validate": 3599,
+       "xslt": 1126,
+       "fop": 6240,
+       "other": 159,
+       "engineFop": 6240,
+       "engineXslt": 874,
+       "engineBreakdown": {
+        "in": 7320,
+        "fo": 874,
+        "pdf": 6240
+       },
+       "done": "Done in 7.32s — fo 874ms · pdf 6.24s (warm FOP)"
+      }
+     },
+     "warm": {
+      "wallMs": 10502,
+      "totalMs": 6699,
+      "bytes": 1534583,
+      "jobId": "be9f44e6-0381-445f-b94a-2822653f8f9c",
+      "peak": {
+       "rssMb": 109.7,
+       "jvmWorkingSetMb": 588,
+       "workerMb": 184
+      },
+      "stages": {
+       "queueMs": 0,
+       "jobMs": 10467,
+       "validate": 3530,
+       "xslt": 1701,
+       "fop": 5051,
+       "other": 152,
+       "engineFop": 5050,
+       "engineXslt": 1430,
+       "engineBreakdown": {
+        "in": 6700,
+        "fo": 1430,
+        "pdf": 5050
+       },
+       "done": "Done in 6.70s — fo 1.43s · pdf 5.05s (warm FOP)"
+      }
+     },
+     "timelineWarm": [
+      {
+       "t": 12,
+       "dur": 3530,
+       "message": "Validating the publication against the S1000D schemas..."
+      },
+      {
+       "t": 3542,
+       "dur": 77,
+       "message": "Engine: direct S1000D -> FO"
+      },
+      {
+       "t": 3619,
+       "dur": 63,
+       "message": "Watermark: NOT RELEASED (diagonal)"
+      },
+      {
+       "t": 3682,
+       "dur": 0,
+       "message": "Added 13 front-matter pages from settings"
+      },
+      {
+       "t": 3682,
+       "dur": 1,
+       "message": "Front-matter artwork missing from the project: Media/Satya.png, Media/JACKSON.png, Media/Satya.png - upload it under Settings > Branding"
+      },
+      {
+       "t": 3683,
+       "dur": 65,
+       "message": "Resolved 100 dmRef entries to xi:include"
+      },
+      {
+       "t": 3748,
+       "dur": 22,
+       "message": "Indexed 0 images for sizing"
+      },
+      {
+       "t": 3770,
+       "dur": 2,
+       "message": "Applied 66 layout settings"
+      },
+      {
+       "t": 3772,
+       "dur": 1427,
+       "message": "Rendering XSL-FO (direct S1000D)..."
+      },
+      {
+       "t": 5199,
+       "dur": 196,
+       "message": "Rendering XSL-FO (direct S1000D) — 1.43s"
+      },
+      {
+       "t": 5395,
+       "dur": 0,
+       "message": "Image references: 2 unresolved: csdb/ICN-S1KSTUDIO-A-291000-A-00001-00001-A-001-01.svg x100, Media/JACKSON.png"
+      },
+      {
+       "t": 5395,
+       "dur": 5050,
+       "message": "Generating PDF (FOP)..."
+      },
+      {
+       "t": 10445,
+       "dur": 1,
+       "message": "Generating PDF (FOP) — 5.05s"
+      },
+      {
+       "t": 10446,
+       "dur": 21,
+       "message": "Done in 6.70s — fo 1.43s · pdf 5.05s (warm FOP)"
+      },
+      {
+       "t": 10467,
+       "dur": 0,
+       "message": "Done in 6.7s"
+      }
+     ]
+    },
+    "eventLoopDuring": {
+     "p50": 15.8,
+     "p99": 27.9,
+     "max": 759.2
+    }
+   },
+   "ws": {
+    "sockets": 50,
+    "people": 10,
+    "openAllMs": 82,
+    "presence": {
+     "toLastSocket": {
+      "n": 8,
+      "median": 2.27,
+      "p95": 2.43,
+      "max": 2.43,
+      "min": 1.64,
+      "mean": 2.08
+     },
+     "p95Socket": {
+      "n": 8,
+      "median": 2.19,
+      "p95": 2.39,
+      "max": 2.39,
+      "min": 1.59,
+      "mean": 2.03
+     },
+     "missed": 0
+    },
+    "checkout": {
+     "toLastSocket": {
+      "n": 5,
+      "median": 5.37,
+      "p95": 5.88,
+      "max": 5.88,
+      "min": 5.08,
+      "mean": 5.47
+     },
+     "missed": 0
+    },
+    "wsClientsSeen": 50
+   }
+  },
+  "memory": {
+   "idle-after-boot": {
+    "rssMb": 143.5,
+    "heapUsedMb": 55.1,
+    "workers": [],
+    "jvmWorkingSetMb": 0,
+    "jvms": 0
+   },
+   "after-api-small": {
+    "rssMb": 166.8,
+    "heapUsedMb": 74.7,
+    "workers": [],
+    "jvmWorkingSetMb": null,
+    "jvms": null
+   },
+   "after-import-1000": {
+    "rssMb": 189.8,
+    "heapUsedMb": 39.7,
+    "workers": [],
+    "jvmWorkingSetMb": 0,
+    "jvms": 0
+   },
+   "after-api-large": {
+    "rssMb": 241.7,
+    "heapUsedMb": 143.9,
+    "workers": [],
+    "jvmWorkingSetMb": null,
+    "jvms": null
+   },
+   "after-validation": {
+    "rssMb": 98.2,
+    "heapUsedMb": 33.9,
+    "workers": [
+     293
+    ],
+    "jvmWorkingSetMb": 0,
+    "jvms": 0
+   },
+   "after-pdf": {
+    "rssMb": 109.7,
+    "heapUsedMb": 35.8,
+    "workers": [
+     183
+    ],
+    "jvmWorkingSetMb": 588,
+    "jvms": 1
+   },
+   "with-ws-clients": {
+    "rssMb": 110.3,
+    "heapUsedMb": 38,
+    "workers": [],
+    "jvmWorkingSetMb": null,
+    "jvms": null
+   },
+   "end": {
+    "rssMb": 110.3,
+    "heapUsedMb": 37.6,
+    "workers": [
+     121
+    ],
+    "jvmWorkingSetMb": 600,
+    "jvms": 1
+   }
+  },
+  "eventLoop": {
+   "idle-after-boot": {
+    "p50": 15.8,
+    "p99": 25.1,
+    "max": 25.1,
+    "mean": 15.8
+   },
+   "after-api-small": {
+    "p50": 41.9,
+    "p99": 447.2,
+    "max": 447.2,
+    "mean": 103.4
+   },
+   "after-import-1000": {
+    "p50": 11.2,
+    "p99": 261.2,
+    "max": 10628.4,
+    "mean": 39.5
+   },
+   "after-api-large": {
+    "p50": 98.6,
+    "p99": 956.3,
+    "max": 956.3,
+    "mean": 238.3
+   },
+   "after-validation": {
+    "p50": 15.8,
+    "p99": 23.7,
+    "max": 25.6,
+    "mean": 15.8
+   },
+   "after-pdf": {
+    "p50": 15.8,
+    "p99": 27.9,
+    "max": 759.2,
+    "mean": 16.3
+   },
+   "with-ws-clients": {
+    "p50": 15.8,
+    "p99": 27.2,
+    "max": 759.2,
+    "mean": 16.2
+   },
+   "end": {
+    "p50": 15.8,
+    "p99": 27.1,
+    "max": 759.2,
+    "mean": 16.2
+   }
+  },
+  "routesByPhase": {
+   "idle-after-boot": {
+    "slowest": [
+     {
+      "route": "/api/auth/setup",
+      "method": "POST",
+      "status": 200,
+      "ms": 123.4,
+      "dbMs": 0.9,
+      "dbN": 20,
+      "at": 1795863634085
+     },
+     {
+      "route": "/api/team/users",
+      "method": "POST",
+      "status": 201,
+      "ms": 104.6,
+      "dbMs": 0.6,
+      "dbN": 9,
+      "at": 1795863634191
+     },
+     {
+      "route": "/api/auth/login",
+      "method": "POST",
+      "status": 200,
+      "ms": 89.6,
+      "dbMs": 0.7,
+      "dbN": 14,
+      "at": 1795863634282
+     },
+     {
+      "route": "/api/auth/onboarding",
+      "method": "POST",
+      "status": 200,
+      "ms": 88.1,
+      "dbMs": 0.6,
+      "dbN": 15,
+      "at": 1795863634371
+     },
+     {
+      "route": "/api/health",
+      "method": "GET",
+      "status": 200,
+      "ms": 10.1,
+      "dbMs": 0,
+      "dbN": 0,
+      "at": 1795863633950
+     }
+    ],
+    "byMean": [
+     {
+      "route": "POST /api/auth/setup",
+      "count": 1,
+      "meanMs": 123.4,
+      "maxMs": 123.4,
+      "meanDbMs": 0.9,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/team/users",
+      "count": 1,
+      "meanMs": 104.6,
+      "maxMs": 104.6,
+      "meanDbMs": 0.6,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/auth/login",
+      "count": 1,
+      "meanMs": 89.6,
+      "maxMs": 89.6,
+      "meanDbMs": 0.7,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/auth/onboarding",
+      "count": 1,
+      "meanMs": 88.1,
+      "maxMs": 88.1,
+      "meanDbMs": 0.6,
+      "errors5xx": 0
+     },
+     {
+      "route": "GET /api/health",
+      "count": 1,
+      "meanMs": 10.1,
+      "maxMs": 10.1,
+      "meanDbMs": 0,
+      "errors5xx": 0
+     }
+    ]
+   },
+   "after-api-small": {
+    "slowest": [
+     {
+      "route": "/api/projects/:id/dms",
+      "method": "POST",
+      "status": 201,
+      "ms": 154.2,
+      "dbMs": 1.1,
+      "dbN": 23,
+      "at": 1795863640248
+     },
+     {
+      "route": "/api/projects/:id/dms",
+      "method": "POST",
+      "status": 201,
+      "ms": 108.8,
+      "dbMs": 0.9,
+      "dbN": 23,
+      "at": 1795863640033
+     },
+     {
+      "route": "/api/projects/:id/dms",
+      "method": "POST",
+      "status": 201,
+      "ms": 74.2,
+      "dbMs": 1.2,
+      "dbN": 23,
+      "at": 1795863638032
+     },
+     {
+      "route": "/api/projects/:id/dms",
+      "method": "POST",
+      "status": 201,
+      "ms": 70.7,
+      "dbMs": 1,
+      "dbN": 23,
+      "at": 1795863637957
+     },
+     {
+      "route": "/api/projects/:id/dms",
+      "method": "POST",
+      "status": 201,
+      "ms": 70.6,
+      "dbMs": 1.1,
+      "dbN": 23,
+      "at": 1795863637826
+     },
+     {
+      "route": "/api/projects/:id/dms",
+      "method": "POST",
+      "status": 201,
+      "ms": 68.8,
+      "dbMs": 1,
+      "dbN": 23,
+      "at": 1795863639924
+     },
+     {
+      "route": "/api/projects/:id/dms",
+      "method": "POST",
+      "status": 201,
+      "ms": 61.9,
+      "dbMs": 0.9,
+      "dbN": 23,
+      "at": 1795863640310
+     },
+     {
+      "route": "/api/projects/:id/dms",
+      "method": "POST",
+      "status": 201,
+      "ms": 59.3,
+      "dbMs": 1,
+      "dbN": 23,
+      "at": 1795863640624
+     },
+     {
+      "route": "/api/projects/:id/dms",
+      "method": "POST",
+      "status": 201,
+      "ms": 59.2,
+      "dbMs": 1,
+      "dbN": 23,
+      "at": 1795863638092
+     },
+     {
+      "route": "/api/projects/:id/dms",
+      "method": "POST",
+      "status": 201,
+      "ms": 58.5,
+      "dbMs": 1,
+      "dbN": 23,
+      "at": 1795863640092
+     }
+    ],
+    "byMean": [
+     {
+      "route": "POST /api/projects/:id/dms",
+      "count": 70,
+      "meanMs": 42.7,
+      "maxMs": 154.2,
+      "meanDbMs": 1.4,
+      "errors5xx": 0
+     },
+     {
+      "route": "GET /api/admin/perf",
+      "count": 1,
+      "meanMs": 3.3,
+      "maxMs": 3.3,
+      "meanDbMs": 0.1,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/admin/metrics/reset",
+      "count": 1,
+      "meanMs": 2.2,
+      "maxMs": 2.2,
+      "meanDbMs": 0.3,
+      "errors5xx": 0
+     }
+    ]
+   },
+   "after-import-1000": {
+    "slowest": [
+     {
+      "route": "/api/projects/:id/packages/import",
+      "method": "POST",
+      "status": 200,
+      "ms": 18193.2,
+      "dbMs": 979.9,
+      "dbN": 11016,
+      "at": 1795863659878
+     },
+     {
+      "route": "/api/projects/:id/dms",
+      "method": "POST",
+      "status": 201,
+      "ms": 154.2,
+      "dbMs": 1.1,
+      "dbN": 23,
+      "at": 1795863640248
+     },
+     {
+      "route": "/api/projects/:id/dms",
+      "method": "POST",
+      "status": 201,
+      "ms": 108.8,
+      "dbMs": 0.9,
+      "dbN": 23,
+      "at": 1795863640033
+     },
+     {
+      "route": "/api/projects/:id/dms",
+      "method": "POST",
+      "status": 201,
+      "ms": 74.2,
+      "dbMs": 1.2,
+      "dbN": 23,
+      "at": 1795863638032
+     },
+     {
+      "route": "/api/projects/:id/dms",
+      "method": "POST",
+      "status": 201,
+      "ms": 70.7,
+      "dbMs": 1,
+      "dbN": 23,
+      "at": 1795863637957
+     },
+     {
+      "route": "/api/projects/:id/dms",
+      "method": "POST",
+      "status": 201,
+      "ms": 70.6,
+      "dbMs": 1.1,
+      "dbN": 23,
+      "at": 1795863637826
+     },
+     {
+      "route": "/api/projects/:id/dms",
+      "method": "POST",
+      "status": 201,
+      "ms": 68.8,
+      "dbMs": 1,
+      "dbN": 23,
+      "at": 1795863639924
+     },
+     {
+      "route": "/api/projects/:id/dms",
+      "method": "POST",
+      "status": 201,
+      "ms": 61.9,
+      "dbMs": 0.9,
+      "dbN": 23,
+      "at": 1795863640310
+     },
+     {
+      "route": "/api/projects/:id/dms",
+      "method": "POST",
+      "status": 201,
+      "ms": 59.3,
+      "dbMs": 1,
+      "dbN": 23,
+      "at": 1795863640624
+     },
+     {
+      "route": "/api/projects/:id/dms",
+      "method": "POST",
+      "status": 201,
+      "ms": 59.2,
+      "dbMs": 1,
+      "dbN": 23,
+      "at": 1795863638092
+     }
+    ],
+    "byMean": [
+     {
+      "route": "POST /api/projects/:id/packages/import",
+      "count": 1,
+      "meanMs": 18193.2,
+      "maxMs": 18193.2,
+      "meanDbMs": 979.9,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/projects",
+      "count": 1,
+      "meanMs": 44.3,
+      "maxMs": 44.3,
+      "meanDbMs": 1.2,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/projects/:id/dms",
+      "count": 70,
+      "meanMs": 42.7,
+      "maxMs": 154.2,
+      "meanDbMs": 1.4,
+      "errors5xx": 0
+     },
+     {
+      "route": "GET /api/admin/perf",
+      "count": 2,
+      "meanMs": 3.4,
+      "maxMs": 3.5,
+      "meanDbMs": 0.1,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/admin/metrics/reset",
+      "count": 1,
+      "meanMs": 2.2,
+      "maxMs": 2.2,
+      "meanDbMs": 0.3,
+      "errors5xx": 0
+     }
+    ]
+   },
+   "after-api-large": {
+    "slowest": [
+     {
+      "route": "/api/projects/:id/dms",
+      "method": "POST",
+      "status": 201,
+      "ms": 145.6,
+      "dbMs": 1.1,
+      "dbN": 24,
+      "at": 1795863695603
+     },
+     {
+      "route": "/api/projects/:id/dms",
+      "method": "POST",
+      "status": 201,
+      "ms": 139.7,
+      "dbMs": 1.2,
+      "dbN": 24,
+      "at": 1795863699093
+     },
+     {
+      "route": "/api/projects/:id/dms",
+      "method": "POST",
+      "status": 201,
+      "ms": 129.6,
+      "dbMs": 25.2,
+      "dbN": 24,
+      "at": 1795863699315
+     },
+     {
+      "route": "/api/projects/:id/dms",
+      "method": "POST",
+      "status": 201,
+      "ms": 129.4,
+      "dbMs": 1.1,
+      "dbN": 24,
+      "at": 1795863698841
+     },
+     {
+      "route": "/api/projects/:id/dms",
+      "method": "POST",
+      "status": 201,
+      "ms": 126.8,
+      "dbMs": 1.3,
+      "dbN": 24,
+      "at": 1795863697155
+     },
+     {
+      "route": "/api/projects/:id/dms",
+      "method": "POST",
+      "status": 201,
+      "ms": 125.7,
+      "dbMs": 1.1,
+      "dbN": 24,
+      "at": 1795863697570
+     },
+     {
+      "route": "/api/projects/:id/dms",
+      "method": "POST",
+      "status": 201,
+      "ms": 117.5,
+      "dbMs": 1.1,
+      "dbN": 24,
+      "at": 1795863700778
+     },
+     {
+      "route": "/api/projects/:id/dms",
+      "method": "POST",
+      "status": 201,
+      "ms": 113,
+      "dbMs": 0.9,
+      "dbN": 24,
+      "at": 1795863701789
+     },
+     {
+      "route": "/api/projects/:id/dms",
+      "method": "POST",
+      "status": 201,
+      "ms": 112,
+      "dbMs": 1.1,
+      "dbN": 24,
+      "at": 1795863698953
+     },
+     {
+      "route": "/api/projects/:id/dms",
+      "method": "POST",
+      "status": 201,
+      "ms": 111.5,
+      "dbMs": 1.4,
+      "dbN": 24,
+      "at": 1795863701088
+     }
+    ],
+    "byMean": [
+     {
+      "route": "POST /api/projects/:id/dms",
+      "count": 70,
+      "meanMs": 99.5,
+      "maxMs": 145.6,
+      "meanDbMs": 1.3,
+      "errors5xx": 0
+     },
+     {
+      "route": "GET /api/admin/perf",
+      "count": 1,
+      "meanMs": 2.4,
+      "maxMs": 2.4,
+      "meanDbMs": 0.1,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/admin/metrics/reset",
+      "count": 1,
+      "meanMs": 1.4,
+      "maxMs": 1.4,
+      "meanDbMs": 0.2,
+      "errors5xx": 0
+     }
+    ]
+   },
+   "after-validation": {
+    "slowest": [
+     {
+      "route": "/api/projects/:id/validation",
+      "method": "POST",
+      "status": 200,
+      "ms": 6785,
+      "dbMs": 3.1,
+      "dbN": 15,
+      "at": 1795863711904
+     },
+     {
+      "route": "/api/projects/:id/validation",
+      "method": "POST",
+      "status": 200,
+      "ms": 1329.7,
+      "dbMs": 0.8,
+      "dbN": 14,
+      "at": 1795863713235
+     },
+     {
+      "route": "/api/projects/:id/validation",
+      "method": "POST",
+      "status": 200,
+      "ms": 1328.9,
+      "dbMs": 0.8,
+      "dbN": 13,
+      "at": 1795863719376
+     },
+     {
+      "route": "/api/projects/:id/validation",
+      "method": "POST",
+      "status": 200,
+      "ms": 1274.8,
+      "dbMs": 0.9,
+      "dbN": 13,
+      "at": 1795863714510
+     },
+     {
+      "route": "/api/projects/:id/validation",
+      "method": "POST",
+      "status": 200,
+      "ms": 1254.8,
+      "dbMs": 1.2,
+      "dbN": 13,
+      "at": 1795863718008
+     },
+     {
+      "route": "/api/projects/:id/validation",
+      "method": "POST",
+      "status": 200,
+      "ms": 1251.3,
+      "dbMs": 0.9,
+      "dbN": 13,
+      "at": 1795863715763
+     },
+     {
+      "route": "/api/projects/:id/validation",
+      "method": "POST",
+      "status": 200,
+      "ms": 988.1,
+      "dbMs": 0.8,
+      "dbN": 13,
+      "at": 1795863716752
+     },
+     {
+      "route": "/api/projects/:id/dms/:file",
+      "method": "PUT",
+      "status": 200,
+      "ms": 12.6,
+      "dbMs": 1.1,
+      "dbN": 22,
+      "at": 1795863718047
+     },
+     {
+      "route": "/api/projects/:id/dms/:file",
+      "method": "GET",
+      "status": 200,
+      "ms": 2,
+      "dbMs": 0.2,
+      "dbN": 6,
+      "at": 1795863718012
+     },
+     {
+      "route": "/api/admin/metrics/reset",
+      "method": "POST",
+      "status": 200,
+      "ms": 1.4,
+      "dbMs": 0.2,
+      "dbN": 5,
+      "at": 1795863705118
+     }
+    ],
+    "byMean": [
+     {
+      "route": "POST /api/projects/:id/validation",
+      "count": 7,
+      "meanMs": 2030.4,
+      "maxMs": 6785,
+      "meanDbMs": 1.2,
+      "errors5xx": 0
+     },
+     {
+      "route": "PUT /api/projects/:id/dms/:file",
+      "count": 1,
+      "meanMs": 12.6,
+      "maxMs": 12.6,
+      "meanDbMs": 1.1,
+      "errors5xx": 0
+     },
+     {
+      "route": "GET /api/projects/:id/dms/:file",
+      "count": 1,
+      "meanMs": 2,
+      "maxMs": 2,
+      "meanDbMs": 0.2,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/admin/metrics/reset",
+      "count": 1,
+      "meanMs": 1.4,
+      "maxMs": 1.4,
+      "meanDbMs": 0.2,
+      "errors5xx": 0
+     }
+    ]
+   },
+   "after-pdf": {
+    "slowest": [
+     {
+      "route": "/api/projects/:id/publish",
+      "method": "POST",
+      "status": 200,
+      "ms": 11157.6,
+      "dbMs": 0.7,
+      "dbN": 16,
+      "at": 1795863768500
+     },
+     {
+      "route": "/api/projects/:id/publish",
+      "method": "POST",
+      "status": 200,
+      "ms": 10469.8,
+      "dbMs": 0.8,
+      "dbN": 16,
+      "at": 1795863782320
+     },
+     {
+      "route": "/api/projects/:id/jsg/build",
+      "method": "POST",
+      "status": 200,
+      "ms": 7261.2,
+      "dbMs": 0.8,
+      "dbN": 15,
+      "at": 1795863745386
+     },
+     {
+      "route": "/api/projects/:id/jsg/build",
+      "method": "POST",
+      "status": 200,
+      "ms": 6429.9,
+      "dbMs": 0.7,
+      "dbN": 15,
+      "at": 1795863755140
+     },
+     {
+      "route": "/api/projects/:id/publish",
+      "method": "POST",
+      "status": 200,
+      "ms": 6148.3,
+      "dbMs": 0.9,
+      "dbN": 16,
+      "at": 1795863726088
+     },
+     {
+      "route": "/api/projects/:id/publish",
+      "method": "POST",
+      "status": 200,
+      "ms": 2695.4,
+      "dbMs": 0.8,
+      "dbN": 16,
+      "at": 1795863733488
+     },
+     {
+      "route": "/api/projects/:id/publish",
+      "method": "POST",
+      "status": 200,
+      "ms": 2181.7,
+      "dbMs": 1,
+      "dbN": 16,
+      "at": 1795863729205
+     },
+     {
+      "route": "/api/projects/:id/publish",
+      "method": "POST",
+      "status": 200,
+      "ms": 2065.1,
+      "dbMs": 0.9,
+      "dbN": 16,
+      "at": 1795863736546
+     },
+     {
+      "route": "/api/projects/:id/packages/import",
+      "method": "POST",
+      "status": 200,
+      "ms": 1425.3,
+      "dbMs": 71.6,
+      "dbN": 1116,
+      "at": 1795863757335
+     },
+     {
+      "route": "/api/admin/perf",
+      "method": "GET",
+      "status": 200,
+      "ms": 1327.9,
+      "dbMs": 0.1,
+      "dbN": 2,
+      "at": 1795863773159
+     }
+    ],
+    "byMean": [
+     {
+      "route": "POST /api/projects/:id/jsg/build",
+      "count": 2,
+      "meanMs": 6845.6,
+      "maxMs": 7261.2,
+      "meanDbMs": 0.8,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/projects/:id/publish",
+      "count": 6,
+      "meanMs": 5786.3,
+      "maxMs": 11157.6,
+      "meanDbMs": 0.9,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/projects/:id/packages/import",
+      "count": 1,
+      "meanMs": 1425.3,
+      "maxMs": 1425.3,
+      "meanDbMs": 71.6,
+      "errors5xx": 0
+     },
+     {
+      "route": "GET /api/admin/perf",
+      "count": 17,
+      "meanMs": 631.3,
+      "maxMs": 1327.9,
+      "meanDbMs": 0.1,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/projects/sample-jss",
+      "count": 1,
+      "meanMs": 266.8,
+      "maxMs": 266.8,
+      "meanDbMs": 2.1,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/projects/sample",
+      "count": 1,
+      "meanMs": 92.5,
+      "maxMs": 92.5,
+      "meanDbMs": 2.8,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/projects/sample-jsg",
+      "count": 1,
+      "meanMs": 73.3,
+      "maxMs": 73.3,
+      "meanDbMs": 1.2,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/projects",
+      "count": 1,
+      "meanMs": 33.4,
+      "maxMs": 33.4,
+      "meanDbMs": 0.9,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/admin/metrics/reset",
+      "count": 1,
+      "meanMs": 1.4,
+      "maxMs": 1.4,
+      "meanDbMs": 0.3,
+      "errors5xx": 0
+     },
+     {
+      "route": "GET /api/projects/:id/jobs/:jobId",
+      "count": 8,
+      "meanMs": 1.3,
+      "maxMs": 1.6,
+      "meanDbMs": 0.3,
+      "errors5xx": 0
+     }
+    ]
+   },
+   "with-ws-clients": {
+    "slowest": [
+     {
+      "route": "/api/projects/:id/publish",
+      "method": "POST",
+      "status": 200,
+      "ms": 11157.6,
+      "dbMs": 0.7,
+      "dbN": 16,
+      "at": 1795863768500
+     },
+     {
+      "route": "/api/projects/:id/publish",
+      "method": "POST",
+      "status": 200,
+      "ms": 10469.8,
+      "dbMs": 0.8,
+      "dbN": 16,
+      "at": 1795863782320
+     },
+     {
+      "route": "/api/projects/:id/jsg/build",
+      "method": "POST",
+      "status": 200,
+      "ms": 7261.2,
+      "dbMs": 0.8,
+      "dbN": 15,
+      "at": 1795863745386
+     },
+     {
+      "route": "/api/projects/:id/jsg/build",
+      "method": "POST",
+      "status": 200,
+      "ms": 6429.9,
+      "dbMs": 0.7,
+      "dbN": 15,
+      "at": 1795863755140
+     },
+     {
+      "route": "/api/projects/:id/publish",
+      "method": "POST",
+      "status": 200,
+      "ms": 6148.3,
+      "dbMs": 0.9,
+      "dbN": 16,
+      "at": 1795863726088
+     },
+     {
+      "route": "/api/projects/:id/publish",
+      "method": "POST",
+      "status": 200,
+      "ms": 2695.4,
+      "dbMs": 0.8,
+      "dbN": 16,
+      "at": 1795863733488
+     },
+     {
+      "route": "/api/projects/:id/publish",
+      "method": "POST",
+      "status": 200,
+      "ms": 2181.7,
+      "dbMs": 1,
+      "dbN": 16,
+      "at": 1795863729205
+     },
+     {
+      "route": "/api/projects/:id/publish",
+      "method": "POST",
+      "status": 200,
+      "ms": 2065.1,
+      "dbMs": 0.9,
+      "dbN": 16,
+      "at": 1795863736546
+     },
+     {
+      "route": "/api/projects/:id/packages/import",
+      "method": "POST",
+      "status": 200,
+      "ms": 1425.3,
+      "dbMs": 71.6,
+      "dbN": 1116,
+      "at": 1795863757335
+     },
+     {
+      "route": "/api/admin/perf",
+      "method": "GET",
+      "status": 200,
+      "ms": 1327.9,
+      "dbMs": 0.1,
+      "dbN": 2,
+      "at": 1795863773159
+     }
+    ],
+    "byMean": [
+     {
+      "route": "POST /api/projects/:id/jsg/build",
+      "count": 2,
+      "meanMs": 6845.6,
+      "maxMs": 7261.2,
+      "meanDbMs": 0.8,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/projects/:id/publish",
+      "count": 6,
+      "meanMs": 5786.3,
+      "maxMs": 11157.6,
+      "meanDbMs": 0.9,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/projects/:id/packages/import",
+      "count": 1,
+      "meanMs": 1425.3,
+      "maxMs": 1425.3,
+      "meanDbMs": 71.6,
+      "errors5xx": 0
+     },
+     {
+      "route": "GET /api/admin/perf",
+      "count": 18,
+      "meanMs": 596.3,
+      "maxMs": 1327.9,
+      "meanDbMs": 0.1,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/projects/sample-jss",
+      "count": 1,
+      "meanMs": 266.8,
+      "maxMs": 266.8,
+      "meanDbMs": 2.1,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/auth/onboarding",
+      "count": 9,
+      "meanMs": 123.7,
+      "maxMs": 178.6,
+      "meanDbMs": 2.4,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/auth/login",
+      "count": 9,
+      "meanMs": 121,
+      "maxMs": 199.3,
+      "meanDbMs": 0.6,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/team/users",
+      "count": 9,
+      "meanMs": 112.2,
+      "maxMs": 128.9,
+      "meanDbMs": 0.6,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/projects/sample",
+      "count": 1,
+      "meanMs": 92.5,
+      "maxMs": 92.5,
+      "meanDbMs": 2.8,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/projects/sample-jsg",
+      "count": 1,
+      "meanMs": 73.3,
+      "maxMs": 73.3,
+      "meanDbMs": 1.2,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/projects",
+      "count": 2,
+      "meanMs": 33.5,
+      "maxMs": 33.6,
+      "meanDbMs": 0.9,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/projects/:id/dms",
+      "count": 1,
+      "meanMs": 18.9,
+      "maxMs": 18.9,
+      "meanDbMs": 0.7,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/projects/:id/dms/:file/checkout",
+      "count": 5,
+      "meanMs": 5,
+      "maxMs": 5.8,
+      "meanDbMs": 0.6,
+      "errors5xx": 0
+     },
+     {
+      "route": "DELETE /api/projects/:id/dms/:file/checkout",
+      "count": 5,
+      "meanMs": 4.3,
+      "maxMs": 5.5,
+      "meanDbMs": 0.6,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/projects/:id/assign",
+      "count": 9,
+      "meanMs": 3.9,
+      "maxMs": 6.3,
+      "meanDbMs": 1.1,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/admin/metrics/reset",
+      "count": 1,
+      "meanMs": 1.4,
+      "maxMs": 1.4,
+      "meanDbMs": 0.3,
+      "errors5xx": 0
+     },
+     {
+      "route": "GET /api/projects/:id/jobs/:jobId",
+      "count": 8,
+      "meanMs": 1.3,
+      "maxMs": 1.6,
+      "meanDbMs": 0.3,
+      "errors5xx": 0
+     }
+    ]
+   },
+   "end": {
+    "slowest": [
+     {
+      "route": "/api/projects/:id/publish",
+      "method": "POST",
+      "status": 200,
+      "ms": 11157.6,
+      "dbMs": 0.7,
+      "dbN": 16,
+      "at": 1795863768500
+     },
+     {
+      "route": "/api/projects/:id/publish",
+      "method": "POST",
+      "status": 200,
+      "ms": 10469.8,
+      "dbMs": 0.8,
+      "dbN": 16,
+      "at": 1795863782320
+     },
+     {
+      "route": "/api/projects/:id/jsg/build",
+      "method": "POST",
+      "status": 200,
+      "ms": 7261.2,
+      "dbMs": 0.8,
+      "dbN": 15,
+      "at": 1795863745386
+     },
+     {
+      "route": "/api/projects/:id/jsg/build",
+      "method": "POST",
+      "status": 200,
+      "ms": 6429.9,
+      "dbMs": 0.7,
+      "dbN": 15,
+      "at": 1795863755140
+     },
+     {
+      "route": "/api/projects/:id/publish",
+      "method": "POST",
+      "status": 200,
+      "ms": 6148.3,
+      "dbMs": 0.9,
+      "dbN": 16,
+      "at": 1795863726088
+     },
+     {
+      "route": "/api/projects/:id/publish",
+      "method": "POST",
+      "status": 200,
+      "ms": 2695.4,
+      "dbMs": 0.8,
+      "dbN": 16,
+      "at": 1795863733488
+     },
+     {
+      "route": "/api/projects/:id/publish",
+      "method": "POST",
+      "status": 200,
+      "ms": 2181.7,
+      "dbMs": 1,
+      "dbN": 16,
+      "at": 1795863729205
+     },
+     {
+      "route": "/api/projects/:id/publish",
+      "method": "POST",
+      "status": 200,
+      "ms": 2065.1,
+      "dbMs": 0.9,
+      "dbN": 16,
+      "at": 1795863736546
+     },
+     {
+      "route": "/api/projects/:id/packages/import",
+      "method": "POST",
+      "status": 200,
+      "ms": 1425.3,
+      "dbMs": 71.6,
+      "dbN": 1116,
+      "at": 1795863757335
+     },
+     {
+      "route": "/api/admin/perf",
+      "method": "GET",
+      "status": 200,
+      "ms": 1327.9,
+      "dbMs": 0.1,
+      "dbN": 2,
+      "at": 1795863773159
+     }
+    ],
+    "byMean": [
+     {
+      "route": "POST /api/projects/:id/jsg/build",
+      "count": 2,
+      "meanMs": 6845.6,
+      "maxMs": 7261.2,
+      "meanDbMs": 0.8,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/projects/:id/publish",
+      "count": 6,
+      "meanMs": 5786.3,
+      "maxMs": 11157.6,
+      "meanDbMs": 0.9,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/projects/:id/packages/import",
+      "count": 1,
+      "meanMs": 1425.3,
+      "maxMs": 1425.3,
+      "meanDbMs": 71.6,
+      "errors5xx": 0
+     },
+     {
+      "route": "GET /api/admin/perf",
+      "count": 19,
+      "meanMs": 565.2,
+      "maxMs": 1327.9,
+      "meanDbMs": 0.1,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/projects/sample-jss",
+      "count": 1,
+      "meanMs": 266.8,
+      "maxMs": 266.8,
+      "meanDbMs": 2.1,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/auth/onboarding",
+      "count": 9,
+      "meanMs": 123.7,
+      "maxMs": 178.6,
+      "meanDbMs": 2.4,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/auth/login",
+      "count": 9,
+      "meanMs": 121,
+      "maxMs": 199.3,
+      "meanDbMs": 0.6,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/team/users",
+      "count": 9,
+      "meanMs": 112.2,
+      "maxMs": 128.9,
+      "meanDbMs": 0.6,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/projects/sample",
+      "count": 1,
+      "meanMs": 92.5,
+      "maxMs": 92.5,
+      "meanDbMs": 2.8,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/projects/sample-jsg",
+      "count": 1,
+      "meanMs": 73.3,
+      "maxMs": 73.3,
+      "meanDbMs": 1.2,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/projects",
+      "count": 2,
+      "meanMs": 33.5,
+      "maxMs": 33.6,
+      "meanDbMs": 0.9,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/projects/:id/dms",
+      "count": 1,
+      "meanMs": 18.9,
+      "maxMs": 18.9,
+      "meanDbMs": 0.7,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/projects/:id/dms/:file/checkout",
+      "count": 5,
+      "meanMs": 5,
+      "maxMs": 5.8,
+      "meanDbMs": 0.6,
+      "errors5xx": 0
+     },
+     {
+      "route": "DELETE /api/projects/:id/dms/:file/checkout",
+      "count": 5,
+      "meanMs": 4.3,
+      "maxMs": 5.5,
+      "meanDbMs": 0.6,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/projects/:id/assign",
+      "count": 9,
+      "meanMs": 3.9,
+      "maxMs": 6.3,
+      "meanDbMs": 1.1,
+      "errors5xx": 0
+     },
+     {
+      "route": "POST /api/admin/metrics/reset",
+      "count": 1,
+      "meanMs": 1.4,
+      "maxMs": 1.4,
+      "meanDbMs": 0.3,
+      "errors5xx": 0
+     },
+     {
+      "route": "GET /api/projects/:id/jobs/:jobId",
+      "count": 8,
+      "meanMs": 1.3,
+      "maxMs": 1.6,
+      "meanDbMs": 0.3,
+      "errors5xx": 0
+     }
+    ]
+   }
+  },
+  "routes": {
+   "routesByMean": [
+    {
+     "route": "POST /api/projects/:id/packages/import",
+     "count": 1,
+     "meanMs": 18193.2,
+     "maxMs": 18193.2,
+     "meanDbMs": 979.9,
+     "errors5xx": 0,
+     "phase": "after-import-1000"
+    },
+    {
+     "route": "POST /api/projects/:id/jsg/build",
+     "count": 2,
+     "meanMs": 6845.6,
+     "maxMs": 7261.2,
+     "meanDbMs": 0.8,
+     "errors5xx": 0,
+     "phase": "after-pdf"
+    },
+    {
+     "route": "POST /api/projects/:id/publish",
+     "count": 6,
+     "meanMs": 5786.3,
+     "maxMs": 11157.6,
+     "meanDbMs": 0.9,
+     "errors5xx": 0,
+     "phase": "after-pdf"
+    },
+    {
+     "route": "POST /api/projects/:id/validation",
+     "count": 7,
+     "meanMs": 2030.4,
+     "maxMs": 6785,
+     "meanDbMs": 1.2,
+     "errors5xx": 0,
+     "phase": "after-validation"
+    },
+    {
+     "route": "GET /api/admin/perf",
+     "count": 17,
+     "meanMs": 631.3,
+     "maxMs": 1327.9,
+     "meanDbMs": 0.1,
+     "errors5xx": 0,
+     "phase": "after-pdf"
+    },
+    {
+     "route": "POST /api/projects/sample-jss",
+     "count": 1,
+     "meanMs": 266.8,
+     "maxMs": 266.8,
+     "meanDbMs": 2.1,
+     "errors5xx": 0,
+     "phase": "after-pdf"
+    },
+    {
+     "route": "POST /api/auth/onboarding",
+     "count": 9,
+     "meanMs": 123.7,
+     "maxMs": 178.6,
+     "meanDbMs": 2.4,
+     "errors5xx": 0,
+     "phase": "with-ws-clients"
+    },
+    {
+     "route": "POST /api/auth/setup",
+     "count": 1,
+     "meanMs": 123.4,
+     "maxMs": 123.4,
+     "meanDbMs": 0.9,
+     "errors5xx": 0,
+     "phase": "idle-after-boot"
+    },
+    {
+     "route": "POST /api/auth/login",
+     "count": 9,
+     "meanMs": 121,
+     "maxMs": 199.3,
+     "meanDbMs": 0.6,
+     "errors5xx": 0,
+     "phase": "with-ws-clients"
+    },
+    {
+     "route": "POST /api/team/users",
+     "count": 9,
+     "meanMs": 112.2,
+     "maxMs": 128.9,
+     "meanDbMs": 0.6,
+     "errors5xx": 0,
+     "phase": "with-ws-clients"
+    },
+    {
+     "route": "POST /api/projects/:id/dms",
+     "count": 70,
+     "meanMs": 99.5,
+     "maxMs": 145.6,
+     "meanDbMs": 1.3,
+     "errors5xx": 0,
+     "phase": "after-api-large"
+    },
+    {
+     "route": "POST /api/projects/sample",
+     "count": 1,
+     "meanMs": 92.5,
+     "maxMs": 92.5,
+     "meanDbMs": 2.8,
+     "errors5xx": 0,
+     "phase": "after-pdf"
+    },
+    {
+     "route": "POST /api/projects/sample-jsg",
+     "count": 1,
+     "meanMs": 73.3,
+     "maxMs": 73.3,
+     "meanDbMs": 1.2,
+     "errors5xx": 0,
+     "phase": "after-pdf"
+    },
+    {
+     "route": "POST /api/projects",
+     "count": 1,
+     "meanMs": 44.3,
+     "maxMs": 44.3,
+     "meanDbMs": 1.2,
+     "errors5xx": 0,
+     "phase": "after-import-1000"
+    },
+    {
+     "route": "PUT /api/projects/:id/dms/:file",
+     "count": 1,
+     "meanMs": 12.6,
+     "maxMs": 12.6,
+     "meanDbMs": 1.1,
+     "errors5xx": 0,
+     "phase": "after-validation"
+    },
+    {
+     "route": "GET /api/health",
+     "count": 1,
+     "meanMs": 10.1,
+     "maxMs": 10.1,
+     "meanDbMs": 0,
+     "errors5xx": 0,
+     "phase": "idle-after-boot"
+    },
+    {
+     "route": "POST /api/projects/:id/dms/:file/checkout",
+     "count": 5,
+     "meanMs": 5,
+     "maxMs": 5.8,
+     "meanDbMs": 0.6,
+     "errors5xx": 0,
+     "phase": "with-ws-clients"
+    },
+    {
+     "route": "DELETE /api/projects/:id/dms/:file/checkout",
+     "count": 5,
+     "meanMs": 4.3,
+     "maxMs": 5.5,
+     "meanDbMs": 0.6,
+     "errors5xx": 0,
+     "phase": "with-ws-clients"
+    },
+    {
+     "route": "POST /api/projects/:id/assign",
+     "count": 9,
+     "meanMs": 3.9,
+     "maxMs": 6.3,
+     "meanDbMs": 1.1,
+     "errors5xx": 0,
+     "phase": "with-ws-clients"
+    },
+    {
+     "route": "POST /api/admin/metrics/reset",
+     "count": 1,
+     "meanMs": 2.2,
+     "maxMs": 2.2,
+     "meanDbMs": 0.3,
+     "errors5xx": 0,
+     "phase": "after-api-small"
+    },
+    {
+     "route": "GET /api/projects/:id/dms/:file",
+     "count": 1,
+     "meanMs": 2,
+     "maxMs": 2,
+     "meanDbMs": 0.2,
+     "errors5xx": 0,
+     "phase": "after-validation"
+    },
+    {
+     "route": "GET /api/projects/:id/jobs/:jobId",
+     "count": 8,
+     "meanMs": 1.3,
+     "maxMs": 1.6,
+     "meanDbMs": 0.3,
+     "errors5xx": 0,
+     "phase": "after-pdf"
+    }
+   ]
+  },
+  "errors": [],
+  "wallSeconds": 165
+ },
+ "frontend": {
+  "kind": "agastya-phase3-frontend",
+  "version": 1,
+  "at": "2026-11-28T11:05:48.809Z",
+  "node": "v22.23.2",
+  "channel": "msedge",
+  "cpus": 8,
+  "cpu": "Intel(R) Core(TM) i7-6820HQ CPU @ 2.70GHz",
+  "bundle": {
+   "manifest": true,
+   "chunks": 70,
+   "totalRaw": 6798053,
+   "totalGzip": 2142138,
+   "initialRaw": 526028,
+   "initialGzip": 148057,
+   "initialFiles": [
+    "assets/react-C246Erd7.js",
+    "assets/index-BPkJWLcY.js",
+    "assets/index-CvJbkeeq.css"
+   ],
+   "largest": [
+    {
+     "file": "assets/Roboto-BHfpBGhJ.js",
+     "src": "node_modules/pdfmake/build/fonts/Roboto.js",
+     "kind": "shared",
+     "raw": 855053,
+     "gzip": 464116,
+     "initial": false
+    },
+    {
+     "file": "assets/pdfmake-CZHSBqnN.js",
+     "src": "node_modules/pdfmake/build/pdfmake.js",
+     "kind": "shared",
+     "raw": 1861406,
+     "gzip": 458884,
+     "initial": false
+    },
+    {
+     "file": "assets/pdf.worker.min-yatZIOMy.mjs",
+     "src": "node_modules/pdfjs-dist/build/pdf.worker.min.mjs",
+     "kind": "shared",
+     "raw": 1375838,
+     "gzip": 402927,
+     "initial": false
+    },
+    {
+     "file": "assets/EditorPage-BiJJcIe1.js",
+     "src": "_EditorPage-BiJJcIe1.js",
+     "kind": "lazy",
+     "raw": 878624,
+     "gzip": 276331,
+     "initial": false
+    },
+    {
+     "file": "assets/PdfJsViewer-C0k2Uw62.js",
+     "src": "src/components/pdf/PdfJsViewer.tsx",
+     "kind": "lazy",
+     "raw": 346462,
+     "gzip": 102442,
+     "initial": false
+    },
+    {
+     "file": "assets/react-C246Erd7.js",
+     "src": "_react-C246Erd7.js",
+     "kind": "shared",
+     "raw": 208517,
+     "gzip": 67920,
+     "initial": true
+    },
+    {
+     "file": "assets/index-BPkJWLcY.js",
+     "src": "index.html",
+     "kind": "entry",
+     "raw": 216519,
+     "gzip": 61528,
+     "initial": true
+    },
+    {
+     "file": "assets/JssEditorPage-B-sXdPZk.js",
+     "src": "src/pages/project/JssEditorPage.tsx",
+     "kind": "lazy",
+     "raw": 86390,
+     "gzip": 26494,
+     "initial": false
+    },
+    {
+     "file": "assets/JsgEditorPage-B6ErmnSS.js",
+     "src": "src/pages/project/JsgEditorPage.tsx",
+     "kind": "lazy",
+     "raw": 72359,
+     "gzip": 23056,
+     "initial": false
+    },
+    {
+     "file": "assets/pdf-OH1R2m-K.js",
+     "src": "src/studio/export/pdf.ts",
+     "kind": "lazy",
+     "raw": 61240,
+     "gzip": 21947,
+     "initial": false
+    },
+    {
+     "file": "assets/index-CvJbkeeq.css",
+     "src": "index.html",
+     "kind": "css",
+     "raw": 100992,
+     "gzip": 18609,
+     "initial": true
+    },
+    {
+     "file": "assets/Administrator-C_V9hHv4.js",
+     "src": "src/pages/Administrator.tsx",
+     "kind": "lazy",
+     "raw": 61879,
+     "gzip": 16685,
+     "initial": false
+    },
+    {
+     "file": "assets/ProjectSettingsPage-BHDum64g.js",
+     "src": "src/pages/project/ProjectSettingsPage.tsx",
+     "kind": "lazy",
+     "raw": 57444,
+     "gzip": 15324,
+     "initial": false
+    },
+    {
+     "file": "assets/useDocEditor-z5va8msa.js",
+     "src": "_useDocEditor-z5va8msa.js",
+     "kind": "shared",
+     "raw": 37931,
+     "gzip": 12893,
+     "initial": false
+    },
+    {
+     "file": "assets/pdf-worker-_hmOWfy7.js",
+     "src": null,
+     "kind": "other",
+     "raw": 33224,
+     "gzip": 12358,
+     "initial": false
+    },
+    {
+     "file": "assets/PublicationRoute-BIQmnMId.js",
+     "src": "_PublicationRoute-BIQmnMId.js",
+     "kind": "lazy",
+     "raw": 36031,
+     "gzip": 11524,
+     "initial": false
+    },
+    {
+     "file": "assets/TeamChip-NLhXjFHO.js",
+     "src": "_TeamChip-NLhXjFHO.js",
+     "kind": "shared",
+     "raw": 30694,
+     "gzip": 10463,
+     "initial": false
+    },
+    {
+     "file": "assets/DocPublicationPage-HdM5GKWu.js",
+     "src": "src/pages/project/DocPublicationPage.tsx",
+     "kind": "lazy",
+     "raw": 26352,
+     "gzip": 7977,
+     "initial": false
+    },
+    {
+     "file": "assets/ProjectHomePage-BWn3nH52.js",
+     "src": "src/pages/project/ProjectHomePage.tsx",
+     "kind": "lazy",
+     "raw": 23524,
+     "gzip": 7605,
+     "initial": false
+    },
+    {
+     "file": "assets/Settings-DheZUqky.js",
+     "src": "src/pages/Settings.tsx",
+     "kind": "lazy",
+     "raw": 28293,
+     "gzip": 7499,
+     "initial": false
+    },
+    {
+     "file": "assets/JsgAncillaryPage-C-gOGvKL.js",
+     "src": "src/pages/project/JsgAncillaryPage.tsx",
+     "kind": "lazy",
+     "raw": 25064,
+     "gzip": 7448,
+     "initial": false
+    },
+    {
+     "file": "assets/TeamChip-DhWWJnma.css",
+     "src": "_TeamChip-!~{00J}~.js",
+     "kind": "shared",
+     "raw": 43160,
+     "gzip": 7329,
+     "initial": false
+    },
+    {
+     "file": "assets/ValidationPage-CPPK_dwq.js",
+     "src": "src/pages/project/ValidationPage.tsx",
+     "kind": "lazy",
+     "raw": 20020,
+     "gzip": 7199,
+     "initial": false
+    },
+    {
+     "file": "assets/PublishRefusal-DwRW9TSI.js",
+     "src": "_PublishRefusal-DwRW9TSI.js",
+     "kind": "shared",
+     "raw": 16486,
+     "gzip": 6440,
+     "initial": false
+    },
+    {
+     "file": "assets/ReleasePage-Cw5fRaKv.js",
+     "src": "src/pages/project/ReleasePage.tsx",
+     "kind": "lazy",
+     "raw": 19707,
+     "gzip": 6296,
+     "initial": false
+    }
+   ]
+  },
+  "firstLoad": {
+   "overview": {
+    "cold": {
+     "readyMs": 556,
+     "lcp": 564,
+     "lcpElement": "div",
+     "longTasks": 0,
+     "longTaskTotal": 0,
+     "longestTask": 0,
+     "dcl": 155,
+     "load": 156,
+     "transferredKB": 141,
+     "requests": 12
+    },
+    "warm": {
+     "readyMs": 140,
+     "lcp": 140,
+     "lcpElement": "div",
+     "longTasks": 0,
+     "longTaskTotal": 0,
+     "longestTask": 0,
+     "dcl": 45,
+     "load": 46,
+     "transferredKB": 3,
+     "requests": 12
+    }
+   },
+   "projectHome": {
+    "cold": {
+     "readyMs": 252,
+     "lcp": 376,
+     "lcpElement": "div.grow",
+     "longTasks": 0,
+     "longTaskTotal": 0,
+     "longestTask": 0,
+     "dcl": 86,
+     "load": 87,
+     "transferredKB": 155,
+     "requests": 20
+    },
+    "warm": {
+     "readyMs": 121,
+     "lcp": 136,
+     "lcpElement": "div.grow",
+     "longTasks": 0,
+     "longTaskTotal": 0,
+     "longestTask": 0,
+     "dcl": 38,
+     "load": 40,
+     "transferredKB": 4,
+     "requests": 20
+    }
+   },
+   "s1000dEditor": {
+    "cold": {
+     "readyMs": 986,
+     "lcp": 800,
+     "lcpElement": "h1",
+     "longTasks": 1,
+     "longTaskTotal": 52,
+     "longestTask": 52,
+     "dcl": 80,
+     "load": 81,
+     "transferredKB": 524,
+     "requests": 32
+    },
+    "warm": {
+     "readyMs": 278,
+     "lcp": 324,
+     "lcpElement": "h1",
+     "longTasks": 0,
+     "longTaskTotal": 0,
+     "longestTask": 0,
+     "dcl": 85,
+     "load": 87,
+     "transferredKB": 4,
+     "requests": 32
+    }
+   },
+   "jssEditor": {
+    "cold": {
+     "readyMs": 889,
+     "lcp": 860,
+     "lcpElement": "div.jss-para",
+     "longTasks": 2,
+     "longTaskTotal": 355,
+     "longestTask": 209,
+     "dcl": 105,
+     "load": 106,
+     "transferredKB": 370,
+     "requests": 27
+    },
+    "warm": {
+     "readyMs": 440,
+     "lcp": 440,
+     "lcpElement": "div.jss-para",
+     "longTasks": 2,
+     "longTaskTotal": 123,
+     "longestTask": 62,
+     "dcl": 136,
+     "load": 137,
+     "transferredKB": 3,
+     "requests": 27
+    }
+   },
+   "jsgEditor": {
+    "cold": {
+     "readyMs": 1025,
+     "lcp": 964,
+     "lcpElement": "div.jsg-p",
+     "longTasks": 1,
+     "longTaskTotal": 354,
+     "longestTask": 354,
+     "dcl": 92,
+     "load": 92,
+     "transferredKB": 1298,
+     "requests": 43
+    },
+    "warm": {
+     "readyMs": 1068,
+     "lcp": 848,
+     "lcpElement": "div.jsg-p",
+     "longTasks": 1,
+     "longTaskTotal": 221,
+     "longestTask": 221,
+     "dcl": 166,
+     "load": 169,
+     "transferredKB": 13,
+     "requests": 43
+    }
+   }
+  },
+  "editors": {
+   "s1000d": {
+    "openModule": {
+     "wallMs": 409,
+     "counted": 1,
+     "over16ms": 0,
+     "worst": "<16",
+     "p75": "<16",
+     "worstEvent": null,
+     "longTasks": 1,
+     "longestTask": 276
+    },
+    "typing": {
+     "wallMs": 1742,
+     "counted": 30,
+     "over16ms": 10,
+     "worst": 32,
+     "p75": 16,
+     "worstEvent": {
+      "name": "keydown",
+      "dur": 32,
+      "delay": 3,
+      "proc": 3
+     },
+     "longTasks": 1,
+     "longestTask": 69
+    },
+    "switchModule": {
+     "wallMs": 1366,
+     "counted": 4,
+     "over16ms": 4,
+     "worst": 64,
+     "p75": 64,
+     "worstEvent": {
+      "name": "pointerdown",
+      "dur": 64,
+      "delay": 2,
+      "proc": 2
+     },
+     "longTasks": 2,
+     "longestTask": 68
+    },
+    "panelToggles": {
+     "wallMs": 1195,
+     "counted": 6,
+     "over16ms": 6,
+     "worst": 24,
+     "p75": 24,
+     "worstEvent": {
+      "name": "pointerdown",
+      "dur": 24,
+      "delay": 1,
+      "proc": 1
+     },
+     "longTasks": 0,
+     "longestTask": 0
+    },
+    "quickPreview": {
+     "wallMs": 7427,
+     "counted": 1,
+     "over16ms": 1,
+     "worst": 48,
+     "p75": 48,
+     "worstEvent": {
+      "name": "pointerdown",
+      "dur": 48,
+      "delay": 2,
+      "proc": 1
+     },
+     "longTasks": 0,
+     "longestTask": 0
+    }
+   },
+   "jss": {
+    "openModule": {
+     "wallMs": 340,
+     "counted": 1,
+     "over16ms": 1,
+     "worst": 24,
+     "p75": 24,
+     "worstEvent": {
+      "name": "pointerdown",
+      "dur": 24,
+      "delay": 3,
+      "proc": 1
+     },
+     "longTasks": 0,
+     "longestTask": 0,
+     "note": "69 outline rows"
+    },
+    "typing": {
+     "wallMs": 1780,
+     "counted": 30,
+     "over16ms": 22,
+     "worst": 40,
+     "p75": 32,
+     "worstEvent": {
+      "name": "keydown",
+      "dur": 40,
+      "delay": 5,
+      "proc": 2
+     },
+     "longTasks": 0,
+     "longestTask": 0
+    },
+    "switchModule": {
+     "wallMs": 1394,
+     "counted": 4,
+     "over16ms": 4,
+     "worst": 24,
+     "p75": 24,
+     "worstEvent": {
+      "name": "pointerdown",
+      "dur": 24,
+      "delay": 2,
+      "proc": 1
+     },
+     "longTasks": 0,
+     "longestTask": 0
+    },
+    "panelToggles": {
+     "wallMs": 1435,
+     "counted": 6,
+     "over16ms": 6,
+     "worst": 56,
+     "p75": 56,
+     "worstEvent": {
+      "name": "pointerdown",
+      "dur": 56,
+      "delay": 1,
+      "proc": 1
+     },
+     "longTasks": 0,
+     "longestTask": 0
+    },
+    "quickPreview": {
+     "wallMs": 5545,
+     "counted": 1,
+     "over16ms": 1,
+     "worst": 152,
+     "p75": 152,
+     "worstEvent": {
+      "name": "pointerdown",
+      "dur": 152,
+      "delay": 1,
+      "proc": 1
+     },
+     "longTasks": 3,
+     "longestTask": 115
+    }
+   },
+   "jsg": {
+    "openModule": {
+     "wallMs": 331,
+     "counted": 1,
+     "over16ms": 1,
+     "worst": 32,
+     "p75": 32,
+     "worstEvent": {
+      "name": "pointerdown",
+      "dur": 32,
+      "delay": 3,
+      "proc": 0
+     },
+     "longTasks": 0,
+     "longestTask": 0,
+     "note": "26 outline rows"
+    },
+    "typing": {
+     "wallMs": 1667,
+     "counted": 30,
+     "over16ms": 10,
+     "worst": 32,
+     "p75": 24,
+     "worstEvent": {
+      "name": "keydown",
+      "dur": 32,
+      "delay": 9,
+      "proc": 1
+     },
+     "longTasks": 0,
+     "longestTask": 0
+    },
+    "switchModule": {
+     "wallMs": 1382,
+     "counted": 4,
+     "over16ms": 4,
+     "worst": 24,
+     "p75": 24,
+     "worstEvent": {
+      "name": "pointerdown",
+      "dur": 24,
+      "delay": 1,
+      "proc": 0
+     },
+     "longTasks": 0,
+     "longestTask": 0
+    },
+    "panelToggles": {
+     "wallMs": 1257,
+     "counted": 6,
+     "over16ms": 6,
+     "worst": 40,
+     "p75": 40,
+     "worstEvent": {
+      "name": "pointerdown",
+      "dur": 40,
+      "delay": 1,
+      "proc": 0
+     },
+     "longTasks": 0,
+     "longestTask": 0
+    },
+    "quickPreview": {
+     "wallMs": 10008,
+     "counted": 1,
+     "over16ms": 1,
+     "worst": 56,
+     "p75": 56,
+     "worstEvent": {
+      "name": "pointerdown",
+      "dur": 56,
+      "delay": 1,
+      "proc": 1
+     },
+     "longTasks": 0,
+     "longestTask": 0
+    }
+   }
+  },
+  "memory": {
+   "switches": 10,
+   "modules": 3,
+   "before": {
+    "jsHeapUsedMB": 8.8,
+    "jsHeapTotalMB": 9.3,
+    "nodes": 4866,
+    "listeners": 1393,
+    "documents": 2
+   },
+   "after": {
+    "jsHeapUsedMB": 15.2,
+    "jsHeapTotalMB": 15.8,
+    "nodes": 3542,
+    "listeners": 1456,
+    "documents": 4
+   },
+   "growthMB": 6.4,
+   "nodeGrowth": -1324,
+   "listenerGrowth": 63,
+   "switchWallMs": 3816
+  },
+  "errors": [],
+  "projects": {
+   "s1000d": "sample-s1000d-dummy-data",
+   "jss": "sample-jss-land-user-handbook-dummy-data",
+   "jsg": "sample-jsg-user-handbook-dummy-data",
+   "s1000dModules": 3
+  }
+ },
+ "cpuProfile": {
+  "note": "server main thread over the whole profiled backend run (same sections, profiler on: about 10 % slower)",
+  "sampledMs": 189689,
+  "busyMs": 63037,
+  "functions": [
+   {
+    "what": "(idle)",
+    "ms": 126652,
+    "pct": 66.8
+   },
+   {
+    "what": "stat  (native):0",
+    "ms": 8811,
+    "pct": 4.6
+   },
+   {
+    "what": "fsync  (native):0",
+    "ms": 6711,
+    "pct": 3.5
+   },
+   {
+    "what": "structuredClone  node:internal/worker/js_transferable:112",
+    "ms": 4164,
+    "pct": 2.2
+   },
+   {
+    "what": "readFileUtf8  (native):0",
+    "ms": 4057,
+    "pct": 2.1
+   },
+   {
+    "what": "join  node:path:521",
+    "ms": 2016,
+    "pct": 1.1
+   },
+   {
+    "what": "decodeText  backend/vendor/engine/pmc.js:25",
+    "ms": 1913,
+    "pct": 1
+   },
+   {
+    "what": "(garbage collector)",
+    "ms": 1773,
+    "pct": 0.9
+   },
+   {
+    "what": "open  (native):0",
+    "ms": 1572,
+    "pct": 0.8
+   },
+   {
+    "what": "(anonymous)  backend/dist/services/metrics.js:94",
+    "ms": 1521,
+    "pct": 0.8
+   },
+   {
+    "what": "listDms  backend/dist/services/csdbIndex.js:249",
+    "ms": 1395,
+    "pct": 0.7
+   },
+   {
+    "what": "summaryFrom  backend/dist/services/csdbIndex.js:153",
+    "ms": 1315,
+    "pct": 0.7
+   },
+   {
+    "what": "readdir  (native):0",
+    "ms": 1185,
+    "pct": 0.6
+   },
+   {
+    "what": "set  node:internal/fs/utils:468",
+    "ms": 1084,
+    "pct": 0.6
+   },
+   {
+    "what": "normalize  node:path:365",
+    "ms": 1077,
+    "pct": 0.6
+   },
+   {
+    "what": "update  node:internal/crypto/hash:132",
+    "ms": 941,
+    "pct": 0.5
+   },
+   {
+    "what": "rename  (native):0",
+    "ms": 926,
+    "pct": 0.5
+   },
+   {
+    "what": "parseAttrs  backend/vendor/engine/pmc.js:42",
+    "ms": 898,
+    "pct": 0.5
+   },
+   {
+    "what": "(anonymous)  backend/dist/services/metrics.js:99",
+    "ms": 849,
+    "pct": 0.4
+   },
+   {
+    "what": "parseXml  backend/vendor/engine/pmc.js:55",
+    "ms": 797,
+    "pct": 0.4
+   },
+   {
+    "what": "existsSync  (native):0",
+    "ms": 713,
+    "pct": 0.4
+   },
+   {
+    "what": "(anonymous)  node:path:601",
+    "ms": 641,
+    "pct": 0.3
+   },
+   {
+    "what": "stringify  backend/node_modules/express/lib/response.js:1155",
+    "ms": 641,
+    "pct": 0.3
+   },
+   {
+    "what": "read  (native):0",
+    "ms": 566,
+    "pct": 0.3
+   },
+   {
+    "what": "get  backend/dist/services/fileMemo.js:12",
+    "ms": 537,
+    "pct": 0.3
+   },
+   {
+    "what": "mkdir  (native):0",
+    "ms": 456,
+    "pct": 0.2
+   },
+   {
+    "what": "fingerprintOf  backend/dist/services/release.js:58",
+    "ms": 449,
+    "pct": 0.2
+   },
+   {
+    "what": "close  (native):0",
+    "ms": 392,
+    "pct": 0.2
+   },
+   {
+    "what": "unlink  (native):0",
+    "ms": 381,
+    "pct": 0.2
+   },
+   {
+    "what": "dateFromMs  node:internal/fs/utils:443",
+    "ms": 380,
+    "pct": 0.2
+   }
+  ],
+  "files": [
+   {
+    "what": "(idle)",
+    "ms": 126652,
+    "pct": 66.8
+   },
+   {
+    "what": "(native)",
+    "ms": 28220,
+    "pct": 14.9
+   },
+   {
+    "what": "backend/vendor/engine/pmc.js",
+    "ms": 4998,
+    "pct": 2.6
+   },
+   {
+    "what": "node:path",
+    "ms": 4268,
+    "pct": 2.3
+   },
+   {
+    "what": "node:internal/worker/js_transferable",
+    "ms": 4165,
+    "pct": 2.2
+   },
+   {
+    "what": "backend/dist/services/csdbIndex.js",
+    "ms": 3064,
+    "pct": 1.6
+   },
+   {
+    "what": "backend/dist/services/metrics.js",
+    "ms": 2476,
+    "pct": 1.3
+   },
+   {
+    "what": "(garbage collector)",
+    "ms": 1773,
+    "pct": 0.9
+   },
+   {
+    "what": "node:internal/fs/utils",
+    "ms": 1720,
+    "pct": 0.9
+   },
+   {
+    "what": "node:internal/crypto/hash",
+    "ms": 1139,
+    "pct": 0.6
+   },
+   {
+    "what": "backend/dist/services/pm.js",
+    "ms": 900,
+    "pct": 0.5
+   },
+   {
+    "what": "backend/node_modules/express/lib/response.js",
+    "ms": 708,
+    "pct": 0.4
+   },
+   {
+    "what": "backend/dist/services/fileMemo.js",
+    "ms": 537,
+    "pct": 0.3
+   },
+   {
+    "what": "backend/dist/services/release.js",
+    "ms": 499,
+    "pct": 0.3
+   },
+   {
+    "what": "node:fs",
+    "ms": 486,
+    "pct": 0.3
+   },
+   {
+    "what": "backend/node_modules/@xmldom/xmldom/lib/dom.js",
+    "ms": 428,
+    "pct": 0.2
+   },
+   {
+    "what": "backend/dist/services/projectRecord.js",
+    "ms": 412,
+    "pct": 0.2
+   },
+   {
+    "what": "(program)",
+    "ms": 345,
+    "pct": 0.2
+   },
+   {
+    "what": "node:internal/modules/cjs/loader",
+    "ms": 312,
+    "pct": 0.2
+   },
+   {
+    "what": "backend/vendor/engine/resolveDmRefs.js",
+    "ms": 303,
+    "pct": 0.2
+   }
+  ]
+ }
+}

@@ -108,7 +108,8 @@ const interactionsSince = (page, since) => page.evaluate((t) => {
 }, since);
 function summariseInteractions(r, count) {
   const durs = r.interactions.map((x) => x.dur);
-  return { counted: count, over16ms: durs.length, worst: durs.length ? Math.max(...durs) : '<16', p75: durs.length >= 4 ? stats(durs).p75 : (durs.length ? Math.max(...durs) : '<16'), worstEvent: r.interactions.sort((a, b) => b.dur - a.dur)[0] ?? null, longTasks: r.longTasks, longestTask: r.longestTask };
+  // 0 = every interaction was under the Event Timing threshold (16 ms); numbers so the budgets can compare them
+  return { counted: count, over16ms: durs.length, worst: durs.length ? Math.max(...durs) : 0, p75: durs.length >= 4 ? stats(durs).p75 : (durs.length ? Math.max(...durs) : 0), worstEvent: r.interactions.sort((a, b) => b.dur - a.dur)[0] ?? null, longTasks: r.longTasks, longestTask: r.longestTask };
 }
 
 (async () => {
@@ -164,8 +165,8 @@ function summariseInteractions(r, count) {
     async function typeInto(page, scope) {
       // JSS and JSG edit in contenteditable blocks; the Studio's design page is itself the editable surface: click into a body text there
       const inner = page.locator(`${scope} [contenteditable="true"]:visible`);
-      const ed = (await inner.count()) ? inner.first() : page.locator(scope).getByText(/[A-Za-z]{5,}/).nth(3);
-      await ed.waitFor({ timeout: 30_000 }); await ed.click(); await page.keyboard.press('End');
+      if (await inner.count()) { const ed = inner.first(); await ed.waitFor({ timeout: 30_000 }); await ed.click(); await page.keyboard.press('End'); }
+      else { const ed = page.locator(scope).first(); await ed.waitFor({ timeout: 30_000 }); await ed.click({ position: { x: 160, y: 220 } }); await page.keyboard.press('End'); }
       for (const ch of ' perf probe typing 123456789012') { await page.keyboard.type(ch); await sleep(40); }
     }
     async function panels(page) {
@@ -237,7 +238,7 @@ function markdown(o) {
   for (const c of b.largest.slice(0, 15)) L.push(`| ${c.file} | ${c.src ?? '-'} | ${c.kind} | ${kb(c.raw)} | ${kb(c.gzip)} | ${c.initial ? 'yes' : ''} |`);
   L.push('', '## First load', '', '| Page | run | ready ms | LCP ms | long tasks | long total ms | longest ms | DCL ms | KB transferred |', '|---|---|---|---|---|---|---|---|---|');
   for (const [k, v] of Object.entries(o.firstLoad)) for (const run of ['cold', 'warm']) { const x = v[run]; L.push(`| ${k} | ${run} | ${x.readyMs} | ${x.lcp} | ${x.longTasks} | ${x.longTaskTotal} | ${x.longestTask} | ${x.dcl} | ${x.transferredKB} |`); }
-  L.push('', '## Editor interactions (Event Timing; worst = INP-style longest interaction; "<16" = every interaction under 16 ms)', '', '| Editor | action | wall ms | interactions | >=16 ms | worst ms | p75 ms | long tasks | longest task ms |', '|---|---|---|---|---|---|---|---|---|');
+  L.push('', '## Editor interactions (Event Timing; worst = INP-style longest interaction; 0 = every interaction under 16 ms)', '', '| Editor | action | wall ms | interactions | >=16 ms | worst ms | p75 ms | long tasks | longest task ms |', '|---|---|---|---|---|---|---|---|---|');
   for (const [k, v] of Object.entries(o.editors)) for (const [a, x] of Object.entries(v)) L.push(`| ${k} | ${a} | ${x.wallMs ?? x.error ?? '-'} | ${x.counted ?? '-'} | ${x.over16ms ?? '-'} | ${x.worst ?? '-'} | ${x.p75 ?? '-'} | ${x.longTasks ?? '-'} | ${x.longestTask ?? '-'} |`);
   if (o.memory) { const m = o.memory; L.push('', '## Memory after module switches (Studio)', '', `${m.switches} switches over ${m.modules} modules in ${m.switchWallMs} ms. JS heap ${m.before.jsHeapUsedMB} -> ${m.after.jsHeapUsedMB} MB (${m.growthMB >= 0 ? '+' : ''}${m.growthMB}), DOM nodes ${m.before.nodes} -> ${m.after.nodes}, listeners ${m.before.listeners} -> ${m.after.listeners}.`); }
   return L.join('\n') + '\n';

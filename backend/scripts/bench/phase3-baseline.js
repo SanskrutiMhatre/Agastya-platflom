@@ -253,7 +253,7 @@ const S1K = { pipeline: 's1000dtofo', s1000d: { mic: 'EXAMPLE', issue: '5.0', re
       /** sample the server and JVM memory every second while `fn` runs */
       async function sampled(fn) {
         let peak = { rssMb: 0, jvmWorkingSetMb: 0, workerMb: 0 }; let on = true;
-        const loop = (async () => { while (on) { try { const p = (await admin.get('/api/admin/perf?top=1&fresh=1')).json; if (p) { peak.rssMb = Math.max(peak.rssMb, p.memory.rssMb); peak.jvmWorkingSetMb = Math.max(peak.jvmWorkingSetMb, p.renderer?.jvmWorkingSetMb ?? 0); peak.workerMb = Math.max(peak.workerMb, ...(p.renderer?.workers ?? []).map((x) => x.workingSetMb ?? 0), 0); } } catch { /* next */ } await sleep(1500); } })();
+        const loop = (async () => { while (on) { try { const p = (await admin.get('/api/admin/perf?top=1&fresh=1')).json; if (p) { peak.rssMb = Math.max(peak.rssMb, p.memory.rssMb); peak.jvmWorkingSetMb = Math.max(peak.jvmWorkingSetMb, p.renderer?.jvmWorkingSetMb ?? 0); peak.workerMb = Math.max(peak.workerMb, ...(p.renderer?.workers ?? []).map((x) => x.workingSetMb ?? 0), 0); } } catch { /* next */ } await sleep(3000); } })();   // the process list costs a PowerShell start: not more often
         try { return { value: await fn(), peak }; } finally { on = false; await loop; }
       }
       /** the build's log lines -> stage timings: validate (gate), xslt (front matter, map, FO), fop (PDF), plus the engine's own breakdown */
