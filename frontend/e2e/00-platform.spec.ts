@@ -521,7 +521,8 @@ test('administrator: every V1 section is there; reference data is edited, mainte
     Appearance: ['Visual settings', 'Settings'],
   };
   for (const [tab, names] of Object.entries(sections)) {
-    await open(tab, tab === 'Users and roles' ? 'Roles' : undefined);
+    await open(tab);
+    if (tab === 'Users and roles') await a.getByRole('link', { name: 'Roles and what they can do' }).click();   // the overview is this tab; Roles opens from the Users card
     for (const n of names) await expect(nav.getByRole('link', { name: n, exact: true })).toBeVisible();
     // the owner removed the second SNS screen on 2026-11-26 (one numbering system per project kind): it must not come back
     await expect(nav.getByRole('link', { name: 'SNS defaults', exact: true })).toHaveCount(0);
