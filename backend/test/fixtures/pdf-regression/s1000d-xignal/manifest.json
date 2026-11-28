@@ -91,7 +91,7 @@
   "Courier",
   "Helvetica-Bold"
  ],
- "knownNotEmbedded": [],
+ "knownNotEmbedded": ["Courier", "Helvetica-Bold"],
  "internalLinks": 69,
  "externalLinks": 0,
  "bookmarks": 6

@@ -28,7 +28,7 @@
   "ArialNarrow-Bold",
   "Helvetica-Bold"
  ],
- "knownNotEmbedded": [],
+ "knownNotEmbedded": ["Helvetica-Bold"],
  "internalLinks": 85,
  "externalLinks": 0,
  "bookmarks": 42

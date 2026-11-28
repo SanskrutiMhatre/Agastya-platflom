@@ -36,7 +36,7 @@
   "DejaVuSans",
   "Helvetica-Bold"
  ],
- "knownNotEmbedded": [],
+ "knownNotEmbedded": ["Helvetica-Bold"],
  "internalLinks": 315,
  "externalLinks": 0,
  "bookmarks": 40

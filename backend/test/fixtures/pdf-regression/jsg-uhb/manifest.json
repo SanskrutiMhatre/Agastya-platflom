@@ -34,7 +34,7 @@
   "Times-BoldItalic",
   "Times-Roman"
  ],
- "knownNotEmbedded": [],
+ "knownNotEmbedded": ["Helvetica-Bold", "Times-Bold", "Times-BoldItalic", "Times-Roman"],
  "internalLinks": 0,
  "externalLinks": 0,
  "bookmarks": 0
