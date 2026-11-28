@@ -1,105 +1,87 @@
 /* =========================================================================
-   The Project Home (WP-22), laid out as the owner-approved mockup docs/audit/mockups/project.html (UI redesign screen 2, 2026-11-28).
-   Loaded with this page's chunk only. Colours are tokens only.
-   The shared mockup classes (.card, .badge, .alert, .progress, .table, .avatar, .dot, .faint, .grow) come from the design system; the rules
-   under .v2-home below are page-scoped fallbacks built from the app's existing tokens, so the page looks right before and after they land.
+   The Project Home (WP-22), drawn as the owner-approved mockup docs/audit/mockups/project.html (UI redesign screen 2, second pass
+   2026-11-28: "exactly like the mockup"). The rules below are the mockup page's own <style> block, scoped to .v2-home, plus the few
+   app-only pieces (each readiness cell being its card's link, the attention line of the gate alert, the "Working now" foot of the Team card).
+   The shared classes (.card, .card-head, .badge, .alert, .progress, .table, .avatar, .dot, .btn ...) come from styles/components.css,
+   which is the mockup's components.css. Loaded with this page's chunk only. Colours are tokens only.
    ========================================================================= */
 
-/* ------------------------------------------------ page-scoped fallbacks for the shared mockup classes */
-.v2-home .card { background: var(--surface-panel); border: 1px solid var(--border-default); border-radius: var(--radius-lg); }
-.v2-home .card.link { color: var(--text-primary); text-decoration: none; }
-.v2-home .card.link:hover { border-color: var(--border-control); box-shadow: var(--shadow-1); text-decoration: none; }
-.v2-home .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border-default); }
-.v2-home .card-head h3, .v2-home .v2-card-head h2 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: var(--fs-md); font-weight: 600; }
-.v2-home .card-body { padding: 16px; }
-.v2-home .faint { color: var(--text-tertiary); font-size: var(--fs-xs); }
-.v2-home .grow { flex: 1; min-width: 0; }
-.v2-home .badge { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px; border-radius: var(--radius-pill); font-size: var(--fs-2xs); font-weight: 600;
-  background: var(--surface-inset); color: var(--text-secondary); border: 1px solid var(--border-default); white-space: nowrap; text-decoration: none; }
-.v2-home .badge.success { background: var(--success-subtle); color: var(--success); border-color: transparent; }
-.v2-home .badge.warning { background: var(--warning-subtle); color: var(--warning); border-color: transparent; }
-.v2-home .badge.danger { background: var(--danger-subtle); color: var(--danger); border-color: transparent; }
-.v2-home .badge.info { background: var(--surface-selected); color: var(--info); border-color: transparent; }
-.v2-home .badge.accent { background: var(--surface-selected); color: var(--accent-text); border-color: transparent; }
-.v2-home .alert { display: flex; gap: 12px; align-items: flex-start; padding: 12px 16px; border: 1px solid var(--border-default); border-radius: var(--radius-lg); background: var(--surface-inset); }
-.v2-home .alert.success { background: var(--success-subtle); } .v2-home .alert.success > .ico { color: var(--success); }
-.v2-home .alert.warning { background: var(--warning-subtle); } .v2-home .alert.warning > .ico { color: var(--warning); }
-.v2-home .alert.danger { background: var(--danger-subtle); } .v2-home .alert.danger > .ico { color: var(--danger); }
-.v2-home .alert.info > .ico { color: var(--info); }
-.v2-home .alert > .ico { display: inline-flex; margin-top: 2px; }
-.v2-home .progress { height: 6px; border-radius: 3px; background: var(--surface-inset); border: 1px solid var(--border-default); overflow: hidden; display: flex; }
-.v2-home .progress > i { display: block; height: 100%; background: var(--accent); }
-.v2-home .progress > i.success { background: var(--success); } .v2-home .progress > i.warning { background: var(--warning); }
-.v2-home .avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--surface-selected); color: var(--accent-text); display: inline-grid; place-items: center; font-size: var(--fs-2xs); font-weight: 600; flex: none; }
-.v2-home .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--surface-pressed); flex: none; display: inline-block; }
-.v2-home .dot.success { background: var(--success); } .v2-home .dot.info { background: var(--info); } .v2-home .dot.accent { background: var(--accent); }
-.v2-home .table-wrap { overflow: auto; }
-.v2-home .table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
-.v2-home .table th { text-align: left; padding: 0 12px; height: 32px; background: var(--surface-inset); color: var(--text-secondary); font-size: var(--fs-xs); font-weight: 600; border-bottom: 1px solid var(--border-default); white-space: nowrap; }
-.v2-home .table td { padding: 0 12px; height: 36px; border-bottom: 1px solid var(--border-default); vertical-align: middle; }
-.v2-home .table tbody tr:last-child td { border-bottom: 0; }
-.v2-home .table tbody tr:hover td { background: var(--surface-hover); }
-.v2-home .table .num { text-align: right; font-variant-numeric: tabular-nums; }
+/* the page: the mockup's .page (max-width var(--content-max), padding 24 32 40, centred) inside the app's scrolling .v2-page */
+.v2-page.v2-home { padding: var(--space-6) max(var(--space-8), calc((100% - var(--content-max)) / 2 + var(--space-8))) var(--space-10); color: var(--text-primary); font-size: var(--fs-sm); line-height: var(--lh-ui); }
+@media (max-width: 1180px) { .v2-page.v2-home { padding: var(--space-5) var(--space-5) var(--space-8); } }
+.v2-home a:not(.btn):not(.card):not(.badge):not(.cell) { color: var(--text-link); text-decoration: none; }
+.v2-home a:not(.btn):not(.card):not(.badge):not(.cell):hover { text-decoration: underline; }
+.v2-home a.badge { text-decoration: none; }
+.v2-home .pad { margin: 0; padding: var(--space-3) var(--space-4); }
+/* the mockup's card heads: the title icon in the title's colour, the head's link in the body size (components.css makes them tertiary and 12px) */
+.v2-home .card-head > a:not(.btn) { font-size: inherit; font-weight: inherit; }
 
-/* ------------------------------------------------ the page (mockup: proj-head, ready, tiles, cols, stackbar, legend, team, tl) */
-.v2-home { display: flex; flex-direction: column; gap: 16px; }
-.home-head { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
-.home-head h1 { margin: 0; font-size: var(--fs-xl); font-weight: 600; }
-.home-head .meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 8px; color: var(--text-secondary); font-size: var(--fs-sm); }
-.home-row { display: flex; gap: 8px; align-items: center; }
-.home-pad { margin: 0; padding: 12px 16px; }
-.home-trunc { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* ------------------------------------------------ header (mockup .proj-head) */
+.v2-home .proj-head { display: flex; gap: var(--space-4); align-items: flex-start; justify-content: space-between; flex-wrap: wrap; margin-bottom: var(--space-4); }
+.v2-home .proj-head .meta { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; margin-top: var(--space-2); color: var(--text-secondary); }
+.v2-home .row { display: flex; align-items: center; gap: var(--space-2); }
 
-.home-ready { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.home-ready-cell { display: flex; flex-direction: column; min-width: 0; padding: 16px; }
-.home-ready-cell + .home-ready-cell { border-left: 1px solid var(--border-default); }
-.home-ready-cell .lab { display: flex; gap: 8px; align-items: center; margin: 0; color: var(--text-secondary); font-size: var(--fs-xs); font-weight: 500; }
-.home-ready-cell .big { font-size: var(--fs-xl); font-weight: 600; line-height: 1.2; font-variant-numeric: tabular-nums; margin: 4px 0 8px; min-width: 0; display: flex; }
-.home-ready-sub { flex: 1; min-width: 0; font-size: var(--fs-sm); }
-.home-ready-act { display: flex; gap: 6px; flex-wrap: wrap; padding-top: 10px; }
-.home-of { font-size: var(--fs-md); font-weight: 400; color: var(--text-secondary); }
-.home-of-big { font-size: var(--fs-lg); }
-.home-bad { color: var(--danger); } .home-good { color: var(--success); font-size: var(--fs-lg); }
+/* ------------------------------------------------ the gate alert (the mockup's .alert; the attention line is the app's) */
+.v2-home .alert .attn > span > span[aria-hidden] { margin: 0 var(--space-1h); color: var(--text-secondary); }
 
-.home-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.home-tile { display: grid; grid-template-columns: 36px 1fr; gap: 12px; padding: 16px; align-content: start; }
-.home-tile h3 { margin: 0; font-size: var(--fs-md); font-weight: 600; }
-.home-tile p { margin: 2px 0 0; }
-.home-tile-ic { width: 36px; height: 36px; border-radius: var(--radius-lg); background: var(--surface-selected); color: var(--accent-text); display: grid; place-items: center; }
-.home-tile-stat { grid-column: 2; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding-top: 8px; border-top: 1px dashed var(--border-default); font-size: var(--fs-xs); color: var(--text-secondary); }
+/* ------------------------------------------------ readiness strip (mockup .ready) */
+.v2-home .ready { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: var(--space-4); overflow: hidden; }
+.v2-home .ready > section { min-width: 0; }
+/* the cell is its card's action (WP-22): a link the size of the cell, the mockup's look, a hover fill */
+.v2-home .ready .cell { display: block; height: 100%; padding: var(--space-4); color: inherit; text-decoration: none; }
+.v2-home .ready .cell:hover { background: var(--surface-hover); text-decoration: none; }
+.v2-home .ready > section + section { border-left: 1px solid var(--border-subtle); }
+.v2-home .ready .big { font-size: var(--fs-2xl); font-weight: var(--fw-semibold); line-height: 1.1; font-variant-numeric: tabular-nums; margin: var(--space-1) 0 var(--space-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2-home .ready .big .of { font-size: var(--fs-md); font-weight: var(--fw-regular); }
+.v2-home .ready .big .bad { color: var(--danger); } .v2-home .ready .big .good { color: var(--success); }
+.v2-home .ready .lab { display: flex; gap: var(--space-2); align-items: center; color: var(--text-secondary); font-size: var(--fs-xs); font-weight: var(--fw-medium); }
+.v2-home .ready .lab h2 { font: inherit; color: inherit; margin: 0; }
+.v2-home .ready .faint { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.home-cols { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
-.home-stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+/* ------------------------------------------------ areas of work (mockup .tiles / .tile) */
+.v2-home .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); margin: var(--space-4) 0; }
+.v2-home .tile { display: grid; grid-template-columns: 36px 1fr; gap: var(--space-3); padding: var(--space-4); color: var(--text-primary); text-decoration: none; align-content: start; min-width: 0; }
+.v2-home .tile:hover { text-decoration: none; }
+.v2-home .tile p { font-size: var(--fs-xs); margin-top: 2px; }
+.v2-home .tile-ic { width: 36px; height: 36px; border-radius: var(--radius-lg); background: var(--surface-selected); color: var(--text-link); display: grid; place-items: center; }
+.v2-home .tile-stat { grid-column: 2; display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; padding-top: var(--space-2); border-top: 1px dashed var(--border-default); font-size: var(--fs-xs); color: var(--text-secondary); }
 
-.home-stackbar { height: 12px; border-radius: 6px; overflow: hidden; display: flex; gap: 2px; background: var(--surface-inset); }
-.home-stackbar i, .home-legend .sw { display: block; height: 100%; }
-.home-stackbar .clean, .home-legend .sw.clean { background: var(--success); }
-.home-stackbar .warn, .home-legend .sw.warn { background: var(--warning); }
-.home-stackbar .error, .home-legend .sw.error { background: var(--danger); }
-.home-stackbar .empty, .home-legend .sw.empty { background: var(--surface-pressed); }
-.home-legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 12px; font-size: var(--fs-xs); color: var(--text-secondary); }
-.home-legend span { display: inline-flex; align-items: center; gap: 6px; }
-.home-legend .sw { width: 10px; height: 10px; border-radius: 3px; }
+/* ------------------------------------------------ the two columns (mockup .cols, .stack) */
+.v2-home .cols { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: var(--space-4); align-items: start; }
+.v2-home .stack { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
 
-.home-list { list-style: none; margin: 0; padding: 4px 0; }
-.home-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 16px; min-width: 0; }
-.home-list li + li, .home-team li + li { border-top: 1px solid var(--border-default); }
-.home-team { list-style: none; margin: 0; padding: 0; }
-.home-team li { display: flex; align-items: center; gap: 12px; padding: 8px 16px; }
-.home-name { font-weight: 500; }
-.home-tl { list-style: none; margin: 0; padding: 4px 0; }
-.home-tl li { display: grid; grid-template-columns: 16px 1fr; gap: 12px; padding: 8px 16px; position: relative; }
-.home-tl li::before { content: ""; position: absolute; left: 19px; top: 22px; bottom: -8px; width: 1px; background: var(--border-default); }
-.home-tl li:last-child::before { display: none; }
-.home-tl .dot { margin-top: 5px; }
+/* status by chapter (mockup .stackbar, .legend) */
+.v2-home .stackbar { height: 12px; border-radius: 6px; overflow: hidden; display: flex; gap: 2px; background: var(--surface-inset); }
+.v2-home .stackbar i { display: block; height: 100%; }
+.v2-home .stackbar .approved { background: var(--success-solid); } .v2-home .stackbar .review { background: var(--info-solid); } .v2-home .stackbar .draft { background: var(--warning-solid); }
+.v2-home .stackbar .error { background: var(--danger-solid); } .v2-home .stackbar .empty { background: var(--border-control); opacity: .5; }
+.v2-home .legend { display: flex; gap: var(--space-4); flex-wrap: wrap; margin-top: var(--space-3); font-size: var(--fs-xs); color: var(--text-secondary); }
+.v2-home .legend span { display: inline-flex; align-items: center; gap: var(--space-1h); }
+.v2-home .legend .sw { width: 10px; height: 10px; border-radius: 3px; }
+.v2-home .sw.approved { background: var(--success-solid); } .v2-home .sw.review { background: var(--info-solid); } .v2-home .sw.draft { background: var(--warning-solid); } .v2-home .sw.error { background: var(--danger-solid); }
 
-@media (max-width: 1280px) { .home-cols { grid-template-columns: minmax(0, 1fr); } .home-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* timeline and team (mockup .tl, .team) */
+.v2-home .team, .v2-home .tl, .v2-home .now-list { list-style: none; margin: 0; padding: 0; }
+.v2-home .team li { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-4); }
+.v2-home .team li + li { border-top: 1px solid var(--border-subtle); }
+.v2-home .team .name { font-weight: var(--fw-medium); }
+.v2-home .tl li { display: grid; grid-template-columns: 16px 1fr; gap: var(--space-3); padding: var(--space-2) var(--space-4); position: relative; }
+.v2-home .tl li::before { content: ""; position: absolute; left: calc(var(--space-4) + 3px); top: 22px; bottom: -8px; width: 1px; background: var(--border-default); }
+.v2-home .tl li:last-child::before { display: none; }
+.v2-home .tl .dot { margin-top: 5px; }
+
+/* "Working now" (WP-28): the foot of the Team card, one quiet line when nobody else is here */
+.v2-home .now { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-2); padding: var(--space-2) var(--space-4); border-top: 1px solid var(--border-subtle); font-size: var(--fs-xs); }
+.v2-home .now-h { font-size: inherit; font-weight: var(--fw-medium); color: var(--text-secondary); margin: 0; }
+.v2-home .now-list { flex-basis: 100%; display: flex; flex-direction: column; gap: var(--space-1h); font-size: inherit; }   /* also .v2-team-list (platform.css), whose 13px is not the foot's size */
+.v2-home .now-list li { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.v2-home .avatar.sm { width: 22px; height: 22px; font-size: 10px; }
+.v2-home .avatar.here { box-shadow: 0 0 0 2px var(--success-solid); }
+
+@media (max-width: 1280px) { .v2-home .cols { grid-template-columns: minmax(0, 1fr); } .v2-home .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 760px) {
-  .home-tiles { grid-template-columns: minmax(0, 1fr); }
-  .home-ready { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .home-ready-cell:nth-child(3) { border-left: 0; }
-  .home-ready-cell:nth-child(n + 3) { border-top: 1px solid var(--border-default); }
+  .v2-home .tiles { grid-template-columns: minmax(0, 1fr); }
+  .v2-home .ready { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .v2-home .ready > section:nth-child(3) { border-left: 0; }
+  .v2-home .ready > section:nth-child(n + 3) { border-top: 1px solid var(--border-subtle); }
 }
-
-/* ------------------------------------------------ WP-35 second pass: moved from platform.css unchanged (WorkingNow's card title) */
-.v2-card-title { font-size: 13px; font-weight: 650; margin: 0; }

@@ -85,7 +85,10 @@ export interface Summary {
   publication: { totals: Explore['totals']; chapters: number; title: string } | null;
   validation: { ranAt: string; error: number; warn: number; info: number } | null;
   release: { released: boolean; stale: boolean; number: number | null; pending: boolean; scheduledAt: string | null } | null;
-  build: { builtAt: string; size: number } | null;
+  /** `pages`: the page count of the last PDF (null when it cannot be read) */
+  build: { builtAt: string; size: number; pages?: number | null } | null;
+  /** S1000D projects: the issue (4.2, 5.0 ...) and the model identification code, for the Project Home header; null for JSS, JSG and the shared repository */
+  s1000d?: { issue: string; mic: string | null } | null;
   members: number;
   /** WP-22: the review loop (state, round, open comments) and how many findings of the last check the team marked reviewed; null when unknown */
   review?: { state: ReviewState; round: number; open: number } | null;
