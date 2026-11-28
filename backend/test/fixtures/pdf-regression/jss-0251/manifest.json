@@ -1,13 +1,13 @@
 {
  "book": "jss-0251",
- "takenAt": "2026-11-27",
+ "takenAt": "2026-11-28",
  "arial": true,
  "scale": 0.5,
- "pageCount": 142,
+ "pageCount": 140,
  "pages": [
   1,
-  15,
-  87
+  13,
+  93
  ],
  "masks": {
   "1": [
@@ -18,13 +18,31 @@
     391
    ]
   ],
-  "15": [],
-  "87": [
+  "13": [],
+  "93": [
    [
-    109,
-    159,
-    141,
-    173
+    71,
+    24,
+    279,
+    38
+   ],
+   [
+    71,
+    368,
+    197,
+    382
+   ],
+   [
+    71,
+    375,
+    223,
+    389
+   ],
+   [
+    71,
+    384,
+    253,
+    398
    ]
   ]
  },
@@ -36,7 +54,9 @@
   "DejaVuSans",
   "Helvetica-Bold"
  ],
- "knownNotEmbedded": ["Helvetica-Bold"],
+ "knownNotEmbedded": [
+  "Helvetica-Bold"
+ ],
  "internalLinks": 315,
  "externalLinks": 0,
  "bookmarks": 40

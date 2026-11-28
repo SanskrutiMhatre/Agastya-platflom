@@ -29,6 +29,7 @@ const ALLOWED = {
   "workspace.ts POST '/api/projects'": 'services/projects.ts createProject audits project.created',
   "workspace.ts POST '/api/projects/sample'": 'creates through services/projects.ts createProject (project.created)',
   "workspace.ts POST '/api/projects/sample-jsg'": 'creates through services/projects.ts createProject (project.created)',
+  "workspace.ts POST '/api/projects/sample-jss'": 'creates through services/projects.ts createProject (project.created)',
   "workspace.ts PATCH '/api/projects/:id'": 'services/projects.ts updateProject audits project.updated',
   "workspace.ts DELETE '/api/projects/:id'": 'services/projects.ts deleteProject audits project.deleted',
   "workspace.ts POST '/api/projects/:id/copy'": 'services/projects.ts createProject audits project.created with meta.from',

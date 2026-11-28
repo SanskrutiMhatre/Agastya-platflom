@@ -306,6 +306,7 @@
   "POST /api/projects/import/detect": "requireAuth :: 401 403 403 ok ok ok 403 | ok ok ok ok ok",
   "POST /api/projects/sample": "requireAuth :: 401 403 403 ok ok ok 403 | ok ok ok ok ok",
   "POST /api/projects/sample-jsg": "requireAuth :: 401 403 403 ok ok ok 403 | ok ok ok ok ok",
+  "POST /api/projects/sample-jss": "requireAuth :: 401 403 403 ok ok ok 403 | ok ok ok ok ok",
   "POST /api/s1000d/validate-config": "requireAuth :: 401 403 403 ok ok ok 403 | ok ok ok ok ok",
   "POST /api/sns/defaults": "requireAdmin :: 401 403 403 403 403 ok 403 | 403 403 403 403 403",
   "POST /api/sns/defaults/merge-legacy": "requireAdmin :: 401 403 403 403 403 ok 403 | 403 403 403 403 403",

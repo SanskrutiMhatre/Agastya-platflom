@@ -47,7 +47,7 @@ test.before(async () => {
 });
 test.after(async () => { await h.close(); });
 
-test('a JSS-authored UHB: page 1 is one page, with the date and authority block in its foot just above the banner (as the L&T reference sets it), and page 2 is its blank back with nothing on it', { timeout: 300000 }, async () => {
+test('a JSS-authored UHB: page 1 is one page, with the date and authority block in its foot just above the banner (as the L&T reference sets it), and page 2 is its back with only the legend', { timeout: 300000 }, async () => {
   const r = await w.post('/api/projects', { name: 'Cover foot', format: 'jss', domain: 'land', manualType: 'uhb' }); assert.equal(r.status, 201);
   const id = r.json.project.id;
   const b = await w.post(`/api/projects/${id}/publish`, {}); assert.equal(b.status, 200, JSON.stringify(b.json).slice(0, 300));
@@ -64,5 +64,5 @@ test('a JSS-authored UHB: page 1 is one page, with the date and authority block 
   assert.equal(authority + 2, lines.length - 1, 'and the block is the line pair just above it');
   // what the body ends with is the publisher, not the block: the block comes after the publisher and the gap between them is the cover's free space
   assert.ok(lines.findIndex((l) => /Prepared & Published by/.test(l)) < authority);
-  assert.equal((await pageText(pdf, 2)).trim(), '', 'the cover is one page: page 2 is its blank back, with nothing on it (the reference)');
+  assert.equal((await pageText(pdf, 2)).trim(), 'This page is intentionally left blank.', 'the cover is one page: page 2 is its back, with only the legend');
 });

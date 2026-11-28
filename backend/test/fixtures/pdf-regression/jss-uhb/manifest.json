@@ -1,13 +1,13 @@
 {
  "book": "jss-uhb",
- "takenAt": "2026-11-27",
+ "takenAt": "2026-11-28",
  "arial": true,
  "scale": 0.5,
- "pageCount": 60,
+ "pageCount": 58,
  "pages": [
   1,
-  15,
-  23
+  13,
+  21
  ],
  "masks": {
   "1": [
@@ -18,8 +18,8 @@
     391
    ]
   ],
-  "15": [],
-  "23": []
+  "13": [],
+  "21": []
  },
  "fonts": [
   "Arial-BoldItalicMT",
@@ -28,7 +28,9 @@
   "ArialNarrow-Bold",
   "Helvetica-Bold"
  ],
- "knownNotEmbedded": ["Helvetica-Bold"],
+ "knownNotEmbedded": [
+  "Helvetica-Bold"
+ ],
  "internalLinks": 85,
  "externalLinks": 0,
  "bookmarks": 42

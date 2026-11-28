@@ -482,8 +482,7 @@
             </xsl:for-each>
         </xsl:variable>
 
-        <xsl:call-template name="cover-page-sequence-lref"><xsl:with-param name="content" select="$content"/></xsl:call-template>
-        <xsl:if test="$blank.versos = '1'"><xsl:call-template name="cover-blank-lref"/></xsl:if>
+        <!-- ONE title page and its back (owner, 2026-11-27: the same page printed a second time was a doubled title page) -->
         <xsl:call-template name="cover-page-sequence-lref"><xsl:with-param name="content" select="$content"/></xsl:call-template>
         <xsl:if test="$blank.versos = '1'"><xsl:call-template name="cover-blank-lref"><xsl:with-param name="legend">1</xsl:with-param></xsl:call-template></xsl:if>
     </xsl:template>

@@ -78,7 +78,7 @@ test('settings: a repeat password that differs is marked on the repeat field, wh
   } finally { await page.context().close(); }
 });
 
-test('projects: one Samples button holds the three samples; a row has a context menu with its own actions', async ({ browser, baseURL }) => {
+test('projects: one Samples button holds the five samples; a row has a context menu with its own actions', async ({ browser, baseURL }) => {
   const page = await fresh(browser, baseURL);
   try {
     await page.goto('/projects');
@@ -86,11 +86,11 @@ test('projects: one Samples button holds the three samples; a row has a context 
     await expect(nav.getByText('Library', { exact: true })).toBeVisible();
     await expect(nav.getByText('Manage', { exact: true })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'Projects', exact: true })).toHaveClass(/active/);
-    for (const id of ['create-sample', 'create-jsg-sample', 'create-jsg-ispl-sample']) await expect(page.getByTestId(id)).toHaveCount(0);
+    for (const id of ['create-sample', 'create-jss-land-sample', 'create-jss-naval-sample', 'create-jsg-sample', 'create-jsg-ispl-sample']) await expect(page.getByTestId(id)).toHaveCount(0);
     const samples = page.getByTestId('samples-menu');
     await samples.click();
     await expect(samples).toHaveAttribute('aria-expanded', 'true');
-    for (const id of ['create-sample', 'create-jsg-sample', 'create-jsg-ispl-sample']) await expect(page.getByTestId(id)).toBeVisible();
+    for (const id of ['create-sample', 'create-jss-land-sample', 'create-jss-naval-sample', 'create-jsg-sample', 'create-jsg-ispl-sample']) await expect(page.getByTestId(id)).toBeVisible();
     await page.getByTestId('create-sample').focus(); await page.keyboard.press('Escape');
     await expect(page.getByTestId('create-sample')).toHaveCount(0);
     await expect(samples).toBeFocused();

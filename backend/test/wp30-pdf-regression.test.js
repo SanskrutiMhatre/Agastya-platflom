@@ -8,7 +8,7 @@
 //   jss-uhb         a new JSS User Handbook (land), the starting document of that type
 //   jss-0251        the JSS-0251 RWI package imported into a JSS project (customer material: SAMPLE PROJECTS/JSS-0251/RWI.zip or RWI_ZIP; skipped
 //                   with the reason when it is not there)
-//   jsg-uhb         the bundled JSG sample (the filled Modular Bridge User Handbook)
+//   jsg-uhb         the bundled JSG sample (the dummy-data User Handbook, since d87dc48)
 //
 // Per book: the page count, the set of fonts and the number of internal links and bookmarks equal the baseline; every font except the 14 standard
 // PDF fonts is embedded, and the standard fonts left unembedded are a recorded known defect (QA-006a) that may only shrink; no link or bookmark

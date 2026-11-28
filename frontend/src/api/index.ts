@@ -125,6 +125,7 @@ export const workspaceApi = {
   detectPackage: (file: File) => { const fd = new FormData(); fd.append('file', file); return request<PackageDetection>('POST', '/api/projects/import/detect', fd); },
   createProject: (b: { name: string; folder?: string; type?: string; pipeline?: string; templateRef?: string; profile?: string; format?: string; domain?: string; manualType?: string; s1000d?: import('./s1000d').NewProjectConfig }) => post<{ project: ProjectCard }>('/api/projects', b).then((r) => r.project),
   createSample: (folder?: string) => post<{ project: ProjectCard }>('/api/projects/sample', { folder }).then((r) => r.project),
+  createJssSample: (folder?: string, domain: 'land' | 'naval' = 'land') => post<{ project: ProjectCard }>('/api/projects/sample-jss', { folder, domain }).then((r) => r.project),
   createJsgSample: (folder?: string, kind: 'uhb' | 'ispl' = 'uhb') => post<{ project: ProjectCard }>('/api/projects/sample-jsg', { folder, kind }).then((r) => r.project),
   copyProject: (id: string, b: { name?: string; folder?: string }) => post<{ project: ProjectCard }>(`/api/projects/${id}/copy`, b).then((r) => r.project),
   updateProject: (id: string, b: { name?: string; folder?: string; pipeline?: string; templateRef?: string; autoAddToPublication?: boolean; sideText?: { enabled?: boolean; publisher?: string; draftNote?: boolean }; headerLogo?: boolean }) => patch<{ project: ProjectCard }>(`/api/projects/${id}`, b).then((r) => r.project),

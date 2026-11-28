@@ -25,6 +25,7 @@
   "POST /api/projects": "Any signed-in person may create a project and becomes its owner.",
   "POST /api/projects/sample": "Creates a sample project owned by the caller.",
   "POST /api/projects/sample-jsg": "Creates a sample JSG project owned by the caller.",
+  "POST /api/projects/sample-jss": "Creates a sample JSS project (Land or Naval User Handbook) owned by the caller.",
   "POST /api/notifications/read": "Marks the caller's own notifications read.",
   "POST /api/cir": "The Common Information Repository is shared: every signed-in person may add modules (by design, see authz.js evaluate).",
   "DELETE /api/cir/:id": "The service refuses Authors (403 CIR_DELETE_ROLE); Project Managers and administrators may delete.",

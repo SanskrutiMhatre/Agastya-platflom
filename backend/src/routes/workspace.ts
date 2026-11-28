@@ -17,6 +17,7 @@ import { pageRequest, searchText, windowOf } from '../services/paging';
 import * as P from '../services/projects';
 import { createSampleProject } from '../services/sample';
 import { createJsgSampleProject } from '../services/jsg/sample';
+import { createJssSampleProject } from '../services/jss/sample';
 import { PROFILES } from '../services/profiles';
 import { csdbDir, listDms } from '../services/csdb';
 import { explore } from '../services/pm';
@@ -106,6 +107,11 @@ export function registerWorkspaceRoutes(app: Express): void {
   // A ready-made project (three real data modules, a figure, a three-chapter publication) for trying the platform.
   app.post('/api/projects/sample', requireAuth(), wrap(async (req, res) => {
     res.status(201).json({ project: await createSampleProject(req.auth.user, req.body?.folder) });
+  }));
+
+  // A ready-made JSS User Handbook with example content (domain "land" or "naval"), to try the JSS editor and its PDF.
+  app.post('/api/projects/sample-jss', requireAuth(), wrap(async (req, res) => {
+    res.status(201).json({ project: await createJssSampleProject(req.auth.user, req.body?.folder, req.body?.domain === 'naval' ? 'naval' : 'land') });
   }));
 
   // A ready-made JSG document (kind "uhb": the filled Modular Bridge handbook; "ispl": the filled foot-bridge spare parts list), imported from Word, to try the editor, the ancillary pages and the PDF on a real document.

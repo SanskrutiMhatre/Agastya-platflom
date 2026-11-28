@@ -1,6 +1,6 @@
 {
  "book": "s1000d-xignal",
- "takenAt": "2026-11-27",
+ "takenAt": "2026-11-28",
  "arial": true,
  "scale": 0.5,
  "pageCount": 20,
@@ -91,7 +91,10 @@
   "Courier",
   "Helvetica-Bold"
  ],
- "knownNotEmbedded": ["Courier", "Helvetica-Bold"],
+ "knownNotEmbedded": [
+  "Courier",
+  "Helvetica-Bold"
+ ],
  "internalLinks": 69,
  "externalLinks": 0,
  "bookmarks": 6

@@ -1,6 +1,6 @@
 {
  "book": "s1000d-plain",
- "takenAt": "2026-11-27",
+ "takenAt": "2026-11-28",
  "arial": true,
  "scale": 0.5,
  "pageCount": 20,
@@ -91,7 +91,13 @@
   "Helvetica-Bold",
   "Helvetica-Oblique"
  ],
- "knownNotEmbedded": ["Courier", "Courier-Bold", "Helvetica", "Helvetica-Bold", "Helvetica-Oblique"],
+ "knownNotEmbedded": [
+  "Courier",
+  "Courier-Bold",
+  "Helvetica",
+  "Helvetica-Bold",
+  "Helvetica-Oblique"
+ ],
  "internalLinks": 52,
  "externalLinks": 0,
  "bookmarks": 6

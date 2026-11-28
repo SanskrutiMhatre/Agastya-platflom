@@ -120,13 +120,8 @@
                     retrieve-position="first-including-carryover" retrieve-boundary="page-sequence"/>
               </fo:block>
             </fo:table-cell>
-            <fo:table-cell display-align="before">
-              <xsl:attribute name="text-align">
-                <xsl:choose><xsl:when test="$verso = '1'">start</xsl:when><xsl:otherwise>end</xsl:otherwise></xsl:choose>
-              </xsl:attribute>
-              <xsl:if test="$verso = '1'">
-                <xsl:attribute name="padding-left"><xsl:value-of select="$header.logo.even.offset"/></xsl:attribute>
-              </xsl:if>
+            <!-- the outer cell ends flush with the rule on both sides: the publication code on a recto, the logo on a verso -->
+            <fo:table-cell display-align="before" text-align="end">
               <fo:block>
                 <xsl:choose>
                   <xsl:when test="$verso = '1'"><xsl:call-template name="xs-logo"/></xsl:when>
