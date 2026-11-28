@@ -75,6 +75,33 @@ export async function saveRevisioned(projectId: string, relOrAbs: string, text: 
   return { created: true };
 }
 
+/**
+ * Phase 8 (docs/phase3/cleanup-backend.md, item 1): save several NEW source documents with one grouped atomic write (ContentStore.writeTexts:
+ * every file flushed, then all renamed, each folder flushed once), then their revisions, as `saveRevisioned` does for one new file.
+ * `precommit` runs synchronously after the flushes and before the first rename (no other request can run between it and the renames): the
+ * caller re-checks there what it checked before the write, because the flushes yield to the event loop. A file that exists already is
+ * refused there too. When a revision cannot be recorded, every file of the batch is removed again and REVISION_FAILED is thrown (the
+ * single-file path removes its one file the same way).
+ */
+export async function saveNewRevisionedBatch(projectId: string, files: Array<{ relOrAbs: string; text: string }>, actor: RevisionActor, reason: string, precommit?: () => void): Promise<void> {
+  const list = files.map((f) => ({ rel: posix(projectId, f.relOrAbs), text: f.text }));
+  for (const d of new Set(list.map((f) => path.posix.dirname(f.rel) || '.'))) content.mkdir(projectId, d);
+  await content.writeTexts(projectId, list, () => {
+    for (const f of list) if (content.exists(projectId, f.rel)) throw new HttpError(409, `${f.rel} was created by someone else meanwhile; nothing of this batch was written.`, 'ALREADY_EXISTS');
+    precommit?.();
+  });
+  try {
+    for (const f of list) {
+      const doc = await documentOf(projectId, f.rel);
+      if (doc) record(projectId, f.rel, doc.id, null, f.text, actor, reason === 'save' ? 'create' : reason);
+    }
+  } catch (e) {
+    for (const f of list) try { content.remove(projectId, f.rel); } catch { /* gone */ }
+    try { await docIndex.syncProject(projectId, projectDirFor(projectId), nowIso()); } catch { /* the files are gone; the index heals at the next sync */ }
+    throw revisionFailed(e);
+  }
+}
+
 /** Before a file is deleted: record its last content in the history, or throw REVISION_FAILED so the caller does not delete it. */
 export async function recordBeforeDelete(projectId: string, relOrAbs: string, actor: RevisionActor): Promise<void> {
   const rel = posix(projectId, relOrAbs);

@@ -121,10 +121,86 @@ export function placeNewDm(projectId: string, file: string): boolean {
     const d = dmSummaryOf(projectId, file);                         // WP-17 (PERF-005): this module, not a listing of all of them
     if (!d || NOT_PRINTED.has(d.dmCodeAttrs.infoCode)) return false;
     if (!unplaced(kept.entries, [d]).length) return false;
-    const model = { ...kept, entries: [...kept.entries, { type: 'dm' as const, title: d.techName || d.dmc, dmCode: d.dmCodeAttrs, techName: d.techName, infoName: d.infoName }] };
+    const entry: PmEntry = { type: 'dm', title: d.techName || d.dmc, dmCode: d.dmCodeAttrs, techName: d.techName, infoName: d.infoName };
+    if (appendPmEntry(projectId, kept, entry)) { placeStats.appended++; return true; }   // phase 8: the one entry appended (same bytes as below)
+    const model = { ...kept, entries: [...kept.entries, entry] };
     writePm(projectId, model, true);
+    placeStats.rewritten++;
     return true;
   } catch { return false; }
+}
+
+/*
+  Phase 8 (docs/phase3/cleanup-backend.md, item 3): a module created at 1,000 modules rewrote the whole publication (serialise 1,000 entries,
+  parse them all back to check, about 70 ms of synchronous work per create). `appendPmEntry` writes the SAME bytes as
+  `writePm({ ...kept, entries: [...kept.entries, entry] }, true)` without touching the other entries:
+
+    * the file on disk must be one `writePm` (or this function) wrote, unchanged since (`canonical`: its text, and the frozen model whose
+      serialisation is exactly that text's <content> - checked once, when writePm wrote it, by serialising the read-back again);
+    * the serialiser writes the top-level entries one after another and the <content> close last, so the full rewrite's text is the old text
+      with the new entry's lines inserted before `  </content>` - the lines come from the vendored serialiser itself (a publication of this
+      one entry, under the same header), so they are the lines the full rewrite would write;
+    * the header the full rewrite would write (the importer's mark carried over, completePmStatus against the file on disk) is computed from
+      the serialised header and must equal the file's header; the new entry being a dmRef, the XInclude namespace does not change;
+    * read-back check, as in writePm: the new entry's text parses back to exactly one entry, which serialises to the same lines again, and the
+      count of the whole publication is the old count plus one.
+  Anything unexpected (a file edited by hand, another layout, a header the full path would change, the importer's mark inside the content)
+  answers false and the caller does the full rewrite. `test/phase8-cleanup.test.js` compares both paths byte for byte on several real PMs.
+*/
+/** How placeNewDm wrote the publication (tests and diagnostics). */
+export const placeStats = { appended: 0, rewritten: 0 };
+interface Canonical { size: number; mtimeMs: number; ctimeMs: number; ino: number; text: string; model: { meta?: unknown; entries: PmEntry[]; warnings?: string[] } }
+const canonical = new Map<string, Canonical>();
+const CONTENT_OPEN = '\n  <content>\n';
+const CONTENT_TAIL = '  </content>\n</pm>\n';
+const XI_NS = ' xmlns:xi="http://www.w3.org/2001/XInclude"';
+const usesInclude = (list: PmEntry[] | undefined): boolean => (list ?? []).some((e) => e.type === 'include' || usesInclude(e.children));
+function rememberCanonical(abs: string, text: string, model: Canonical['model']): void {
+  try {
+    const st = fs.statSync(abs);
+    canonical.delete(abs); canonical.set(abs, { size: st.size, mtimeMs: st.mtimeMs, ctimeMs: st.ctimeMs, ino: st.ino, text, model });
+    if (canonical.size > 64) { const first = canonical.keys().next().value; if (first !== undefined) canonical.delete(first); }
+  } catch { canonical.delete(abs); }
+}
+
+/** The text the append path would write, or null when only the full rewrite can be trusted to give the same bytes. Exported for the tests. */
+export function appendedPmText(existing: string, kept: { meta?: unknown; entries: PmEntry[] }, entry: PmEntry): { text: string; entry: PmEntry } | null {
+  if (entry.type !== 'dm' || !existing.endsWith(CONTENT_TAIL)) return null;
+  const one: string = pmc.serialisePm({ meta: kept.meta, entries: [entry] });
+  const at = one.indexOf(CONTENT_OPEN); if (at < 0 || !one.endsWith(CONTENT_TAIL)) return null;
+  const lines = one.slice(at + CONTENT_OPEN.length, one.length - CONTENT_TAIL.length);
+  let head = one.slice(0, at);
+  if (usesInclude(kept.entries)) { if (!head.includes('<pm xmlns:xsi=')) return null; head = head.replace('<pm xmlns:xsi=', `<pm${XI_NS} xmlns:xsi=`); }
+  // the importer's mark: the full path carries it over unless the new text has it; inside the content it would change that decision
+  if (existing.indexOf(RECONSTRUCTED_MARKER, head.length) >= 0 || lines.includes(RECONSTRUCTED_MARKER)) return null;
+  head = completePmStatus(carryReconstructedMarker(existing, head), existing, { enterpriseCode: (kept.meta as { rpc?: { enterpriseCode?: string } } | undefined)?.rpc?.enterpriseCode });
+  if (!existing.startsWith(head + CONTENT_OPEN)) return null;
+  // read-back of what is added: one entry, serialising to the same lines again
+  const back = pmc.parsePm(one);
+  if (back.entries.length !== 1 || back.warnings.length) return null;
+  const again: string = pmc.serialisePm({ meta: kept.meta, entries: back.entries });
+  if (again !== one) return null;
+  return { text: existing.slice(0, existing.length - CONTENT_TAIL.length) + lines + CONTENT_TAIL, entry: back.entries[0] };
+}
+
+function appendPmEntry(projectId: string, kept: { meta?: unknown; entries: PmEntry[]; warnings?: string[] }, entry: PmEntry): boolean {
+  const abs = pmPath(projectId);
+  const c = canonical.get(abs);
+  if (!c || c.model !== kept) return false;
+  let st: fs.Stats; try { st = fs.statSync(abs); } catch { return false; }
+  if (st.size !== c.size || st.mtimeMs !== c.mtimeMs || st.ctimeMs !== c.ctimeMs || st.ino !== c.ino) { canonical.delete(abs); return false; }
+  const got = appendedPmText(c.text, kept, entry); if (!got) return false;
+  assertS1000dPublication(projectId);
+  const before = pmc.countEntries(kept.entries);
+  const entries = [...kept.entries, got.entry];
+  const after = pmc.countEntries(entries);
+  if (after.total !== before.total + 1 || after.dms !== before.dms + 1) return false;
+  fs.copyFileSync(abs, abs + '.bak');
+  content.writeText(projectId, abs, got.text);
+  const model = deepFreeze({ ...kept, entries });
+  try { pmParseMemo.get(abs, fs.statSync(abs), () => model); } catch { /* the memo is a convenience */ }
+  rememberCanonical(abs, got.text, model);
+  return true;
 }
 
 /** Modules in csdb/ that no entry references, whichever style the entry uses. */
@@ -199,15 +275,23 @@ export function writePm(projectId: string, model: { meta?: unknown; entries: PmE
   // the identification and status section and a leading comment: the entries (everything under <content>) are the ones just read back, and
   // the header is read from the written text with its <content> left out (a few hundred bytes instead of the whole publication). Before,
   // every create paid a second full parse here (the next placeNewDm missed the memo).
+  canonical.delete(abs);
   try {
     const st = fs.statSync(abs);
-    if (xml === written) pmParseMemo.get(abs, st, () => deepFreeze(reread));
+    let kept: Canonical['model'] | null = null;
+    if (xml === written) kept = pmParseMemo.get(abs, st, () => deepFreeze(reread));
     else {
       const head = xml.replace(/<content\b[\s\S]*<\/content>/, '');
       if (head.length < xml.length) {
         const h = pmc.parsePm(head);
-        if (h.entries.length === 0) pmParseMemo.get(abs, st, () => deepFreeze({ meta: h.meta, entries: reread.entries, warnings: reread.warnings }));
+        if (h.entries.length === 0) kept = pmParseMemo.get(abs, st, () => deepFreeze({ meta: h.meta, entries: reread.entries, warnings: reread.warnings }));
       }
+    }
+    // phase 8 (item 3): the append path may build on this file when the kept model serialises to exactly its content (checked once, here)
+    if (kept) {
+      const again: string = pmc.serialisePm(kept);
+      const a = again.indexOf(CONTENT_OPEN); const b = xml.indexOf(CONTENT_OPEN);
+      if (a >= 0 && b >= 0 && again.slice(a) === xml.slice(b)) rememberCanonical(abs, xml, kept);
     }
   } catch { /* the memo is a convenience */ }
   return { counts, backup: path.basename(abs) + '.bak', hash: sha(xml) };

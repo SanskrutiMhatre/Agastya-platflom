@@ -18,7 +18,7 @@ import { FileMemo } from './fileMemo';
 import { wellFormedError } from './wellFormed';
 import { readProjectJson, csdbRel, mediaRel } from './projectRecord';
 import { assertNewDmAllowed } from './projectConfig';
-import { saveRevisioned, withDocumentLock, recordBeforeDelete } from './projectFiles';
+import { saveRevisioned, saveNewRevisionedBatch, withDocumentLock, recordBeforeDelete } from './projectFiles';
 import { assertNotLeasedByOther } from './leases';
 
 const { checkXmlSafety } = require('../core/auth/xmlGuard');
@@ -90,11 +90,10 @@ export function assertUnique(projectId: string, file: string, xml: string): void
   const mine = parseIdent(headOf(xml), file);
   const key = identityKey(mine);
   const clashFile = identityClash(projectId, file, key);               // WP-17 (PERF-005): the identity index, not a listing of every module
-  const clash = clashFile ? { file: clashFile } : null;
-  if (clash) {
-    throw conflict(`This project already has that data module: ${clash.file} has the same code (${mine.dmc}), issue (${mine.issueNumber}-${mine.inWork}) and language (${mine.language || 'none'}). Each data module exists once per project - open the existing one, or give this one a different code or issue.`, 'DUPLICATE_DMC', { existing: clash.file });
-  }
+  if (clashFile) throw duplicateDm(mine, clashFile);
 }
+const duplicateDm = (mine: ReturnType<typeof parseIdent>, clashFile: string): HttpError =>
+  conflict(`This project already has that data module: ${clashFile} has the same code (${mine.dmc}), issue (${mine.issueNumber}-${mine.inWork}) and language (${mine.language || 'none'}). Each data module exists once per project - open the existing one, or give this one a different code or issue.`, 'DUPLICATE_DMC', { existing: clashFile });
 
 export async function cut(projectId: string, rel: string, xml: string, actor: Actor, reason: string): Promise<void> {
   try {
@@ -145,9 +144,41 @@ export async function createDm(projectId: string, file: string, xml: string, act
   // A NEW module must fit the project's S1000D configuration (MIC, issue, offered types and codes, SNS). The server decides this, not the form.
   // Imports (lenient) are brought in as they are: validation and the publication gate report what does not fit.
   if (!lenient && !opts.fromRepository && !opts.revisionOf) assertNewDmAllowed(projectId, xml);   // a revision of a module the project already holds is not a NEW module
-  await saveRevisioned(projectId, at, xml, actor, 'create');            // WP-11: atomic, and refused when its revision cannot be recorded
+  // WP-11: atomic, and refused when its revision cannot be recorded. Phase 8: through the grouped writer (a group of one), so the flush runs
+  // off the event loop; the uniqueness and existence checks run again right before the rename (another create may have come in meanwhile)
+  await saveNewRevisionedBatch(projectId, [{ relOrAbs: at, text: xml }], actor, 'create', () => assertUnique(projectId, file, xml));
   noteDmWritten(projectId, file, xml);                                   // WP-17: the identity index learns the new module
   return { file, hash: sha(xml), modified: modifiedOf(projectId, at) };
+}
+
+/**
+ * Phase 8 (docs/phase3/cleanup-backend.md, item 1): create several NEW modules at once (the package import, in groups of IMPORT_WRITE_GROUP). Each module
+ * passes exactly the checks of `createDm`, in order (size, content unless already checked, uniqueness in the project and within the group,
+ * not there yet, fits the project unless lenient); then all are written with one grouped atomic write and their revisions recorded
+ * (projectFiles.saveNewRevisionedBatch). The uniqueness and existence checks run again right before the renames, because the flushes yield
+ * to the event loop and another request may have created one of them meanwhile. A failure writes none of the group.
+ */
+export async function createDms(projectId: string, list: Array<{ file: string; xml: string }>, actor: Actor, lenient = false, opts: { contentChecked?: boolean } = {}): Promise<Array<{ file: string; hash: string }>> {
+  const crel = csdbRel(readProjectJson(projectId));
+  const prepared: Array<{ file: string; xml: string; at: string; mine: ReturnType<typeof parseIdent> }> = [];
+  const inGroup = new Map<string, string>();
+  for (const { file, xml } of list) {
+    const at = inProject(projectId, resolveDmFile(projectId, file));
+    if (!lenient) assertModuleSize(xml);
+    if (!opts.contentChecked) validateContent(`${crel}/${file}`, xml, lenient);
+    assertUnique(projectId, file, xml);
+    const mine = parseIdent(headOf(xml), file); const key = identityKey(mine);
+    const twin = inGroup.get(key); if (twin !== undefined && twin.toLowerCase() !== file.toLowerCase()) throw duplicateDm(mine, twin);
+    if (content.exists(projectId, at) || prepared.some((p) => p.file.toLowerCase() === file.toLowerCase())) throw conflict(`A data module named ${file} already exists in this project.`, 'ALREADY_EXISTS');
+    if (!lenient) assertNewDmAllowed(projectId, xml);
+    inGroup.set(key, file); prepared.push({ file, xml, at, mine });
+  }
+  if (!prepared.length) return [];
+  await saveNewRevisionedBatch(projectId, prepared.map((p) => ({ relOrAbs: p.at, text: p.xml })), actor, 'create', () => {
+    for (const p of prepared) { const c = identityClash(projectId, p.file, identityKey(p.mine)); if (c) throw duplicateDm(p.mine, c); }
+  });
+  for (const p of prepared) noteDmWritten(projectId, p.file, p.xml);
+  return prepared.map((p) => ({ file: p.file, hash: sha(p.xml) }));
 }
 
 export async function deleteDm(projectId: string, file: string, actor: Actor, projectRole: string) {
@@ -160,7 +191,8 @@ export async function deleteDm(projectId: string, file: string, actor: Actor, pr
   await recordBeforeDelete(projectId, rel, actor);
   content.remove(projectId, at);
   noteDmWritten(projectId, file, null);
-  await docIndex.syncProject(projectId, projectDirFor(projectId), nowIso());
+  // phase 8 (item 2): the one entry, not a walk of the whole project (same result for this file as syncProject)
+  await docIndex.removeFile(projectId, projectDirFor(projectId), rel, nowIso());
 }
 
 export function history(projectId: string, file: string) {
