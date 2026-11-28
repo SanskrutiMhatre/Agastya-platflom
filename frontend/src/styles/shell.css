@@ -61,7 +61,7 @@
 @media (max-width: 1180px) { .topbar .search-trigger { width: 220px; } .topbar .search-trigger.compact { width: auto; } .topbar .search-trigger.compact .v2-jump-label { display: none; } }
 
 /* ---------------------------------------------------------------- project shell: the activity bar */
-.app.project { grid-template-columns: var(--activity-w) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) var(--status-h); }
+.app.project { grid-template-columns: var(--activity-w) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; }
 .app.project > .topbar { grid-column: 1 / -1; }
 .app.project > .activity { grid-row: 2; grid-column: 1; min-height: 0; overflow: visible; z-index: var(--z-rail); }
 .app.project > .main { grid-row: 2; grid-column: 2; }
@@ -94,6 +94,6 @@
 .v2-rail-label { font-size: var(--fs-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 
 /* ---------------------------------------------------------------- project shell: the status bar */
-.app.project > .statusbar { grid-column: 1 / -1; grid-row: 3; }
+.app.project > .statusbar { grid-column: 1 / -1; grid-row: 3; height: var(--status-h); }
 .statusbar .page-status, .statusbar .default-status { display: contents; }
 .statusbar .page-status:not(:empty) + .default-status { display: none; }

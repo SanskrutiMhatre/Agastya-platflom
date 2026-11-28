@@ -189,7 +189,7 @@ function AuthorOverview() {
                     <td className="proj-cell"><span className="proj-link"><span className="avatar" aria-hidden="true">{p.name.charAt(0).toUpperCase()}</span><span className="proj-text">
                       <a href={`/projects/${p.id}`} onClick={(e) => e.preventDefault()}><span className="proj-name">{p.name}</span></a>
                       <span className="faint">{p.folder || 'No folder'}{p.hasPdf ? ' · PDF built' : ''}</span></span></span></td>
-                    <td><RoleBadge role={p.role} /></td><td className="num">{p.dmCount}</td><td>{formatLabel(p)}</td>
+                    <td><RoleBadge role={p.role} /></td><td className="num">{p.dmCount}</td><td style={{ whiteSpace: 'nowrap' }}>{formatLabel(p)}</td>
                     <td className="faint" style={{ whiteSpace: 'nowrap' }}>{ago(p.lastOpened ?? p.updatedAt)}</td>
                   </tr>))}</tbody>
               </table></div>
