@@ -46,6 +46,8 @@ export interface DocAdapter<L extends DocLoaded> {
   save(id: string, xml: string, hash: string): Promise<{ hash: string; report: DocReport; merged?: boolean; xml?: string }>;
   validate(id: string, xml: string): Promise<DocReport>;
   build(id: string): Promise<{ totalMs?: number; releaseLabel?: string | null }>;
+  /** the Quick preview: the saved document rendered by the server as a draft PDF (nothing is published; the PDF the build made stays as it is) */
+  preview?(id: string): Promise<Blob>;
   pdfUrl(id: string, download?: boolean): string;
   /** the note under the PDF after a build */
   builtNote(out: { totalMs?: number; releaseLabel?: string | null }): string;
@@ -135,25 +137,62 @@ export function useDocEditor<L extends DocLoaded>(ctx: ProjectCtx, adapter: DocA
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  /** a build or a preview the server refused: its findings go to the Problems panel, the reason under the PDF */
+  const refused = (e: unknown, what: string) => {
+    if (e instanceof ApiError && e.status === 422) {
+      const findings = ((e.body as { findings?: DocFinding[] } | undefined)?.findings ?? []).filter((f) => f && typeof f.message === 'string');
+      if (findings.length) applyFindings(findings);
+      setNote(`${what}: ${findings.length ? `${findings.length} problem${findings.length === 1 ? '' : 's'} in the document (${adapter.findingsWhere}).` : e.message}`);
+    } else setNote(errText(e));
+  };
+
+  // the PDF on show: the publication the server built (a URL) or a Quick preview (a draft, held in the browser as a blob)
+  const [shown, setShown] = useState<'build' | 'preview' | null>(null);
+  const blobUrl = useRef<string | null>(null);
+  const dropBlob = () => { if (blobUrl.current) { URL.revokeObjectURL(blobUrl.current); blobUrl.current = null; } };
+  useEffect(() => dropBlob, []);
+
   const generate = useCallback(async () => {
     if (!canBuild(can)) return;
     setBuilding(true); setNote(''); progress.clear();
     try {
       if (!(await save())) return;
       const out = await adapter.build(id);
-      setSrc(`${adapter.pdfUrl(id)}?t=${Date.now()}`);
+      dropBlob(); setSrc(`${adapter.pdfUrl(id)}?t=${Date.now()}`); setShown('build');
       setNote(adapter.builtNote(out));
       layout.reveal();
       if (adapter.reloadProject) ctx.reload();
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 422) {
-        const findings = ((e.body as { findings?: DocFinding[] } | undefined)?.findings ?? []).filter((f) => f && typeof f.message === 'string');
-        if (findings.length) applyFindings(findings);
-        setNote(`The PDF was not built: ${findings.length ? `${findings.length} problem${findings.length === 1 ? '' : 's'} in the document (${adapter.findingsWhere}).` : e.message}`);
-      } else setNote(errText(e));
-    } finally { setBuilding(false); }
+    } catch (e) { refused(e, 'The PDF was not built'); } finally { setBuilding(false); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, role, save, layout.reveal]);
+
+  // ---- Quick preview: save, then the server renders the saved document as a draft PDF beside the PDF pane's publication (no release, no build
+  // state, not in the publication history). "Refresh on save" renders it again after each save while a preview is on show.
+  const [previewing, setPreviewing] = useState(false);
+  const [autoPreview, setAutoPreviewState] = useState(() => { try { return localStorage.getItem(`agastya.${adapter.kind}.preview.auto`) !== '0'; } catch { return true; } });
+  const setAutoPreview = useCallback((on: boolean) => { setAutoPreviewState(on); try { localStorage.setItem(`agastya.${adapter.kind}.preview.auto`, on ? '1' : '0'); } catch { /* private mode */ } }, [adapter.kind]);
+  const previewRun = useRef(0);
+  const preview = useCallback(async () => {
+    if (!canBuild(can) || !adapter.preview) return;
+    const mine = ++previewRun.current;
+    layout.reveal();
+    setPreviewing(true); setNote(''); progress.clear();
+    try {
+      if (!(await save())) return;
+      const t0 = performance.now();
+      const blob = await adapter.preview(id);
+      if (mine !== previewRun.current) return;
+      dropBlob(); blobUrl.current = URL.createObjectURL(blob);
+      setSrc(blobUrl.current); setShown('preview');
+      setNote(`Quick preview rendered by the server in ${((performance.now() - t0) / 1000).toFixed(1)} s from the saved document: a draft, not the publication (Generate PDF builds that).`);
+    } catch (e) { if (mine === previewRun.current) refused(e, 'The quick preview was not rendered'); } finally { if (mine === previewRun.current) setPreviewing(false); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, role, save, layout.reveal]);
+  // after a save (Ctrl+S, the Save button, auto-save), while a Quick preview is on show
+  useEffect(() => {
+    if (savedAt && autoPreview && shown === 'preview' && !previewing && !building) void preview();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedAt]);
 
   // ---- a refused save: the author's version is kept (FE-007), and can be compared with theirs (PRD-004)
   const [confirmReload, setConfirmReload] = useState(false);
@@ -227,6 +266,7 @@ export function useDocEditor<L extends DocLoaded>(ctx: ProjectCtx, adapter: DocA
   return {
     id, writable, editorRef, hashRef, loaded, setLoaded, error, setError, dirty, setDirty, saving, failed, checking, building, savedAt, stale,
     src, setSrc, note, progress, draft, load, save, check, generate, applyFindings, findings, guard, banners,
+    preview, previewing, autoPreview, setAutoPreview, shown,
     saveState: { saving, dirty, savedAt, failed },
   };
 }

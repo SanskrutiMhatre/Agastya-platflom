@@ -14,6 +14,8 @@ import { Icon } from '../../components/Icon';
 import { Spinner, errText } from '../../components/ui';
 import { canBuild, useProject } from '../../layouts/ProjectShell';
 import { JssEditor, type GraphicInfo } from '../../jss/editor';
+import { META_FIELDS } from '../../jss/model';
+import { QuickPreview } from '../../editors/host/ChromeControls';
 import { JssParseError, parseJss, serializeJss } from '../../jss/xml';
 import { PackagePanel } from '../../jss/PackagePanel';
 import { ConvertButton, ExportProjectButton, useSectionCode } from '../../components/DocCodes';
@@ -29,6 +31,7 @@ const ADAPTER: DocAdapter<JssDocument> = {
   save: (id, xml, hash) => jssApi.save(id, xml, hash),
   validate: (id, xml) => jssApi.validate(id, xml),
   build: (id) => contentApi.build(id),
+  preview: (id) => jssApi.preview(id),
   pdfUrl: (id, download) => contentApi.pdfUrl(id, download),
   builtNote: (out) => `Built in ${((out.totalMs ?? 0) / 1000).toFixed(1)} s${out.releaseLabel ? ` · ${out.releaseLabel}` : ' · stamped NOT RELEASED'}`,
   findingsWhere: 'listed below the page',
@@ -42,7 +45,7 @@ export function JssEditorPage() {
   const toast = useUi((s) => s.toast);
   const layout = useEditorLayout({ format: 'jss', split: [30, 80, 58] });
   const host = useDocEditor(ctx, ADAPTER, layout);
-  const { loaded, writable, dirty, saving, checking, building } = host;
+  const { loaded, writable, dirty, saving, checking, building, previewing } = host;
   const hostRef = useRef<HTMLDivElement>(null);
 
   // mount the editor once the document is here
@@ -100,11 +103,15 @@ export function JssEditorPage() {
       crumb={loaded ? <span className="v2-badge accent" title={`Document type ${loaded.docType}, from the stencil ${loaded.stencil}`}>{loaded.label}</span> : null}
       saveState={host.saveState} guard={host.guard} banners={host.banners(recover)}
       docName={loaded?.label ?? undefined} findings={host.findings}
+      inspect={() => (host.editorRef.current as JssEditor | null)?.inspect() ?? null}
+      identity={() => { const m = (host.editorRef.current as JssEditor | null)?.getDoc().meta ?? {}; return META_FIELDS.filter((f) => m[f.key]).map((f) => [f.label, m[f.key]] as [string, string]); }}
       meta={loaded ? [['Type', loaded.label], ['Type code', <span className="mono">{loaded.docType}</span>], ['Stencil', <span className="mono">{loaded.stencil}</span>], ['Heading depth', String(loaded.maxDepth)]] : []}
       section={loaded ? <span>JSS</span> : undefined}
       topActions={<>
         <button className="btn" onClick={() => void host.check()} disabled={!loaded || checking} data-testid="jss-check" title="Check the document for problems without saving or building">{checking ? <Spinner /> : <Icon name="shield" size={16} className="ico" />}Check</button>
-        <button className="btn primary" onClick={() => void host.generate()} disabled={!canBuild(can) || building || !loaded} data-testid="jss-generate" title={!canBuild(can) ? 'Reviewers, editors and owners can build the PDF' : 'Save, then build the whole publication as a PDF'}>{building ? <Spinner /> : <Icon name="play" size={16} className="ico" />}{building ? 'Building…' : 'Generate PDF'}</button>
+        <QuickPreview onRun={() => void host.preview()} busy={previewing} disabled={!canBuild(can) || building || !loaded} testId="jss-quick-preview" autoTestId="jss-preview-auto" auto={host.autoPreview} setAuto={host.setAutoPreview}
+          title={!canBuild(can) ? 'Reviewers, editors and owners can preview the PDF' : 'Save, then render this document as a draft PDF beside the editor (not the publication: nothing is released or recorded)'} />
+        <button className="btn primary" onClick={() => void host.generate()} disabled={!canBuild(can) || building || previewing || !loaded} data-testid="jss-generate" title={!canBuild(can) ? 'Reviewers, editors and owners can build the PDF' : 'Save, then build the whole publication as a PDF'}>{building ? <Spinner /> : <Icon name="play" size={16} className="ico" />}{building ? 'Building…' : 'Generate PDF'}</button>
       </>}
       actions={<>
         <button className="btn btn-sm" onClick={() => void host.save()} disabled={!writable || !dirty || saving} data-testid="jss-save" title={!writable ? 'You have read-only access' : !dirty ? 'Nothing to save' : 'Save the document (Ctrl+S)'}>{saving ? <Spinner /> : <Icon name="check" size={12} />}Save</button>
@@ -114,6 +121,6 @@ export function JssEditorPage() {
         <ExportProjectButton id={id} dirty={dirty} saveFirst={host.save} label="Export project" />
       </>}
       pdf={<DocPdfPane kind="jss" src={host.src} downloadHref={contentApi.pdfUrl(id, true)} downloadName={`${summary.project.name}.pdf`} builtBy="the server" what="the publication"
-        note={host.note} building={building} progressLines={host.progress.lines} />} />
+        note={host.note} building={building} progressLines={host.progress.lines} shown={host.shown} />} />
   );
 }

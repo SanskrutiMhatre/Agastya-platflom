@@ -17,6 +17,10 @@ export type { GraphicInfo, JsgFinding, JsgHost, JsgEditorOptions } from './share
 type Container = Array<Block | Clause>;
 interface Slot { list: Array<any>; index: number }
 
+/** What JsgEditor.inspect() says about the selected block (the workspace's Properties panel shows it; nothing in it edits the document). */
+export interface ElementInfo { element: string; label: string; attrs: Array<[string, string]>; inner?: { element: string; attrs: Array<[string, string]> }; where?: string }
+const JSG_BLOCK_LABEL: Record<string, string> = { clause: 'Heading', para: 'Paragraph', list: 'List', table: 'Table', figure: 'Figure', note: 'Note', warning: 'Warning', caution: 'Caution', pageBreak: 'Page break' };
+
 /** 1 -> i, 4 -> iv ... (the stencil's roman lists) */
 const toRoman = (n: number): string => { const m: Array<[number, string]> = [[1000, 'm'], [900, 'cm'], [500, 'd'], [400, 'cd'], [100, 'c'], [90, 'xc'], [50, 'l'], [40, 'xl'], [10, 'x'], [9, 'ix'], [5, 'v'], [4, 'iv'], [1, 'i']]; let r = ''; for (const [v, t] of m) while (n >= v) { r += t; n -= v; } return r; };
 const ALIGNS: Array<[Align | undefined, string]> = [[undefined, 'Justified (default)'], ['left', 'Left'], ['center', 'Centre'], ['right', 'Right']];
@@ -135,6 +139,39 @@ export class JsgEditor implements JsgEditorLike {
   getXml(): string { return serializeJsg(this.doc); }
   getDoc(): JsgDoc { return this.doc; }
   setFindings(f: JsgFinding[]): void { this.findings = f; this.renderNav(); }
+
+  /**
+   * UI redesign (the workspace's Properties panel, Element tab): the block the author is in, read from the model and never changed (D16): its
+   * XML element and attributes, the table cell inside it, and the heading above it. Null when nothing in the sheet is selected. The toolbar
+   * above the sheet stays the one place that edits them.
+   */
+  inspect(): ElementInfo | null {
+    const e = this.selectedEl; const slot = this.selected;
+    if (!e || !slot || !e.isConnected) return null;
+    const x = slot.list[slot.index] as Block | Clause | undefined; if (!x) return null;
+    let h: Element | null = isClause(x) ? null : e;
+    while (h && !/\bjsg-(clause|sectionh|chapter|app)\b/.test(h.className)) h = h.previousElementSibling;
+    const where = h ? Array.from(h.childNodes, (c) => c.textContent ?? '').join(' ').replace(/\s+/g, ' ').trim().slice(0, 90) : undefined;
+    const a = (k: string, v: string | number | boolean | undefined | null): Array<[string, string]> => (v === undefined || v === null || v === '' || v === false ? [] : [[k, String(v)]]);
+    const info: ElementInfo = { element: x.k, label: JSG_BLOCK_LABEL[x.k] ?? x.k, attrs: [], where };
+    switch (x.k) {
+      case 'clause': info.attrs = [...a('title', x.title), ...a('id', x.id), ...a('orientation', x.orientation ?? 'portrait'), ...a('content', x.children.length)]; break;
+      case 'para': info.attrs = [...a('indent', x.indent), ...a('align', x.align ?? 'justify')]; break;
+      case 'list': info.attrs = [...a('type', x.type), ...a('indent', x.indent), ...a('items', x.items.length)]; break;
+      case 'table': info.attrs = [...a('id', x.id), ...a('title', x.title), ...a('widths', x.widths), ...a('header rows', x.head.length), ...a('body rows', x.body.length)]; break;
+      case 'figure': info.attrs = [...a('id', x.id), ...a('title', x.title), ...a('graphics', x.graphics.length), ...a('src', x.graphics[0]?.src), ...a('width', x.graphics[0]?.width)]; break;
+      case 'note': case 'warning': case 'caution': info.attrs = a('paragraphs', x.paras.length); break;
+      default: break;
+    }
+    if (x.k === 'table') {
+      const n = document.getSelection()?.anchorNode ?? null; const at = n ? (n.nodeType === 1 ? (n as Element) : n.parentElement) : null;
+      const td = at && e.contains(at) ? at.closest<HTMLElement>('td, th') : null;
+      const r = td ? Number(td.dataset.r) : NaN; const c = td ? Number(td.dataset.c) : NaN;
+      const cell: Cell | undefined = td && Number.isFinite(r) && Number.isFinite(c) ? [...x.head, ...x.body][r]?.cells[c] : undefined;
+      if (td && cell) info.inner = { element: td.tagName === 'TH' ? 'cell (header)' : 'cell', attrs: [...a('row', r + 1), ...a('column', c + 1), ...a('colspan', cell.colspan), ...a('rowspan', cell.rowspan), ...a('align', cell.align), ...a('bold', cell.bold)] };
+    }
+    return info;
+  }
 
   private touch(): void {
     if (!this.dirty) { this.dirty = true; this.host.onDirty(true); }

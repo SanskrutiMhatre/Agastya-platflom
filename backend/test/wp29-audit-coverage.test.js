@@ -37,6 +37,8 @@ const ALLOWED = {
   // no lasting state change (checks, previews, renders on demand, personal bookkeeping)
   'jsg.ts POST `${base}/validate`': 'validation of the posted document; nothing is stored',
   'jss.ts POST `${base}/validate`': 'validation of the posted document; nothing is stored',
+  'jsg.ts POST `${base}/preview`': 'the editor\'s Quick preview: a draft PDF of the saved document beside its PDF; nothing is published',
+  'jss.ts POST `${base}/preview`': 'the editor\'s Quick preview: a draft PDF of the saved document beside its PDF; nothing is published',
   "packages.ts POST '/api/projects/import/detect'": 'reads an uploaded package to say what it is; nothing is imported',
   'packages.ts POST `${base}/objects/:file/pdf`': 'renders a PDF of an existing object on demand; no project content changes',
   'project-content.ts POST `${base}/publish/preview/:file`': 'a draft preview of one module; nothing is published',

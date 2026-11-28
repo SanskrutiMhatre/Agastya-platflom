@@ -20,6 +20,8 @@ import { ConflictDialog } from '../../editors/host/ConflictDialog';
 import { EditorHeader, SaveStateChip } from '../../editors/host/EditorHeader';
 import { useEditorLayout } from '../../editors/host/useEditorLayout';
 import { useHostKeys } from '../../editors/host/useHostKeys';
+import { ViewSwitch, type PanelId } from '../../editors/host/ChromeControls';
+import type { EditorView } from '../../editors/host/useEditorLayout';
 import { S1000D_STATE } from '../../editors/host/testIds';
 import { EditorSide } from './editor/EditorSide';
 import { PdfPane } from './editor/PdfPane';
@@ -37,7 +39,7 @@ export function EditorPage() {
   const [params, setParams] = useSearchParams();
   const hostRef = useRef<HTMLDivElement>(null);
   const layout = useEditorLayout({ format: 'editor', split: [25, 80, 56], onResize: () => studio.relayout() });
-  const { view, pct, dragging, startDrag, dividerKey, splitRef, narrow, focus, setFocus, toggleFocus } = layout;
+  const { view, setView, pct, dragging, startDrag, dividerKey, splitRef, narrow, focus, setFocus, toggleFocus } = layout;
   const [savedTick, setSavedTick] = useState(0);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [error, setError] = useState('');
@@ -52,6 +54,7 @@ export function EditorPage() {
   // the header slot that holds Quick preview and Generate while the PDF pane is closed
   const [slot, setSlot] = useState<HTMLSpanElement | null>(null);
   const [statusSlot, setStatusSlot] = useState<HTMLElement | null>(null);
+  const [viewSlot, setViewSlot] = useState<HTMLElement | null>(null);
   const reload = ctx.reload;
   // With both previews in their own windows the editor takes the whole width.
   // On a narrow window two panes side by side are unusable: show one at a time.
@@ -78,6 +81,28 @@ export function EditorPage() {
   }, [toggleFocus]);
   // WP-22 (UX-009): the review comments in the editor (the open data module's first); stepping to one in another module opens it
   const comments = useEditorComments(ctx.id, ctx.can, activeDoc?.file, (c) => { if (c.dmFile) studio.openDm(c.dmFile).catch((e) => toast(errText(e), 'error')); });
+  // UI redesign, second pass: the three panel toggles of the top bar (the data module explorer is the page's; the Properties and Problems panes
+  // are the Studio's own, opened and closed through it so its remembered layout stays the one record)
+  const panes = useStudio((s) => s.panes);
+  const togglePanel = (p: PanelId) => {
+    if (focus) setFocus(false);
+    if (p === 'explorer') setSide(!sideOpen);
+    else studio.setPane(p === 'props' ? 'right' : 'bottom', !(p === 'props' ? panes.right : panes.bottom));
+  };
+  const pickView = (v: EditorView) => { if (focus) setFocus(false); setView(v === 'split' && narrow ? 'pdf' : v); };
+  const pageRef = useRef({ togglePanel, pickView }); pageRef.current = { togglePanel, pickView };
+  useEffect(() => {
+    // the palette and the shortcuts dialog of the Studio list these too (the Studio's own pane commands give way to the page's)
+    studio.pageCommands = () => [
+      { id: 'explorer', label: 'Show or hide the data module explorer', group: 'View', keys: ['Mod+Shift+B'], run: () => pageRef.current.togglePanel('explorer') },
+      { id: 'props', label: 'Show or hide the Properties panel', group: 'View', keys: ['Mod+Alt+Shift+B'], replaces: 'view.props', run: () => pageRef.current.togglePanel('props') },
+      { id: 'problems', label: 'Show or hide the Problems panel', group: 'View', keys: ['Mod+J'], replaces: 'view.problems', run: () => pageRef.current.togglePanel('problems') },
+      { id: 'view-edit', label: 'Editor only', group: 'View', keys: ['Mod+Shift+1'], run: () => pageRef.current.pickView('edit') },
+      { id: 'view-split', label: 'Editor and PDF side by side (Split)', group: 'View', keys: ['Mod+Shift+2'], run: () => pageRef.current.pickView('split') },
+      { id: 'view-pdf', label: 'PDF only', group: 'View', keys: ['Mod+Shift+3'], run: () => pageRef.current.pickView('pdf') },
+    ];
+    return () => { studio.pageCommands = null; };
+  }, []);
   useHostKeys({
     palette: () => studio.run('tools.palette'),
     shortcuts: () => studio.run('tools.shortcuts'),
@@ -85,6 +110,8 @@ export function EditorPage() {
     find: (replace) => studio.run(replace ? 'edit.replace' : 'edit.find'),
     comment: comments.comments.length ? comments.step : undefined,
     escape: () => { if (comments.shown) { comments.setShown(false); return true; } if (focus) { setFocus(false); return true; } return false; },
+    panel: togglePanel,
+    view: pickView,
   });
 
   /** Drag the edge of the data-module list; the width is remembered. */
@@ -122,6 +149,9 @@ export function EditorPage() {
         // UI redesign: the save state sits at the start of the Studio's status bar (a slot the page owns; the Studio's own items are untouched)
         const bar = hostRef.current.querySelector<HTMLElement>('.status-bar');
         if (bar) { let slot = bar.querySelector<HTMLElement>(':scope > .ed-status-slot'); if (!slot) { slot = document.createElement('span'); slot.className = 'ed-status-slot'; bar.prepend(slot); } setStatusSlot(slot); }
+        // the Editor | Split | PDF switch: at the right end of the Studio's document tab row (a slot the page owns, after the Studio's tabs)
+        const tabRow = hostRef.current.querySelector<HTMLElement>('.app-header');
+        if (tabRow) { let vs = tabRow.querySelector<HTMLElement>(':scope > .ed-view-slot'); if (!vs) { vs = document.createElement('span'); vs.className = 'ed-view-slot'; tabRow.append(vs); } setViewSlot(vs); }
         setReady(true);
         // (not ?new=1: the Studio's own startup reads that one and opens the wizard itself)
         if (params.get('create') === '1') { setParams({}, { replace: true }); studio.newDocument(); }
@@ -168,7 +198,7 @@ export function EditorPage() {
   return (
     <>
       <EditorHeader layout={layout} title={ctx.summary.project.name} homeHref={ctx.summary.project.type === 'CIR' ? undefined : `/projects/${ctx.id}/home`}
-        lead={<button className="icon-btn" onClick={() => setSide(!sideOpen)} title={sideOpen ? 'Hide the data module panel' : 'Show the data module panel'} aria-label={sideOpen ? 'Hide the data module panel' : 'Show the data module panel'} aria-pressed={sideOpen} data-testid="toggle-side"><Icon name="panel" size={16} className="ico" /></button>}
+        panels={{ explorer: { on: sideOpen, set: setSide }, problems: { on: panes.bottom, set: (on) => studio.setPane('bottom', on) }, props: { on: panes.right, set: (on) => studio.setPane('right', on) } }}
         section={sns ? `${sns[1]}-${sns[2]}` : undefined}
         doc={activeDoc ? <span title={activeDoc.file ?? activeDoc.title}>{m ? m[1] : activeDoc.title || activeDoc.file}</span> : undefined}
         badge={activeDoc?.file && m ? <span className={`badge ${draft ? 'warning' : 'success'} ed-crumb-badge`} title={`Issue ${m[2] ?? ''}-${m[3] ?? ''}`}>{draft ? 'Draft' : `Issue ${m[2]}`}</span> : null}
@@ -196,11 +226,14 @@ export function EditorPage() {
         </div>
         {shown === 'split' ? <div className={`v2-divider ${dragging ? 'drag' : ''}`} role="separator" aria-orientation="vertical" aria-label="Resize editor and PDF" aria-valuenow={Math.round(pct)} aria-valuemin={layout.splitRange[0]} aria-valuemax={layout.splitRange[1]} tabIndex={0} onPointerDown={startDrag} onKeyDown={dividerKey} /> : null}
         <div className="b" style={{ flex: '1 1 0', borderLeft: shown === 'pdf' ? 0 : undefined, display: shown === 'edit' ? 'none' : undefined }}>
-          <PdfPane ctx={ctx} savedTick={savedTick} onOpenAt={openAt} onPopped={setBothPopped} slot={shown === 'edit' && !focus ? slot : null} onReveal={layout.reveal} />
+          <PdfPane ctx={ctx} savedTick={savedTick} onOpenAt={openAt} onPopped={setBothPopped} slot={focus ? null : slot} onReveal={layout.reveal}
+            viewSwitch={shown === 'pdf' && !focus ? <ViewSwitch layout={layout} canSplit={!bothPopped} /> : null} />
         </div>
       </div>
       <StatusBar testId="s1000d-statusbar"><span className="ed-studio-status" ref={setStatusHost} /></StatusBar>
       {chipInStatus && chip ? createPortal(<span className="item">{chip}</span>, statusSlot!) : null}
+      {/* PDF only hides the Studio (and its tab row): the switch then heads the PDF pane, at the same right-hand end */}
+      {viewSlot && !focus && shown !== 'pdf' ? createPortal(<ViewSwitch layout={layout} canSplit={!bothPopped} />, viewSlot) : null}
       {conflict ? <ConflictDialog base={conflict.base} mine={conflict.mine} theirs={conflict.theirs} onClose={() => setConflict(null)}
         check={(xml) => studio.checkText(xml, conflict.file)}
         save={async (xml) => { const ok = await studio.saveMerged(conflict.file, xml, conflict.hash); if (ok) toast('Saved: the merged data module replaced both versions.', 'success'); return ok; }} /> : null}

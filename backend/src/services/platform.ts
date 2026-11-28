@@ -71,12 +71,12 @@ export function checkSchemas(): { installed: string[]; wizard: string[]; missing
   return { installed, wizard, missing: wizard.filter((w) => !installed.some((i) => String(i).startsWith(w))) };
 }
 
-/** Delete the temporary single-module preview files every project accumulates. */
+/** Delete the temporary preview files every project accumulates (single-module previews, and the JSS / JSG editors' Quick previews). */
 export function clearPreviewFiles(): { removed: number } {
   let removed = 0;
   for (const id of allProjectIds()) {
     const dir = projectDirFor(id);
-    for (const f of ['jss-preview.pdf', 'jss-preview.fo', '_preview-pm.xml', '_preview-order.xml', '_preview-book.xml']) {
+    for (const f of ['jss-preview.pdf', 'jss-preview.fo', '_preview-pm.xml', '_preview-order.xml', '_preview-book.xml', '_quick-preview.pdf', '_quick-preview.fo', '_quick-preview-book.xml']) {
       try { fs.unlinkSync(path.join(dir, f)); removed++; } catch { /* not there */ }
     }
   }

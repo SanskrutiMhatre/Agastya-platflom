@@ -45,6 +45,9 @@ import { tempNameFor, commitFile, copyFileAtomic, discardTemp } from '../storage
 
 export const PDF_NAME = 'jss-output.pdf';
 export const PREVIEW_NAME = 'jss-preview.pdf';
+/** The editor's Quick preview of the whole document (a JSS book): a draft beside the publication's PDF, never the publication itself. The
+ *  leading underscore keeps it, and its intermediates, out of a project archive (services/projectArchive.ts GENERATED). */
+export const QUICK_PREVIEW_NAME = '_quick-preview.pdf';
 
 export function startRenderer(): void {
   try { fopd.start(); fopd.warmup(); }
@@ -387,7 +390,7 @@ export function buildPublication(projectId: string, opts: { compression?: number
  * Render the publication from `workDir` (default: the project itself). A configuration-specific build passes a work directory that holds the
  * FILTERED copies of the publication module and data modules; everything else about the build is the same code path as the unfiltered one.
  */
-async function renderFull(projectId: string, gate: GatePass, log: (m: string) => void, opts: { compression?: number; workDir?: string } = {}): Promise<BuildResult> {
+async function renderFull(projectId: string, gate: GatePass, log: (m: string) => void, opts: { compression?: number; workDir?: string; preview?: boolean } = {}): Promise<BuildResult> {
   {
     const dir = opts.workDir ?? projectDirFor(projectId);
     const { project, effective } = effectiveConfig(projectId);
@@ -399,7 +402,8 @@ async function renderFull(projectId: string, gate: GatePass, log: (m: string) =>
     if (!useDirect) applyDefaultArtwork(projectId, effective, dir, log);        // every JSS book: written in the editor, built from S1000D modules, or imported
 
     const renderedState = releaseStateOf(projectId);          // what this PDF will claim: released or NOT RELEASED, for which content
-    const { wm, releaseLabel } = resolveMarks(projectId, effective, project.pipeline, log, { derived: !!opts.workDir, dir });
+    // a Quick preview is a draft: like a derived (configuration) PDF it never claims a release
+    const { wm, releaseLabel } = resolveMarks(projectId, effective, project.pipeline, log, { derived: !!opts.workDir || !!opts.preview, dir });
     const { input, isS1000D: s1000d } = prepareInput(projectId, project, effective, useDirect, log, dir);
     const compression = opts.compression ?? Number(project.output?.compression ?? 0);
     const classification = effective.publication?.securityClassification ?? '';
@@ -407,10 +411,11 @@ async function renderFull(projectId: string, gate: GatePass, log: (m: string) =>
 
     // WP-30 (QA-008, found by the chaos suite): FOP writes a temporary sibling that becomes the PDF only when it is complete (commitFile), so a
     // server killed mid-build never leaves a torn jss-output.pdf for the download to serve
-    const pdfTmp = tempNameFor(path.join(dir, PDF_NAME));
+    const pdfName = opts.preview ? QUICK_PREVIEW_NAME : PDF_NAME;
+    const pdfTmp = tempNameFor(path.join(dir, pdfName));
     const common = {
       workDir: dir, xsltproc: paths.XSLTPROC, fop: paths.FOP_BAT, inputXml: input, resourceRoots: resourceRootsFor(projectId),
-      foOut: 'jss-output.fo', pdfOut: path.basename(pdfTmp), classification,
+      foOut: opts.preview ? '_quick-preview.fo' : 'jss-output.fo', pdfOut: path.basename(pdfTmp), classification,
       // Code No. / Rev No. belong to the JSS book's cover; the direct S1000D engine never prints them.
       layoutParams: useDirect
         ? furnitureFor(projectId, project, effective, !!releaseLabel, dir, engineConfig.stage2Params(effective).filter(([n]: [string, string]) => !/^cover\.(codeNo|revNo)$/.test(n)), log)
@@ -435,17 +440,37 @@ async function renderFull(projectId: string, gate: GatePass, log: (m: string) =>
         : await engineBuild.buildJss({ ...common,
             stage1Xsl: relFromProject(projectId, path.join(config.pipelineDir, 's1000dtojss', 's1000dtojss.xsl'), dir),
             stage2Xsl: relFromProject(projectId, path.join(config.pipelineDir, 'jsstofo', 'jsstofo.xsl'), dir),
-            stage1Out: 'jss-book.xml', isS1000D: s1000d,
+            stage1Out: opts.preview ? '_quick-preview-book.xml' : 'jss-book.xml', isS1000D: s1000d,
             stage1Params: engineConfig.stage1Params(effective),
             frontMatter: effective.frontMatter, branding: effective.branding,
             systemImage: effective.frontMatter?.systemImage ?? '' });
-      commitFile(pdfTmp, path.join(dir, PDF_NAME));
-      if (!opts.workDir) writeBuildState(projectId, { fingerprint: renderedState.fingerprint, released: renderedState.released });
-      broadcast(projectId, { type: 'progress', message: result?.totalMs != null ? `Done in ${(result.totalMs / 1000).toFixed(1)}s` : 'Done', done: true });
-      if (!opts.workDir) broadcast(projectId, { type: 'reload', kind: 'pdf' });
-      return { pdf: path.join(dir, PDF_NAME), totalMs: result?.totalMs, releaseLabel };
+      commitFile(pdfTmp, path.join(dir, pdfName));
+      // a Quick preview leaves the publication alone: no build state (the download's "is the PDF current" check), no reload of the PDF views
+      if (!opts.workDir && !opts.preview) writeBuildState(projectId, { fingerprint: renderedState.fingerprint, released: renderedState.released });
+      broadcast(projectId, { type: 'progress', message: result?.totalMs != null ? `Done in ${(result.totalMs / 1000).toFixed(1)}s` : 'Done', done: true, ...(opts.preview ? { preview: true } : {}) });
+      if (!opts.workDir && !opts.preview) broadcast(projectId, { type: 'reload', kind: 'pdf' });
+      return { pdf: path.join(dir, pdfName), totalMs: result?.totalMs, releaseLabel };
     } catch (e) { discardTemp(pdfTmp); return failure(projectId, e); }
   }
+}
+
+/**
+ * The JSS editor's Quick preview: the whole document rendered exactly as Generate renders it (the same gate, engine and frame), as a draft
+ * kept beside the publication (_quick-preview.pdf). It never claims a release, writes no build state and does not replace the publication's
+ * PDF, so the Publication page, the download and the release flow see nothing of it. It waits in the full build's queue (the two write the
+ * same composed book) and runs in the job runner's build lane (services/jobs, kind "doc-preview").
+ */
+export function buildDocumentPreview(projectId: string): Promise<BuildResult> {
+  refuseOwnEngine(projectId);
+  return serial(`${projectId}:full`, async () => {
+    const log = (m: string) => { console.log(`[preview:${projectId}] ${m}`); broadcast(projectId, { type: 'progress', message: m, preview: true }); };
+    log(isJssAuthored(projectId) ? 'Quick preview: validating the JSS document against its schema and stencil rules...' : 'Quick preview: validating the publication...');
+    let gate;
+    try { gate = await assertPublishable(projectId, 'publication', { waivable: !releaseStateOf(projectId).released }); }
+    catch (e) { broadcast(projectId, { type: 'progress', message: (e as Error).message, error: true, done: true, preview: true }); throw e; }
+    for (const w of gate.warnings) log(`Note: ${w}`);
+    return renderFull(projectId, gate, log, { preview: true, compression: 0 });
+  });
 }
 
 const minimalPm = (href: string, cls: string): string => `<?xml version="1.0"?>

@@ -6,6 +6,7 @@
 //   PUT  /api/projects/:id/jsg             save the XML { xml, baseHash } (baseHash mandatory, WP-11) - malformed refused, schema-invalid kept as a draft   (editor)
 //   POST /api/projects/:id/jsg/validate    check { xml? } (default: the saved document)   (viewer)
 //   POST /api/projects/:id/jsg/build       build the PDF with the JSG engine   (reviewer)
+//   POST /api/projects/:id/jsg/preview     the editor's Quick preview: the saved document as a draft PDF (not the document's PDF)   (reviewer)
 //   GET  /api/projects/:id/jsg/pdf         the last PDF built   (viewer)
 //   POST /api/projects/:id/jsg/import-docx  a Word file (multipart `file`) in the JSG User Handbook or ISPL format -> replaces the document, copies its pictures   (editor)
 //
@@ -79,6 +80,15 @@ export function registerJsgRoutes(app: Express): void {
       ok: true, totalMs: out.totalMs, bytes: fs.statSync(out.pdf).size, warnings: out.warnings, releaseLabel: out.releaseLabel, released: out.released, warmFop: out.warmFop,
       pdfUrl: `/api/projects/${req.project.id}/jsg/pdf`, jobId: s.id, report: jobs.buildReport(req.project.id, s.id),
     });
+  }));
+
+  // The editor's Quick preview: the saved document built by the JSG engine as a draft beside the document's PDF (a job in the build lane).
+  // Nothing is published: never released, no build state, no reload of the PDF views, not in the publication history.
+  app.post(`${base}/preview`, requireProject('reviewer', { from: 'param', cap: 'publish.preview' }), wrap(async (req, res) => {
+    needJsg(req);
+    const out = await jobs.run<JsgBuild & { jobId?: string }>({ kind: 'jsg-preview', projectId: req.project.id, params: {}, actor: actorOf(req) });
+    res.set('X-Build-Ms', String(out.totalMs ?? '')).set('X-Job-Id', String(out.jobId ?? ''));
+    res.type('application/pdf').sendFile(out.pdf);
   }));
 
   app.get(`${base}/pdf`, requireProject('viewer', { from: 'param', cap: 'project.read' }), wrap((req, res) => {

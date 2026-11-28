@@ -65,10 +65,7 @@ html[data-editor-focus] .v2-pshell > .v2-rail { visibility: hidden; overflow: hi
 .v2-divider { flex: none; width: 5px; cursor: col-resize; background: var(--border); transition: background .1s; touch-action: none; }
 .v2-divider:hover, .v2-divider.drag { background: var(--accent); }
 .v2-dmpanel { flex: 0 0 248px; display: flex; flex-direction: column; min-height: 0; background: var(--bg-elev); border-right: 1px solid var(--border); }
-.v2-btngroup { display: inline-flex; }
-.v2-btngroup > .btn:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; }
-.v2-btngroup > .btn:last-child { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: -1px; padding: 0 7px; }
-.v2-btngroup > .btn.is-on { box-shadow: inset 0 0 0 2px var(--accent-text); }
+.v2-pdfbar > .btn.is-on { box-shadow: inset 0 0 0 2px var(--accent-text); }   /* a pop-out window is open for it */
 .v2-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 8px; }
 .v2-tile { border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; background: var(--bg-sunken); }
 .v2-tile b { display: block; font-size: 17px; font-weight: 650; }
@@ -133,7 +130,30 @@ html[data-editor-focus] .ed-topslot > .topbar { padding-left: var(--space-3); }
 .ed-topbar .search-trigger.ed-cmd .ed-cmd-label { flex: 1; text-align: left; }
 .ed-topbar .btn kbd, .ed-topbar .search-trigger kbd { margin-left: var(--space-1); }
 .ed-topbar .v2-edactions, .ed-topbar .ed-actions { display: contents; }
-.ed-topbar .ed-layout button { width: 30px; padding: 0; }
+/* UI redesign, second pass: the panel toggles (VS Code's layout controls: pressed = the panel is open) and Quick preview with its Refresh toggle */
+.ed-topbar .ed-panels { display: inline-flex; align-items: center; gap: 2px; flex: none; padding-left: var(--space-2); border-left: 1px solid var(--border-default); }
+.ed-topbar .ed-panel-toggle { width: 30px; height: 30px; }
+.ed-qp { display: inline-flex; flex: none; }
+.ed-qp > .btn.ed-qp-run { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.ed-qp > .btn.ed-qp-auto { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: -1px; width: 30px; padding: 0; justify-content: center; color: var(--text-secondary); }
+.ed-qp > .btn.ed-qp-auto[aria-pressed="true"] { background: var(--surface-selected); color: var(--text-link); }
+@media (max-width: 1280px) { .ed-topbar .ed-qp-label { display: none; } .ed-topbar .ed-qp > .btn.ed-qp-run { padding: 0 var(--space-2); gap: 0; } }
+/* the close button in a panel's head (the explorer, Problems, Properties) */
+.pane-close { flex: none; width: 24px; height: 24px; }
+.props-head { display: flex; align-items: stretch; border-bottom: 1px solid var(--border-default); flex: none; }
+.props-head > .tabs { flex: 1; min-width: 0; border-bottom: 0; }
+.props-head > .pane-close { align-self: center; margin-right: var(--space-1); }
+.ed .problems .tabs .grow-r .pane-close { margin-left: var(--space-1); }
+.jss-problems:has(> .ed-pclose) { position: relative; }
+.jss-problems > .ed-pclose { display: contents; }
+.jss-problems > .ed-pclose > .pane-close { position: absolute; top: 4px; right: var(--space-2); z-index: 2; }
+/* Editor | Split | PDF: a labelled switch at the right end of the document tab row, above the canvas (all three editors) */
+.ed-viewswitch { flex: none; align-self: center; margin: 0 var(--space-2); }
+.ed-viewswitch button { height: 24px; padding: 0 var(--space-2); font-size: var(--fs-xs); }
+.ed-viewswitch .ed-viewswitch-label { white-space: nowrap; }
+@media (max-width: 1100px) { .ed-viewswitch .ed-viewswitch-label { display: none; } .ed-viewswitch button { width: 30px; padding: 0; } }
+.ed-view-slot { display: inline-flex; align-items: center; flex: none; height: 100%; border-left: 1px solid var(--border-default); }
+.ed-doc-actions { display: inline-flex; align-items: center; gap: var(--space-1); flex: none; }
 .ed-topbar > .icon-btn, .ed-topbar .ed-tools > .icon-btn { flex: none; }
 .ed-topbar .v2-edstate { flex: none; }
 @media (max-width: 1500px) { .ed-topbar .search-trigger.ed-cmd { min-width: 0; width: auto; } .ed-topbar .search-trigger.ed-cmd .ed-cmd-label { display: none; } }
@@ -147,7 +167,7 @@ html[data-editor-focus] .ed-topslot > .topbar { padding-left: var(--space-3); }
   .ed-topbar .crumbs .ed-crumb-doc { min-width: 6ch; }
   .ed-topbar .kbd-group, .ed-topbar .btn kbd { display: none; }
   .ed-topbar .ed-actions .btn, .ed-topbar .v2-edactions .btn, .ed-topbar .btn.ed-validate { font-size: 0; gap: 0; padding: 0 var(--space-2); }
-  .ed-topbar .seg:not(.ed-layout) { display: none; }   /* the theme switch: Settings > Appearance and every other page's top bar keep it */
+  .ed-topbar .seg { display: none; }   /* the theme switch: Settings > Appearance and every other page's top bar keep it */
 }
 
 /* the status bar: the editor's save state, problems, schema; at the right the position, element, language, encoding, zoom */
@@ -381,7 +401,8 @@ html[data-editor-focus] .ed-topslot > .topbar { padding-left: var(--space-3); }
 .app.app--embedded > .studio-pathbar .crumb:last-of-type, .app.app--embedded > .studio-pathbar .crumb.active { color: var(--text-link); font-weight: var(--fw-medium); }
 .app.app--embedded > .studio-pathbar .crumb-sep { color: var(--text-tertiary); }
 .app.app--embedded .pane-left { grid-area: left; width: 248px; background: var(--surface-panel); border-right: 1px solid var(--border-default); }
-.app.app--embedded .pane-right { grid-area: right; width: var(--props-w, 288px); background: var(--surface-panel); border-left: 1px solid var(--border-default); }
+.app.app--embedded .pane-right { grid-area: right; width: var(--props-w, 288px); background: var(--surface-panel); border-left: 1px solid var(--border-default); position: relative; }
+.app.app--embedded .pane-right > .pane-close { position: absolute; top: 6px; right: var(--space-1); }
 .app.app--embedded .center { grid-area: center; background: var(--surface-canvas); min-height: 0; min-width: 0; }
 .app.app--embedded > .pane-bottom { grid-area: bottom; height: 148px; max-height: 25vh; background: var(--surface-panel); border-top: 1px solid var(--border-default); min-width: 0; }
 .app.app--embedded .pane[hidden], .app.app--embedded .pane.hidden { display: none; }
@@ -466,3 +487,9 @@ html[data-editor-focus] .ed-topslot > .topbar { padding-left: var(--space-3); }
 .app.app--embedded .x-isolationMainProcedure > .x-section-label::before { content: counter(ed-sec); color: var(--doc-selection); font-variant-numeric: tabular-nums; }
 .app.app--embedded .x-preliminaryRqmts, .app.app--embedded .x-closeRqmts { font-size: 1em; }
 .app.app--embedded .x-step-num { color: var(--doc-selection); font-weight: var(--fw-semibold); }
+
+/* UI redesign, second pass: the order-dependent overrides of the rules above (the panel heads with a close button, the Element tab's rows) */
+.ed .props .props-head > .tabs { flex: 1; min-width: 0; border-bottom: 0; }
+.app.app--embedded .pane-right > .panel-tabs { padding-right: 32px; }
+.props-body .ed-el-where, .props-body .ed-el-text { font-size: var(--fs-xs); color: var(--text-secondary); overflow-wrap: anywhere; }
+.props-body .ed-el-none { font-size: var(--fs-xs); }

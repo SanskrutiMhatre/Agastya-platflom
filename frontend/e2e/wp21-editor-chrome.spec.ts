@@ -66,7 +66,10 @@ for (const e of EDITORS) {
       await open(page, e);
       const head = page.getByTestId('editor-header');
       for (const id of ['chrome-palette', 'chrome-shortcuts', 'chrome-focus']) await expect(head.getByTestId(id)).toBeVisible();
-      const seg = head.getByRole('group', { name: 'Editor layout' });
+      // second pass: the labelled Editor | Split | PDF switch sits at the right end of the document tab row, above the canvas (not in the top bar)
+      const seg = page.getByTestId('view-switch');
+      await expect(head.getByRole('group', { name: 'Editor layout' })).toHaveCount(0);
+      await expect(page.locator(e.kind === 's1000d' ? '.app-header [data-testid="view-switch"]' : '[data-testid="doc-tabs"] [data-testid="view-switch"]')).toBeVisible();
       await expect(seg.getByRole('button', { name: 'Editor' })).toHaveAttribute('aria-pressed', 'true');          // a new session is in Write
       for (const v of ['Split', 'PDF']) await expect(seg.getByRole('button', { name: v })).toBeVisible();
       await expect(page.getByTestId(e.state)).toHaveText(/All changes saved/);                                   // the same words in all three
@@ -116,7 +119,7 @@ for (const e of EDITORS) {
       // the chosen layout survives a reload
       await seg.getByRole('button', { name: 'Split' }).click();
       await page.reload(); await e.ready(page);
-      await expect(page.getByTestId('editor-header').getByRole('group', { name: 'Editor layout' }).getByRole('button', { name: 'Split' })).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.getByTestId('view-switch').getByRole('button', { name: 'Split' })).toHaveAttribute('aria-pressed', 'true');
     } finally { await page.context().close(); }
   });
 }
@@ -259,6 +262,126 @@ test('the S1000D ribbon folds to its tabs by default; a tab shows its commands u
     await expect(page.locator('.ribbon-body')).toBeVisible();                                                 // the choice is remembered
     await page.keyboard.press('Control+F1');
     await expect(page.locator('.ribbon-body')).toBeHidden();
+  } finally { await page.context().close(); }
+});
+
+// UI redesign, second pass (owner's editor-chrome requests 2026-11-28): the panel toggles, the panel close buttons, their keys and the labelled
+// Editor | Split | PDF switch, the same in the three editors.
+const panelOf = (page: Page, kind: (typeof EDITORS)[number]['kind'], p: 'explorer' | 'problems' | 'props') =>
+  p === 'explorer' ? page.getByRole('complementary', { name: kind === 's1000d' ? 'Data modules' : 'Explorer' })
+    : p === 'props' ? page.getByRole('complementary', { name: 'Properties' }).first()
+      : kind === 's1000d' ? page.locator('.app--embedded > .pane-bottom') : kind === 'jss' ? page.getByTestId('jss-problems') : page.getByTestId('doc-problems');
+
+for (const e of EDITORS) {
+  test(`${e.kind}: the top bar's panel toggles, the panels' close buttons and their keys; remembered after a reload`, async ({ browser, baseURL }) => {
+    const page = await fresh(browser, baseURL, 1440, 900);
+    try {
+      await open(page, e);
+      const group = page.getByTestId('editor-header').getByRole('group', { name: 'Panels' });
+      const toggle = { explorer: group.getByTestId('toggle-side'), problems: group.getByTestId('toggle-problems'), props: group.getByTestId('doc-props-toggle') };
+      // the first view: everything open, every toggle pressed, the key in its tooltip
+      for (const [p, key] of [['explorer', 'Ctrl+Shift+B'], ['problems', 'Ctrl+J'], ['props', 'Ctrl+Alt+Shift+B']] as const) {
+        await expect(toggle[p]).toHaveAttribute('aria-pressed', 'true');
+        await expect(toggle[p]).toHaveAttribute('title', new RegExp(`\\(${key.replace(/\+/g, '\\+')}\\)`));
+        await expect(panelOf(page, e.kind, p)).toBeVisible();
+      }
+      // a click hides, a second click shows
+      for (const p of ['explorer', 'problems', 'props'] as const) {
+        await toggle[p].click();
+        await expect(toggle[p]).toHaveAttribute('aria-pressed', 'false');
+        await expect(panelOf(page, e.kind, p)).toBeHidden();
+        await toggle[p].click();
+        await expect(toggle[p]).toHaveAttribute('aria-pressed', 'true');
+        await expect(panelOf(page, e.kind, p)).toBeVisible();
+      }
+      // each panel closes from its own head
+      for (const [p, id] of [['explorer', 'explorer-close'], ['problems', 'problems-close'], ['props', 'props-close']] as const) {
+        await panelOf(page, e.kind, p).getByTestId(id).first().click();
+        await expect(toggle[p]).toHaveAttribute('aria-pressed', 'false');
+        await expect(panelOf(page, e.kind, p)).toBeHidden();
+      }
+      // the keys bring them back (Ctrl+B stays Bold, Ctrl+Alt+B the Studio's bulleted list)
+      await page.getByTestId('chrome-shortcuts').focus();                                                       // the keys work wherever the focus is
+      await page.keyboard.press('Control+Shift+B'); await expect(toggle.explorer).toHaveAttribute('aria-pressed', 'true');
+      await page.keyboard.press('Control+J'); await expect(toggle.problems).toHaveAttribute('aria-pressed', 'true');
+      await page.keyboard.press('Control+Alt+Shift+B'); await expect(toggle.props).toHaveAttribute('aria-pressed', 'true');
+      for (const p of ['explorer', 'problems', 'props'] as const) await expect(panelOf(page, e.kind, p)).toBeVisible();
+      // the choice is remembered for this person on this computer
+      await toggle.problems.click(); await toggle.props.click();
+      await expect(toggle.props).toHaveAttribute('aria-pressed', 'false');
+      await page.reload(); await e.ready(page);
+      await expect(toggle.explorer).toHaveAttribute('aria-pressed', 'true');
+      await expect(toggle.problems).toHaveAttribute('aria-pressed', 'false');
+      await expect(toggle.props).toHaveAttribute('aria-pressed', 'false');
+      await expect(panelOf(page, e.kind, 'props')).toBeHidden();
+    } finally { await page.context().close(); }
+  });
+
+  test(`${e.kind}: Editor | Split | PDF is a labelled switch in the tab row with its tooltips and keys`, async ({ browser, baseURL }) => {
+    const page = await fresh(browser, baseURL, 1440, 900);
+    try {
+      await open(page, e);
+      const seg = page.getByTestId('view-switch');
+      for (const [name, tip] of [['Editor', 'Editor only (Ctrl+Shift+1)'], ['Split', 'Editor and PDF side by side (Ctrl+Shift+2)'], ['PDF', 'PDF only (Ctrl+Shift+3)']]) {
+        const b = seg.getByRole('button', { name, exact: true });
+        await expect(b).toHaveText(name);                                                                      // the words are shown, not only an icon
+        await expect(b).toHaveAttribute('title', tip);
+      }
+      await page.getByTestId('chrome-shortcuts').focus();                                                       // the keys work wherever the focus is
+      await page.keyboard.press('Control+Shift+3');
+      await expect(seg.getByRole('button', { name: 'PDF', exact: true })).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.getByTestId('pdf-pane')).toBeVisible();
+      await page.keyboard.press('Control+Shift+2');
+      await expect(seg.getByRole('button', { name: 'Split', exact: true })).toHaveAttribute('aria-pressed', 'true');
+      await page.keyboard.press('Control+Shift+1');
+      await expect(seg.getByRole('button', { name: 'Editor', exact: true })).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.getByTestId('pdf-pane')).toBeHidden();
+    } finally { await page.context().close(); }
+  });
+}
+
+for (const kind of ['jss', 'jsg'] as const) {
+  test(`${kind}: Quick preview in the top bar renders a draft PDF beside the editor, and nothing is published`, async ({ browser, baseURL }) => {
+    test.setTimeout(180_000);
+    const page = await fresh(browser, baseURL, 1440, 900);
+    try {
+      const e = EDITORS.find((x) => x.kind === kind)!;
+      await open(page, e);
+      const head = page.getByTestId('editor-header');
+      const qp = head.getByTestId(`${kind}-quick-preview`);
+      await expect(qp).toBeVisible();
+      await expect(head.getByTestId(`${kind}-preview-auto`)).toHaveAttribute('aria-pressed', 'true');           // Refresh on save, on by default
+      await qp.click();
+      await expect(page.getByTestId('pdf-showing')).toHaveAttribute('data-showing', 'preview', { timeout: 120_000 });
+      await expect(page.locator('[data-testid="pdf-pane"] canvas').first()).toBeVisible({ timeout: 60_000 });
+      await expect(page.getByTestId('pdf-showing')).toContainText('Quick preview (draft)');
+      await expect(page.getByTestId('view-switch').getByRole('button', { name: 'Editor', exact: true })).toHaveAttribute('aria-pressed', 'false');   // the PDF pane opened
+      // a draft: the publication's PDF is not made by it
+      const pub = await author.api.get(kind === 'jss' ? `/api/projects/${ids[kind]}/publish/pdf` : `/api/projects/${ids[kind]}/jsg/pdf`);
+      expect(pub.status(), 'a quick preview does not build the publication').toBe(404);
+      // Refresh on save can be turned off, and stays off
+      await head.getByTestId(`${kind}-preview-auto`).click();
+      await expect(head.getByTestId(`${kind}-preview-auto`)).toHaveAttribute('aria-pressed', 'false');
+      await page.reload(); await e.ready(page);
+      await expect(page.getByTestId('editor-header').getByTestId(`${kind}-preview-auto`)).toHaveAttribute('aria-pressed', 'false');
+    } finally { await page.context().close(); }
+  });
+}
+
+test('s1000d: Quick preview, Refresh on save and Generate are in the top bar in every view; the PDF pane keeps only viewing controls', async ({ browser, baseURL }) => {
+  const page = await fresh(browser, baseURL, 1440, 900);
+  try {
+    await open(page, EDITORS[0]);
+    const slot = page.getByTestId('chrome-preview-slot');
+    for (const v of ['Editor', 'Split', 'PDF']) {
+      await page.getByTestId('view-switch').getByRole('button', { name: v, exact: true }).click();
+      for (const id of ['quick-preview-btn', 'preview-autorefresh', 'generate-btn']) await expect(slot.getByTestId(id), `${id} in the top bar in ${v}`).toBeVisible();
+    }
+    const bar = page.getByRole('toolbar', { name: 'PDF controls' });
+    await expect(bar.getByTestId('quick-preview-btn')).toHaveCount(0);
+    await expect(bar.getByTestId('generate-btn')).toHaveCount(0);
+    await expect(bar.getByRole('checkbox')).toHaveCount(0);
+    for (const id of ['popout-quick', 'popout-build']) await expect(bar.getByTestId(id)).toBeVisible();
   } finally { await page.context().close(); }
 });
 

@@ -15,6 +15,7 @@ import { useSession } from '../../../store/session';
 import { useUi } from '../../../store/ui';
 import { MoreRows, VirtualRows, useProgressive } from '../../../components/windowing';
 import { countTreeRows, layoutTree, type TreeItem } from './publicationTree';
+import { PanelClose } from '../../../editors/host/ChromeControls';
 
 type View = 'tree' | 'all';
 
@@ -207,6 +208,7 @@ export function EditorSide({ ctx, refreshKey, treeKey, width, onCollapse }: { ct
             </div>
           ) : null}
         </div>
+        <PanelClose panel="explorer" onClose={onCollapse} testId="explorer-close" />
         {writable ? <>
           <input ref={fileInput} type="file" accept=".xml,.XML,.png,.jpg,.jpeg,.gif,.svg,.bmp,.webp" multiple hidden onChange={(e) => void doImport(e.target.files)} />
           <input ref={rawInput} data-testid="import-raw-input" type="file" accept=".xml,.XML,.png,.jpg,.jpeg,.gif,.svg,.bmp,.webp" multiple hidden onChange={(e) => void doImport(e.target.files, true)} />

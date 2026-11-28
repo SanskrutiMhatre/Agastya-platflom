@@ -77,7 +77,15 @@ export interface StudioHost {
   /** WP-21: the platform's focus mode (only the document and a slim header), the same in the three editors; Ctrl+. in the Studio. */
   toggleFocus?(): void;
   isFocus?(): boolean;
+  /** UI redesign: the Properties and Problems panes were opened or closed (the platform's top-bar toggles show their state). */
+  panesChanged?(panes: { left: boolean; right: boolean; bottom: boolean }): void;
+  /** UI redesign: the page's own commands (its panel toggles, its Editor / Split / PDF layout), listed in the palette and the shortcuts
+   *  dialog with their keys; the page's key handler answers the keys. `replaces` hides a Studio command that does the same thing. */
+  commands?(): HostCommand[];
 }
+
+/** A command of the page around the Studio (StudioHost.commands). `keys` in the Studio's notation (Mod+Shift+B). */
+export interface HostCommand { id: string; label: string; group: string; keys?: string[]; replaces?: string; run(): void }
 
 export class App {
   settings: Settings = loadLocal('studio.settings', DEFAULT_SETTINGS);
@@ -236,6 +244,8 @@ export class App {
     }
     this.rightPane = this.host
       ? h('aside', { class: 'pane pane-right', 'aria-label': 'Properties' }, h('div', { class: 'pane-resize', 'data-pane': 'right' }), rtabs,
+        // UI redesign: every panel of the workspace closes from its own head (the top bar's toggle and Ctrl+Alt+Shift+B open it again)
+        h('button', { class: 'icon-btn pane-close', type: 'button', 'data-testid': 'props-close', title: 'Close the Properties panel (Ctrl+Alt+Shift+B)', 'aria-label': 'Close the Properties panel', on: { click: () => this.togglePane('right') } }, icon('close', 14)),
         h('div', { class: 'props-scroll' }, this.attributes.el, this.elements.el), this.docInfoEl!, this.commentsEl!, this.pdf.el)
       : h('aside', { class: 'pane pane-right' }, h('div', { class: 'pane-resize', 'data-pane': 'right' }), rtabs, this.attributes.el, this.elements.el, this.pdf.el);
     this.bottomPane = h('section', { class: 'pane pane-bottom' }, h('div', { class: 'pane-resize-h', 'data-pane': 'bottom' }), this.problems.el);
@@ -521,6 +531,7 @@ export class App {
     this.rightPane.hidden = !this.layout.right;
     this.bottomPane.hidden = !this.layout.bottom;
     this.active?.xml.view.requestMeasure();
+    this.host?.panesChanged?.({ left: this.layout.left, right: this.layout.right, bottom: this.layout.bottom });
   }
 
   private bindResizers() {

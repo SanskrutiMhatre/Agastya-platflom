@@ -29,6 +29,8 @@ export const jssApi = {
   /** WP-11: `merged` = someone else had saved other chapters meanwhile; `xml` is then the merged document now on the server. */
   save: (id: string, xml: string, baseHash?: string) => put<{ hash: string; report: JssReport; merged?: boolean; xml?: string }>(P(id), { xml, baseHash }),
   validate: (id: string, xml?: string) => post<JssReport>(`${P(id)}/validate`, xml === undefined ? {} : { xml }),
+  /** The editor's Quick preview: the saved document rendered by the server as a draft PDF (not the publication; nothing is published). */
+  preview: async (id: string): Promise<Blob> => (await request<Response>('POST', `${P(id)}/preview`, {}, { raw: true })).blob(),
 };
 
 /** What an import or an export found, in plain language (the server writes the messages). */

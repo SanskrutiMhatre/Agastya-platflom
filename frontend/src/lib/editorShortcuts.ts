@@ -65,6 +65,12 @@ export const EDITOR_SHORTCUTS: EditorShortcut[] = [
   host('find', ['Mod+F', 'Mod+H'], 'Open Find; with H, Find and replace', 'the JSS editor (the JSG editor has its own find bar on the same keys)'),
   host('escape', ['Escape'], 'Close the find bar, or leave focus mode', 'anywhere on the editor page'),
   host('comments', ['Alt+Shift+N', 'Alt+Shift+P'], 'Next review comment; with P the previous one (the comments panel opens; WP-22)', 'anywhere on the editor page, when the project has review comments'),
+  // UI redesign: the workspace's panels and layout (the same keys on the S1000D page, listed there in the Studio's own dialog). VS Code's
+  // Ctrl+B and Ctrl+Alt+B take a Shift: Ctrl+B is Bold in the three editors, Ctrl+Alt+B the Studio's bulleted list.
+  host('explorer', ['Mod+Shift+B'], 'Show or hide the explorer (the document outline)', 'anywhere on the editor page'),
+  host('problems', ['Mod+J'], 'Show or hide the Problems panel', 'anywhere on the editor page'),
+  host('props', ['Mod+Alt+Shift+B'], 'Show or hide the Properties panel (Element, Document, Comments)', 'anywhere on the editor page'),
+  host('view', ['Mod+Shift+1', 'Mod+Shift+2', 'Mod+Shift+3'], 'Editor only; Editor and PDF side by side; PDF only', 'anywhere on the editor page'),
   host('paletteMove', ['ArrowDown', 'ArrowUp'], 'Move through the commands', 'the command palette', 'editors/host/CommandPalette.tsx'),
   host('paletteRun', ['Enter'], 'Run the command', 'the command palette', 'editors/host/CommandPalette.tsx'),
   host('findStep', ['Enter', 'Shift+Enter'], 'Next match; with Shift the previous one', 'the JSS find box', 'editors/host/FindBar.tsx'),

@@ -54,6 +54,10 @@ interface CellRef { table: Table; group: 'head' | 'body'; row: number; col: numb
 const ALIGNS: Array<[Align | undefined, string]> = [[undefined, 'Justified (default)'], ['left', 'Left'], ['center', 'Centre'], ['right', 'Right']];
 const NOTICE_LABEL: Record<NoticeKind, string> = { note: 'NOTE', warning: 'WARNING', caution: 'CAUTION' };
 
+/** What JssEditor.inspect() says about the caret's place (the workspace's Properties panel shows it; nothing in it edits the document). */
+export interface ElementInfo { element: string; label: string; attrs: Array<[string, string]>; inner?: { element: string; attrs: Array<[string, string]> }; where?: string }
+const BLOCK_LABEL: Record<string, string> = { para: 'Paragraph', list: 'List', table: 'Table', figure: 'Figure', note: 'Note', warning: 'Warning', caution: 'Caution', pageBreak: 'Page break' };
+
 export class JssEditor {
   private doc: JssDoc;
   private numbers: Numbers;
@@ -114,6 +118,39 @@ export class JssEditor {
   private chapterNumberOf(s: Section): number { for (const ch of this.doc.chapters) if (ch.children.includes(s)) return ch.number; return 0; }
 
   setFindings(findings: Finding[]): void { this.findings = findings; this.applyFindingMarks(); this.renderProblems(); this.markOutline(); }
+
+  /**
+   * UI redesign (the workspace's Properties panel, Element tab): what the caret is in, read from the model and never changed (D16): the block
+   * (its XML element and attributes), the list item or table cell inside it, and the section or chapter around it. Null when the caret is not
+   * in the sheet. The toolbar above the sheet stays the one place that edits them.
+   */
+  inspect(): ElementInfo | null {
+    const n = selection()?.anchorNode ?? null;
+    if (!n || !this.paper.contains(n)) return null;
+    const el = n.nodeType === 1 ? (n as Element) : n.parentElement; if (!el) return null;
+    const secEl = el.closest('.jss-sec, .jss-chapter'); const sec = secEl ? (this.elNode.get(secEl) as Section | Chapter | undefined) : undefined;
+    const where = sec ? `${sec.k === 'chapter' ? 'Chapter ' : ''}${this.numbers.heading.get(sec) ?? ''} ${sec.title}`.trim() : undefined;
+    const blkEl = el.closest('.jss-block'); const block = blkEl ? (this.elNode.get(blkEl) as Block | undefined) : undefined;
+    const a = (k: string, v: string | number | undefined | null): Array<[string, string]> => (v === undefined || v === null || v === '' ? [] : [[k, String(v)]]);
+    if (!block) {
+      if (!sec) return null;
+      return { element: sec.k, label: sec.k === 'chapter' ? 'Chapter heading' : 'Section heading', where,
+        attrs: [...a('title', sec.title), ...(sec.k === 'chapter' ? a('number', sec.number) : []), ...a('id', sec.id), ...a('orientation', sec.orientation ?? 'portrait')] };
+    }
+    const info: ElementInfo = { element: block.k, label: BLOCK_LABEL[block.k] ?? block.k, attrs: [], where };
+    switch (block.k) {
+      case 'para': info.attrs = [...a('align', block.align ?? 'justify'), ...a('indent', block.indentNone ? 'none' : undefined)]; break;
+      case 'list': info.attrs = [...a('type', block.type ?? 'alpha (default)'), ...a('items', block.items.length)]; break;
+      case 'table': info.attrs = [...a('id', block.id), ...a('title', block.title), ...a('widths', block.widths), ...a('header rows', block.head.length), ...a('body rows', block.body.length), ...a('columns', Math.max(0, ...[...block.head, ...block.body].map((r) => r.cells.reduce((s, c) => s + (c.colspan ?? 1), 0))))]; break;
+      case 'figure': info.attrs = [...a('id', block.id), ...a('title', block.title), ...a('graphics', block.graphics.length), ...a('src', block.graphics[0]?.src), ...a('width', block.graphics[0]?.width), ...a('legend items', block.legend.length || undefined)]; break;
+      case 'note': case 'warning': case 'caution': info.attrs = a('paragraphs', block.parts.length); break;
+      default: break;
+    }
+    const td = el.closest('td'); const cell = td ? this.cellRefs.get(td) : undefined;
+    if (cell) info.inner = { element: cell.group === 'head' ? 'cell (header)' : 'cell', attrs: [...a('row', cell.row + 1), ...a('column', cell.col + 1), ...a('colspan', cell.cell.colspan), ...a('rowspan', cell.cell.rowspan), ...a('align', cell.cell.align)] };
+    else { const li = el.closest('.jss-li'); const item = li ? this.itemRefs.get(li) : undefined; if (item) info.inner = { element: 'item', attrs: [...a('number', item.list.items.indexOf(item.item) + 1), ...a('level', item.depth + 1), ...a('list type', item.list.type)] }; }
+    return info;
+  }
 
   destroy(): void { document.removeEventListener('selectionchange', this.onSelChange); document.removeEventListener('keydown', this.onPageKey); this.fit?.disconnect(); clearTimeout(this.labelTimer); this.root.remove(); }
 
