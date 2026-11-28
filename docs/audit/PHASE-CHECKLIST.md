@@ -88,6 +88,9 @@ Legend: ✅ done · ◐ done in part (limits in the log) · ⏸ parked by decisi
 - ✅ Screen 1 - Global shell, project shell and main dashboard
 - ✅ Shared fixes: button hover in the light theme, the editor "Built in" log line, themed PDF canvas token, unused shared classes (lint)
 - ✅ Restart :4040 with the new UI for the owner's review
+- ✅ Exact-match pass (owner: "make it look exactly like the mockup"): each screen screenshotted side by side with its mockup at 1366 and 1920, light and dark, and fixed until only real data differs. Merged: validation, project dashboard, publication, administration, shells + tokens + main dashboard, editor (all panes open as drawn)
+- ✅ Theme: only Light and Dark, one toggle button (no System); a stored "system" becomes light
+- ✅ Tokens equal the mockup's `tokens.css` value for value (0 differences); visual suite 67/67 on two consecutive full runs
 
 ## 5. Other work this session
 
@@ -106,7 +109,7 @@ Legend: ✅ done · ◐ done in part (limits in the log) · ⏸ parked by decisi
 ## 7. Still to do
 
 - ✅ Finish screen 1 and the shared fixes; merge
-- 🔄 Owner review of the new UI on :4040
+- 🔄 Owner review of the exact-match UI on :4040
 - ⬜ Re-run the full release gate on a quiet machine; fix what it finds
 - ⬜ Push `main` to GitHub (local `main` is ahead; nothing from this phase is pushed)
 - ⬜ External gates (section 6), with the owner
