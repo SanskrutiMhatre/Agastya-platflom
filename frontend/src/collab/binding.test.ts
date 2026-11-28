@@ -180,6 +180,25 @@ describe('live co-editing binding', () => {
     expect(text(a.doc)).toBe(before.replace('The pump has these main characteristics:', 'The pump has these main characteristics: (B)'));
   });
 
+  it('a selected table follows a remote move: the element selection is re-mapped to where the table now is', () => {
+    const [a, b, sync] = pair();
+    const tb = b.doc.xml.getElementsByTagName('table')[0];
+    const parent = tb.parentNode!; const i = Array.prototype.indexOf.call(parent.childNodes, tb) as number;
+    b.doc.selection = { anchor: { node: parent, offset: i }, focus: { node: parent, offset: i + 1 }, element: tb };
+    // A moves the table up above the paragraph before it, and adds a paragraph in front of everything in that container
+    const ta = a.doc.xml.getElementsByTagName('table')[0];
+    a.doc.transact('Move up', () => moveElement(ta, -1, null));
+    sync();
+    const sel = b.doc.selection!;
+    expect(sel.element).toBe(tb);                                     // the same element (re-placed, not re-created)
+    expect(tb.isConnected).toBe(true);
+    const j = Array.prototype.indexOf.call(tb.parentNode!.childNodes, tb) as number;
+    expect(sel.anchor.node).toBe(tb.parentNode);
+    expect(sel.anchor.offset).toBe(j);
+    expect(sel.focus.offset).toBe(j + 1);
+    expect(j).not.toBe(i);
+  });
+
   it('a relative position (comment anchor, cursor) follows the text', () => {
     const [a, b, sync] = pair();
     const tb = textNode(paras(b.doc)[0]);

@@ -48,6 +48,20 @@ export async function joinJsgRoom(projectId: string, user: LiveUser): Promise<Li
 }
 
 /** A DOM copy of what a Y document holds, child for child (the shadow the keyed reconcile compares against). */
+/**
+ * This person's undo history in a room, kept while the editor is rebuilt (the page builds the editor again when this person's right to change
+ * the document changes: a check-out taken or freed, the release lock). A Y.UndoManager belongs to the Y document, not to the editor, so the
+ * next binding of the same room takes it over; it ends with the room's document.
+ */
+const keptUndo = new WeakMap<Y.Doc, Y.UndoManager>();
+function undoFor(ydoc: Y.Doc): Y.UndoManager {
+  const k = keptUndo.get(ydoc);
+  if (k) { keptUndo.delete(ydoc); return k; }
+  const um = new Y.UndoManager(ydom.undoScope(ydoc), { trackedOrigins: new Set([ORIGIN_LOCAL]), captureTimeout: 600 });
+  ydoc.once('destroy', () => { keptUndo.delete(ydoc); um.destroy(); });
+  return um;
+}
+
 function shadowOf(ydoc: Y.Doc): XMLDocument {
   const d = document.implementation.createDocument(null, '', null);
   while (d.firstChild) d.removeChild(d.firstChild);
@@ -234,7 +248,7 @@ export class JsgLive {
     this.shadow = shadowOf(room.doc);
     this.lastText = serializeJsg(ed.getDoc());
     // the tree, its blocks and their placements (ydom.ts schema 2: a moved block or plate is re-placed, its content stays)
-    this.undo = new Y.UndoManager(ydom.undoScope(room.doc), { trackedOrigins: new Set([ORIGIN_LOCAL]), captureTimeout: 600 });
+    this.undo = undoFor(room.doc);         // kept across a rebuild of the editor (see undoFor)
     ed.setCollab({
       changed: (typing) => this.local(typing),
       undo: () => this.undoLocal(),
@@ -444,11 +458,11 @@ export class JsgLive {
     return n.nodeType === 1 ? (n as unknown as Element) : null;
   }
   /** The object a field edits whose element is in the room (a rich field: its paragraph, text part or note; a plain field: the object holding the attribute). */
-  private targetOf(slot: JsgSlot): object { return Array.isArray(slot.owner) ? ((slot.owner as unknown[])[slot.key as number] as object) : slot.owner; }
+  private targetOf(slot: JsgSlot): object { if (slot.kind === 'cell') return slot.owner; return Array.isArray(slot.owner) ? ((slot.owner as unknown[])[slot.key as number] as object) : slot.owner; }
   private slotFor(obj: object | undefined, rich: boolean, attr?: string): JsgSlot | null {
     if (!obj) return null;
     for (const s of this.ed.liveSlots()) {
-      if (rich ? s.kind === 'rich' && this.targetOf(s) === obj : (s.kind === 'title' || s.kind === 'input') && s.owner === obj && s.key === attr) return s;
+      if (rich ? (s.kind === 'rich' || s.kind === 'cell') && this.targetOf(s) === obj : (s.kind === 'title' || s.kind === 'input') && s.owner === obj && s.key === attr) return s;
     }
     return null;
   }
@@ -459,7 +473,8 @@ export class JsgLive {
     const el = o.m2e.get(this.targetOf(p.slot)); if (!el) return null;
     const y = this.yOfEl(el); if (!(y instanceof Y.XmlElement)) return null;
     try {
-      if (p.slot.kind === 'rich') {
+      // rich text, and an ISPL appendix cell (its <cell><text>: the characters of the input, by the same count)
+      if (p.slot.kind === 'rich' || p.slot.kind === 'cell') {
         let rel: Y.RelativePosition | null = null;
         yUnits(y, (t, start, len) => { if (t instanceof Y.XmlText && p.offset <= start + len) { rel = Y.createRelativePositionFromTypeIndex(t, p.offset - start); return true; } return false; });
         rel ??= Y.createRelativePositionFromTypeIndex(y, y.length);
@@ -509,7 +524,7 @@ export class JsgLive {
     let slot = active instanceof HTMLInputElement ? this.slotOf(active) : null;
     if (slot && slot.el instanceof HTMLInputElement) {
       const a = slot.el.selectionStart ?? 0; const b = slot.el.selectionEnd ?? a;
-      return slot.kind === 'cell' ? null : { a: { slot, offset: a }, b: { slot, offset: b } };
+      return { a: { slot, offset: a }, b: { slot, offset: b } };
     }
     slot = this.slotOf(sel?.anchorNode ?? null);
     if (!slot || slot.kind === 'cell' || slot.kind === 'input') return null;
@@ -690,7 +705,7 @@ export class JsgLive {
     this.ro?.disconnect(); this.navObserver?.disconnect();
     this.layer.remove();
     try { this.unobserve?.(); this.unobserve = null; } catch { /* destroyed */ }
-    this.undo.destroy();
+    if (leave) this.undo.destroy(); else { this.undo.stopCapturing(); keptUndo.set(this.room.doc, this.undo); }
     this.ed.setCollab(null);
     try { this.room.setEvents({}); this.room.setPresence(null); } catch { /* the room closed */ }
     if (leave) this.room.close();

@@ -138,8 +138,13 @@ export class DocumentEditor {
   // ------------------------------------------------------------ model sync
   private onChange(ev: ChangeEvent) {
     this.cache = null;
-    if (this.elementSelection && !this.elementSelection.isConnected) this.elementSelection = null;
+    // a remote change (live co-editing) may have moved or re-drawn the selected element: the binding re-maps doc.selection to it
+    const followed = ev.source === 'remote' ? this.doc.selection?.element : null;
+    if (this.elementSelection && (!this.elementSelection.isConnected || (followed && followed !== this.elementSelection))) {
+      this.elementSelection = followed && followed.isConnected ? followed : null;
+    }
     if (ev.source !== 'xml-reload') this.design.onModelChange(ev);
+    if (followed && this.elementSelection === followed && this.mode !== 'xml') this.design.applySelection(this.doc.selection, false);
     if (ev.source !== 'xml') this.xml.markStale();
     else this.xml.setValidation([]);
     if (this.mode === 'xml') this.design.invalidate();

@@ -62,6 +62,8 @@ export class JsgEditor implements JsgEditorLike, JsgLiveSurface {
   private selected: Slot | null = null;
   private selectedEl: HTMLElement | null = null;
   private slots = new WeakMap<HTMLElement, Slot>();
+  /** the elements in `slots`, in drawing order (a selection is found again after a redraw) */
+  private slotEls: HTMLElement[] = [];
   private sheet!: HTMLElement; private nav!: HTMLElement; private bar!: HTMLElement;
   private figures = 0; private tables = 0;
   // history: the document as XML before each burst of editing (typing is grouped by a short pause), so Undo and Redo work on the model whatever was edited
@@ -112,7 +114,14 @@ export class JsgEditor implements JsgEditorLike, JsgLiveSurface {
   // ── live co-editing (JsgLiveSurface) ──
   setCollab(c: JsgCollab | null): void { this.collab = c; if (this.histTimer) { clearTimeout(this.histTimer); this.histTimer = undefined; } this.refreshHistory(); }
   liveSlots(): JsgSlot[] { this.slotList = this.slotList.filter((s) => s.el.isConnected); return this.slotList; }
-  liveRedraw(): void { const keep = this.sheet.parentElement?.scrollTop ?? 0; this.selected = null; this.selectedEl = null; this.render(); if (this.sheet.parentElement) this.sheet.parentElement.scrollTop = keep; }
+  liveRedraw(): void {
+    const keep = this.sheet.parentElement?.scrollTop ?? 0;
+    // the selected block (a table, a figure ...) is the same model object after a remote change (it keeps its object when moved): select it again where it now is
+    const was = this.selected ? this.selected.list[this.selected.index] as unknown : null;
+    this.selected = null; this.selectedEl = null; this.render();
+    if (was) for (const e of this.slotEls) { const sl = this.slots.get(e); if (sl && sl.list[sl.index] === was && e.isConnected) { this.select(e); break; } }
+    if (this.sheet.parentElement) this.sheet.parentElement.scrollTop = keep;
+  }
   afterRemote(): void { this.renderNav(); this.refreshStatus(); this.refreshHistory(); if (this.findBar.classList.contains('open')) this.runFind(false); }
   liveParts(): { root: HTMLElement; sheet: HTMLElement; scroll: HTMLElement; nav: HTMLElement } { return { root: this.root, sheet: this.sheet, scroll: this.sheet.parentElement as HTMLElement, nav: this.nav }; }
   /** Show (or stop showing) a code beside each section heading. The document is not touched; the sheet is drawn again where it stood. */
@@ -548,7 +557,7 @@ export class JsgEditor implements JsgEditorLike, JsgLiveSurface {
 
   // ── rendering ────────────────────────────────────────────────────────────────────────────────────────────────────────────────
   private render(focus?: unknown): void {
-    this.sheet.innerHTML = ''; this.slots = new WeakMap(); this.figures = 0; this.tables = 0; this.slotList = [];
+    this.sheet.innerHTML = ''; this.slots = new WeakMap(); this.slotEls = []; this.figures = 0; this.tables = 0; this.slotList = [];
     const s = this.sheet; let focusEl: HTMLElement | null = null;
     this.ancillaryNote();
     this.doc.chapters.forEach((ch, ci) => {
@@ -563,7 +572,7 @@ export class JsgEditor implements JsgEditorLike, JsgLiveSurface {
           if (isClause(x)) {
             const n = list.slice(0, i + 1).filter(isClause).length; const num = `${prefix}${n}`;
             const c = this.el('div', 'jsg-clause'); c.append(this.el('span', 'n', num)); c.append(this.titleEl(x, 'title', 'Heading'));
-            this.slots.set(c, slot(list, i)); c.addEventListener('focusin', () => this.select(c)); s.appendChild(c); if (focus === x) focusEl = c;
+            this.slots.set(c, slot(list, i)); this.slotEls.push(c); c.addEventListener('focusin', () => this.select(c)); s.appendChild(c); if (focus === x) focusEl = c;
             if (x.orientation && x.orientation !== 'portrait') s.appendChild(this.el('div', 'jsg-orient', `This heading is on its own ${x.orientation === 'a3-landscape' ? 'A3 landscape' : 'landscape'} page`));
             walk(x.children, `${num}.`);
           } else { const e = this.blockEl(x, slot(list, i)); s.appendChild(e); if (focus === x) focusEl = e; }
@@ -622,7 +631,7 @@ export class JsgEditor implements JsgEditorLike, JsgLiveSurface {
       case 'pageBreak': e = this.el('div', 'jsg-break', 'page break'); break;
       default: e = this.noticeEl(b);
     }
-    this.slots.set(e, slot);
+    this.slots.set(e, slot); this.slotEls.push(e);
     e.addEventListener('focusin', (ev) => { ev.stopPropagation(); this.select(e); });
     e.addEventListener('click', () => this.select(e));
     return e;

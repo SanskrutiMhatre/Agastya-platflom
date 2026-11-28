@@ -69,7 +69,6 @@ const WINDOW_MAX_MSGS = 600;          // a page batches typing every 50 ms (20/s
 const WINDOW_MAX_BYTES = 32 << 20;
 const MAX_AWARENESS_BYTES = 16 * 1024;
 const ACCESS_TTL_MS = 10_000;
-const LEASE_RENEW_MS = 60_000;
 const ORIGIN_LOAD = Symbol('collab-load');
 const ORIGIN_EXTERNAL = Symbol('collab-external');
 
@@ -660,13 +659,17 @@ function awarenessIsOwn(update: Uint8Array, m: Member): boolean {
 /** The holder of a check-out keeps it while they work (P3-1: the check-out expires after inactivity, not while someone types). */
 function renewLease(m: Member): void {
   const lock = m.access.lock;
-  if (!lock || !lock.mine || Date.now() - m.lastRenew < LEASE_RENEW_MS) return;
+  if (!lock || !lock.mine || Date.now() - m.lastRenew < config.collab.leaseRenewMs) return;
   m.lastRenew = Date.now();
   const id = m.room.docId;
   if (!id) return;
   try {
     const expiresAt = new Date(Date.now() + config.leaseMinutes * 60_000).toISOString();
-    repos.leases.acquire({ documentId: id, part: m.room.format.leasePart ?? '', projectId: m.room.projectId, userId: m.conn.user.id, username: m.conn.user.username, now: nowIso(), expiresAt });
+    // Phase 8: each check-out this person holds, with its own part (a chapter or section check-out stays one: renewing it as the whole
+    // document would have turned a part check-out into a whole-document one)
+    const now = nowIso();
+    const held = repos.leases.listForDocument(id).filter((r) => r.user_id === m.conn.user.id && r.expires_at > now);
+    for (const r of held) repos.leases.acquire({ documentId: id, part: r.part, projectId: m.room.projectId, userId: m.conn.user.id, username: m.conn.user.username, now, expiresAt });
     m.access = { ...m.access, lock: { ...lock, expiresAt } };
   } catch { /* the lease stays as it was */ }
 }

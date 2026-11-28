@@ -8,6 +8,7 @@
 process.env.AGASTYA_COLLAB_WRITEBACK_MS = '800';
 process.env.AGASTYA_COLLAB_PERSIST_MS = '20';
 process.env.AGASTYA_COLLAB_IDLE_MS = '1000';
+process.env.AGASTYA_COLLAB_LEASE_RENEW_MS = '50';   // a check-out holder's lease is renewed while they type (Phase 8: with its own part)
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -282,6 +283,18 @@ test('a reviewer sees the document live but cannot change it; a check-out locks 
   // checked in: Ann writes again
   assert.equal((await ben.del(`${U()}/checkout`)).status, 200);
   assert.ok(await until(() => ja.room.state && ja.room.state.writable === true));
+  // Phase 8: a chapter check-out stays a chapter check-out while its holder types live (it was renewed as the whole book before)
+  const chapterId = (/<chapter\b[^>]*\sid="([^"]+)"/.exec(fileText()) ?? [])[1] ?? 'ch-test';
+  assert.equal((await ben.post(`${U()}/checkout`, { part: chapterId })).status, 200);
+  assert.ok(await until(() => ja.room.state && ja.room.state.code === 'CHECKED_OUT'), 'the book is locked for the others (documented: per room)');
+  const B = bound(jb.room); const bp = B.doc.chapters[0].children.filter((c) => c.k === 'para')[1];
+  for (let i = 0; i < 3; i++) { bp.inline = [...bp.inline, { t: 'text', text: ` RENEW${i}` }]; B.sync(); await new Promise((res) => setTimeout(res, 120)); }
+  assert.ok(await b.settled(ROOM()));
+  const held = (await ben.get(`${U()}/checkouts`)).json;
+  const parts = (held.checkouts ?? held.leases ?? held).map((l) => l.part);
+  assert.deepEqual(parts, [chapterId], `only the chapter is checked out: ${JSON.stringify(held)}`);
+  assert.equal((await ben.del(`${U()}/checkout?part=${encodeURIComponent(chapterId)}`)).status, 200);
+  assert.ok(await until(() => ja.room.state && ja.room.state.writable === true), 'checked in: the book is free (no whole-book check-out was left behind)');
   a.close(); b.close(); r.close();
 });
 

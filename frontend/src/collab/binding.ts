@@ -212,6 +212,8 @@ export class DomBinding {
       tree.push(ev);
     }
     const sorted = tree.map((ev) => ({ ev, depth: yDepth(ev.target) })).sort((a, b) => a.depth - b.depth).map((x) => x.ev);
+    const selEl = this.doc.selection?.element ?? null;
+    const selY = selEl ? this.d2y.get(selEl) : undefined;
     this.applying = true;
     try {
       this.doc.applyRemote(kind === 'remote' ? 'Change by another author' : kind === 'undo' ? 'Undo' : 'Redo', () => {
@@ -229,9 +231,31 @@ export class DomBinding {
           const d = p === this.frag ? this.doc.xml : this.y2d.get(p);
           if (d && (d === this.doc.xml || this.doc.xml.contains(d))) this.pull(p, d, false);
         }
+        this.remapElementSelection(selY);
       }, kind);
     } finally { this.applying = false; }
     this.opts.onRemote?.();
+  }
+
+  /**
+   * A selected element (a figure or table in element-selection mode) after a remote change: the selection follows the element, by its Y
+   * node, to wherever it now is (moved by someone: the same DOM element; re-drawn: the new one). Gone: a caret where it was.
+   */
+  private remapElementSelection(selY: YAny | undefined): void {
+    const sel = this.doc.selection;
+    if (!sel?.element || !selY) return;
+    let el: Node | undefined = sel.element;
+    if (!el.isConnected || this.d2y.get(el) !== selY) el = !yDeleted(selY) ? this.y2d.get(selY) : undefined;
+    if (el && el.nodeType === 1 && el.isConnected && el.parentNode) {
+      const parent = el.parentNode; const i = Array.prototype.indexOf.call(parent.childNodes, el) as number;
+      if (sel.element === el && sel.anchor.node === parent && sel.anchor.offset === i && sel.focus.offset === i + 1) return;
+      this.doc.selection = { anchor: { node: parent, offset: i }, focus: { node: parent, offset: i + 1 }, element: el as Element };
+      return;
+    }
+    if (!sel.element.isConnected) {
+      const at = sel.anchor.node.isConnected ? { node: sel.anchor.node, offset: Math.min(sel.anchor.offset, sel.anchor.node.childNodes.length) } : null;
+      this.doc.selection = at ? { anchor: at, focus: at } : null;
+    }
   }
 
   private remoteMeta(tr: Y.Transaction): void {
