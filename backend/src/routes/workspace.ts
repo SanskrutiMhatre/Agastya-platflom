@@ -29,6 +29,8 @@ import fs from 'fs';
 import path from 'path';
 import { projectDirFor } from '../context';
 import { PDF_NAME } from '../services/publisher';
+import { getConfigRow, DEFAULT_ISSUE } from '../services/projectConfig';
+import { ISSUE_LABEL } from '../services/s1000dRef';
 import { notify, adminIds } from '../services/notifications';
 
 /** The dashboard's facts of one project (display only, WP-18 reuse): its release status and the counts of its last validation run. */
@@ -177,8 +179,9 @@ export function registerWorkspaceRoutes(app: Express): void {
     const validation = lastRun(id);
     const rel = (() => { try { return releaseStateOf(id, { reuse: true, known: dms }); } catch { return null; } })();   // display only (WP-18)
     const pdf = path.join(projectDirFor(id), PDF_NAME);
+    const card = P.projectCard(store.getProjectRow(id), req.project.role, req.auth.user.role === 'admin' ? 'admin' : 'project', req.auth.user);
     res.json({
-      project: P.projectCard(store.getProjectRow(id), req.project.role, req.auth.user.role === 'admin' ? 'admin' : 'project', req.auth.user),
+      project: card,
       role: req.project.role,
       dataModules: { total: dms.length, withIssues: validation ? new Set(validation.issues.filter((i) => i.sev !== 'info').map((i) => i.file)).size : null },
       publication: pm,
@@ -188,7 +191,10 @@ export function registerWorkspaceRoutes(app: Express): void {
         number: rel.approved ? rel.approved.release_number : null,
         pending: !!rel.pending, scheduledAt: rel.scheduled ? rel.scheduled.scheduled_at : null,
       } : null,
-      build: fs.existsSync(pdf) ? { builtAt: fs.statSync(pdf).mtime.toISOString(), size: fs.statSync(pdf).size } : null,
+      build: fs.existsSync(pdf) ? { builtAt: fs.statSync(pdf).mtime.toISOString(), size: fs.statSync(pdf).size, pages: pdfPages(pdf) } : null,
+      // UI redesign (Project Home header, mockup project.html): the S1000D issue and model identification code of the project, read only;
+      // the stored configuration when there is one (it is not created here: a GET writes nothing), else the codes the data modules carry
+      s1000d: (card.format ?? 's1000d') === 's1000d' && card.type !== 'CIR' ? (() => { try { return identityOf(id, dms); } catch { return null; } })() : null,
       members: store.listMembers(id).length,
       // WP-22 (UX-007): the Project Home's Review and Check cards; display only, a failure leaves them out
       review: (() => { try { return { ...reviewState(id, rel ?? undefined), open: openComments(id) }; } catch { return null; } })(),   // the state above, not a second full pass (WP-17)
@@ -197,6 +203,28 @@ export function registerWorkspaceRoutes(app: Express): void {
   }));
 
   void csdbDir; void workspace; void workspaceDir; void audit; void clientIp;
+}
+
+/** The S1000D issue and the model identification code shown on the Project Home: the configuration's, else the most common among the data modules. */
+function identityOf(id: string, dms: Array<{ dmc: string; issue: string }>): { issue: string; mic: string | null } {
+  const cfg = getConfigRow(id)?.config ?? null;
+  const common = (xs: string[]): string | null => { const n = new Map<string, number>(); for (const x of xs) if (x) n.set(x, (n.get(x) ?? 0) + 1); return [...n].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null; };
+  const issue = cfg?.issue ? ISSUE_LABEL[cfg.issue] : common(dms.map((d) => d.issue)) ?? ISSUE_LABEL[DEFAULT_ISSUE];
+  return { issue, mic: cfg?.mic || common(dms.map((d) => d.dmc.split('-')[0] ?? '')) };
+}
+
+/** The number of pages of the last PDF (its page tree's /Count), remembered per file version; null when it cannot be read. */
+const pageCache = new Map<string, { key: string; pages: number | null }>();
+function pdfPages(file: string): number | null {
+  try {
+    const st = fs.statSync(file); const key = `${st.mtimeMs}:${st.size}`;
+    const hit = pageCache.get(file); if (hit && hit.key === key) return hit.pages;
+    const text = fs.readFileSync(file).toString('latin1');
+    let pages: number | null = null;
+    for (const m of text.matchAll(/\/Type\s*\/Pages\b[^>]*?\/Count\s+(\d+)/g)) pages = Math.max(pages ?? 0, Number(m[1]));
+    pageCache.set(file, { key, pages });
+    return pages;
+  } catch { return null; }
 }
 
 function safeJson(s: unknown): unknown { try { return typeof s === 'string' ? JSON.parse(s) : s; } catch { return null; } }
