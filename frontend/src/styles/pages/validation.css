@@ -1,39 +1,101 @@
 /* =========================================================================
-   WP-35 second pass: the Validation report on the design system (mockup docs/audit/mockups/validation.html): a filter bar on a card,
-   the finding list beside a sticky detail panel, file groups with their counts, a reviewed badge on each reviewed finding and the detail
-   as a term/description list. Loaded only with ValidationPage's chunk. Colours are tokens only.
+   UI redesign screen 5, the Validation report (owner approved mockup docs/audit/mockups/validation.html): the severity summary whose
+   cards are the filters, the issue table, the selected finding with its source excerpt, the errors counted by check.
+   The class names are the mockup's (.sum, .stat, .card, .card-head, .seg, .table, .sevic, .src, .kv, .byrule, .progress, .field .error).
+   The shared component classes come with the design system; until they are there, the rules below are scoped fallbacks under
+   .val-page, written with tokens only (a missing mockup token falls back to an existing one). Loaded only with ValidationPage's chunk.
    ========================================================================= */
+.val-page .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.val-page .faint { color: var(--text-tertiary, var(--text-faint)); }
+.val-page .mono { font-family: var(--font-mono); }
+.val-page .trunc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.val-page .grow { flex: 1; }
+.val-page .num { text-align: right; font-variant-numeric: tabular-nums; }
 .v2-val-notes { margin-bottom: 12px; }
-.v2-val-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 12px; margin-bottom: 12px;
-  background: var(--bg-elev); border: 1px solid var(--border); border-radius: 10px; }
-.v2-val-sev { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 999px;
-  font-size: 12.5px; color: var(--text-muted); cursor: pointer; user-select: none; }
-.v2-val-sev:has(input:checked) { background: var(--accent-soft); border-color: var(--accent); color: var(--text); }
-.v2-val-sev input { margin: 0; }
-.v2-val-sev .v2-sev { margin-top: 0; }
-.v2-val-sev .n { font-variant-numeric: tabular-nums; color: var(--text-faint); }
-.v2-val-sev:has(input:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
-.v2-val-bar .v2-select { width: 200px; height: 30px; }
-.v2-val-bar .v2-input { width: 220px; height: 30px; }
-.v2-val-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; }
+.v2-val-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; padding: 0; }
 .v2-val-issue-sel { width: 210px; }
 
-.v2-val-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: 16px; align-items: start; }
-@media (max-width: 1100px) { .v2-val-layout { grid-template-columns: minmax(0, 1fr); } }
-.v2-val-list { overflow: hidden; }
-.v2-val-group { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--bg-sunken); border-bottom: 1px solid var(--border); font-weight: 600; }
-.v2-val-group .v2-trunc { flex: 1; }
-.v2-issue.sel { box-shadow: inset 3px 0 0 var(--accent); }
-.v2-issue:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
-.v2-issue-body { min-width: 0; flex: 1; }
-.v2-issue-body.done { opacity: .55; }
-.v2-issue-title { font-weight: 600; }
-.v2-issue-detail { white-space: normal; }
-.v2-issue-tags { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: none; }
+/* severity icons */
+.val-page .sevic { display: inline-flex; vertical-align: middle; }
+.val-page .sevic.danger { color: var(--danger); } .val-page .sevic.warning { color: var(--warning); } .val-page .sevic.info { color: var(--info); }
 
-.v2-val-detail { position: sticky; top: 0; }
-.v2-val-detail h3 { margin: 0; }
+/* the severity summary */
+.val-sum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+.val-stat { display: flex; flex-direction: column; padding: 12px 16px; cursor: pointer; user-select: none;
+  background: var(--surface-panel); border: 1px solid var(--border-default); border-left: 3px solid var(--border-default); border-radius: var(--radius-lg); }
+.val-stat:hover { background: var(--surface-hover); }
+.val-stat[data-on="true"] { background: var(--surface-selected); }
+.val-stat.e { border-left-color: var(--danger); } .val-stat.w { border-left-color: var(--warning); } .val-stat.i { border-left-color: var(--info); } .val-stat.s { border-left-color: var(--success); }
+.val-stat:has(input:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.val-stat-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.val-stat-top input { margin: 4px 0 0; }
+.val-stat .v { font-size: 24px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.val-stat .l { color: var(--text-secondary, var(--text-muted)); font-size: var(--fs-xs); margin-top: 4px; }
+.val-stat .d { font-size: var(--fs-xs); margin-top: 6px; }
+
+/* the report: issues beside the selected finding */
+.val-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: 16px; align-items: start; }
+@media (max-width: 1280px) { .val-layout { grid-template-columns: minmax(0, 1fr); } .val-sum { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.val-page .card { background: var(--surface-panel); border: 1px solid var(--border-default); border-radius: var(--radius-lg); }
+.val-page .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 16px;
+  border-bottom: 1px solid var(--border); }
+.val-page .card-head h3 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: var(--fs-md); min-width: 0; }
+.val-page .card-body { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.val-issues { overflow: hidden; }
+.val-count { font-weight: 400; font-size: var(--fs-xs); }
+.val-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.val-bar .input { width: 240px; height: 30px; }
+
+/* the source filter (mockup .seg) */
+.val-seg { display: inline-flex; flex-wrap: wrap; padding: 2px; gap: 2px; background: var(--surface-inset); border: 1px solid var(--border-default); border-radius: var(--radius); }
+.val-seg button { height: 24px; min-width: 28px; padding: 0 8px; border: 0; border-radius: var(--radius-sm); background: none; color: var(--text-secondary, var(--text-muted)); cursor: pointer; font: inherit; font-size: var(--fs-xs); font-weight: 500; }
+.val-seg button:hover { color: var(--text-primary, var(--text)); background: var(--surface-hover); }
+.val-seg button[aria-pressed="true"] { background: var(--surface-panel); color: var(--text-primary, var(--text)); box-shadow: var(--shadow-1); }
+.val-seg button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+
+/* the issue table (mockup .table.issues) */
+.val-issues .table-wrap { overflow: auto; }
+.val-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.val-table th { position: sticky; top: 0; z-index: 1; text-align: left; padding: 0 12px; height: 32px; background: var(--surface-inset); color: var(--text-secondary, var(--text-muted));
+  font-size: var(--fs-xs); font-weight: 600; border-bottom: 1px solid var(--border-default); white-space: nowrap; }
+.val-table td { padding: 6px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.val-table tbody tr[data-testid="issue"] { cursor: pointer; }
+.val-table tbody tr[data-testid="issue"]:hover td { background: var(--surface-hover); }
+.val-table tbody tr[aria-selected="true"] td, .val-table tbody tr[aria-selected="true"]:hover td { background: var(--surface-selected); }
+.val-table tbody tr[aria-selected="true"] td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+.val-table tbody tr[data-testid="issue"]:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.val-table tr.done .val-msg { opacity: .55; }
+.val-sevcol { width: 32px; }
+.val-msg { max-width: 0; width: 60%; }
+.val-title { font-weight: 500; }
+.val-loc { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.val-file { max-width: 180px; }
+.val-file .trunc { display: block; }
+.val-group td { background: var(--surface-inset); font-weight: 600; padding: 6px 12px; }
+.val-group td > * { vertical-align: middle; }
+.val-group .trunc { display: inline-block; max-width: calc(100% - 80px); margin: 0 8px; }
+
+/* the selected finding */
+.val-side { display: flex; flex-direction: column; gap: 16px; position: sticky; top: 0; }
+.val-detail .card-head h3 { overflow-wrap: anywhere; }
 .v2-val-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.v2-kv { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 6px 12px; margin: 0; font-size: 12.5px; }
-.v2-kv dt { color: var(--text-faint); }
-.v2-kv dd { margin: 0; overflow-wrap: anywhere; }
+.val-kv { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 4px 12px; margin: 0; font-size: var(--fs-xs); }
+.val-kv dt { color: var(--text-tertiary, var(--text-faint)); }
+.val-kv dd { margin: 0; color: var(--text-primary, var(--text)); overflow-wrap: anywhere; }
+.val-src { margin: 0; padding: 12px; background: var(--surface-inset); border: 1px solid var(--border-default); border-radius: var(--radius);
+  font-family: var(--font-mono); font-size: var(--fs-xs); line-height: 1.6; overflow: auto; white-space: pre; }
+.val-src .ln { display: inline-block; width: 36px; color: var(--text-tertiary, var(--text-faint)); user-select: none; }
+.val-src .hit { display: block; background: var(--danger-subtle); box-shadow: inset 2px 0 0 var(--danger); }
+.val-src .t { color: var(--syntax-tag); } .val-src .a { color: var(--syntax-attr); } .val-src .v { color: var(--syntax-value); }
+.val-src .b { color: var(--syntax-bracket); } .val-src .c { color: var(--syntax-comment); }
+.val-src-note { margin: 0; font-size: var(--fs-xs); }
+.val-review { border-top: 1px solid var(--border); padding-top: 12px; align-items: flex-start; gap: 6px; }
+.val-review .hint { font-size: var(--fs-xs); color: var(--text-tertiary, var(--text-faint)); }
+.val-review .error { font-size: var(--fs-xs); color: var(--danger); display: flex; gap: 4px; align-items: center; }
+
+/* errors by check (mockup .byrule) */
+.val-page .byrule { list-style: none; margin: 0; padding: 0; }
+.val-page .byrule li { display: grid; grid-template-columns: minmax(0, 1fr) 120px 28px; gap: 12px; align-items: center; padding: 8px 16px; font-size: var(--fs-xs); }
+.val-page .byrule li + li { border-top: 1px solid var(--border); }
+.val-page .progress { height: 6px; border-radius: 3px; background: var(--surface-inset); border: 1px solid var(--border); overflow: hidden; display: flex; }
+.val-page .progress > i { display: block; height: 100%; background: var(--danger); }
