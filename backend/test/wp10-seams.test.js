@@ -207,7 +207,8 @@ test('PRD-002: the migration files are complete for the SQLite engine, unique, a
     '010-folder-permissions', '011-folder-access-and-changes', '012-change-seen', '013-manager-and-author-roles', '016-s1000d-reference',
     '017-s1000d-completion', '018-sns-preset-model', '019-review-comment-anchor', '020-login-throttle', '021-project-lifecycle', '022-audit-project-index',
     '023-document-leases', '024-directory-groups-permissions', '025-audit-chain', '026-jobs',
-    '027-default-accounts',   // Phase 3 P3-6 (standalone default accounts), appended
+    '027-default-accounts',    // Phase 3 P3-6 (standalone default accounts), appended
+    '028-pdf-annotations',     // Phase 3 P3-4 (PDF review), appended
     '029-collab-documents'],   // Phase 3 P3-1 (live co-editing rooms), appended
   'a shipped migration is never renamed or reordered; a new one is appended');
   assert.equal(new Set(ORDER).size, ORDER.length);

@@ -154,7 +154,7 @@ export function JsgEditorPage() {
         <ExportProjectButton id={id} dirty={dirty} saveFirst={host.save} />
       </>}
       pdf={<DocPdfPane kind="jsg" src={host.src} downloadHref={jsgApi.pdfUrl(id, true)} downloadName={`${summary.project.name}.pdf`} builtBy="the JSG engine" what="the document"
-        note={host.note} building={building} progressLines={host.progress.lines} shown={host.shown} />} />
+        note={host.note} building={building} progressLines={host.progress.lines} shown={host.shown} projectId={id} />} />
     {wordFile ? <ConfirmModal title="Replace this handbook?" danger confirmLabel="Replace with the Word file"
       body={<p>Replace this handbook with “{wordFile.name}”? The whole document and its front matter are replaced by what the Word file contains (its pictures are added to the project). The handbook as it is now is kept in the project folder as jsg-document.before-import.bak.</p>}
       onClose={() => setWordFile(null)} onConfirm={() => { const f = wordFile; setWordFile(null); void importWord(f); }} /> : null}

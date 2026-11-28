@@ -172,6 +172,12 @@
   --p-viewer-match-outline: rgb(230, 120, 0);
   --p-viewer-text-select: rgba(0, 100, 255, 0.3);
   --p-viewer-highlight: rgba(180, 0, 170, 0.25);
+  --p-pdf-annot-comment: rgba(255, 196, 0, 0.36);
+  --p-pdf-annot-suggestion: rgba(46, 160, 67, 0.3);
+  --p-pdf-annot-remark: rgba(59, 130, 246, 0.28);
+  --p-pdf-annot-closed: rgba(110, 118, 129, 0.2);
+  --p-pdf-annot-draft: rgba(0, 100, 255, 0.18);
+  --p-pdf-annot-focus: rgb(230, 100, 0);
   --p-preview-canvas: #6b7280;
   --p-preview-edge: #374151;
   --p-preview-control-line: #9ca3af;
@@ -447,6 +453,12 @@
   --viewer-match-outline: var(--p-viewer-match-outline);
   --viewer-text-select: var(--p-viewer-text-select);
   --viewer-highlight: var(--p-viewer-highlight);
+  --pdf-annot-comment: var(--p-pdf-annot-comment);
+  --pdf-annot-suggestion: var(--p-pdf-annot-suggestion);
+  --pdf-annot-remark: var(--p-pdf-annot-remark);
+  --pdf-annot-closed: var(--p-pdf-annot-closed);
+  --pdf-annot-draft: var(--p-pdf-annot-draft);
+  --pdf-annot-focus: var(--p-pdf-annot-focus);
   --preview-canvas: var(--p-preview-canvas);
   --preview-edge: var(--p-preview-edge);
   --preview-text: var(--p-white);
