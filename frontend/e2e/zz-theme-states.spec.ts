@@ -35,7 +35,7 @@ async function fixture(page: Page): Promise<void> {
       <input class="v2-input" data-s="in" value="x"><input class="v2-input" data-s="in-dis" value="x" disabled><input class="v2-input" data-s="in-err" aria-invalid="true" value="x">
       <select class="v2-select" data-s="sel"><option>One</option></select><select class="v2-select" data-s="sel-dis" disabled><option>One</option></select>
       <div class="v2-seg"><button data-s="seg">A</button><button class="on" data-s="seg-on">B</button><button data-s="seg-dis" disabled>C</button></div>
-      <div class="v2-tabs"><button class="v2-tab" data-s="tab">Tab</button><button class="v2-tab active" data-s="tab-on">Tab</button></div>`;
+      <div class="tabs" role="tablist"><button class="tab" role="tab" aria-selected="false" data-s="tab">Tab</button><button class="tab" role="tab" aria-selected="true" data-s="tab-on">Tab</button></div>`;
     document.body.appendChild(box);
   });
 }

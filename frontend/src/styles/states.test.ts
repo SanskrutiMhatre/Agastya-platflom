@@ -36,7 +36,13 @@ function parse(css: string): Rule[] {
   }
   return rules;
 }
-const RULES = parse(SHEETS).filter((r) => !r.media.includes('print') && !r.media.includes('forced-colors') && !r.media.includes('prefers-') && !r.media.includes('max-width'));
+const screenOnly = (r: Rule): boolean => !r.media.includes('print') && !r.media.includes('forced-colors') && !r.media.includes('prefers-') && !r.media.includes('max-width');
+const RULES = parse(SHEETS).filter(screenOnly);
+// The mockup components (.tab and the other UI-redesign classes) are in components.css, loaded right after base.css (main.tsx). This
+// equal-specificity model cannot add that sheet to every control (a later base rule such as .icon-btn would wrongly beat an earlier
+// .icon-btn:hover), so only controls marked `mockup` are evaluated with it; their states are also checked in a real browser
+// (e2e/visual/screens.spec.ts, design system).
+const MOCKUP_RULES = parse(read('styles/components.css') + '\n' + SHEETS).filter(screenOnly);
 const TOKEN_RULES = parse(TOKENS);
 const vars = (theme: 'light' | 'dark'): Record<string, string> => {
   const out: Record<string, string> = {};
@@ -56,12 +62,12 @@ function resolve(v: string, theme: 'light' | 'dark', depth = 0): string {
   }).trim();
 }
 /** The declarations an element gets from these selectors, in source order (later rule wins, like equal-specificity cascade). */
-function cascade(selectors: string[]): Record<string, string> {
+function cascade(selectors: string[], rules: Rule[] = RULES): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const r of RULES) if (r.selectors.some((s) => selectors.includes(s))) Object.assign(out, r.decls);
+  for (const r of rules) if (r.selectors.some((s) => selectors.includes(s))) Object.assign(out, r.decls);
   return out;
 }
-const has = (sel: string): boolean => RULES.some((r) => r.selectors.includes(sel));
+const has = (sel: string, rules: Rule[] = RULES): boolean => rules.some((r) => r.selectors.includes(sel));
 const bgOf = (d: Record<string, string>): string | undefined => d['background-color'] ?? d.background;
 
 // --- WCAG contrast
@@ -69,7 +75,7 @@ const hex = (c: string): [number, number, number] | null => { const m = /^#([0-9
 const lum = (c: [number, number, number]): number => c.map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
 const ratio = (a: string, b: string): number | null => { const x = hex(a), y = hex(b); if (!x || !y) return null; const p = lum(x), q = lum(y); return (Math.max(p, q) + 0.05) / (Math.min(p, q) + 0.05); };
 
-interface Control { name: string; base: string[]; states: Partial<Record<'hover' | 'active' | 'selected' | 'focus' | 'disabled' | 'busy' | 'error', string[]>>; surface?: string }
+interface Control { name: string; mockup?: true; base: string[]; states: Partial<Record<'hover' | 'active' | 'selected' | 'focus' | 'disabled' | 'busy' | 'error', string[]>>; surface?: string }
 const FOCUS_GLOBAL = ':where(button, [tabindex], select, input, textarea, a, summary):focus-visible';
 const MATRIX: Control[] = [
   { name: 'button', base: ['.btn'], states: { hover: ['.btn:hover'], active: ['.btn:active:not(:disabled)'], focus: ['.btn:focus-visible'], disabled: ['.btn:disabled'], busy: [".btn[aria-busy='true']"] } },
@@ -80,7 +86,7 @@ const MATRIX: Control[] = [
   { name: 'ribbon button', base: ['.rb'], states: { hover: ['.rb:hover:not(:disabled)'], active: ['.rb:active:not(:disabled)'], selected: ['.rb.pressed'], focus: ['.rb:focus-visible'], disabled: ['.rb:disabled'] } },
   { name: 'view switch', base: ['.vs-btn'], states: { hover: ['.vs-btn:hover:not(:disabled)'], selected: ['.vs-btn.pressed'], focus: ['.vs-btn:focus-visible'], disabled: ['.vs-btn:disabled'] } },
   { name: 'segmented control', base: ['.v2-seg button'], states: { hover: ['.v2-seg button:hover:not(:disabled):not(.on)'], selected: ['.v2-seg button.on'], focus: ['.v2-seg button:focus-visible'], disabled: ['.v2-seg button:disabled'] } },
-  { name: 'tab', base: ['.v2-tab'], states: { hover: ['.v2-tab:hover'], selected: ['.v2-tab.active'], focus: ['.v2-tab:focus-visible'], disabled: ['.v2-tab:disabled'] } },
+  { name: 'tab', mockup: true, base: ['.tab'], states: { hover: ['.tab:hover'], selected: ['.tab[aria-selected="true"]'], focus: ['.tab:focus-visible'], disabled: ['.tab:disabled'] } },
   { name: 'menu item', base: ['.ctx-item'], states: { hover: ['.ctx-item:hover:not(:disabled)'], disabled: ['.ctx-item:disabled'], focus: [FOCUS_GLOBAL] } },
   { name: 'file menu item', base: ['.fm-item'], states: { hover: ['.fm-item:hover:not(:disabled)'], disabled: ['.fm-item:disabled'], focus: [FOCUS_GLOBAL] } },
   // UI redesign (mockup editor.html): the data module row is the explorer's tree row (.tree .node.ed-node, its button .ed-node-btn), no longer .v2-dm
@@ -106,8 +112,9 @@ describe('component x state matrix (both themes)', () => {
   for (const c of MATRIX) for (const [state, sels] of Object.entries(c.states)) for (const theme of THEMES) {
     it(`${c.name} / ${state} / ${theme}`, () => {
       executions++;
-      for (const s of sels!) expect(has(s), `no rule ${s}`).toBe(true);
-      const base = cascade(c.base), st = cascade([...c.base, ...sels!]);
+      const rules = c.mockup ? MOCKUP_RULES : RULES;
+      for (const s of sels!) expect(has(s, rules), `no rule ${s}`).toBe(true);
+      const base = cascade(c.base, rules), st = cascade([...c.base, ...sels!], rules);
       const b = colour(base, theme), x = colour(st, theme);
       if (state === 'hover' || state === 'active' || state === 'selected') {
         expect(`${x.fg}|${x.bg}|${st['border-color'] ?? ''}|${st['box-shadow'] ?? ''}|${st['border-bottom-color'] ?? ''}`, `${state} looks like the default`)
