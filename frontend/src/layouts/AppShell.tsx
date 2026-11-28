@@ -76,7 +76,7 @@ export function AppShell() {
     <div className="app v2-shell" data-density="comfortable">
       <SkipLink />
       <header className="topbar v2-top" data-testid="global-topbar">
-        <div className="brand"><span className="brand-mark"><Icon name="book" size={20} /></span><span className="trunc brand-name">{appName}</span></div>
+        <div className="brand v2-brand"><span className="brand-mark"><Icon name="book" size={20} /></span><span className="trunc brand-name">{appName}</span></div>
         <nav className="crumbs" aria-label="Breadcrumb">
           <span className="sep" aria-hidden="true">/</span>
           {groupHead ? <><span className="crumb-group">{groupHead}</span><span className="sep" aria-hidden="true">/</span></> : null}

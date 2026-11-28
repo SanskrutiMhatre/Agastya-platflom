@@ -68,10 +68,10 @@
 /* =============================================================================
    UI redesign 2026-11-28 (mockup 4 "Publication and PDF preview"): the viewer chrome.
    A themed canvas with a panel-coloured toolbar; the pages themselves stay white
-   paper in both themes (--viewer-page); the canvas is --viewer-canvas until --viewer-canvas-themed has a contrast pair. The
+   paper in both themes (--viewer-page); the canvas is --viewer-canvas-themed (light grey in light, near-black in dark). The
    shared classes (.icon-btn, .vsep, .btn.sm.subtle, .input) do the rest.
    ============================================================================= */
-.pdfv { height: 100%; display: flex; flex-direction: column; min-height: 0; background: var(--viewer-canvas); }
+.pdfv { height: 100%; display: flex; flex-direction: column; min-height: 0; background: var(--viewer-canvas-themed); }
 .pdfv .vbar { display: flex; align-items: center; gap: var(--space-1); min-height: 40px; padding: 0 var(--space-3); background: var(--surface-panel); border-bottom: 1px solid var(--border-default); flex: none; flex-wrap: wrap; }
 .pdfv.compact .vbar { padding: 0 var(--space-2); gap: 2px; }
 .pdfv .vbar .icon-btn[aria-pressed="true"] { background: var(--surface-selected); color: var(--text-link); }

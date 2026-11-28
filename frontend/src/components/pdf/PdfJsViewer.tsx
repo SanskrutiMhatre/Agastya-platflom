@@ -512,13 +512,13 @@ export const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ src, downloadName = 'o
 
         <div ref={containerRef} style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
           {error ? (
-            <div style={{ padding: 24, color: 'var(--viewer-error)', fontSize: 13 }}>⚠ {error}</div>
+            <div style={{ padding: 24, color: 'var(--danger)', fontSize: 13 }}>⚠ {error}</div>
           ) : !src ? (
-            <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: 'var(--viewer-ink-55)', fontSize: 13 }}>
+            <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: 'var(--text-secondary)', fontSize: 13 }}>
               {placeholder ?? 'No PDF yet.'}
             </div>
           ) : loading && !numPages ? (
-            <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: 'var(--viewer-ink-70)', fontSize: 13 }}>
+            <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: 'var(--text-secondary)', fontSize: 13 }}>
               Loading…
             </div>
           ) : (
