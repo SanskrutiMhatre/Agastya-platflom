@@ -139,6 +139,16 @@ html[data-editor-focus] .ed-topslot > .topbar { padding-left: var(--space-3); }
 @media (max-width: 1500px) { .ed-topbar .search-trigger.ed-cmd { min-width: 0; width: auto; } .ed-topbar .search-trigger.ed-cmd .ed-cmd-label { display: none; } }
 @media (max-width: 1280px) { .ed-topbar .search-trigger.ed-cmd { min-width: 0; width: auto; } .ed-topbar .search-trigger.ed-cmd .ed-cmd-label, .ed-topbar .btn kbd { display: none; } }
 @media (max-width: 1100px) { .ed-topbar .crumbs .ed-crumb-section, .ed-topbar .crumbs .ed-crumb-section + .sep { display: none; } }
+/* narrow windows: the bar never pushes the page sideways; the labelled buttons keep their names (font-size 0 hides the words, not the name) */
+.ed-topbar { overflow: hidden; }
+@media (max-width: 900px) {
+  .ed-topbar { gap: var(--space-2); padding-right: var(--space-2); }
+  .ed-topbar .crumbs .ed-crumb-project, .ed-topbar .crumbs .ed-crumb-project + .sep, .ed-topbar .crumbs .badge { display: none; }
+  .ed-topbar .crumbs .ed-crumb-doc { min-width: 6ch; }
+  .ed-topbar .kbd-group, .ed-topbar .btn kbd { display: none; }
+  .ed-topbar .ed-actions .btn, .ed-topbar .v2-edactions .btn, .ed-topbar .btn.ed-validate { font-size: 0; gap: 0; padding: 0 var(--space-2); }
+  .ed-topbar .seg:not(.ed-layout) { display: none; }   /* the theme switch: Settings > Appearance and every other page's top bar keep it */
+}
 
 /* the status bar: the editor's save state, problems, schema; at the right the position, element, language, encoding, zoom */
 .ed-statusbar > .grow { flex: 1; }
@@ -187,6 +197,7 @@ html[data-editor-focus] .ed-topslot > .topbar { padding-left: var(--space-3); }
 .tree-pane .tree .node > .ed-node-btn { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-1h); height: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .tree-pane .tree .node .label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tree-pane .tree .node .dot { flex: none; }
+.tree-pane .tree .node .ed-node-new { flex: 0 1 auto; min-width: 0; margin-left: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-tertiary); }
 .tree-pane .tree .node .ed-node-del { width: 22px; height: 22px; opacity: 0; flex: none; }
 .tree-pane .tree .node:hover .ed-node-del, .tree-pane .tree .node .ed-node-del:focus-visible { opacity: .7; }
 .tree-pane .tree .node .ed-node-lock { color: var(--text-tertiary); flex: none; display: inline-flex; }
@@ -420,7 +431,7 @@ html[data-editor-focus] .ed-topslot > .topbar { padding-left: var(--space-3); }
 .app.app--embedded .pane-bottom .problems-bar { height: 32px; min-height: 32px; padding: 0 var(--space-2); border-bottom: 1px solid var(--border-default); font-size: var(--fs-xs); background: none; }
 .app.app--embedded .pane-bottom .problems-title { align-self: stretch; display: inline-flex; align-items: center; padding: 0 var(--space-2); margin-right: var(--space-2); position: relative; color: var(--text-link); font-weight: var(--fw-medium); font-size: var(--fs-xs); }
 .app.app--embedded .pane-bottom .problems-title::after { content: ""; position: absolute; left: var(--space-2); right: var(--space-2); bottom: -1px; height: 2px; background: var(--accent); border-radius: 2px; }
-.app.app--embedded .pane-bottom .problems-bar { align-items: center; }
+.app.app--embedded .pane-bottom .problems-bar { align-items: center; overflow: hidden; flex-wrap: nowrap; }
 .app.app--embedded .pane-bottom .problem {min-height: var(--row-h); padding: 0 var(--space-3); border-bottom: 1px solid var(--border-subtle); font-size: var(--fs-sm); }
 .app.app--embedded .pane-bottom .problem:hover { background: var(--surface-hover); }
 /* the Studio's own outline pane (View ribbon) in the explorer's look */

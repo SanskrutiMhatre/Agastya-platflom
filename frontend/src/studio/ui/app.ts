@@ -288,7 +288,7 @@ export class App {
     } } }, icon('warning', 14), 'Warning', icon('chevronDown', 14));
     const views = h('div', { class: 'seg', role: 'group', 'aria-label': 'View mode' }, ...['view.design', 'view.tags', 'view.xml'].map((id) => {
       const cmd = this.byId.get(id)!;
-      const b = h('button', { type: 'button', title: tooltip(cmd), 'aria-label': cmd.label, on: { click: () => this.run(id) } }, cmd.label.replace(' view', ''));
+      const b = h('button', { type: 'button', class: 'vs-btn', title: tooltip(cmd), 'aria-label': cmd.label, on: { click: () => this.run(id) } }, cmd.label.replace(' view', ''));
       this.ribbonButtons.push({ el: b, cmd });
       return b;
     }));

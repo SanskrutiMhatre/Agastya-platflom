@@ -220,7 +220,7 @@ export function EditorSide({ ctx, refreshKey, treeKey, width, onCollapse }: { ct
           {untitled.map((d) => (
             <div key={d.key} className="node ed-node" aria-selected={d.active || undefined}>
               <button className="ed-node-btn" onClick={() => studio.focusEditor()} title="New, not saved to the project yet">
-                <span className="twist" /><Icon name="file" size={16} className="ico" /><span className="label trunc">{d.title}</span>{d.dirty ? <span className="dot warning" /> : null}
+                <span className="twist" /><Icon name="file" size={16} className="ico" /><span className="label trunc">{d.title}</span><span className="meta ed-node-new">New, not saved to the project yet</span>{d.dirty ? <span className="dot warning" /> : null}
               </button>
             </div>
           ))}
