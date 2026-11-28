@@ -60,7 +60,7 @@ const share = (page: Page, sel: string) => page.locator(sel).first().evaluate((e
 });
 
 for (const e of EDITORS) {
-  test(`${e.kind}: the shared header, Write by default with at least 55% of 1366x768, the palette, the shortcuts, focus mode and Esc`, async ({ browser, baseURL }) => {
+  test(`${e.kind}: the shared header, Write by default with the mockup's panels open and at least 30% of 1366x768, the palette, the shortcuts, focus mode and Esc`, async ({ browser, baseURL }) => {
     const page = await fresh(browser, baseURL);
     try {
       await open(page, e);
@@ -73,7 +73,15 @@ for (const e of EDITORS) {
 
       const area = await share(page, e.surface);
       console.log(`${e.kind}: editing surface ${(area * 100).toFixed(1)}% of 1366x768 in Write`);
-      expect(area).toBeGreaterThanOrEqual(0.55);
+      // UI redesign 2026-11-28: the first view is the owner-approved mockup's (docs/audit/mockups/editor.html): explorer 248 px, Properties
+      // 288 px and Problems 148 px open beside and under the document, as in the mockup itself (its document area is about 34% of 1366x768);
+      // the WP-21 "panels closed, 55%" first view is replaced. Focus mode below still gives the page at least 70%.
+      if (e.kind === 's1000d') await expect(page.locator('.app--embedded > .pane-bottom')).toBeVisible();
+      else if (e.kind === 'jss') await expect(page.getByTestId('jss-problems')).toHaveAttribute('open', '');
+      else await expect(page.getByTestId('doc-problems')).toBeVisible();
+      await expect(page.getByRole('complementary', { name: e.kind === 's1000d' ? 'Data modules' : 'Explorer' })).toBeVisible();
+      await expect(page.getByRole('complementary', { name: 'Properties' }).first()).toBeVisible();
+      expect(area).toBeGreaterThanOrEqual(0.3);
 
       // Ctrl+K: the command palette; Esc closes it
       await page.locator(e.surface).first().click({ position: { x: 5, y: 5 } }).catch(() => undefined);
@@ -236,10 +244,15 @@ test('the S1000D ribbon folds to its tabs by default; a tab shows its commands u
     const body = page.locator('.ribbon-body');
     await expect(page.locator('.ribbon')).toHaveClass(/is-collapsed/);
     await expect(body).toBeHidden();
+    // UI redesign: the folded ribbon is hidden under the one-row toolbar; the toolbar's last button shows it (its tabs, then a tab's commands)
+    await expect(page.locator('.ribbon-tab[data-tab]').first()).toBeHidden();
+    await page.getByTestId('ribbon-toggle').click();
+    await expect(page.getByTestId('ribbon-toggle')).toHaveAttribute('aria-expanded', 'true');
     await page.locator('.ribbon-tab[data-tab="insert"], .ribbon-tab[data-tab]').nth(1).click();
     await expect(body).toBeVisible();
     await page.keyboard.press('Escape');
     await expect(body).toBeHidden();
+    await page.getByTestId('ribbon-toggle').click();                                                          // show the folded ribbon again to reach its pin
     await page.getByTestId('ribbon-pin').click();
     await expect(body).toBeVisible();
     await page.reload(); await EDITORS[0].ready(page);

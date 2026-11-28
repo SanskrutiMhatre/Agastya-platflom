@@ -101,14 +101,17 @@ export function JssEditorPage() {
       saveState={host.saveState} guard={host.guard} banners={host.banners(recover)}
       docName={loaded?.label ?? undefined} findings={host.findings}
       meta={loaded ? [['Type', loaded.label], ['Type code', <span className="mono">{loaded.docType}</span>], ['Stencil', <span className="mono">{loaded.stencil}</span>], ['Heading depth', String(loaded.maxDepth)]] : []}
+      section={loaded ? <span>JSS</span> : undefined}
+      topActions={<>
+        <button className="btn" onClick={() => void host.check()} disabled={!loaded || checking} data-testid="jss-check" title="Check the document for problems without saving or building">{checking ? <Spinner /> : <Icon name="shield" size={16} className="ico" />}Check</button>
+        <button className="btn primary" onClick={() => void host.generate()} disabled={!canBuild(can) || building || !loaded} data-testid="jss-generate" title={!canBuild(can) ? 'Reviewers, editors and owners can build the PDF' : 'Save, then build the whole publication as a PDF'}>{building ? <Spinner /> : <Icon name="play" size={16} className="ico" />}{building ? 'Building…' : 'Generate PDF'}</button>
+      </>}
       actions={<>
-        <button className="btn btn-sm" onClick={() => void host.check()} disabled={!loaded || checking} data-testid="jss-check" title="Check the document for problems without saving or building">{checking ? <Spinner /> : <Icon name="search" size={12} />}Check</button>
         <button className="btn btn-sm" onClick={() => void host.save()} disabled={!writable || !dirty || saving} data-testid="jss-save" title={!writable ? 'You have read-only access' : !dirty ? 'Nothing to save' : 'Save the document (Ctrl+S)'}>{saving ? <Spinner /> : <Icon name="check" size={12} />}Save</button>
         <PackagePanel id={id} writable={writable} dirty={dirty} saveFirst={host.save} onImported={() => { host.setDirty(false); void host.load(); ctx.reload(); }} />
         <ConvertButton id={id} from="jss" name={summary.project.name} dirty={dirty} saveFirst={host.save} />
         {/* WP-07 (UX-019): two different exports, so two names; WP-22 folds them into the Document menu */}
         <ExportProjectButton id={id} dirty={dirty} saveFirst={host.save} label="Export project" />
-        <button className="btn btn-sm btn-primary" onClick={() => void host.generate()} disabled={!canBuild(can) || building || !loaded} data-testid="jss-generate" title={!canBuild(can) ? 'Reviewers, editors and owners can build the PDF' : 'Save, then build the whole publication as a PDF'}>{building ? <Spinner /> : <Icon name="play" size={12} />}{building ? 'Building…' : 'Generate PDF'}</button>
       </>}
       pdf={<DocPdfPane kind="jss" src={host.src} downloadHref={contentApi.pdfUrl(id, true)} downloadName={`${summary.project.name}.pdf`} builtBy="the server" what="the publication"
         note={host.note} building={building} progressLines={host.progress.lines} />} />

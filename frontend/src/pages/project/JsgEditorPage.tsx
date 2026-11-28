@@ -127,17 +127,20 @@ export function JsgEditorPage() {
       saveState={host.saveState} guard={host.guard} banners={host.banners(recover)}
       docName={loaded?.label ?? undefined} findings={host.findings}
       meta={loaded ? [['Type', `JSG · ${loaded.label}`], ['Type code', <span className="mono">{loaded.docType}</span>], ['Stencil', <span className="mono">{loaded.stencil}</span>], ['Auto-save', writable ? (autosave ? 'On' : 'Off') : 'Not available']] : []}
+      section={loaded ? <span>JSG</span> : undefined}
+      topActions={<>
+        <button className="btn" onClick={() => void host.check()} disabled={!loaded || checking} data-testid="jsg-check" title="Check the document for problems without saving or building">{checking ? <Spinner /> : <Icon name="shield" size={16} className="ico" />}Check</button>
+        <button className="btn primary" onClick={() => void host.generate()} disabled={!canBuild(can) || building || !loaded} data-testid="jsg-generate" title={!canBuild(can) ? 'Reviewers, editors and owners can build the PDF' : 'Save, then build the document as a PDF'}>{building ? <Spinner /> : <Icon name="play" size={16} className="ico" />}{building ? 'Building…' : 'Generate PDF'}</button>
+      </>}
       actions={<>
         {loaded?.docType === 'uhb' && writable ? <>
           <input ref={wordInput} type="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden data-testid="jsg-word-input" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) setWordFile(f); }} />
           <button className="btn btn-sm" onClick={() => wordInput.current?.click()} disabled={importing || saving || building} data-testid="jsg-import-word" title="Replace this handbook with a Word file written in the JSG styles (Section, Heading 1-5, L2-L5 paragraphs, Caption ...)">{importing ? <Spinner /> : <Icon name="upload" size={12} />}Import Word…</button>
         </> : null}
         {writable ? <label className="v2-row v2-edautosave" title="Save by itself a minute after the last change"><input type="checkbox" checked={autosave} onChange={(e) => setAutosave(e.target.checked)} data-testid="jsg-autosave" />Auto-save</label> : null}
-        <button className="btn btn-sm" onClick={() => void host.check()} disabled={!loaded || checking} data-testid="jsg-check" title="Check the document for problems without saving or building">{checking ? <Spinner /> : <Icon name="search" size={12} />}Check</button>
         <button className="btn btn-sm" onClick={() => void host.save()} disabled={!writable || !dirty || saving} data-testid="jsg-save" title={!writable ? 'You have read-only access' : !dirty ? 'Nothing to save' : 'Save the document (Ctrl+S)'}>{saving ? <Spinner /> : <Icon name="check" size={12} />}Save</button>
         {loaded?.docType === 'uhb' ? <ConvertButton id={id} from="jsg" name={summary.project.name} dirty={dirty} saveFirst={host.save} /> : null}
         <ExportProjectButton id={id} dirty={dirty} saveFirst={host.save} />
-        <button className="btn btn-sm btn-primary" onClick={() => void host.generate()} disabled={!canBuild(can) || building || !loaded} data-testid="jsg-generate" title={!canBuild(can) ? 'Reviewers, editors and owners can build the PDF' : 'Save, then build the document as a PDF'}>{building ? <Spinner /> : <Icon name="play" size={12} />}{building ? 'Building…' : 'Generate PDF'}</button>
       </>}
       pdf={<DocPdfPane kind="jsg" src={host.src} downloadHref={jsgApi.pdfUrl(id, true)} downloadName={`${summary.project.name}.pdf`} builtBy="the JSG engine" what="the document"
         note={host.note} building={building} progressLines={host.progress.lines} />} />

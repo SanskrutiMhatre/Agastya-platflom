@@ -82,7 +82,7 @@ export interface StudioHost {
 export class App {
   settings: Settings = loadLocal('studio.settings', DEFAULT_SETTINGS);
   // ribbonCollapsed: null = not chosen: collapsed inside the platform (WP-21, UX-002: the editing surface comes first), open in the standalone Studio
-  layout = loadLocal('studio.layout', { left: true, right: true, bottom: true, rightTab: 'attributes' as 'attributes' | 'elements' | 'pdf', ribbonTab: 'home', ribbonCollapsed: null as boolean | null });
+  layout = loadLocal('studio.layout', { left: true, right: true, bottom: true, rightTab: 'attributes' as 'attributes' | 'elements' | 'pdf' | 'document' | 'comments', ribbonTab: 'home', ribbonCollapsed: null as boolean | null });
   readonly commands: Command[] = buildCommands();
   private byId = new Map(this.commands.map((c) => [c.id, c]));
   editors: DocumentEditor[] = [];
@@ -115,6 +115,15 @@ export class App {
   private toasts!: HTMLElement;
   private ctxMenu: HTMLElement | null = null;
   private fileMenu: HTMLElement | null = null;
+  // UI redesign (owner-approved mockup docs/audit/mockups/editor.html), inside the platform only: the one-row toolbar over the document, its
+  // "Insert a block" list, the ribbon's show/hide button, and the Properties panel's Document and Comments tabs (the platform fills the latter)
+  private toolbarEl: HTMLElement | null = null;
+  private blockSelect: HTMLSelectElement | null = null;
+  private ribbonToggle: HTMLButtonElement | null = null;
+  private docInfoEl: HTMLElement | null = null;
+  /** the Properties panel's Comments tab body: the platform draws the review comments into it */
+  commentsEl: HTMLElement | null = null;
+  private commentsBadge: HTMLElement | null = null;
   readonly outline: OutlinePanel;
   readonly attributes: AttributesPanel;
   readonly elements: ElementsPanel;
@@ -193,7 +202,11 @@ export class App {
       h('span', { class: 'quick-sep' }),
       this.quickBtn('tools.palette'), ...(this.host ? [] : [this.quickBtn('view.theme')]),
     );
-    const header = h('header', { class: 'app-header' }, logo, this.tabsEl, quick);
+    // inside the platform the header is the open-document tabs only (the mockup's .doctabs): Save, Undo and Redo lead the toolbar, the
+    // palette and Validate are the platform's top bar
+    if (this.host) this.tabsEl.classList.add('doctabs');
+    const header = this.host ? h('header', { class: 'app-header' }, this.tabsEl) : h('header', { class: 'app-header' }, logo, this.tabsEl, quick);
+    if (this.host) this.toolbarEl = this.buildToolbar();
     this.ribbonTabs = h('div', { class: 'ribbon-tabs', role: 'tablist', 'aria-label': 'Ribbon' });
     this.ribbonBody = h('div', { class: 'ribbon-body', role: 'toolbar' });
     const ribbon = h('div', { class: 'ribbon' }, this.ribbonTabs, this.ribbonBody);
@@ -205,12 +218,26 @@ export class App {
       ? h('div', { class: 'center', role: 'region', 'aria-label': 'Document' }, this.find.el, this.editorHost, this.startPage)
       : h('main', { class: 'center' }, this.find.el, this.editorHost, this.startPage);
     this.leftPane = h('aside', { class: 'pane pane-left' }, this.outline.el, h('div', { class: 'pane-resize', 'data-pane': 'left' }));
-    const rtabs = h('div', { class: 'panel-tabs pane-tabs', role: 'tablist' },
-      h('button', { class: 'panel-tab', 'data-rtab': 'attributes', role: 'tab', on: { click: () => this.setRightTab('attributes') } }, 'Attributes'),
-      h('button', { class: 'panel-tab', 'data-rtab': 'elements', role: 'tab', on: { click: () => this.setRightTab('elements') } }, 'Elements'),
-      h('button', { class: 'panel-tab', 'data-rtab': 'pdf', role: 'tab', on: { click: () => this.setRightTab('pdf') } }, 'PDF'),
-    );
-    this.rightPane = h('aside', { class: 'pane pane-right' }, h('div', { class: 'pane-resize', 'data-pane': 'right' }), rtabs, this.attributes.el, this.elements.el, this.pdf.el);
+    // inside the platform: the mockup's Properties tabs. Element = the attributes and, under them, what can be inserted there (the Elements
+    // panel); Document = the data module's identification; Comments = the review comments (drawn by the platform)
+    const rtabs = this.host
+      ? h('div', { class: 'panel-tabs pane-tabs', role: 'tablist', 'aria-label': 'Properties' },
+        h('button', { class: 'panel-tab', 'data-rtab': 'attributes', role: 'tab', on: { click: () => this.setRightTab('attributes') } }, 'Element'),
+        h('button', { class: 'panel-tab', 'data-rtab': 'document', role: 'tab', on: { click: () => this.setRightTab('document') } }, 'Document'),
+        h('button', { class: 'panel-tab', 'data-rtab': 'comments', role: 'tab', on: { click: () => this.setRightTab('comments') } }, 'Comments', this.commentsBadge = h('span', { class: 'badge accent', hidden: true })))
+      : h('div', { class: 'panel-tabs pane-tabs', role: 'tablist' },
+        h('button', { class: 'panel-tab', 'data-rtab': 'attributes', role: 'tab', on: { click: () => this.setRightTab('attributes') } }, 'Attributes'),
+        h('button', { class: 'panel-tab', 'data-rtab': 'elements', role: 'tab', on: { click: () => this.setRightTab('elements') } }, 'Elements'),
+        h('button', { class: 'panel-tab', 'data-rtab': 'pdf', role: 'tab', on: { click: () => this.setRightTab('pdf') } }, 'PDF'),
+      );
+    if (this.host) {
+      this.docInfoEl = h('section', { class: 'panel docinfo-panel', 'aria-label': 'Document' });
+      this.commentsEl = h('section', { class: 'panel comments-host', 'aria-label': 'Comments' });
+    }
+    this.rightPane = this.host
+      ? h('aside', { class: 'pane pane-right', 'aria-label': 'Properties' }, h('div', { class: 'pane-resize', 'data-pane': 'right' }), rtabs,
+        h('div', { class: 'props-scroll' }, this.attributes.el, this.elements.el), this.docInfoEl!, this.commentsEl!, this.pdf.el)
+      : h('aside', { class: 'pane pane-right' }, h('div', { class: 'pane-resize', 'data-pane': 'right' }), rtabs, this.attributes.el, this.elements.el, this.pdf.el);
     this.bottomPane = h('section', { class: 'pane pane-bottom' }, h('div', { class: 'pane-resize-h', 'data-pane': 'bottom' }), this.problems.el);
     const middle = h('div', { class: 'workspace' }, this.leftPane, center, this.rightPane);
     this.statusLeft = h('div', { class: 'status-left', 'aria-label': 'Element path' });
@@ -220,7 +247,7 @@ export class App {
     const pathbar = this.host ? h('div', { class: 'pathbar studio-pathbar' }, this.statusLeft) : null;
     const status = h('footer', { class: 'status-bar' }, ...(pathbar ? [] : [this.statusLeft]), this.statusMsg, this.statusRight);
     this.toasts = h('div', { class: 'toasts', 'aria-live': 'polite' });
-    this.root.append(header, ribbon, ...(pathbar ? [pathbar] : []), middle, this.bottomPane, status, this.toasts);
+    this.root.append(header, ...(this.toolbarEl ? [this.toolbarEl] : []), ribbon, ...(pathbar ? [pathbar] : []), middle, this.bottomPane, status, this.toasts);
     this.buildRibbon();
     this.setRightTab(this.layout.rightTab);
     this.applyLayout();
@@ -232,6 +259,71 @@ export class App {
     const b = h('button', { class: 'icon-btn quick-btn', title: tooltip(cmd), 'aria-label': cmd.label, on: { click: () => this.run(id) } }, icon(cmd.icon ?? 'dot', 16));
     this.ribbonButtons.push({ el: b, cmd });
     return b;
+  }
+
+  /**
+   * UI redesign (mockup editor.html), inside the platform: the one-row toolbar over the document. Every button is an existing command (the same
+   * enabled / pressed states as the ribbon's); "Insert a block" lists the block commands; the safety button opens Warning / Caution / Note; the
+   * view switch is Design | Tags | XML (Split view stays on Alt+3 and in the ribbon); the last button shows the whole ribbon (WP-21: folded).
+   */
+  private buildToolbar(): HTMLElement {
+    const btn = (id: string) => this.quickBtn(id);
+    const vsep = () => h('span', { class: 'vsep', 'aria-hidden': 'true' });
+    const blocks: Array<[string, string]> = [['insert.para', 'Paragraph'], ['insert.step', 'Step'], ['insert.substep', 'Sub-step'], ['insert.levelledPara', 'Levelled paragraph'], ['insert.subLevelledPara', 'Sub-paragraph']];
+    const sel = h('select', { class: 'select', 'aria-label': 'Insert a block', title: 'Insert a block after the current one', on: { change: () => {
+      const id = sel.value; sel.selectedIndex = 0; if (id) { this.run(id); this.active?.focus(); }
+    } } },
+    h('option', { value: '' }, 'Paragraph'), ...blocks.map(([id, label]) => h('option', { value: id }, label))) as HTMLSelectElement;
+    this.blockSelect = sel;
+    const safety = h('button', { class: 'btn sm subtle', 'aria-haspopup': 'menu', title: 'Insert a warning, a caution or a note', on: { click: (e: Event) => {
+      e.stopPropagation();
+      if (this.ctxMenu) { this.closeContextMenu(); return; }
+      const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const item = (id: string) => { const c = this.byId.get(id)!; const ed = this.active; const ok = !!ed && (!c.enabled || safe(() => c.enabled!(this, ed))); return h('button', { class: 'ctx-item', role: 'menuitem', disabled: !ok, on: { click: () => { this.closeContextMenu(); this.run(id); } } }, icon(c.icon ?? 'dot', 15), h('span', null, c.label), h('span', { class: 'ctx-key' }, c.keys?.[0] ? shortcutLabel(c.keys[0]) : '')); };
+      const menu = h('div', { class: 'ctx-menu', role: 'menu', 'aria-label': 'Safety' }, item('insert.warning'), item('insert.caution'), item('insert.note'));
+      menu.style.left = `${Math.round(r.left)}px`; menu.style.top = `${Math.round(r.bottom + 4)}px`;
+      document.body.appendChild(menu); this.ctxMenu = menu;
+      menuKeys(menu, () => Array.from(menu.querySelectorAll<HTMLElement>('.ctx-item:not(:disabled)')));
+      menu.querySelector<HTMLElement>('.ctx-item:not(:disabled)')?.focus();
+    } } }, icon('warning', 14), 'Warning', icon('chevronDown', 14));
+    const views = h('div', { class: 'seg', role: 'group', 'aria-label': 'View mode' }, ...['view.design', 'view.tags', 'view.xml'].map((id) => {
+      const cmd = this.byId.get(id)!;
+      const b = h('button', { type: 'button', title: tooltip(cmd), 'aria-label': cmd.label, on: { click: () => this.run(id) } }, cmd.label.replace(' view', ''));
+      this.ribbonButtons.push({ el: b, cmd });
+      return b;
+    }));
+    this.ribbonToggle = h('button', { class: 'icon-btn', 'data-testid': 'ribbon-toggle', title: 'All commands: show the ribbon', 'aria-label': 'Show the ribbon', 'aria-expanded': 'false', on: { click: () => this.toggleRibbonPeek() } }, icon('more', 16)) as HTMLButtonElement;
+    return h('div', { class: 'toolbar studio-toolbar', role: 'toolbar', 'aria-label': 'Formatting' },
+      btn('file.save'), btn('edit.undo'), btn('edit.redo'), vsep(),
+      sel, btn('format.bold'), btn('format.italic'), btn('format.superscript'), vsep(),
+      btn('insert.randomList'), btn('insert.sequentialList'), btn('insert.table'), btn('insert.internalRef'), btn('insert.figure'), safety,
+      h('span', { class: 'grow' }), views, this.ribbonToggle);
+  }
+
+  /** The toolbar's ribbon button: show the folded ribbon (its tabs and the chosen tab's commands) until a command is used, or hide it. */
+  private toggleRibbonPeek() {
+    if (!this.ribbonCollapsed) { this.toggleRibbon(); return; }
+    this.ribbonPeek = !this.ribbonPeek;
+    this.applyRibbon();
+    if (this.ribbonPeek) this.ribbonTabs.querySelector<HTMLElement>('.ribbon-tab[data-tab].active, .ribbon-tab[data-tab]')?.focus({ preventScroll: true });
+  }
+
+  /** The block list names the block the cursor is in (Step, Paragraph ...), as the mockup's style list does. */
+  private syncToolbar() {
+    const sel = this.blockSelect; if (!sel) return;
+    const ed = this.active;
+    let name = 'Paragraph';
+    if (ed) {
+      for (let n: Node | null = ed.currentElement(); n && n.nodeType === 1; n = n.parentNode) {
+        const nn = n.nodeName;
+        if (nn === 'proceduralStep') { name = 'Step'; break; }
+        if (nn === 'levelledPara') { name = 'Levelled paragraph'; break; }
+        if (nn === 'para' || nn === 'warningAndCautionPara' || nn === 'notePara') { name = 'Paragraph'; break; }
+        if (nn === 'title') { name = 'Title'; break; }
+      }
+    }
+    if (sel.options[0].text !== name) sel.options[0].text = name;
+    sel.disabled = !ed || !!ed.readOnlyReason();
   }
 
   private buildRibbon() {
@@ -248,7 +340,7 @@ export class App {
       this.ribbonButtons.push({ el: b, cmd });
       return b;
     }));
-    this.ribbonTabs.appendChild(viewSwitch);
+    if (!this.host) this.ribbonTabs.appendChild(viewSwitch);   // inside the platform the toolbar has the view switch
     // WP-21 (UX-002, UX-012): the ribbon folds to its tab strip; a tab click shows that tab's commands until one is used
     this.ribbonPin = h('button', { class: 'icon-btn ribbon-pin', 'data-testid': 'ribbon-pin', on: { click: () => this.toggleRibbon() } }) as HTMLButtonElement;
     this.ribbonTabs.appendChild(this.ribbonPin);
@@ -318,6 +410,7 @@ export class App {
     const label = folded ? 'Pin the ribbon open (Ctrl+F1)' : 'Collapse the ribbon to its tabs (Ctrl+F1)';
     this.ribbonPin.title = label; this.ribbonPin.setAttribute('aria-label', folded ? 'Pin the ribbon open' : 'Collapse the ribbon');
     this.ribbonPin.setAttribute('aria-expanded', String(!folded || this.ribbonPeek));
+    if (this.ribbonToggle) { const open = !folded || this.ribbonPeek; this.ribbonToggle.setAttribute('aria-expanded', String(open)); this.ribbonToggle.setAttribute('aria-pressed', String(open)); this.ribbonToggle.title = open ? (folded ? 'Hide the ribbon' : 'The ribbon is pinned open (the pin in the ribbon folds it)') : 'All commands: show the ribbon'; this.ribbonToggle.setAttribute('aria-label', open ? 'Hide the ribbon' : 'Show the ribbon'); }
     this.active?.xml.view.requestMeasure();
   }
 
@@ -368,16 +461,52 @@ export class App {
     document.removeEventListener('mousedown', this.fileMenuOutside);
   }
 
-  setRightTab(t: 'attributes' | 'elements' | 'pdf') {
-    if (this.host && t === 'pdf') t = 'attributes';
+  setRightTab(t: 'attributes' | 'elements' | 'pdf' | 'document' | 'comments') {
+    // inside the platform the Element tab shows the attributes and the insertable elements together; there is no PDF tab (the page has its own)
+    if (this.host && (t === 'pdf' || t === 'elements')) t = 'attributes';
+    if (!this.host && (t === 'document' || t === 'comments')) t = 'attributes';
     this.layout.rightTab = t;
-    this.rightPane.querySelectorAll<HTMLElement>('[data-rtab]').forEach((b) => b.classList.toggle('active', b.dataset.rtab === t));
-    this.attributes.el.hidden = t !== 'attributes';
-    this.elements.el.hidden = t !== 'elements';
+    this.rightPane.querySelectorAll<HTMLElement>('[data-rtab]').forEach((b) => { b.classList.toggle('active', b.dataset.rtab === t); b.setAttribute('aria-selected', String(b.dataset.rtab === t)); });
+    const elementTab = t === 'attributes';
+    this.attributes.el.hidden = !elementTab;
+    this.elements.el.hidden = !(t === 'elements' || (this.host && elementTab));
     this.pdf.el.hidden = t !== 'pdf';
-    if (t === 'elements') this.elements.render();
+    if (this.docInfoEl) this.docInfoEl.hidden = t !== 'document';
+    if (this.commentsEl) this.commentsEl.hidden = t !== 'comments';
+    (this.rightPane.querySelector('.props-scroll') as HTMLElement | null)?.toggleAttribute('hidden', !(elementTab || t === 'elements'));
+    if (this.elementsShown) this.elements.render();
     if (t === 'pdf') this.pdf.render();
+    if (t === 'document') this.renderDocInfo();
     saveLocal('studio.layout', this.layout);
+  }
+
+  /** the Elements panel is on screen (its own tab standalone, under the attributes inside the platform) */
+  private get elementsShown(): boolean { return this.layout.rightTab === 'elements' || (!!this.host && this.layout.rightTab === 'attributes'); }
+
+  /** The platform tells how many review comments are open (the Comments tab's badge). */
+  setCommentCount(n: number) {
+    if (!this.commentsBadge) return;
+    this.commentsBadge.textContent = String(n);
+    this.commentsBadge.hidden = !n;
+  }
+
+  /** The Properties panel's Document tab: the open data module's identification and status, in the mockup's key/value rows. */
+  private renderDocInfo() {
+    const el = this.docInfoEl; if (!el || el.hidden) return;
+    clear(el);
+    const ed = this.active;
+    if (!ed) { el.appendChild(h('div', { class: 'panel-empty' }, 'No document open')); return; }
+    const id = ed.doc.ident;
+    const ref = ed.doc.schemaRef;
+    const row = (k: string, v: string) => h('div', { class: 'attr' }, h('span', { class: 'attr-k mono' }, k), h('span', { class: 'attr-v' }, v || '—'));
+    el.append(
+      h('div', { class: 'el-title' }, h('span', { class: 'mono' }, ed.doc.xml.documentElement?.nodeName ?? 'dmodule'), h('span', { class: 'muted' }, [id?.techName, id?.infoName].filter(Boolean).join(' - ') || ed.doc.fileName)),
+      h('div', null, h('div', { class: 'sec-h' }, 'Identification'), h('div', { class: 'docinfo-rows' },
+        row('dmCode', id?.dmc ?? ''), row('issueNumber', id?.issueNumber ?? ''), row('inWork', id?.inWork ?? ''), row('language', [id?.language, id?.country].filter(Boolean).join('-')), row('issueDate', id?.issueDate ?? ''))),
+      h('div', null, h('div', { class: 'sec-h' }, 'Status'), h('div', { class: 'docinfo-rows' },
+        row('issueType', id?.issueType ?? ''), row('securityClassification', id?.security ?? ''), row('schema', ref ? `S1000D ${ISSUE_LABEL[ref.issue] ?? ref.issue} · ${SCHEMAS[ref.schema] ?? ref.schema}` : ''), row('file', ed.doc.fileName))),
+      h('div', { class: 'chips' }, h('button', { class: 'btn sm', on: { click: () => this.run('tools.dmProps') } }, 'Data module properties…')),
+    );
   }
 
   togglePane(p: 'left' | 'right' | 'bottom') {
@@ -636,6 +765,8 @@ export class App {
     this.startPage.hidden = !!ed;
     this.editorHost.hidden = !ed;
     this.renderStatus();
+    this.syncToolbar();
+    this.renderDocInfo();
     this.host?.changed();
   }
 
@@ -648,8 +779,11 @@ export class App {
     for (const ed of this.editors) {
       const id = ed.doc.ident;
       const label = ed.doc.fileName;
+      // inside the platform the tab names the module as the mockup does ("520A Remove main pump": the information code and the name); the file is the tooltip
+      const code = id?.parts ? `${id.parts.infoCode ?? ''}${id.parts.infoCodeVariant ?? ''}` : '';
+      const shown = this.host && id && (id.techName || id.infoName) ? [code, [id.techName, id.infoName].filter(Boolean).join(' - ')].filter(Boolean).join(' ') : label;
       const tab = h('div', {
-        class: 'doc-tab' + (ed === this.active ? ' active' : ''), role: 'tab', tabindex: ed === this.active || (!this.active && ed === this.editors[0]) ? '0' : '-1',
+        class: 'doc-tab' + (this.host ? ' doctab' : '') + (ed === this.active ? ' active' : ''), role: 'tab', tabindex: ed === this.active || (!this.active && ed === this.editors[0]) ? '0' : '-1',
         'aria-selected': String(ed === this.active), title: [id?.dmc, id?.techName && `${id.techName} – ${id.infoName}`].filter(Boolean).join('\n') || label,
         on: {
           mousedown: (e: Event) => { if ((e as MouseEvent).button === 1) { e.preventDefault(); void this.closeEditor(ed); } },
@@ -674,9 +808,9 @@ export class App {
         },
       },
         icon(ed.mode === 'xml' ? 'xml' : 'file', 14),
-        h('span', { class: 'doc-tab-name' }, label),
-        ed.doc.dirty ? h('span', { class: 'doc-tab-dirty', title: 'Unsaved changes' }, '●') : null,
-        h('button', { class: 'doc-tab-close', 'aria-label': 'Close ' + label, tabindex: '-1', on: { click: (e: Event) => { e.stopPropagation(); void this.closeEditor(ed); } } }, icon('close', 12)),
+        h('span', { class: 'doc-tab-name' }, shown),
+        ed.doc.dirty ? h('span', { class: 'doc-tab-dirty mod', title: 'Unsaved changes' }, '●') : null,
+        h('button', { class: 'doc-tab-close x', 'aria-label': 'Close ' + label, tabindex: '-1', on: { click: (e: Event) => { e.stopPropagation(); void this.closeEditor(ed); } } }, icon('close', 12)),
       );
       tabEls.push(tab);
       if (ed === this.active) activeTab = tab;
@@ -736,7 +870,7 @@ export class App {
   private selectionChrome() {
     this.attributes.update();
     this.outline.highlightCurrent();
-    if (this.layout.rightTab === 'elements') this.elementsSoon();
+    if (this.elementsShown) this.elementsSoon();
     this.updateChrome();
   }
 
@@ -745,7 +879,7 @@ export class App {
     this.outlineSoon();
     this.find.onDocChanged();
     this.attributes.update();
-    if (this.layout.rightTab === 'elements') this.elementsSoon();
+    if (this.elementsShown) this.elementsSoon();
     void ev;
   }
 

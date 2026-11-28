@@ -82,6 +82,7 @@ for (const width of WIDTHS) {
       await page.goto(`/projects/${ids.s1000d}/editor`); await expect(page.getByTestId('save-state')).toBeVisible({ timeout: 60_000 }); await healthy(page, 's1000d editor');
       await reachable(page, page.getByTestId('save-state'), `S1000D save state at ${width}px`);
       await reachable(page, page.getByRole('group', { name: 'Editor layout' }).last(), `S1000D layout switch at ${width}px`);
+      await page.getByTestId('explorer-menu').click();   // UI redesign: these commands are in the explorer's menu
       await reachable(page, page.getByTestId('view-tree'), `S1000D Publication switch at ${width}px`);
       expect(await page.getByTestId('view-tree').evaluate((el) => el.scrollWidth <= el.clientWidth + 1), 'the Publication switch label is not cut ("Publica")').toBe(true);
 

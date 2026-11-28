@@ -12,8 +12,7 @@
 
 /* ---------------------------------------------------------------- inputs: a 3:1 boundary (WCAG 1.4.11) */
 .input, .v2-input, .v2-select, .v2-textarea, .x-input, .x-select, .v2-jsg-cover input, .attr-input,
-.panel-filter, .find-input, .find-scope, .pdf-field input[type='text'], .pdf-field select, .v2-filter { border-color: var(--border-control); }
-.v2-filter .v2-input { border-color: transparent; }
+.panel-filter, .find-input, .find-scope, .pdf-field input[type='text'], .pdf-field select { border-color: var(--border-control); }
 
 /* the destructive solid button of ConfirmModal (it was a class no stylesheet defined, patched with an inline style) */
 .btn-danger-solid { background: var(--danger-solid); border-color: var(--danger-solid); color: var(--text-on-accent); }
@@ -54,7 +53,7 @@ input[type='checkbox']:disabled, input[type='radio']:disabled { cursor: not-allo
 /* ---------------------------------------------------------------- active (pressed) and focus */
 .btn:active:not(:disabled), .x-btn:active:not(:disabled) { background: var(--surface-pressed); }
 .btn-primary:active:not(:disabled), .x-btn--primary:active:not(:disabled) { background: var(--accent-hover); }
-.v2-seg button:focus-visible, .v2-tab:focus-visible, .v2-chap:focus-visible, .v2-dm:focus-visible, .v2-anc-name:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.v2-seg button:focus-visible, .v2-tab:focus-visible, .v2-chap:focus-visible, .v2-anc-name:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 .v2-seg button:hover:not(:disabled):not(.on) { background: var(--surface-hover); color: var(--text); }
 
 /* ---------------------------------------------------------------- error (UID-002) */
@@ -85,12 +84,12 @@ input[type='checkbox']:disabled, input[type='radio']:disabled { cursor: not-allo
 @media (forced-colors: active) {
   .btn, .x-btn, .v2-seg, .v2-card, .modal, .ctx-menu, .jsg-menu, .file-menu, .v2-toast, .toast, .v2-badge, .v2-alert, .v2-rail-badge, .v2-count, .v2-bell-count { border: 1px solid CanvasText; }
   .input, .v2-input, .v2-select, .v2-textarea, .x-input, .x-select, .attr-input, .panel-filter, .find-input { border-color: FieldText; }
-  .v2-rail-item.active, .act-btn[aria-current="page"], .nav-item[aria-current="page"], .v2-dm.active, .v2-tnode.sel, .v2-anc-row.sel, .v2-admin-nav a.active, .outline-row.current,
+  .v2-rail-item.active, .act-btn[aria-current="page"], .nav-item[aria-current="page"], .v2-tnode.sel, .v2-anc-row.sel, .v2-admin-nav a.active, .outline-row.current,
   .problem.active, .v2-tab.active, .ribbon-tab.active, .panel-tab.active, .jsg-tab.on, .jsg-bar .jsg-tb.on, .v2-seg button.on, .doc-tab.active,
   .vs-btn.pressed, .rb.pressed, .icon-btn.pressed, .picker-item.active, .v2-chapter.sel, [aria-selected='true'], [aria-current='page'] { outline: 2px solid Highlight; outline-offset: -2px; }
   .btn:disabled, .x-btn:disabled, .icon-btn:disabled, .rb:disabled, .v2-input:disabled, .input:disabled, .v2-select:disabled { color: GrayText; border-color: GrayText; }
   :focus-visible { outline: 2px solid Highlight !important; outline-offset: 2px; }
-  .v2-dot, .v2-unread { forced-color-adjust: none; border: 1px solid CanvasText; }
+  .v2-unread { forced-color-adjust: none; border: 1px solid CanvasText; }
   .btn-primary, .x-btn--primary, .btn-danger-solid { forced-color-adjust: none; border: 2px solid ButtonText; }
 }
 

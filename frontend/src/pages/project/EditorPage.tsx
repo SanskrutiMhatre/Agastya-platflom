@@ -27,6 +27,7 @@ import { rememberDoc } from '../../lib/continueDoc';
 import { confirmDialog } from '../../lib/dialogs';
 import { CommentsButton, CommentsPanel, useEditorComments } from '../../editors/host/EditorComments';
 import { TeamChip } from '../../editors/host/TeamChip';
+import { StatusBar } from '../../editors/host/Workspace';
 import { useSession } from '../../store/session';
 
 export function EditorPage() {
@@ -147,28 +148,48 @@ export function EditorPage() {
   const canBreak = ctx.role === 'owner' || ctx.role === 'manager' || me?.role === 'admin';
 
   const chip = ready && writable ? <SaveStateChip state={{ saving, dirty: dirtyCount > 0, savedAt, dirtyCount }} ids={S1000D_STATE} /> : null;
-  // the chip is in the Studio's status bar while the Studio is on screen, in the header when only the PDF is
-  const chipInStatus = !!statusSlot && shown !== 'pdf';
+  // UI redesign (mockup editor.html): the Studio's status bar is the window's status bar, under the activity bar and the workspace: it is moved
+  // into the page's status bar (a shell slot) while the page is shown, and back into the Studio when the page goes (the Studio outlives it)
+  const [statusHost, setStatusHost] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const root = hostRef.current?.querySelector<HTMLElement>(':scope > .app');
+    const bar = root?.querySelector<HTMLElement>(':scope > .status-bar');
+    if (!ready || !statusHost || !root || !bar) return;
+    statusHost.appendChild(bar);
+    return () => { root.insertBefore(bar, root.querySelector(':scope > .toasts')); };
+  }, [ready, statusHost]);
+  // the review comments: the Properties panel's Comments tab (its badge is the number still open)
+  useEffect(() => { if (ready) studio.setCommentCount(comments.open.length); }, [ready, comments.open.length]);
+  const chipInStatus = !!statusSlot;
+  // the top bar's crumbs: the project, the module's system and sub-system ("29-10"), the data module code, its state
+  const m = activeDoc?.file?.match(/^(DMC-[^_]+?)(?:_(\d{3})-(\d{2}))?(?:_[A-Z]{2}-[A-Z]{2})?\.xml$/i);
+  const sns = activeDoc?.file?.match(/^DMC-[^-]+-[^-]+-([^-]+)-([^-]+)-/i);
+  const draft = m?.[3] && m[3] !== '00';
   return (
     <>
-      <EditorHeader layout={layout} title={ctx.summary.project.name}
-        lead={<button className="icon-btn" onClick={() => setSide(!sideOpen)} title={sideOpen ? 'Hide the data module panel' : 'Show the data module panel'} aria-label={sideOpen ? 'Hide the data module panel' : 'Show the data module panel'} aria-pressed={sideOpen} data-testid="toggle-side"><Icon name="panel" size={17} /></button>}
-        crumb={activeDoc ? <span className="v2-hint v2-trunc v2-crumb" title={activeDoc.file ?? activeDoc.title}>/ {activeDoc.title || activeDoc.file}</span> : null}
+      <EditorHeader layout={layout} title={ctx.summary.project.name} homeHref={ctx.summary.project.type === 'CIR' ? undefined : `/projects/${ctx.id}/home`}
+        lead={<button className="icon-btn" onClick={() => setSide(!sideOpen)} title={sideOpen ? 'Hide the data module panel' : 'Show the data module panel'} aria-label={sideOpen ? 'Hide the data module panel' : 'Show the data module panel'} aria-pressed={sideOpen} data-testid="toggle-side"><Icon name="panel" size={16} className="ico" /></button>}
+        section={sns ? `${sns[1]}-${sns[2]}` : undefined}
+        doc={activeDoc ? <span title={activeDoc.file ?? activeDoc.title}>{m ? m[1] : activeDoc.title || activeDoc.file}</span> : undefined}
+        badge={activeDoc?.file && m ? <span className={`badge ${draft ? 'warning' : 'success'} ed-crumb-badge`} title={`Issue ${m[2] ?? ''}-${m[3] ?? ''}`}>{draft ? 'Draft' : `Issue ${m[2]}`}</span> : null}
         state={chipInStatus ? null : chip}
-        actions={<span className="v2-edactions">
-          {ready && writable && dirtyCount > 0
-            ? <button className="btn btn-sm btn-primary" onClick={() => void saveNow()} disabled={saving || !activeDoc} title="Save the open data module (Ctrl+S)" data-testid="save-now"><Icon name="check" size={12} />{saving ? 'Saving…' : `Save${dirtyCount > 1 ? ` (${dirtyCount} unsaved)` : ''}`}</button>
+        actions={<>
+          <button type="button" className="btn ed-validate" onClick={() => studio.run('review.validate')} disabled={!ready || !activeDoc} title="Validate the open data module against its schema and the business rules (F7)" aria-keyshortcuts="F7" data-testid="chrome-validate">
+            <Icon name="shield" size={16} className="ico" />Validate<kbd>F7</kbd></button>
+          {ready && writable && dirtyCount > 1
+            ? <button className="btn" onClick={() => void saveNow()} disabled={saving || !activeDoc} title="Save the open data module (Ctrl+S)" data-testid="save-now"><Icon name="save" size={16} className="ico" />{saving ? 'Saving…' : `Save (${dirtyCount} unsaved)`}</button>
             : null}
-          <span className="v2-edactions" ref={setSlot} data-testid="chrome-preview-slot" />
-        </span>}
+          <span className="ed-actions" ref={setSlot} data-testid="chrome-preview-slot" />
+        </>}
         extra={<><TeamChip projectId={ctx.id} doc={teamDoc} writable={ready && writable} canBreak={canBreak} editing={!!activeDoc?.dirty} /><CommentsButton state={comments} /></>}
         onPalette={() => studio.run('tools.palette')} onShortcuts={() => studio.run('tools.shortcuts')} />
       <CommentsPanel projectId={ctx.id} state={comments} activeFile={activeDoc?.file} onOpen={(c) => { if (c.dmFile) openAt(c.dmFile); }} />
+      {ready && studio.commentsEl ? createPortal(<CommentsPanel inline projectId={ctx.id} state={comments} activeFile={activeDoc?.file} onOpen={(c) => { if (c.dmFile) openAt(c.dmFile); }} />, studio.commentsEl) : null}
       {!writable ? <Alert tone="warn">You have {ctx.role} access to this project: you can read and proof data modules, but changes cannot be saved.</Alert> : null}
       {error ? <Alert tone="bad">{error}</Alert> : null}
-      <div className={`v2-split ed-s1000d${focus ? ' is-focus' : ''}`} data-density="compact" data-testid="editor-split" ref={splitRef} style={dragging || listDrag ? { userSelect: 'none' } : undefined}>
+      <div className={`v2-split ed ed-s1000d${focus ? ' is-focus' : ''}${shown !== 'edit' ? ' is-split' : ''}`} data-density="compact" data-testid="editor-split" ref={splitRef} style={dragging || listDrag ? { userSelect: 'none' } : undefined}>
         {side ? <EditorSide ctx={ctx} refreshKey={sideKey} treeKey={treeKey} width={listW} onCollapse={() => setSide(false)} /> : null}
-        {side ? <div className={`v2-divider panel-resize rz1 ${listDrag ? 'drag' : ''}`} role="separator" aria-orientation="vertical" aria-label="Resize data module list" tabIndex={0} aria-valuenow={listW} aria-valuemin={180} aria-valuemax={480}
+        {side ? <div className={`panel-resize rz1 ${listDrag ? 'drag' : ''}`} role="separator" aria-orientation="vertical" aria-label="Resize data module list" tabIndex={0} aria-valuenow={listW} aria-valuemin={180} aria-valuemax={480}
           onPointerDown={startListDrag} onKeyDown={(e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { const w = Math.min(480, Math.max(180, listW + (e.key === 'ArrowRight' ? 16 : -16))); setListW(w); localStorage.setItem('agastya.editor.listw', String(w)); studio.relayout(); } }} /> : null}
         <div className="a" style={{ display: shown === 'pdf' ? 'none' : 'flex', flex: shown === 'edit' ? '1 1 0' : `0 0 calc((100% - ${side ? listW + 1 : 0}px) * ${pct / 100})` }}>
           <div ref={hostRef} className="v2-studio-host" data-testid="studio-host" />
@@ -178,6 +199,7 @@ export function EditorPage() {
           <PdfPane ctx={ctx} savedTick={savedTick} onOpenAt={openAt} onPopped={setBothPopped} slot={shown === 'edit' && !focus ? slot : null} onReveal={layout.reveal} />
         </div>
       </div>
+      <StatusBar testId="s1000d-statusbar"><span className="ed-studio-status" ref={setStatusHost} /></StatusBar>
       {chipInStatus && chip ? createPortal(<span className="item">{chip}</span>, statusSlot!) : null}
       {conflict ? <ConflictDialog base={conflict.base} mine={conflict.mine} theirs={conflict.theirs} onClose={() => setConflict(null)}
         check={(xml) => studio.checkText(xml, conflict.file)}

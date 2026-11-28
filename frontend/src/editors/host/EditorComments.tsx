@@ -67,11 +67,12 @@ export function CommentsButton({ state }: { state: EditorCommentsState }) {
 }
 
 /** The panel beside the document. */
-export function CommentsPanel({ projectId, state, activeFile, onOpen }: { projectId: string; state: EditorCommentsState; activeFile?: string | null; onOpen?: (c: ReviewComment) => void }) {
+/** `inline`: the list in the Properties panel's Comments tab (UI redesign, mockup editor.html): always drawn, without the floating frame and head. */
+export function CommentsPanel({ projectId, state, activeFile, onOpen, inline = false }: { projectId: string; state: EditorCommentsState; activeFile?: string | null; onOpen?: (c: ReviewComment) => void; inline?: boolean }) {
   const toast = useUi((s) => s.toast);
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
-  if (!state.shown) return null;
+  if (!state.shown && !inline) return null;
   const list = done ? state.comments : state.open;
   const current = state.at !== null ? state.open[state.at] : null;
   const resolve = async (c: ReviewComment, resolved: boolean) => {
@@ -80,18 +81,18 @@ export function CommentsPanel({ projectId, state, activeFile, onOpen }: { projec
     catch (e) { toast(errText(e), 'error'); } finally { setBusy(false); }
   };
   return (
-    <aside className="v2-edcomments" id="editor-comments" aria-label="Review comments" data-testid="comments-panel">
-      <div className="v2-edcomments-head">
+    <aside className={inline ? 'v2-edcomments is-inline' : 'v2-edcomments'} id={inline ? undefined : 'editor-comments'} aria-label="Review comments" {...(inline ? { 'data-testid': 'comments-inline' } : { 'data-testid': 'comments-panel' })}>
+      {inline ? null : <div className="v2-edcomments-head">
         <b>Review comments</b><span className="v2-hint">{state.open.length} open</span>
         <span className="spacer" />
         <button className="icon-btn" onClick={() => state.step(-1)} title="Previous comment (Alt+Shift+P)" aria-label="Previous comment" data-testid="comment-prev" disabled={!state.open.length}><Icon name="up" size={14} /></button>
         <button className="icon-btn" onClick={() => state.step(1)} title="Next comment (Alt+Shift+N)" aria-label="Next comment" data-testid="comment-next" disabled={!state.open.length}><Icon name="down" size={14} /></button>
         <button className="icon-btn" onClick={() => state.setShown(false)} title="Close" aria-label="Close the comments" data-testid="comments-close"><Icon name="close" size={14} /></button>
-      </div>
+      </div>}
       <label className="v2-row v2-hint v2-edcomments-done"><input type="checkbox" checked={done} onChange={(e) => setDone(e.target.checked)} />Show the comments marked done</label>
       <div className="v2-edcomments-list">
         {list.length === 0 ? <p className="v2-hint v2-edcomments-empty">No open comments.</p> : list.map((c) => (
-          <div key={c.id} className={`v2-rv ${c.kind === 'changes' ? 'changes' : ''} ${c.resolved ? 'done' : ''}${current?.id === c.id ? ' is-current' : ''}`} data-testid="editor-comment" data-current={current?.id === c.id || undefined}>
+          <div key={c.id} className={`v2-rv ${c.kind === 'changes' ? 'changes' : ''} ${c.resolved ? 'done' : ''}${current?.id === c.id ? ' is-current' : ''}`} {...(inline ? {} : { 'data-testid': 'editor-comment' })} data-current={current?.id === c.id || undefined}>
             <div className="v2-rv-head">
               <b>{c.byName ?? c.by ?? 'Someone'}</b>
               {c.kind === 'changes' ? <Badge tone="bad">Sent back</Badge> : null}
@@ -100,8 +101,8 @@ export function CommentsPanel({ projectId, state, activeFile, onOpen }: { projec
             {c.dmFile ? <div className="v2-hint v2-trunc" title={c.dmFile}>{c.dmFile === activeFile ? 'This data module' : c.dmFile}{c.anchor ? ` · on “${c.anchor.text.slice(0, 50)}${c.anchor.text.length > 50 ? '…' : ''}”` : ''}</div> : null}
             <p className="v2-rv-body">{c.body}</p>
             <div className="v2-row v2-edcomment-acts">
-              {c.dmFile && onOpen && c.dmFile !== activeFile ? <button className="btn btn-sm" onClick={() => onOpen(c)} data-testid="editor-comment-open"><Icon name="editor" size={12} />Open the data module</button> : null}
-              {state.canResolve ? <button className="btn btn-sm" disabled={busy} onClick={() => void resolve(c, !c.resolved)} data-testid="editor-comment-done"><Icon name="check" size={12} />{c.resolved ? 'Reopen' : 'Done'}</button> : null}
+              {c.dmFile && onOpen && c.dmFile !== activeFile ? <button className="btn btn-sm" onClick={() => onOpen(c)} {...(inline ? {} : { 'data-testid': 'editor-comment-open' })}><Icon name="editor" size={12} />Open the data module</button> : null}
+              {state.canResolve ? <button className="btn btn-sm" disabled={busy} onClick={() => void resolve(c, !c.resolved)} {...(inline ? {} : { 'data-testid': 'editor-comment-done' })}><Icon name="check" size={12} />{c.resolved ? 'Reopen' : 'Done'}</button> : null}
             </div>
           </div>
         ))}

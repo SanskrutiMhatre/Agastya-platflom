@@ -2,7 +2,7 @@
 // hierarchy (as saved in Publication) or as a flat list of every module. Project-level
 // functions (release, watermark, publication settings) are intentionally NOT here.
 
-import { useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { contentApi, IMPORT_MAX_FILES, type DmSummary, type ExploreNode } from '../../../api';
 import { Icon } from '../../../components/Icon';
 import { ConfirmModal, Modal, errText, useAsync } from '../../../components/ui';
@@ -93,21 +93,60 @@ export function EditorSide({ ctx, refreshKey, treeKey, width, onCollapse }: { ct
     list.reload(); explore.reload(); ctx.reload();
   };
 
+  // UI redesign (mockup editor.html): each module's row carries the state of the project's last check (a dot), the foot the totals
+  const checks = useAsync(() => contentApi.validation(ctx.id).catch(() => null), [ctx.id, ctx.summary.validation?.ranAt]);
+  const fileState = useMemo(() => {
+    const m = new Map<string, 'danger' | 'warning' | 'success'>();
+    const run = checks.data?.run; if (!run) return m;
+    for (const i of run.issues) {
+      const f = i.file?.split(/[\\/]/).pop(); if (!f) continue;
+      if (i.sev === 'error') m.set(f, 'danger'); else if (i.sev === 'warn' && m.get(f) !== 'danger') m.set(f, 'warning');
+    }
+    for (const d of list.data ?? []) if (!m.has(d.file)) m.set(d.file, 'success');
+    return m;
+  }, [checks.data, list.data]);
+  const errorsTotal = checks.data?.run?.summary.error ?? 0;
+  const drafts = (list.data ?? []).filter((d) => d.inWork && d.inWork !== '00').length;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = (e: MouseEvent) => { if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [menuOpen]);
+  const chapterKeys = useMemo(() => {
+    const keys: string[] = [];
+    const walk = (nodes: ExploreNode[], path: string) => nodes.forEach((n, i) => { const k = `${path}/${i}`; if (n.kind === 'chapter') { keys.push(k); walk(n.children, k); } });
+    walk(explore.data?.tree ?? [], 'r');
+    return keys;
+  }, [explore.data]);
+  const allShut = chapterKeys.length > 0 && chapterKeys.every((k) => closed.has(k));
+  const collapseAll = () => {
+    const n = allShut ? new Set<string>() : new Set(chapterKeys);
+    setClosed(n);
+    try { localStorage.setItem(`agastya.editor.closed.${ctx.id}`, JSON.stringify([...n])); } catch { /* private mode */ }
+  };
+  const menuAct = (f: () => void) => () => { setMenuOpen(false); f(); };
+
   const row = ({ file, title, sub, indent = 0 }: { file: string; title: string; sub: string; indent?: number }) => {
     const o = openMap.get(file);
     const locked = byFile.get(file)?.locked;
+    const state = o?.dirty ? 'warning' : fileState.get(file);
     return (
       <div key={file} className="node ed-node" style={{ '--depth': indent } as CSSProperties} aria-selected={o?.active || undefined}>
-        <button className={`v2-dm ed-node-btn ${o?.active ? 'active' : ''}`} onClick={() => open(file)} title={`${title || file}\n${sub}${locked ? ' · locked' : ''}\n${file}`} data-file={file} data-testid="dm-row">
-          <span className="twist" /><Icon name="file" size={14} />
-          <span className="t label"><b>{title || file}</b><span>{sub}{locked ? ' · locked' : ''}</span></span>
+        <button className="ed-node-btn" onClick={() => open(file)} title={`${title || file}\n${sub}${locked ? ' · locked' : ''}\n${file}`} data-file={file} data-testid="dm-row">
+          <span className="twist" /><Icon name="file" size={16} className="ico" />
+          <span className="label trunc">{title || file}</span>
+          {state ? <span className={`dot ${state}`} title={o?.dirty ? 'Open, unsaved changes' : state === 'danger' ? 'Errors in the last check' : state === 'warning' ? 'Warnings in the last check' : 'No problems in the last check'} /> : null}
         </button>
-        {locked ? <Icon name="lock" size={13} /> : null}
-        {o ? <span className={`dot ${o.dirty ? 'warning' : 'accent'}`} title={o.dirty ? 'Open, unsaved changes' : 'Open in the editor'} /> : null}
+        {locked ? <Icon name="lock" size={13} className="ico sm" /> : null}
         {writable && mayDelete ? <button className="icon-btn ed-node-del" aria-label={`Delete ${file}`} title="Delete" onClick={() => setDel(file)}><Icon name="trash" size={13} /></button> : null}
       </div>
     );
   };
+  /** the row's words, as the mockup's: "Pump - Description" (the technical name and the information name) */
+  const rowTitle = (techName: string | undefined, infoName: string | undefined, fallback: string) => techName ? (infoName ? `${techName} - ${infoName}` : techName) : fallback;
 
   const matchNode = (n: Extract<ExploreNode, { kind: 'dm' }>) => match({ file: n.file, title: n.title, dmc: n.dmc, infoName: n.infoName, techName: byFile.get(n.file)?.techName });
   const treeOpts = { closed, q, match: matchNode };
@@ -115,15 +154,15 @@ export function EditorSide({ ctx, refreshKey, treeKey, width, onCollapse }: { ct
   /** Draws the laid-out tree (publicationTree.ts): chapters with their modules, in publication order. */
   const renderItems = (items: TreeItem[]): React.ReactNode[] => items.map((it) => {
     if (it.kind === 'chapter') return (
-      <div key={it.key} data-testid="chapter-node">
+      <div key={it.key} data-testid="chapter-node" role="group">
         <button className="v2-chap node group" style={{ '--depth': it.depth } as CSSProperties} onClick={() => toggle(it.key)} aria-expanded={!it.shut}>
-          <span className="twist"><Icon name={it.shut ? 'right' : 'down'} size={13} /></span><Icon name={it.shut ? 'folder' : 'folderOpen'} size={14} /><span className="label trunc">{it.title || 'Untitled chapter'}</span><span className="meta">{it.dmCount}</span>
+          <span className="twist"><Icon name={it.shut ? 'right' : 'down'} size={14} className="ico sm" /></span><Icon name={it.shut ? 'folder' : 'folderOpen'} size={16} className="ico" /><span className="label trunc">{it.title || 'Untitled chapter'}</span><span className="meta">{it.dmCount}</span>
         </button>
         {it.shut ? null : renderItems(it.children)}
       </div>
     );
-    if (it.kind === 'dm') return row({ file: it.node.file, title: byFile.get(it.node.file)?.techName || it.node.title, sub: it.node.infoName || it.node.dmc, indent: it.depth + 1 });
-    return <div key={it.key} className="node ed-node-missing" style={{ '--depth': it.depth + 1 } as CSSProperties} title="Listed in the publication but not in the project"><span className="twist" /><Icon name="warn" size={13} /><span className="label trunc">Missing: {it.ref}</span></div>;
+    if (it.kind === 'dm') { const s = byFile.get(it.node.file); return row({ file: it.node.file, title: rowTitle(s?.techName, s?.infoName || it.node.infoName, it.node.title), sub: it.node.infoName || it.node.dmc, indent: it.depth + 1 }); }
+    return <div key={it.key} className="node ed-node-missing" style={{ '--depth': it.depth + 1 } as CSSProperties} title="Listed in the publication but not in the project"><span className="twist" /><Icon name="warn" size={14} className="ico sm" /><span className="label trunc">Missing: {it.ref}</span></div>;
   });
 
   const rows: DmSummary[] = (list.data ?? []).filter(match);
@@ -135,75 +174,84 @@ export function EditorSide({ ctx, refreshKey, treeKey, width, onCollapse }: { ct
   const tree = renderItems(laid.items);
   const unplacedShown = unplaced.slice(0, Math.max(0, laid.left));
   const treeShown = progressive.limit;
+  const total = list.data?.length ?? 0;
+  const unsaved = docs.filter((d) => d.dirty).length;
 
   return (
-    <aside className="v2-dmpanel pane tree-pane" aria-label="Data modules" style={{ flex: `0 0 ${width}px`, width }}>
+    <aside className="v2-dmpanel pane tree-pane ed-explorer" aria-label="Data modules" style={{ width, flex: `0 0 ${width}px` }}>
       {/* UI redesign (mockup editor.html): the Explorer: its head carries the panel's commands, the project's name is its tooltip */}
       <div className="pane-head" title={ctx.summary.project.name}>
         <span>Explorer</span>
         <span className="grow" />
-        {writable ? <>
-          <button className="icon-btn" title="Write a new data module" aria-label="New data module" data-testid="new-dm" onClick={() => studio.newDocument()}><Icon name="plus" size={14} /></button>
-        </> : null}
-        <button className="icon-btn" onClick={onCollapse} title="Hide this panel" aria-label="Hide the data module panel" data-testid="collapse-side"><Icon name="panel" size={14} /></button>
-      </div>
-      <section className="v2-pside-section ed-explorer" aria-label="Data module list">
-        {/* WP-07 (UX-019): the row wraps instead of cutting the switch to "Publica" in a narrow panel */}
-        <header className="ed-explorer-tools">
-          {isCir ? <b className="v2-trunc">{list.data?.length ?? 0} common data modules</b> : (
-            <div className="v2-seg seg" role="group" aria-label="Show">
-              <button className={view === 'tree' ? 'on' : ''} onClick={() => setView('tree')} aria-pressed={view === 'tree'} data-testid="view-tree">Publication</button>
-              <button className={view === 'all' ? 'on' : ''} onClick={() => setView('all')} aria-pressed={view === 'all'} data-testid="view-all" title={`${list.data?.length ?? 0} data modules`}>All</button>
-            </div>)}
-          <span className="spacer" />
-          {writable ? <>
-            <button className="icon-btn" title="Import data modules (.xml) and graphics" aria-label="Import data modules and graphics" onClick={() => fileInput.current?.click()}><Icon name="upload" size={14} /></button>
-            <button className="icon-btn" title="Import without validation: brings in every file as it is (enterprise and content checks skipped)" aria-label="Import without validation" data-testid="import-raw" onClick={() => rawInput.current?.click()}><Icon name="warn" size={14} /></button>
-            {canImportPackage(ctx.can) && !isCir ? <button className="icon-btn" title="Import a package: a folder, a .zip or files from another S1000D tool, scanned and repaired first" aria-label="Import package" data-testid="import-package" onClick={() => setPackageOpen(true)}><Icon name="package" size={14} /></button> : null}
-            {isCir ? null : <button className="icon-btn" title="Add a data module from the common repository" aria-label="Add from the common repository" onClick={() => setPicking(true)} data-testid="cir-pick"><Icon name="library" size={14} /></button>}
-            <input ref={fileInput} type="file" accept=".xml,.XML,.png,.jpg,.jpeg,.gif,.svg,.bmp,.webp" multiple hidden onChange={(e) => void doImport(e.target.files)} />
-            <input ref={rawInput} data-testid="import-raw-input" type="file" accept=".xml,.XML,.png,.jpg,.jpeg,.gif,.svg,.bmp,.webp" multiple hidden onChange={(e) => void doImport(e.target.files, true)} />
-          </> : null}
-          <button className="icon-btn" title="Refresh" aria-label="Refresh list" onClick={() => { list.reload(); explore.reload(); }}><Icon name="refresh" size={14} /></button>
-        </header>
-        <div className="v2-filter search-box">
-          <Icon name="search" size={13} />
-          <input className="v2-input" placeholder="Search by title, code or file…" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Escape') setQ(''); }} aria-label="Filter data modules" />
-          {q ? <button className="icon-btn" aria-label="Clear the filter" title="Clear (Esc)" onClick={() => setQ('')}><span aria-hidden="true">×</span></button> : null}
+        {writable ? <button className="icon-btn" title="New data module" aria-label="New data module" data-testid="new-dm" onClick={() => studio.newDocument()}><Icon name="plus" size={16} className="ico" /></button> : null}
+        {view === 'tree' && chapterKeys.length ? <button className="icon-btn" title={allShut ? 'Expand all' : 'Collapse all'} aria-label={allShut ? 'Expand all' : 'Collapse all'} data-testid="collapse-all" onClick={collapseAll}><Icon name="tree" size={16} className="ico" /></button> : null}
+        <div className="v2-pop-anchor ed-explorer-menu" ref={menuRef} onKeyDown={(e) => { if (e.key === 'Escape' && menuOpen) { e.stopPropagation(); setMenuOpen(false); (menuRef.current?.querySelector('button') as HTMLButtonElement | null)?.focus(); } }}>
+          <button className="icon-btn" title="Filter, import and more" aria-label="Filter, import and more" aria-expanded={menuOpen} aria-controls="ed-explorer-menu" data-testid="explorer-menu" onClick={() => setMenuOpen((m) => !m)}><Icon name="filter" size={16} className="ico" /></button>
+          {menuOpen ? (
+            <div className="menu" id="ed-explorer-menu" role="group" aria-label="Explorer">
+              {isCir ? null : <>
+                <div className="menu-label">Show</div>
+                <button type="button" className="item" aria-pressed={view === 'tree'} onClick={menuAct(() => setView('tree'))} data-testid="view-tree"><Icon name="book" size={16} className="ico" />Publication<span className="k faint">{view === 'tree' ? '✓' : ''}</span></button>
+                <button type="button" className="item" aria-pressed={view === 'all'} onClick={menuAct(() => setView('all'))} data-testid="view-all" title={`${total} data modules`}><Icon name="file" size={16} className="ico" />All<span className="k faint">{view === 'all' ? '✓' : ''}</span></button>
+                <div className="sep" />
+              </>}
+              {writable ? <>
+                <button type="button" className="item" title="Import data modules (.xml) and graphics" aria-label="Import data modules and graphics" onClick={menuAct(() => fileInput.current?.click())}><Icon name="upload" size={16} className="ico" />Import data modules and graphics…</button>
+                <button type="button" className="item" title="Import without validation: brings in every file as it is (enterprise and content checks skipped)" aria-label="Import without validation" data-testid="import-raw" onClick={menuAct(() => rawInput.current?.click())}><Icon name="warn" size={16} className="ico" />Import without validation…</button>
+                {canImportPackage(ctx.can) && !isCir ? <button type="button" className="item" title="Import a package: a folder, a .zip or files from another S1000D tool, scanned and repaired first" aria-label="Import package" data-testid="import-package" onClick={menuAct(() => setPackageOpen(true))}><Icon name="package" size={16} className="ico" />Import package…</button> : null}
+                {isCir ? null : <button type="button" className="item" title="Add a data module from the common repository" aria-label="Add from the common repository" onClick={menuAct(() => setPicking(true))} data-testid="cir-pick"><Icon name="library" size={16} className="ico" />Add from the common repository…</button>}
+                <div className="sep" />
+              </> : null}
+              <button type="button" className="item" title="Refresh" aria-label="Refresh list" onClick={menuAct(() => { list.reload(); explore.reload(); checks.reload(); })}><Icon name="refresh" size={16} className="ico" />Refresh</button>
+              <button type="button" className="item" onClick={menuAct(onCollapse)} title="Hide this panel" aria-label="Hide the data module panel" data-testid="collapse-side"><Icon name="panel" size={16} className="ico" />Hide this panel</button>
+            </div>
+          ) : null}
         </div>
-        <div className="v2-dmlist tree-scroll tree" data-testid="dm-list" ref={listBox}>
+        {writable ? <>
+          <input ref={fileInput} type="file" accept=".xml,.XML,.png,.jpg,.jpeg,.gif,.svg,.bmp,.webp" multiple hidden onChange={(e) => void doImport(e.target.files)} />
+          <input ref={rawInput} data-testid="import-raw-input" type="file" accept=".xml,.XML,.png,.jpg,.jpeg,.gif,.svg,.bmp,.webp" multiple hidden onChange={(e) => void doImport(e.target.files, true)} />
+        </> : null}
+      </div>
+      <div className="search-box">
+        <input className="input search" placeholder="Filter by title, code or file…" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Escape') setQ(''); }} aria-label="Filter data modules" />
+      </div>
+      <div className="tree-scroll" data-testid="dm-list" ref={listBox}>
+        <div className="tree focused" role="tree" aria-label={view === 'tree' ? 'Data modules by publication chapter' : 'All data modules'}>
           {untitled.map((d) => (
-            <button key={d.key} className={`v2-dm ${d.active ? 'active' : ''}`} onClick={() => studio.focusEditor()}>
-              <span className={`v2-dot ${d.dirty ? 'dirty' : 'open'}`} /><span className="t"><b>{d.title}</b><span>New, not saved to the project yet</span></span>
-            </button>
+            <div key={d.key} className="node ed-node" aria-selected={d.active || undefined}>
+              <button className="ed-node-btn" onClick={() => studio.focusEditor()} title="New, not saved to the project yet">
+                <span className="twist" /><Icon name="file" size={16} className="ico" /><span className="label trunc">{d.title}</span>{d.dirty ? <span className="dot warning" /> : null}
+              </button>
+            </div>
           ))}
-          {list.loading && !list.data ? <div className="v2-hint" style={{ padding: 8 }}>Loading…</div> : null}
-          {list.error ? <div className="v2-error" style={{ padding: 8 }}>{list.error}</div> : null}
+          {list.loading && !list.data ? <div className="ed-tree-note">Loading…</div> : null}
+          {list.error ? <div className="ed-tree-note v2-error">{list.error}</div> : null}
 
           {view === 'tree' ? (
             <>
               {tree}
               {unplaced.length ? (
-                <div data-testid="unplaced-group">
-                  <div className="v2-chap static node group" title="Not placed in the publication yet. Add them from the Publication tab.">Not in the publication <span className="v2-hint">{unplaced.length}</span></div>
-                  {unplacedShown.map((d) => row({ file: d.file, title: d.techName, sub: d.infoName || d.dmc, indent: 1 }))}
+                <div data-testid="unplaced-group" role="group">
+                  <div className="v2-chap static node group" title="Not placed in the publication yet. Add them from the Publication tab."><span className="twist" /><Icon name="folder" size={16} className="ico" /><span className="label trunc">Not in the publication</span><span className="meta">{unplaced.length}</span></div>
+                  {unplacedShown.map((d) => row({ file: d.file, title: rowTitle(d.techName, d.infoName, d.dmc), sub: d.infoName || d.dmc, indent: 1 }))}
                 </div>
               ) : null}
               <MoreRows shown={treeShown} total={treeTotal} onMore={progressive.more} onAll={progressive.all} />
-              {!explore.loading && !tree.length && !unplaced.length && !untitled.length ? <div className="v2-hint" style={{ padding: 10 }}>{q ? 'No data module matches.' : 'No chapters yet. Arrange them in the Publication tab.'}</div> : null}
+              {!explore.loading && !tree.length && !unplaced.length && !untitled.length ? <div className="ed-tree-note">{q ? 'No data module matches.' : 'No chapters yet. Arrange them in the Publication tab.'}</div> : null}
             </>
           ) : (
             <>
-              <VirtualRows items={rows} scrollRef={listBox} keyOf={(d) => d.file} row={(d) => row({ file: d.file, title: d.techName, sub: d.infoName || d.dmc })} />
-              {!list.loading && rows.length === 0 && !untitled.length ? <div className="v2-hint" style={{ padding: 10 }}>{q ? <>No data module matches “{q}”. <button className="v2-link" onClick={() => setQ('')}>Clear the search</button></> : <>No data modules yet. Press <b>New</b> to write one, or use the upload button to import existing files.</>}</div> : null}
+              <VirtualRows items={rows} scrollRef={listBox} keyOf={(d) => d.file} row={(d) => row({ file: d.file, title: rowTitle(d.techName, d.infoName, d.dmc), sub: d.infoName || d.dmc })} />
+              {!list.loading && rows.length === 0 && !untitled.length ? <div className="ed-tree-note">{q ? <>No data module matches “{q}”. <button className="v2-link" onClick={() => setQ('')}>Clear the search</button></> : <>No data modules yet. Press <b>New data module</b> (+) to write one, or import existing files from the explorer menu.</>}</div> : null}
             </>
           )}
         </div>
-      </section>
-      <div className="tree-foot v2-dmcount" aria-live="polite">
-        <span>{q ? `${rows.length} of ${list.data?.length ?? 0} data modules match` : `${list.data?.length ?? 0} data module${(list.data?.length ?? 0) === 1 ? '' : 's'}`}</span>
-        {docs.some((d) => d.dirty) ? <span className="ed-foot-warn">{docs.filter((d) => d.dirty).length} unsaved</span> : null}
-        {docs.filter((d) => d.file).length ? <span>{docs.filter((d) => d.file).length} open</span> : null}
+      </div>
+      <div className="tree-foot" aria-live="polite">
+        <span>{q ? `${view === 'all' ? rows.length : treeTotal} of ${total} match` : `${total} module${total === 1 ? '' : 's'}`}</span>
+        {errorsTotal ? <span className="ed-foot-bad">{errorsTotal} error{errorsTotal === 1 ? '' : 's'}</span> : null}
+        {drafts ? <span className="ed-foot-warn">{drafts} draft{drafts === 1 ? '' : 's'}</span> : null}
+        {unsaved ? <span className="ed-foot-warn">{unsaved} unsaved</span> : null}
       </div>
       {picking ? <CirPicker projectId={ctx.id} existing={new Set((list.data ?? []).map((d) => d.file))} onClose={() => setPicking(false)} onAdded={() => { list.reload(); explore.reload(); void studio.refreshProjectData(); ctx.reload(); }} /> : null}
       {packageOpen ? <ImportPackageDialog projectId={ctx.id} can={ctx.can} onClose={() => setPackageOpen(false)} onChanged={onPackageChanged} /> : null}

@@ -40,6 +40,16 @@
       "decision": "owner approved mockups 2026-11-28 (UI redesign)",
       "batch": "UI redesign step 1",
       "date": "2026-11-28"
+    },
+    {
+      "category": "tests",
+      "key": "e2e wp21-editor-chrome.spec.ts > ${e.kind}: the shared header, Write by default with at least 55% of 1366x768, the palette, the shortcuts, focus mode and Esc",
+      "reason": "Renamed, not removed: the owner-approved editor mockup (docs/audit/mockups/editor.html) opens with the explorer (248 px), the Properties panel (288 px) and the Problems panel (148 px) open, so the WP-21 first view with every panel closed and the document at 55% of 1366x768 is replaced by the mockup's (about 34% in the mockup itself; the test now asks 30% and checks that the three panels are open). Every other assertion is kept, focus mode still gives the page at least 70%",
+      "newHome": "e2e wp21-editor-chrome.spec.ts > ${e.kind}: the shared header, Write by default with the mockup's panels open and at least 30% of 1366x768, the palette, the shortcuts, focus mode and Esc",
+      "checklistRow": "Editors: chrome, layout, focus",
+      "decision": "owner approved mockups 2026-11-28 (UI redesign): the default state must be the mockup's",
+      "batch": "UI redesign: editor workspace",
+      "date": "2026-11-28"
     }
   ]
 }

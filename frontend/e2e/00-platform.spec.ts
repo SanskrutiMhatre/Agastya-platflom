@@ -229,6 +229,7 @@ test('editor: the left panel can be hidden and shown again, and the editor takes
   await expect(page.getByRole('complementary', { name: 'Data modules' })).toHaveCount(0);   // the choice is remembered
   await page.getByTestId('toggle-side').click();
   await expect(page.getByRole('complementary', { name: 'Data modules' })).toBeVisible();
+  await page.getByTestId('explorer-menu').click();   // UI redesign: these commands are in the explorer's menu
   await page.getByTestId('collapse-side').click();
   await expect(page.getByRole('complementary', { name: 'Data modules' })).toHaveCount(0);
   await page.getByTestId('toggle-side').click();
@@ -306,8 +307,10 @@ test('editor: the saved publication hierarchy shows in the left panel, with its 
   await chapter.locator('.v2-chap').first().click();
   await expect(chapter.getByTestId('dm-row').first()).toBeVisible();
   await shot(page, '34-editor-hierarchy');
+  await page.getByTestId('explorer-menu').click();   // UI redesign: these commands are in the explorer's menu
   await page.getByTestId('view-all').click();
   await expect(page.getByTestId('chapter-node')).toHaveCount(0);
+  await page.getByTestId('explorer-menu').click();   // UI redesign: these commands are in the explorer's menu
   await page.getByTestId('view-tree').click();
   await expect(page.getByTestId('chapter-node')).toHaveCount(1);
   await chapter.getByTestId('dm-row').first().click();                              // opens in the editor
@@ -638,6 +641,7 @@ test('CIR: create a data module in the repository with the wizard (its own uniqu
   // reuse: from a project's own editor, add it with "Add from the common repository"
   await page.goto(`${projectUrl}/editor`);
   await expect(page.getByTestId('studio-host')).toBeVisible();
+  await page.getByTestId('explorer-menu').click();   // UI redesign: these commands are in the explorer's menu
   await page.getByTestId('cir-pick').click();
   const pick = page.locator(`[data-testid="cir-pick-row"][data-file="${first}"]`);
   await expect(pick).toBeVisible();
@@ -645,6 +649,7 @@ test('CIR: create a data module in the repository with the wizard (its own uniqu
   await page.getByTestId('cir-pick-add').click();
   await expect(page.locator('.v2-toast', { hasText: /Added 1 data module from the repository/ })).toBeVisible();
   await expect(page.getByTestId('dm-list').locator(`[data-file="${first}"]`)).toBeVisible();
+  await page.getByTestId('explorer-menu').click();   // UI redesign: these commands are in the explorer's menu
   await page.getByTestId('cir-pick').click();
   await expect(page.locator(`[data-testid="cir-pick-row"][data-file="${first}"]`)).toContainText('already here');   // not offered twice
   await page.getByRole('button', { name: 'Cancel' }).click();
