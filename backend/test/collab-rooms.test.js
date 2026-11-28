@@ -333,3 +333,38 @@ test('the server form is stable: every sample module round-trips Y -> XML -> Y -
     assert.ok(Y.encodeStateAsUpdate(doc, sv).length < 600, `${f}: a one-word change is a small update, not a rebuild`);
   }
 });
+
+test('the binding contract (docs/phase3/COLLAB-CONTRACT.md): a second format is one register() call; rooms, access, merge and write-back are the core\'s', async () => {
+  // a throwaway format standing in for JSS / JSG (which are not bound in P3-1): its own room kind, file and write-back
+  const { register, formatOf } = require('../dist/services/collab/formats');
+  const { content } = require('../dist/context');
+  const REL = 'contract-proof-book.xml';   // at the project root (a folder of its own would need creating first)
+  content.writeText(pid, REL, '<book><chapter><para>Contract proof.</para></chapter></book>\n');
+  const writes = [];
+  const prior = formatOf('jsg');
+  register({
+    kind: 'jsg', writeRole: 'editor', writeCap: 'dm.write',
+    resolve: (projectId, docPath) => { if (docPath !== 'book') throw Object.assign(new Error('No such book.'), { status: 404, code: 'NOT_FOUND' }); return REL; },
+    toY: (text, ydoc, origin) => require('../dist/services/collab/xml').yFromText(text, ydoc, origin),
+    fromY: (ydoc) => require('../dist/services/collab/xml').serializeY(ydoc),
+    reconcile: (ydoc, text, origin) => require('../dist/services/collab/xml').reconcileText(ydoc, text, origin),
+    async writeBack(projectId, rel, text, actor, revision) { writes.push({ rel, revision, actor: actor.id }); content.writeText(projectId, rel, text); },
+  });
+  try {
+    const name = `${pid}/jsg/book`;
+    const a = await client(alice); const b = await client(bob); const r = await client(rita);
+    const ja = await a.join(name); const jb = await b.join(name); const jr = await r.join(name);
+    assert.ok(!ja.error && !jb.error && !jr.error, JSON.stringify([ja.error, jb.error, jr.error]));
+    assert.equal(jr.room.state.code, 'ROLE', 'a reviewer is read-only in any format');
+    assert.equal((await a.join(`${pid}/jsg/other`)).error.code, 'NOT_FOUND', 'the format decides what exists');
+    paraText(ja.room).insert(0, 'ALPHA ');
+    const tb = paraText(jb.room); tb.insert(tb.length, ' OMEGA');
+    assert.ok(await a.settled(name) && await b.settled(name));
+    assert.ok(await until(() => textOf(jr.room.doc.getXmlFragment('xml')).includes('ALPHA') && textOf(jr.room.doc.getXmlFragment('xml')).includes('OMEGA'), 5000), 'merged and seen live');
+    const fl = await a.flush(name, true);
+    assert.ok(fl.info.hash);
+    assert.match(content.readText(pid, REL), /<para>ALPHA Contract proof\. OMEGA<\/para>/);
+    assert.ok(writes.some((w) => w.rel === REL && w.revision), 'the format\'s own write-back was used, with a revision on FLUSH');
+    a.close(); b.close(); r.close();
+  } finally { if (prior) register(prior); }
+});

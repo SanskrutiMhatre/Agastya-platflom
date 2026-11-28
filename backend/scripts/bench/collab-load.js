@@ -26,7 +26,12 @@ if (process.argv[2] === '--server') {
   start(Number(process.argv[3])).then((port) => process.send({ ready: port }), (e) => { console.error(e); process.exit(1); });
   process.on('message', (m) => {
     if (m === 'usage') process.send({ cpu: process.cpuUsage(), mem: process.memoryUsage(), rooms: require(path.join(ROOT, 'dist', 'services', 'collab', 'rooms.js')).inspect().length });
-    if (m === 'stop') { try { stop(); } catch { /* */ } setTimeout(() => { fs.rmSync(ws, { recursive: true, force: true }); process.exit(0); }, 500); }
+    if (m === 'stop') {
+      try { stop(); } catch { /* already stopped */ }
+      // the database closes a moment after stop() on Windows: retry the removal, never fail the run over it
+      const rm = (left) => { try { fs.rmSync(ws, { recursive: true, force: true }); process.exit(0); } catch (e) { if (left > 0) setTimeout(() => rm(left - 1), 500); else { console.warn(`could not remove ${ws}: ${e.message}`); process.exit(0); } } };
+      setTimeout(() => rm(10), 500);
+    }
   });
   return;
 }
