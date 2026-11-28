@@ -22,6 +22,7 @@ import { MoreRows, useProgressive } from '../components/windowing';
 import { useContextMenu, type MenuAction } from '../components/ContextMenu';
 import { PasswordInput } from '../components/PasswordInput';
 import { AdmHead, TabLinks } from './adminParts';
+import { GitlabConnectCard } from '../components/GitlabConnect';
 
 function Account() {
   const { user, logout } = useSession();
@@ -72,6 +73,7 @@ function Account() {
             <ThemeChoiceControl />
           </div>
         </section>
+        <GitlabConnectCard returnTo="/settings/account" />   {/* Phase 3 (P3-5): renders nothing while GitLab is off */}
         <section className="card" aria-labelledby="acct-session">
           <div className="card-head"><h3 id="acct-session"><Icon name="logout" />Session</h3></div>
           <div className="card-body stack adm-gap">

@@ -122,14 +122,14 @@ export function registerGitlabRoutes(app: Express): void {
   app.get('/api/gitlab/oauth/callback', requireAuth(), wrap(async (req, res) => {
     on();
     const back = (to: string, q: string): void => { res.redirect(302, `${to}${to.includes('?') ? '&' : '?'}${q}`); };
-    if (typeof req.query.error === 'string') { log(req, 'gitlab.connect.failed', { reason: String(req.query.error).slice(0, 100) }); back('/settings', `gitlab=error&reason=${encodeURIComponent(String(req.query.error).slice(0, 100))}`); return; }
+    if (typeof req.query.error === 'string') { log(req, 'gitlab.connect.failed', { reason: String(req.query.error).slice(0, 100) }); back('/settings/account', `gitlab=error&reason=${encodeURIComponent(String(req.query.error).slice(0, 100))}`); return; }
     try {
       const out = await finishOauth(userOf(req).id, String(req.query.code ?? ''), String(req.query.state ?? ''));
       log(req, 'gitlab.account.connected', { method: 'oauth', gitlabUser: out.account.gitlab_username, gitlabUserId: out.account.gitlab_user_id });
       back(safeReturnTo(out.returnTo), 'gitlab=connected');
     } catch (e) {
       log(req, 'gitlab.connect.failed', { reason: (e as Error).message.slice(0, 200) });
-      back('/settings', `gitlab=error&reason=${encodeURIComponent((e as Error).message.slice(0, 200))}`);
+      back('/settings/account', `gitlab=error&reason=${encodeURIComponent((e as Error).message.slice(0, 200))}`);
     }
   }));
 

@@ -29,6 +29,7 @@ import { Audit, RecentAudit, Users } from './Settings';
 import { CatalogueSection, SnsPresetsSection, ExtensionsSection, CoverageSection } from './AdminS1000d';
 import { PlatformBackups } from './PlatformBackups';
 import { DirectorySection, GroupsSection } from './AccessAdmin';
+import { GitlabSection } from './AdminGitlab';
 
 const VERSION = typeof __AGASTYA_CLIENT_VERSION__ === 'string' ? __AGASTYA_CLIENT_VERSION__ : '';
 
@@ -51,7 +52,7 @@ const TABS: Array<{ label: string; items: Array<[string, string]>; more?: Array<
   { label: 'Appearance', items: [['visual-settings', 'Visual settings'], ['settings', 'Settings']] },
   { label: 'Reference data', items: [...SHARED, ['format-jss', 'JSS manual types'], ['format-jsg', 'JSG manual types']] },
   { label: 'S1000D', items: S1000D_ITEMS, more: S1000D_ADVANCED },
-  { label: 'System', items: [['maintenance', 'Maintenance'], ['licence', 'Licence']] },
+  { label: 'System', items: [['maintenance', 'Maintenance'], ['gitlab', 'GitLab'], ['licence', 'Licence']] },
   { label: 'Backup', items: [['backup', 'Platform backup']] },
   { label: 'Audit log', items: [['audit-logs', 'Audit logs']] },
 ];
@@ -213,6 +214,7 @@ export function AdministratorPage() {
           <Route path="visual-settings" element={<VisualSection />} />
           <Route path="settings" element={<SettingsSection />} />
           <Route path="licence" element={<LicenceSection />} />
+          <Route path="gitlab" element={<GitlabSection />} />
           <Route path="*" element={<Navigate to="users" replace />} />
         </Routes>
       </div>

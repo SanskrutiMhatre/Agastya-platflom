@@ -8,6 +8,7 @@ import {
   Palette, ScrollText,
   Flag, Funnel, CircleX, Cpu, Database, HardDrive, Archive, WifiOff, BookOpen, Ban, ListOrdered, Ellipsis, ZoomIn, ZoomOut, ChevronLeft, Save, Link, ListChecks, Hash, FileCheck, Printer, Columns2,
   PanelBottom, PanelRight,
+  GitBranch, GitMerge, GitPullRequest, GitCommitHorizontal,
 } from 'lucide';
 
 const ICONS: Record<string, IconNode> = {
@@ -28,6 +29,8 @@ const ICONS: Record<string, IconNode> = {
   split: Columns2,
   // the top bar's panel toggles (left sidebar = panel, bottom panel, right panel)
   panelBottom: PanelBottom, panelRight: PanelRight,
+  // Phase 3 (P3-5): the GitLab repository page
+  branch: GitBranch, merge: GitMerge, mr: GitPullRequest, commit: GitCommitHorizontal,
 };
 
 export type IconName = keyof typeof ICONS;
