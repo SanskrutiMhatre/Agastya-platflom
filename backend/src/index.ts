@@ -21,8 +21,7 @@ import { loadTls, listen, hostCheckFor, setHostCheck, describeNetwork } from './
 import { installLogging } from './services/log';
 import { enableHostEventSink } from './services/securityEvents';
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { ensureBootstrapAdmin } = require('./core/auth/bootstrap');
+import { initialiseAccounts } from './services/firstRun';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 import { assertPasswordHashing } from './core/auth/crypto';
 
@@ -47,7 +46,8 @@ export async function start(port: number = config.port): Promise<number> {
   try { sweepPendingImports(); } catch (e) { console.warn('[start] unfinished imports:', (e as Error).message); }    // REL-004: an import cut off by a crash
   try { const n = sweepTempFiles(path.join(workspaceDir, 'projects')); if (n) console.warn(`[start] removed ${n} temporary file(s) left by interrupted saves`); } catch { /* best effort */ }   // WP-11: a save cut off between write and rename
   await reconcileRegistry();
-  await ensureBootstrapAdmin({ store, audit, env: config.initialAdmin, now: () => new Date() });
+  // P3-6: a standalone installation's default accounts (fresh data folder only), then the INITIAL_ADMIN_* bootstrap (services/firstRun.ts)
+  await initialiseAccounts({ store, audit, deployment: config.deployment, initialAdmin: config.initialAdmin });
 
   const app = createApp();
   // WP-14: builds run in job workers, each with its own bounded JVM; the server keeps a warm one only when jobs run inline
@@ -66,6 +66,7 @@ export async function start(port: number = config.port): Promise<number> {
   console.log(`  Network:   ${describeNetwork(config, material?.info ?? null)}`);
   console.log(`  Workspace: ${workspaceDir}`);
   console.log(`  Renderer:  ${r.warm ? 'warm FOP ready' : 'cold (per-request FOP)'}  java=${r.java}`);
+  console.log(`  Accounts:  ${config.deployment} deployment`);
   console.log(`  Setup:     ${store.anyAdminExists() ? 'administrator exists' : 'first run - open the app to create the administrator'}  (${nowIso()})`);
   return l.port;
 }

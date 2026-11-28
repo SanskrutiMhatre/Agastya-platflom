@@ -223,6 +223,7 @@
   "POST /api/admin/users/import/preview": "requireAdmin :: 401 403 403 403 403 ok 403 | 403 403 403 403 403",
   "POST /api/auth/activity": "requireAuth :: 401 ok ok ok ok ok ok | ok ok ok ok ok",
   "POST /api/auth/change-password": "requireAuth :: 401 403 ok ok ok ok ok | ok ok ok ok ok",
+  "POST /api/auth/default-credentials/acknowledge": "public :: ok ok ok ok ok ok ok | ok ok ok ok ok",
   "POST /api/auth/forgot": "public :: ok ok ok ok ok ok ok | ok ok ok ok ok",
   "POST /api/auth/login": "public :: ok ok ok ok ok ok ok | ok ok ok ok ok",
   "POST /api/auth/logout": "requireAuth :: 401 ok ok ok ok ok ok | ok ok ok ok ok",

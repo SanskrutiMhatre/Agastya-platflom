@@ -138,6 +138,9 @@ namespace Agastya
         public string ServiceName = "AgastyaPlatform";
         // WP-26: Mode B (a server on the network) serves TLS only. Empty Mode = "server" when Bind is not loopback, else "local".
         public string Mode = "";
+        // Phase 3 P3-6: how the accounts began (AGASTYA_DEPLOYMENT). standalone = the single-computer EXE (default accounts on the first start
+        // of a fresh data folder); server = a common server (the administrator is created at the first start). Written by Setup; empty = server.
+        public string Deployment = "";
         public string ServerNames = "";
         public string TlsCert = "", TlsKey = "", TlsPfx = "", TlsPassphraseFile = "", HstsMaxAge = "";
         // WP-25: where the interface opens (auto = an app window of Microsoft Edge when it is there, else the default browser with a notice)
@@ -215,6 +218,10 @@ namespace Agastya
                     case "logging.keepfiles": int kf; if (int.TryParse(val, out kf) && kf >= 1) s.LogKeep = kf; break;
                     case "service.name": if (val.Length > 0) s.ServiceName = val; break;
                     case "server.mode": s.Mode = val; break;
+                    case "server.deployment":
+                        string dv = val.ToLowerInvariant();
+                        if (dv == "standalone" || dv == "server" || dv.Length == 0) s.Deployment = dv; else s.Problems.Add("line " + lineNo + ": Deployment must be standalone or server");
+                        break;
                     case "server.servernames": s.ServerNames = val; break;
                     case "tls.certificate": s.TlsCert = val; break;
                     case "tls.key": s.TlsKey = val; break;
@@ -482,6 +489,8 @@ namespace Agastya
             if (cfg.SecureCookies) psi.EnvironmentVariables["AGASTYA_SECURE_COOKIES"] = "1";
             // WP-26: the server refuses a network address without TLS and names the setting in the server log.
             psi.EnvironmentVariables["AGASTYA_MODE"] = cfg.EffectiveMode;
+            // P3-6: standalone (default accounts) or server (setup screen); the server refuses standalone with a network address
+            if (cfg.Deployment.Length > 0) psi.EnvironmentVariables["AGASTYA_DEPLOYMENT"] = cfg.Deployment;
             if (cfg.ServerNames.Length > 0) psi.EnvironmentVariables["AGASTYA_SERVER_NAMES"] = cfg.ServerNames;
             if (cfg.TlsCert.Length > 0) psi.EnvironmentVariables["AGASTYA_TLS_CERT"] = Settings.StatePath(cfg.TlsCert);
             if (cfg.TlsKey.Length > 0) psi.EnvironmentVariables["AGASTYA_TLS_KEY"] = Settings.StatePath(cfg.TlsKey);
@@ -949,6 +958,7 @@ namespace Agastya
             "  AgastyaCtl.exe --rollback [--restore-db]        go back to the previous version (--restore-db: and to the database copy taken before the update)\r\n" +
             "  AgastyaCtl.exe --versions | --prune-versions | --repair-launcher\r\n" +
             "  AgastyaCtl.exe --first-admin <user> --password-file <file>  create the first administrator (temporary password, changed at first sign-in)\r\n" +
+            "  AgastyaCtl.exe --default-accounts     standalone: create the default accounts of a fresh data folder (exit 0 created, 3 nothing to do)\r\n" +
             "  AgastyaCtl.exe --configure-server [--name <host> ...] [--bind lan|<address>] [--port <n>] (--make-cert | --pfx <f> [--passphrase-file <f>] | --cert <pem> --key <pem>) [--firewall]\r\n" +
             "                                        make this installation a team server (Mode B, TLS); then --install-service and --start\r\n" +
             "  AgastyaCtl.exe --check-server [<url>]  the client/server handshake from this computer ([client] Server= when no address is given)\r\n" +
@@ -1038,6 +1048,7 @@ namespace Agastya
                     case "--prepare-upgrade": return Updater.PrepareUpgrade(cfg, label);
                     case "--activate": return Updater.Activate(cfg, label);
                     case "--first-admin": return Updater.FirstAdmin(cfg, label, passwordFile);
+                    case "--default-accounts": return Updater.DefaultAccounts(cfg);
                     case "--remove-data": return Updater.RemoveData(cfg, confirm);
                     case "--reset-admin": return ResetAdmin(cfg, label);
                     case "--quit":
@@ -1046,7 +1057,7 @@ namespace Agastya
                         catch (Exception e) { Console.Error.WriteLine("Could not reach the running application: " + e.Message); return 1; }
                     case "--install-service":
                         if (port != null) { int pn; if (!int.TryParse(port, out pn) || pn < 1 || pn > 65535) { Console.Error.WriteLine("--port must be 1-65535"); return 2; } Settings.Set("server", "Port", port); }
-                        if (lan) Settings.Set("server", "Bind", "lan");
+                        if (lan) { Settings.Set("server", "Bind", "lan"); Settings.Set("server", "Deployment", "server"); }   // P3-6: a network server has no default accounts
                         if (port != null || lan) cfg = Settings.Load();
                         return ServiceTools.Install(cfg);
                     case "--uninstall-service": return ServiceTools.Uninstall(cfg);
