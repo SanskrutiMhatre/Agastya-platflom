@@ -1,6 +1,8 @@
 // UI redesign screen 5 (mockup docs/audit/mockups/validation.html): the source excerpt of the selected finding. The lines are the
 // module's own text, read from the server (contentApi.readDm) at the line the check reported; nothing is made up. Tokens are drawn as
-// React text (never as HTML), with the syntax colour tokens of the design system.
+// React text (never as HTML), with the syntax colour tokens of the design system. As the mockup draws it: two lines before the reported one,
+// the reported line highlighted, one line after, and the indentation the lines share taken off (a deep module would otherwise push the text
+// out of the card).
 
 import { useEffect, useState } from 'react';
 import { contentApi } from '../../api';
@@ -34,14 +36,17 @@ export function tokenizeXmlLine(line: string): XmlTok[] {
   return out;
 }
 
-/** The lines around `line` (1-based), with their numbers. */
-export function excerpt(text: string, line: number, around = 2): Array<{ n: number; s: string }> {
+const lead = (s: string): number => /^ */.exec(s)![0].length;
+
+/** The lines around `line` (1-based) with their numbers: `before` lines above it, `after` below, kept inside the file; the shared indentation is removed. */
+export function excerpt(text: string, line: number, before = 2, after = 1): Array<{ n: number; s: string }> {
   const lines = text.split(/\r?\n/);
   const at = Math.min(Math.max(1, line), lines.length);
-  const from = Math.max(1, at - around); const to = Math.min(lines.length, at + around);
+  const from = Math.max(1, at - before); const to = Math.min(lines.length, at + after);
   const out: Array<{ n: number; s: string }> = [];
-  for (let n = from; n <= to; n++) out.push({ n, s: lines[n - 1] });
-  return out;
+  for (let n = from; n <= to; n++) out.push({ n, s: lines[n - 1].replace(/\t/g, '  ') });
+  const indent = Math.min(...out.filter((l) => l.s.trim()).map((l) => lead(l.s)));
+  return Number.isFinite(indent) && indent > 0 ? out.map((l) => ({ n: l.n, s: l.s.slice(Math.min(indent, lead(l.s))) })) : out;
 }
 
 export function SourceExcerpt({ projectId, file, line }: { projectId: string; file: string; line: number }) {
@@ -56,7 +61,7 @@ export function SourceExcerpt({ projectId, file, line }: { projectId: string; fi
   if (state.key !== key) return <p className="faint val-src-note">Reading the source…</p>;
   if (state.failed || state.text == null) return <p className="faint val-src-note">The source of this module could not be read.</p>;
   return (
-    <pre className="src val-src" aria-label="Source excerpt" data-testid="issue-source">
+    <pre className="src" aria-label="Source excerpt" data-testid="issue-source">
       {excerpt(state.text, line).map(({ n, s }) => {
         const toks = tokenizeXmlLine(s).map((t, i) => (t.k === 'x' ? <span key={i}>{t.s}</span> : <span key={i} className={t.k}>{t.s}</span>));
         // the reported line is a block of its own (the mockup's highlight); the other lines end in a line break

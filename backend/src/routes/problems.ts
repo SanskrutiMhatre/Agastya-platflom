@@ -2,7 +2,7 @@
 //
 //   GET  /api/projects/:id/problems            anyone who can see the project: the last run's findings with open / reviewed / waived
 //   GET  /api/projects/:id/problems/reviewed   anyone who can see the project: the marks (who, when)
-//   PUT  /api/projects/:id/problems/reviewed   a reviewer or above (the people who may run the checks): { keys: [...], reviewed: true|false }
+//   PUT  /api/projects/:id/problems/reviewed   a reviewer or above (the people who may run the checks): { keys: [...], reviewed: true|false, note?: text kept with a new mark }
 //
 // A mark is shared by the whole project and recorded in the audit log; it never changes what the publication gate enforces.
 
@@ -27,8 +27,9 @@ export function registerProblemRoutes(app: Express): void {
     const reviewed = req.body?.reviewed !== false;
     const keys = req.body?.keys ?? req.body?.key;
     const u = req.auth.user;
-    const marks = setReviewed(req.project.id, keys, reviewed, { username: u.username, fullName: u.fullName ?? u.full_name ?? null });
-    log(req, reviewed ? 'problems.reviewed' : 'problems.unreviewed', { count: Array.isArray(keys) ? keys.length : 1 });
+    const note = reviewed ? req.body?.note : undefined;
+    const marks = setReviewed(req.project.id, keys, reviewed, { username: u.username, fullName: u.fullName ?? u.full_name ?? null }, note);
+    log(req, reviewed ? 'problems.reviewed' : 'problems.unreviewed', { count: Array.isArray(keys) ? keys.length : 1, ...(typeof note === 'string' && note.trim() ? { note: true } : {}) });
     res.json({ marks });
   }));
 }
