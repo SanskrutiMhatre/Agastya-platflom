@@ -61,6 +61,13 @@ export interface DocAdapter<L extends DocLoaded> {
   reloadProject: boolean;
 }
 
+/**
+ * Phase 3 (P3-1): a document the page opened LIVE (co-edited in its room, collab/client.ts). Saving is continuous; Save asks the server to
+ * write the file and record a revision now. The page sets `host.liveRef.current` and reports the room's state with `host.setLive`.
+ */
+export interface LiveDocHandle { flush(revision: boolean): Promise<{ hash: string | null }> }
+export type LiveSaveState = 'saved' | 'syncing' | 'offline';
+
 export function useDocEditor<L extends DocLoaded>(ctx: ProjectCtx, adapter: DocAdapter<L>, layout: EditorLayout) {
   const { id, role, can, summary } = ctx;
   const toast = useUi((s) => s.toast);
@@ -82,6 +89,8 @@ export function useDocEditor<L extends DocLoaded>(ctx: ProjectCtx, adapter: DocA
   const [src, setSrc] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [gotoMissing, setGotoMissing] = useState('');
+  const liveRef = useRef<LiveDocHandle | null>(null);
+  const [live, setLive] = useState<LiveSaveState | null>(null);
 
   const load = useCallback(async () => {
     setError(''); setLoaded(null);
@@ -96,10 +105,18 @@ export function useDocEditor<L extends DocLoaded>(ctx: ProjectCtx, adapter: DocA
   useEffect(() => { setFindings(loaded?.report.findings ?? []); }, [loaded]);
   const applyFindings = (list: DocFinding[]) => { setFindings(list); editorRef.current?.setFindings(list as never[]); };
 
-  const draft = useLocalDraft(id, adapter.kind, () => { const ed = editorRef.current; return ed && ed.isDirty() ? ed.getXml() : null; }, dirty, () => hashRef.current, loaded?.xml ?? null);
+  // (a live document keeps no draft: its unacknowledged changes are in IndexedDB until the server has them, collab/pending.ts)
+  const draft = useLocalDraft(id, adapter.kind, () => { const ed = editorRef.current; return ed && !liveRef.current && ed.isDirty() ? ed.getXml() : null; }, dirty, () => hashRef.current, loaded?.xml ?? null);
 
   const save = useCallback(async (): Promise<boolean> => {
     const ed = editorRef.current; if (!ed || !writable) return true;
+    if (liveRef.current) {
+      // P3-1: live: everything is sent; the server writes the file now (and a revision), so a build or a preview reads the merged document
+      setSaving(true);
+      try { await liveRef.current.flush(true); setSavedAt(new Date()); setFailed(false); if (adapter.reloadProject) ctx.reload(); return true; }
+      catch (e) { setFailed(true); toast(errText(e), 'error'); return false; }
+      finally { setSaving(false); }
+    }
     if (!ed.isDirty()) return true;
     setSaving(true);
     try {
@@ -267,6 +284,7 @@ export function useDocEditor<L extends DocLoaded>(ctx: ProjectCtx, adapter: DocA
     id, writable, editorRef, hashRef, loaded, setLoaded, error, setError, dirty, setDirty, saving, failed, checking, building, savedAt, stale,
     src, setSrc, note, progress, draft, load, save, check, generate, applyFindings, findings, guard, banners,
     preview, previewing, autoPreview, setAutoPreview, shown,
-    saveState: { saving, dirty, savedAt, failed },
+    liveRef, live, setLive,
+    saveState: { saving, dirty, savedAt, failed, ...(live ? { live } : {}) },
   };
 }

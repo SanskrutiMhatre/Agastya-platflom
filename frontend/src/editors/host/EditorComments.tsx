@@ -132,7 +132,7 @@ export function CommentsPanel({ projectId, state, activeFile, onOpen, inline = f
               {c.kind === 'changes' ? <Badge tone="bad">Sent back</Badge> : null}
               <span className="v2-hint" title={fmtDate(c.at)}>{ago(c.at)}</span>
             </div>
-            {c.dmFile ? <div className="v2-hint v2-trunc" title={c.dmFile}>{c.dmFile === activeFile ? 'This data module' : c.dmFile}{c.anchor ? ` · on “${c.anchor.text.slice(0, 50)}${c.anchor.text.length > 50 ? '…' : ''}”` : ''}</div> : null}
+            {c.dmFile ? <div className="v2-hint v2-trunc" title={c.dmFile}>{c.dmFile === activeFile ? (activeFile.includes('/') ? 'This document' : 'This data module') : c.dmFile}{c.anchor ? ` · on “${c.anchor.text.slice(0, 50)}${c.anchor.text.length > 50 ? '…' : ''}”` : ''}</div> : null}
             <p className="v2-rv-body">{c.body}</p>
             <div className="v2-row v2-edcomment-acts">
               {c.dmFile && c.dmFile === activeFile && c.anchor?.y && pinning?.reveal ? <button className="btn btn-sm" onClick={() => { if (!pinning.reveal!(c.dmFile!, c.anchor!)) toast('Those words are no longer in the document.', 'info'); }} {...(inline ? {} : { 'data-testid': 'editor-comment-show' })}><Icon name="search" size={12} />Show</button> : null}

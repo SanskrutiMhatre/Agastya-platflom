@@ -30,7 +30,18 @@ export interface EditorHost {
   onSaveRequested(): void;
   onCheckRequested(): void;
   notify(message: string, kind?: 'info' | 'error'): void;
+  /**
+   * Phase 3 (P3-1, live co-editing): the model changed (after the editor's own change, whatever it was). `at` is the editable typed into when
+   * the change was typing there (the binding then merges only that text), null for anything else (the binding merges the whole document).
+   */
+  onChange?(at: HTMLElement | null): void;
 }
+
+/** Phase 3 (P3-1): a text place of the sheet - the model node and which of its texts ('inline', 'title', 'num', 'text'). */
+export interface TextSlot { node: object; slot: 'inline' | 'title' | 'num' | 'text' }
+
+/** Phase 3 (P3-1): undo, redo and "unsaved" of a live document belong to the room (each person undoes only their own changes). */
+export interface EditorCollab { undo(): void; redo(): void; readonly canUndo: boolean; readonly canRedo: boolean; readonly dirty: boolean }
 
 export interface EditorOptions {
   doc: JssDoc; maxDepth: number; readOnly: boolean; host: EditorHost;
@@ -79,6 +90,11 @@ export class JssEditor {
   private readonly toolButtons = new Map<string, HTMLButtonElement>();
   private readonly onSelChange = () => this.selectionChanged();
   private fit: ResizeObserver | null = null;
+  // Phase 3 (P3-1): the text places of the sheet (for the live binding: carets, remote text, comment anchors), and the room's undo
+  private readonly slots = new WeakMap<HTMLElement, TextSlot>();
+  private slotEls = new Map<object, Map<string, HTMLElement>>();
+  private collab: EditorCollab | null = null;
+  private changeAt: HTMLElement | null = null;
 
   constructor(container: HTMLElement, opts: EditorOptions) {
     ensureStyles();
@@ -99,9 +115,9 @@ export class JssEditor {
 
   getDoc(): JssDoc { return this.doc; }
   getXml(): string { return serializeJss(this.doc); }
-  isDirty(): boolean { return this.dirty; }
-  canUndo(): boolean { return this.undoStack.length > 0; }
-  canRedo(): boolean { return this.redoStack.length > 0; }
+  isDirty(): boolean { return this.collab ? this.collab.dirty : this.dirty; }
+  canUndo(): boolean { return this.collab ? this.collab.canUndo : this.undoStack.length > 0; }
+  canRedo(): boolean { return this.collab ? this.collab.canRedo : this.redoStack.length > 0; }
 
   /** The document has been saved: it is no longer unsaved. */
   markSaved(): void { this.dirty = false; this.opts.host.onDirty(false); }
@@ -116,6 +132,77 @@ export class JssEditor {
   setSectionBadge(fn: EditorOptions['sectionBadge'] | undefined): void { this.opts.sectionBadge = fn; this.refreshLabels(); }
   /** The chapter a top-level section belongs to; 0 for a section lower down. */
   private chapterNumberOf(s: Section): number { for (const ch of this.doc.chapters) if (ch.children.includes(s)) return ch.number; return 0; }
+
+  // ── Phase 3 (P3-1): what the live binding (jss/live.ts) asks of the editor. None of it changes how the editor edits (D16). ─────────────
+
+  /** A live document: undo, redo and "unsaved" are the room's (null: the editor's own again). */
+  setCollab(c: EditorCollab | null): void { this.collab = c; this.undoStack = []; this.redoStack = []; this.updateToolbar(); }
+  /** The toolbar's undo and redo follow the room. */
+  refreshToolbar(): void { this.updateToolbar(); }
+  /** The text place an editable element is (null: not one). */
+  slotOf(el: Element | null): TextSlot | null { return el ? this.slots.get(el as HTMLElement) ?? null : null; }
+  /** The editable element of a text place, as drawn now. */
+  slotEl(node: object, slot: string): HTMLElement | null { return this.slotEls.get(node)?.get(slot) ?? null; }
+  /** The element the sheet scrolls in (other people's carets are drawn in it) and the sheet itself. */
+  scrollHost(): HTMLElement { return this.scrollEl; }
+  paperEl(): HTMLElement { return this.paper; }
+  /** The explorer row of a chapter or section (faces of the people in it are put on it). */
+  outlineRowFor(node: object): HTMLElement | null {
+    for (const row of Array.from(this.outlineEl.querySelectorAll<HTMLElement>('.jss-ol'))) if (this.elNode.get(row) === node) return row;
+    return null;
+  }
+  /** The chapter or section a model node is in (itself for one). */
+  sectionOf(node: object): Chapter | Section | null { return this.sectionOwner(node); }
+
+  /** Read-only on and off at run time (a check-out by someone else, a release lock): the sheet is drawn again without its tools. */
+  setReadOnly(ro: boolean): void {
+    if (this.opts.readOnly === ro) return;
+    this.opts.readOnly = ro; this.root.classList.toggle('jss-ro', ro);
+    this.redrawKeepingCaret();
+  }
+
+  /**
+   * Other people changed the model (the binding has changed it in place). `texts`: only these text places changed - each is drawn again
+   * where it is and the caret keeps its place in the words; null: anything else changed, and the sheet is drawn again (caret kept).
+   */
+  applyRemote(texts: TextSlot[] | null): void {
+    if (texts) {
+      let all = true;
+      for (const t of texts) {
+        const el = this.slotEl(t.node, t.slot);
+        if (!el) { all = false; break; }
+        this.keepCaret(el, () => this.redrawSlot(el, t));
+      }
+      if (all) { clearTimeout(this.labelTimer); this.labelTimer = setTimeout(() => this.refreshLabels(), 250); this.updateToolbar(); return; }
+    }
+    this.redrawKeepingCaret();
+  }
+
+  private redrawSlot(el: HTMLElement, t: TextSlot): void {
+    const n = t.node as { inline?: Inline[]; title?: string; num?: string; text?: string };
+    if (t.slot === 'inline') renderInline(el, n.inline ?? [], this.numbers.label);
+    else el.textContent = (t.slot === 'title' ? n.title : t.slot === 'num' ? n.num : n.text) ?? '';
+  }
+
+  /** Run `draw` (which redraws `el`), keeping the caret in `el` at the same place in its words (moved by the text inserted or removed before it). */
+  private keepCaret(el: HTMLElement, draw: () => void): void {
+    const off = caretOffset(el);
+    if (off < 0) { draw(); return; }
+    const before = el.textContent ?? '';
+    draw();
+    placeCaret(el, shiftOffset(before, el.textContent ?? '', off));
+  }
+
+  private redrawKeepingCaret(): void {
+    const sel = selection(); const n = sel?.anchorNode ?? null;
+    const el = n && this.paper.contains(n) ? this.editableOf(n) : null;
+    const slot = this.slotOf(el); const off = el ? caretOffset(el) : -1; const before = el?.textContent ?? '';
+    const top = this.scrollEl.scrollTop;
+    this.renderAll(); this.scrollEl.scrollTop = top; this.updateToolbar();
+    if (!slot || off < 0) return;
+    const again = this.slotEl(slot.node, slot.slot);
+    if (again) placeCaret(again, shiftOffset(before, again.textContent ?? '', off));
+  }
 
   setFindings(findings: Finding[]): void { this.findings = findings; this.applyFindingMarks(); this.renderProblems(); this.markOutline(); }
 
@@ -190,10 +277,12 @@ export class JssEditor {
   }
 
   undo(): void {
+    if (this.collab) { this.collab.undo(); this.updateToolbar(); return; }
     if (!this.undoStack.length) return;
     this.redoStack.push(serializeJss(this.doc)); this.restore(this.undoStack.pop() as string);
   }
   redo(): void {
+    if (this.collab) { this.collab.redo(); this.updateToolbar(); return; }
     if (!this.redoStack.length) return;
     this.undoStack.push(serializeJss(this.doc)); this.restore(this.redoStack.pop() as string);
   }
@@ -375,7 +464,7 @@ export class JssEditor {
   private updateToolbar(): void {
     const set = (id: string, on: boolean) => this.toolButtons.get(id)?.classList.toggle('on', on);
     const dis = (id: string, d: boolean) => { const b = this.toolButtons.get(id); if (b) b.disabled = d || (this.opts.readOnly && !['check', 'source'].includes(id)); };
-    dis('undo', !this.undoStack.length); dis('redo', !this.redoStack.length);
+    dis('undo', !this.canUndo()); dis('redo', !this.canRedo());
     const editing = this.view === 'edit';
     for (const id of ['bold', 'italic', 'underline', 'sup', 'sub', 'align', 'noindent', 'linebreak', 'nest', 'unnest', 'demote', 'promote', 'para', 'section', 'list', 'table', 'figure', 'notice', 'pagebreak', 'xref', 'link', 'up', 'down', 'delete', 'details']) dis(id, !editing);
     if (typeof document.queryCommandState === 'function' && editing) {
@@ -396,7 +485,7 @@ export class JssEditor {
 
   private renderAll(): void {
     this.numbers = numberDocument(this.doc);
-    this.nodeEl.clear(); this.labelFns = [];
+    this.nodeEl.clear(); this.labelFns = []; this.slotEls = new Map();
     this.paper.textContent = '';
     for (const ch of this.doc.chapters) this.paper.append(this.chapterEl(ch));
     if (this.opts.chapterRule === 'free' && !this.opts.readOnly) {
@@ -413,7 +502,7 @@ export class JssEditor {
     const free = this.opts.chapterRule === 'free';
     const page = ch.orientation === 'a3-landscape' ? 'A3 landscape pages' : ch.orientation === 'landscape' ? 'landscape pages' : '';
     const title = h('div', { class: 'jss-ch-title', ...(free ? { 'data-ph': 'Name of the system or sub-system' } : { title: 'The stencil fixes the chapters of this publication, so their titles cannot be changed here' }) });
-    if (free) this.plainEditable(title, () => ch.title, (v) => { ch.title = v; });
+    if (free) this.plainEditable(title, () => ch.title, (v) => { ch.title = v; }, { node: ch, slot: 'title' });
     else title.append(ch.title, h('span', { class: 'jss-ch-lock' }, 'fixed by the stencil'));
     el.append(
       this.chapterTools(ch),
@@ -466,7 +555,7 @@ export class JssEditor {
     const group = h('div', { class: 'jss-secgroup' });
     const sec = this.reg(s, h('div', { class: `jss-sec d${Math.min(depth - 1, 5)}`, 'data-kind': 'section' }));
     const no = h('span', { class: 'jss-sec-no' }); const title = h('div', { class: 'jss-sec-title', 'data-ph': 'Section title' });
-    this.plainEditable(title, () => s.title, (v) => { s.title = v; });
+    this.plainEditable(title, () => s.title, (v) => { s.title = v; }, { node: s, slot: 'title' });
     if (this.opts.sectionsFixed) { this.setEditable(title, false); title.title = 'The stencil fixes the sections of this publication, so their titles cannot be changed here'; }
     const bindNo = () => { no.textContent = this.numbers.heading.get(s) ?? ''; }; bindNo(); this.labelFns.push(bindNo);
     // the section's document code (DMC), kept in the backend and shown here only when the author switches it on; it is never part of the document
@@ -520,17 +609,24 @@ export class JssEditor {
 
   private setEditable(el: HTMLElement, on: boolean): void { el.setAttribute('contenteditable', on && !this.opts.readOnly ? 'true' : 'false'); }
 
-  private inlineEditable(el: HTMLElement, get: () => Inline[], set: (v: Inline[]) => void, ph?: string): void {
+  private inlineEditable(el: HTMLElement, get: () => Inline[], set: (v: Inline[]) => void, ph?: string, slot?: TextSlot): void {
     if (ph) el.setAttribute('data-ph', ph);
     renderInline(el, get(), this.numbers.label); this.setEditable(el, true); el.setAttribute('data-edit', 'inline');
     this.binds.set(el, { kind: 'inline', sync: () => set(readInline(el)) });
+    if (slot) this.regSlot(el, slot);
   }
-  private plainEditable(el: HTMLElement, get: () => string, set: (v: string) => void): void {
+  private plainEditable(el: HTMLElement, get: () => string, set: (v: string) => void, slot?: TextSlot): void {
     el.textContent = get(); this.setEditable(el, true); el.setAttribute('data-edit', 'plain');
     this.binds.set(el, { kind: 'plain', sync: () => set((el.textContent ?? '').replace(/\s+/g, ' ')) });
+    if (slot) this.regSlot(el, slot);
+  }
+  private regSlot(el: HTMLElement, s: TextSlot): void {
+    this.slots.set(el, s);
+    let m = this.slotEls.get(s.node); if (!m) { m = new Map(); this.slotEls.set(s.node, m); }
+    m.set(s.slot, el);
   }
   private paraEditable(el: HTMLElement, p: Para): void {
-    this.inlineEditable(el, () => p.inline, (v) => { p.inline = v; });
+    this.inlineEditable(el, () => p.inline, (v) => { p.inline = v; }, undefined, { node: p, slot: 'inline' });
     if (p.align) el.setAttribute('data-align', p.align);
     this.elNode.set(el, p); if (!this.nodeEl.has(p)) this.nodeEl.set(p, el);          // a top-level paragraph is already registered through its wrapper
   }
@@ -539,7 +635,7 @@ export class JssEditor {
   private partsEls(into: HTMLElement, parts: Part[], depth: number, ownerItem: ListItem | null, ownerList: List | null): void {
     for (const part of parts) {
       if (part.k === 'inline') {
-        const d = h('div', { class: 'jss-itext' }); this.inlineEditable(d, () => part.inline, (v) => { part.inline = v; }); this.reg(part, d); into.append(d);
+        const d = h('div', { class: 'jss-itext' }); this.inlineEditable(d, () => part.inline, (v) => { part.inline = v; }, undefined, { node: part, slot: 'inline' }); this.reg(part, d); into.append(d);
       } else if (part.k === 'para') {
         const d = h('div', { class: 'jss-para', style: 'margin-bottom:1.5mm' }); this.paraEditable(d, part); into.append(d);
       } else into.append(this.listEl(part, depth + 1, ownerItem, ownerList));
@@ -564,7 +660,7 @@ export class JssEditor {
     const wrap = h('div', { class: 'jss-tablewrap' });
     wrap.append(this.tableTools(t));
     const cap = h('div', { class: 'jss-cap' }); const no = h('span', { class: 'no' }); const titleEl = h('span', { 'data-ph': 'Table caption' });
-    this.plainEditable(titleEl, () => t.title ?? '', (v) => { t.title = v; });
+    this.plainEditable(titleEl, () => t.title ?? '', (v) => { t.title = v; }, { node: t, slot: 'title' });
     const bindNo = () => { no.textContent = this.numbers.caption.get(t) ? `${this.numbers.caption.get(t)}: ` : 'Table: '; }; bindNo(); this.labelFns.push(bindNo);
     cap.append(no, titleEl); wrap.append(cap);
     const tbl = h('table', { class: 'jss-table' });
@@ -667,14 +763,14 @@ export class JssEditor {
       box.append(img); el.append(box);
     }
     const cap = h('div', { class: 'jss-cap', style: 'margin-top:2mm' }); const no = h('span', { class: 'no' }); const titleEl = h('span', { 'data-ph': 'Figure caption' });
-    this.plainEditable(titleEl, () => f.title ?? '', (v) => { f.title = v; });
+    this.plainEditable(titleEl, () => f.title ?? '', (v) => { f.title = v; }, { node: f, slot: 'title' });
     const bindNo = () => { no.textContent = this.numbers.caption.get(f) ? `${this.numbers.caption.get(f)}: ` : 'Figure: '; }; bindNo(); this.labelFns.push(bindNo);
     cap.append(no, titleEl); el.append(cap);
     if (f.legend.length) {
       const legend = h('div', { class: 'jss-legend' });
       f.legend.forEach((k, i) => {
         const n = h('b'); const tx = h('span', { style: 'flex:1', 'data-ph': 'Part name' });
-        this.plainEditable(n, () => k.num, (v) => { k.num = v; }); this.plainEditable(tx, () => k.text, (v) => { k.text = v; });
+        this.plainEditable(n, () => k.num, (v) => { k.num = v; }, { node: k, slot: 'num' }); this.plainEditable(tx, () => k.text, (v) => { k.text = v; }, { node: k, slot: 'text' });
         const rm = this.opts.readOnly ? null : h('button', { type: 'button', title: 'Remove this key item', 'aria-label': 'Remove this key item', style: 'border:0;background:none;cursor:pointer;color:var(--sheet-error)', on: { mousedown: (e: Event) => e.preventDefault(), click: () => this.mutate(() => { f.legend.splice(i, 1); }, () => f) } }, '✕');
         legend.append(h('div', { class: 'row' }, n, tx, rm)); void i;
       });
@@ -788,7 +884,7 @@ export class JssEditor {
 
   private onInput(e: Event): void {
     const el = this.editableOf(e.target); if (!el) return;
-    this.binds.get(el)?.sync(); this.setDirty(true);
+    this.binds.get(el)?.sync(); this.changeAt = el; this.setDirty(true);
     clearTimeout(this.labelTimer); this.labelTimer = setTimeout(() => this.refreshLabels(), 250);
   }
 
@@ -805,7 +901,11 @@ export class JssEditor {
     if (this.view === 'source') this.sourceEl.textContent = this.getXml();
   }
 
-  private setDirty(d: boolean): void { if (this.dirty !== d) { this.dirty = d; this.opts.host.onDirty(d); } else if (d) this.opts.host.onDirty(true); }
+  private setDirty(d: boolean): void {
+    // P3-1: every change of the model passes here (typing, a command, a structural edit): a live document merges it into the room now
+    if (d && this.collab) { const at = this.changeAt; this.changeAt = null; this.opts.host.onChange?.(at); }
+    if (this.dirty !== d) { this.dirty = d; this.opts.host.onDirty(d); } else if (d) this.opts.host.onDirty(true);
+  }
 
   private onPaste(e: ClipboardEvent): void {
     const el = this.editableOf(e.target); if (!el) return;
@@ -1166,6 +1266,7 @@ export class JssEditor {
   // ── history and the one path for structural change ──────────────────────────────────────────────────────────────────────────────
 
   private pushHistory(): void {
+    if (this.collab) return;                                     // P3-1: a live document's history is the room's (per person)
     const s = serializeJss(this.doc);
     if (this.undoStack[this.undoStack.length - 1] !== s) { this.undoStack.push(s); if (this.undoStack.length > 200) this.undoStack.shift(); }
     this.redoStack = []; this.updateToolbar();
@@ -1201,6 +1302,17 @@ export class JssEditor {
       case 'section': case 'subsection': { const items = this.sectionMenu(); items[cmd === 'section' ? 0 : 1].run(); break; }
     }
   }
+}
+
+/** A caret at `off` in `before`, in `after`: moved by what was inserted or removed before it (the text's common start and end). */
+export function shiftOffset(before: string, after: string, off: number): number {
+  let p = 0; const max = Math.min(before.length, after.length);
+  while (p < max && before.charCodeAt(p) === after.charCodeAt(p)) p++;
+  if (off <= p) return off;
+  let s = 0;
+  while (s < before.length - p && s < after.length - p && before.charCodeAt(before.length - 1 - s) === after.charCodeAt(after.length - 1 - s)) s++;
+  if (off >= before.length - s) return Math.max(0, off + after.length - before.length);
+  return Math.min(after.length, p + (after.length - p - s));
 }
 
 export { inlineText };
