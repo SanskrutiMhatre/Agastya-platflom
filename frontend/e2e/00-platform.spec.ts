@@ -66,7 +66,9 @@ test('first run: set up the administrator and land on the platform overview', as
 
 test('the administrator oversees but does not create projects: its navigation has no Workspace, Projects has no New project', async () => {
   const nav = adminPage.getByRole('navigation', { name: 'Main navigation' });
-  for (const n of ['Overview', 'Projects', 'Graphics', 'CIR', 'Backup', 'Activity', 'Administrator', 'Settings']) await expect(nav.getByRole('link', { name: n, exact: true })).toBeVisible();
+  for (const n of ['Overview', 'Projects', 'Graphics', 'CIR', 'Backup', 'Activity', 'Administrator']) await expect(nav.getByRole('link', { name: n, exact: true })).toBeVisible();
+  // Phase 3 (owner: no redundant options): Settings is in the account menu only, not also in the sidebar
+  await expect(nav.getByRole('link', { name: 'Settings' })).toHaveCount(0);
   await expect(nav.getByRole('link', { name: 'Workspace' })).toHaveCount(0);
   await expect(nav.getByRole('link', { name: 'Workspace' })).toHaveCount(0);
   await adminPage.getByRole('link', { name: 'Projects' }).click();
@@ -104,9 +106,21 @@ test('the Author signs in with it, chooses a password and lands on her own dashb
   await shot(page, '02-overview-empty');
 });
 
-test('main dashboard has Overview, Workspace, Projects, Graphics, CIR, Backup and Settings; Notifications is a bell beside an icon-only account menu; the theme is one icon button', async () => {
+test('main dashboard has Overview, Workspace, Projects, Graphics, CIR and Backup; Settings and About are in the icon-only account menu beside the Notifications bell; no offline/version status text; the theme is one icon button', async () => {
   const nav = page.getByRole('navigation', { name: 'Main navigation' });
-  for (const n of ['Overview', 'Workspace', 'Projects', 'Graphics', 'CIR', 'Backup', 'Settings']) await expect(nav.getByRole('link', { name: n, exact: true })).toBeVisible();
+  for (const n of ['Overview', 'Workspace', 'Projects', 'Graphics', 'CIR', 'Backup']) await expect(nav.getByRole('link', { name: n, exact: true })).toBeVisible();
+  // Phase 3 (owner): Settings only in the account menu; no "Offline · on-premises · v… · Server connected" foot and no offline icon
+  await expect(nav.getByRole('link', { name: 'Settings' })).toHaveCount(0);
+  await expect(nav).not.toContainText(/on-premises|Server connected/);
+  await expect(page.getByTestId('net-state')).toHaveCount(0);
+  await page.getByTestId('account-menu').click();
+  await page.getByRole('menuitem', { name: 'Account settings' }).click();
+  await expect(page).toHaveURL(/\/settings\/account$/);
+  await page.getByTestId('account-menu').click();
+  await page.getByTestId('about-agastya').click();
+  await expect(page.getByTestId('app-dialog')).toContainText(/version \d+\.\d+\.\d+/);
+  await page.getByTestId('app-dialog-confirm').click();
+  await page.goto('/overview');
   await expect(nav.getByRole('link', { name: 'Administrator' })).toHaveCount(0);
   await expect(nav.getByRole('link', { name: 'Notifications' })).toHaveCount(0);            // the bell in the top bar opens it
   await expect(nav.getByRole('link', { name: 'Activity' })).toHaveCount(0);

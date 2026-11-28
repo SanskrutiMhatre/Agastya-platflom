@@ -4,7 +4,8 @@
 import { AsyncLocalStorage } from 'async_hooks';
 import crypto from 'crypto';
 
-export interface RequestContext { id: string; ip: string; method: string; path: string }
+/** `dbMs` / `dbN`: the database time and statement count of this request (services/metrics.ts adds to them; the Server-Timing header). */
+export interface RequestContext { id: string; ip: string; method: string; path: string; dbMs?: number; dbN?: number }
 
 const als = new AsyncLocalStorage<RequestContext>();
 

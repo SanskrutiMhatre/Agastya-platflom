@@ -74,6 +74,8 @@ test('the account menu answers the arrow keys and Escape (4.1.2)', async ({ brow
     await page.keyboard.press('Enter');
     await expect(page.getByRole('menu', { name: 'Account' })).toBeVisible();
     expect((await focused(page)).text).toBe('Account settings');
+    // Phase 3: "About Agastya" (the version, for support) sits between Account settings and Sign out
+    await page.keyboard.press('ArrowDown'); expect((await focused(page)).text).toMatch(/^About /);
     await page.keyboard.press('ArrowDown'); expect((await focused(page)).text).toBe('Sign out');
     await page.keyboard.press('ArrowDown'); expect((await focused(page)).text, 'wraps round').toBe('Account settings');
     await page.keyboard.press('End'); expect((await focused(page)).text).toBe('Sign out');

@@ -11,11 +11,18 @@
 //   * WebSocket connections and presence entries (services/broadcast, services/presence).
 // Nothing is written to disk. GET /api/admin/metrics shows it; POST /api/admin/metrics/reset starts a new measuring window.
 // The D21 switch criteria (addendum 17): p95 write latency above 200 ms or event-loop lag above 100 ms under the stated load.
+//
+// Phase 3 (performance baseline, docs/phase3/ui-and-baseline.md): every /api answer carries a `Server-Timing` header (`db;dur=…;desc="n
+// statements"`, `total;dur=…` = time to the first byte), the database time is counted per request through the request context that already
+// exists (services/requestContext.ts: no extra async hook), and the last ROUTE_RING requests are kept with their route template (never a
+// concrete path) so GET /api/admin/perf (services/perfReport.ts) can list the slowest. Per-route totals are bounded to MAX_ROUTES keys.
 // =============================================================================
 
 import { monitorEventLoopDelay, performance, type IntervalHistogram } from 'perf_hooks';
 import type { Request, Response, NextFunction } from 'express';
 import type { SqlDatabase, SqlStatement } from '../storage/sqlite';
+import { currentRequest } from './requestContext';
+import { routeOf } from './log';
 
 export const SLOW_STATEMENT_MS = 50;
 const RING = 4096;
@@ -44,6 +51,7 @@ function timed<T>(sql: string, fn: () => T): T {
   } finally {
     const ms = performance.now() - t0;
     db.statements++; db.totalMs += ms;
+    const ctx = currentRequest(); if (ctx) { ctx.dbMs = (ctx.dbMs ?? 0) + ms; ctx.dbN = (ctx.dbN ?? 0) + 1; }
     if (ms >= SLOW_STATEMENT_MS) db.slow++;
     if (ms > db.maxMs) { db.maxMs = ms; db.maxSql = sql.replace(/\s+/g, ' ').slice(0, 80); }
   }
@@ -75,12 +83,53 @@ export function instrumentDatabase(handle: SqlDatabase): SqlDatabase {
 
 const WRITE = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
-/** Express middleware: request time of every /api request into the ring buffers. */
+// ---- per-route figures (Phase 3): the last ROUTE_RING requests, and totals per route template (bounded)
+export const ROUTE_RING = 512;
+export const MAX_ROUTES = 300;
+export interface RouteSample { route: string; method: string; status: number; ms: number; dbMs: number; dbN: number; at: number }
+const recent: Array<RouteSample | undefined> = new Array(ROUTE_RING);
+let recentN = 0;
+const byRoute = new Map<string, { count: number; totalMs: number; maxMs: number; dbMs: number; errors5xx: number }>();
+let routesDropped = 0;
+
+const r1 = (v: number): number => Math.round(v * 10) / 10;
+
+function recordRoute(s: RouteSample): void {
+  recent[recentN++ % ROUTE_RING] = s;
+  const key = `${s.method} ${s.route}`;
+  let a = byRoute.get(key);
+  if (!a) {
+    if (byRoute.size >= MAX_ROUTES) { routesDropped++; return; }
+    a = { count: 0, totalMs: 0, maxMs: 0, dbMs: 0, errors5xx: 0 }; byRoute.set(key, a);
+  }
+  a.count++; a.totalMs += s.ms; a.dbMs += s.dbMs; if (s.ms > a.maxMs) a.maxMs = s.ms; if (s.status >= 500) a.errors5xx++;
+}
+
+/** The slowest of the last ROUTE_RING requests, and the routes with the highest mean (route templates only, never ids or file names). */
+export function routeFigures(top = 20): { recentSlowest: RouteSample[]; routesByMean: Array<{ route: string; count: number; meanMs: number; maxMs: number; meanDbMs: number; errors5xx: number }>; tracked: number; dropped: number; ring: number } {
+  const xs = recent.filter((x): x is RouteSample => !!x).sort((a, b) => b.ms - a.ms).slice(0, top);
+  const routes = [...byRoute].map(([route, a]) => ({ route, count: a.count, meanMs: r1(a.totalMs / a.count), maxMs: r1(a.maxMs), meanDbMs: r1(a.dbMs / a.count), errors5xx: a.errors5xx }))
+    .sort((a, b) => b.meanMs - a.meanMs).slice(0, top);
+  return { recentSlowest: xs, routesByMean: routes, tracked: byRoute.size, dropped: routesDropped, ring: Math.min(recentN, ROUTE_RING) };
+}
+
+/** Express middleware: request time of every /api request into the ring buffers, and the Server-Timing header of its answer. */
 export function requestMetrics(r: Request, res: Response, next: NextFunction): void {
   if (!r.path.startsWith('/api/')) { next(); return; }
   ensureLoop();
   const t0 = performance.now();
   req.inFlight++; if (req.inFlight > req.maxInFlight) req.maxInFlight = req.inFlight;
+  // the request context is made by the next middleware; the first database statement or the answer's head reads it from the async context
+  let ctx: ReturnType<typeof currentRequest>;
+  const writeHead = res.writeHead;
+  res.writeHead = function (this: Response, ...args: unknown[]) {
+    ctx = ctx ?? currentRequest();
+    if (!res.headersSent && !res.getHeader('Server-Timing')) {
+      const dbMs = ctx?.dbMs ?? 0; const dbN = ctx?.dbN ?? 0;
+      res.setHeader('Server-Timing', `db;dur=${dbMs.toFixed(1)};desc="${dbN} statements", total;dur=${(performance.now() - t0).toFixed(1)}`);
+    }
+    return (writeHead as (...a: unknown[]) => Response).apply(this, args);
+  } as typeof res.writeHead;
   let done = false;
   const finish = (): void => {
     if (done) return; done = true;
@@ -89,9 +138,26 @@ export function requestMetrics(r: Request, res: Response, next: NextFunction): v
     req.ring[req.n++ % RING] = ms; req.total++;
     if (WRITE.has(r.method)) req.writes[req.wn++ % RING] = ms;
     if (res.statusCode >= 500) req.errors5xx++;
+    recordRoute({ route: routeOf(r), method: r.method, status: res.statusCode, ms: r1(ms), dbMs: r1(ctx?.dbMs ?? 0), dbN: ctx?.dbN ?? 0, at: Date.now() });
   };
   res.on('finish', finish); res.on('close', finish);
   next();
+}
+
+/** The event-loop delay histogram (ms): percentiles, mean, deviation, and the number of samples, since the last reset. */
+export function eventLoopHistogram(): { count: number; min: number; mean: number; stddev: number; max: number; percentiles: Record<string, number> } {
+  const l = ensureLoop();
+  const percentiles: Record<string, number> = {};
+  for (const p of [50, 75, 90, 95, 99, 99.9]) percentiles[`p${p}`] = ms(l.percentile(p));
+  const ns = (v: number): number => (Number.isFinite(v) ? ms(v) : 0);
+  return { count: Number((l as IntervalHistogram & { count?: number }).count ?? 0), min: ns(l.min), mean: ns(l.mean), stddev: ns(l.stddev), max: ns(l.max), percentiles };
+}
+
+/** The live gauges (WebSocket clients, presence entries, ...). */
+export function liveGauges(): Record<string, number> {
+  const live: Record<string, number> = {};
+  for (const [k, g] of gauges) { try { live[k] = g(); } catch { live[k] = -1; } }
+  return live;
 }
 
 function percentiles(buf: Float64Array, n: number): { count: number; p50: number; p95: number; p99: number; max: number } {
@@ -139,4 +205,5 @@ export function reset(): void {
   windowStart = Date.now();
   Object.assign(db, { statements: 0, totalMs: 0, maxMs: 0, slow: 0, locked: 0, maxSql: '' });
   req.n = 0; req.wn = 0; req.total = 0; req.errors5xx = 0; req.maxInFlight = req.inFlight;
+  recent.fill(undefined); recentN = 0; byRoute.clear(); routesDropped = 0;
 }

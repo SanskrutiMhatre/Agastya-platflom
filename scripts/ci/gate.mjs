@@ -25,6 +25,8 @@
 //   visual           the theme and accessibility suite (WP-20): per-theme screenshots, G-UX-1 checks on the ten named routes; its own port
 //                    (E2E_VISUAL_PORT, default 4060) and config (frontend/playwright.visual.config.ts)
 //   perf             performance probes (WP-20, QA-013): scripts/ci/perf.mjs against the runner's history; the release fails on +40 %
+//   perf-budgets     Phase 3: backend/scripts/bench/phase3-baseline.js and frontend/scripts/perf/phase3-frontend.mjs, compared with
+//                    docs/phase3/perf-budgets.json by scripts/ci/perf-budgets.mjs (nightly reports; release fails on FAIL or MISSING)
 //   release-tools    WP-24: the release-engineering tests (scripts/release/*.test.mjs, listed in test-plan.json scriptTests): manifest, SBOM,
 //                    signing with a throwaway certificate, both offline verifiers, the host's --verify, doctor faults, support-bundle redaction
 //   package          release-tools, then npm run package:win (with --release in the release profile: signed, time-stamped, EULA and publisher
@@ -60,8 +62,8 @@ const BUDGET = JSON.parse(fs.readFileSync(BUDGET_FILE, 'utf8'));
 const flag = (name) => argv.includes(`--${name}`);
 const PROFILES = {
   pr: ['build', 'frontend-build', 'lint', 'parity', 'cleanup', 'theme', 'tools', 'security', 'backend', 'pdf-smoke', 'frontend'],      // frontend-build: the security headers test reads the served client
-  nightly: ['build', 'frontend-build', 'typecheck', 'lint', 'parity', 'cleanup', 'theme', 'tools', 'security', 'backend', 'pdf-smoke', 'backend-heavy', 'frontend', 'e2e', 'visual', 'perf'],
-  release: ['build', 'frontend-build', 'typecheck', 'lint', 'parity', 'cleanup', 'theme', 'tools', 'security', 'backend', 'pdf-smoke', 'backend-heavy', 'frontend', 'frontend-verify', 'e2e', 'visual', 'perf', 'package', 'readiness'],
+  nightly: ['build', 'frontend-build', 'typecheck', 'lint', 'parity', 'cleanup', 'theme', 'tools', 'security', 'backend', 'pdf-smoke', 'backend-heavy', 'frontend', 'e2e', 'visual', 'perf', 'perf-budgets'],
+  release: ['build', 'frontend-build', 'typecheck', 'lint', 'parity', 'cleanup', 'theme', 'tools', 'security', 'backend', 'pdf-smoke', 'backend-heavy', 'frontend', 'frontend-verify', 'e2e', 'visual', 'perf', 'perf-budgets', 'package', 'readiness'],
 };
 const profile = opt('profile', 'pr');
 if (!PROFILES[profile]) { console.error(`unknown profile ${profile} (pr, nightly, release)`); process.exit(2); }
@@ -235,6 +237,18 @@ const STAGES = {
   },
   perf: async () => (await simpleStage('perf-rule', nodeBin, ['--test', path.join(ROOT, 'scripts', 'ci', 'perf-compare.test.mjs')], { limitMs: 2 * 60_000 }))
     && simpleStage('perf', nodeBin, [path.join(ROOT, 'scripts', 'ci', 'perf.mjs'), '--profile', profile === 'release' ? 'release' : 'nightly', '--evidence', EVIDENCE], { limitMs: 120 * 60_000 }),
+  // Phase 3: the baseline benchmarks (backend API/validation/PDF/WebSocket and the browser probes) against docs/phase3/perf-budgets.json.
+  // Their own ports (PERF_BENCH_PORT, default 4310; PERF_FE_PORT, default 4312), never the e2e or visual ones. The nightly reports; the
+  // release (--strict) fails on a budget above its max or not measured.
+  'perf-budgets': async () => {
+    const rule = await simpleStage('perf-budgets-rule', nodeBin, ['--test', path.join(ROOT, 'scripts', 'ci', 'perf-budgets.test.mjs')], { limitMs: 2 * 60_000 });
+    const be = path.join(EVIDENCE, 'perf-bench-backend.json'); const fe = path.join(EVIDENCE, 'perf-bench-frontend.json');
+    const bench = await simpleStage('perf-bench-backend', nodeBin, [path.join(BACKEND, 'scripts', 'bench', 'phase3-baseline.js'), '--port', process.env.PERF_BENCH_PORT || '4310', '--out', be, '--md', path.join(EVIDENCE, 'perf-bench-backend.md')], { cwd: BACKEND, limitMs: 60 * 60_000 });
+    const browser = await simpleStage('perf-bench-frontend', nodeBin, [path.join(FRONTEND, 'scripts', 'perf', 'phase3-frontend.mjs'), '--port', process.env.PERF_FE_PORT || '4312', '--out', fe, '--md', path.join(EVIDENCE, 'perf-bench-frontend.md'), '--channel', process.env.E2E_CHANNEL || 'msedge'], { cwd: FRONTEND, limitMs: 30 * 60_000 });
+    const args = [path.join(ROOT, 'scripts', 'ci', 'perf-budgets.mjs'), '--report', path.join(EVIDENCE, 'perf-budgets.md'), ...(fs.existsSync(be) ? ['--backend', be] : []), ...(fs.existsSync(fe) ? ['--frontend', fe] : []), ...(profile === 'release' ? ['--strict'] : [])];
+    const verdict = (fs.existsSync(be) || fs.existsSync(fe)) ? await simpleStage('perf-budgets', nodeBin, args, { limitMs: 2 * 60_000 }) : false;
+    return rule && verdict && (profile !== 'release' || (bench && browser));
+  },
   // WP-24: the release-engineering tests, one file per process (they compile the host, make and delete a throwaway certificate)
   'release-tools': async () => {
     let ok = true;

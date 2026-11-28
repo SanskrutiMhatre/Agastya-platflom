@@ -9,7 +9,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { JumpButton, QuickSwitcher, useQuickSwitcher } from '../components/QuickSwitcher';
-import { contentApi, workspaceApi, type ProjectRole, type Summary } from '../api';
+import { workspaceApi, type ProjectRole, type Summary } from '../api';
 import { Icon } from '../components/Icon';
 import { projectRailItems } from './projectRail';
 import { Alert, Loading, errText } from '../components/ui';
@@ -55,10 +55,10 @@ function ProjectShellFor({ id }: { id: string }) {
   const switcher = useQuickSwitcher();
   const [actionsEl, setActionsEl] = useState<HTMLElement | null>(null);
   const [statusEl, setStatusEl] = useState<HTMLElement | null>(null);
+  // Phase 3 (owner): the status bar no longer starts with "Renderer ready" / "Offline · on-premises" (information only, and a request per
+  // project open to feed it); it shows the project's format and size, and "Server not answering" while the connection is lost.
   const unreachable = useSession((s) => s.unreachable);
-  // the mockup's status bar starts with the PDF renderer's state ("Renderer ready")
-  const [renderer, setRenderer] = useState<boolean | null>(null);
-  useEffect(() => { let live = true; contentApi.rendererStatus(id).then((r) => { if (live) setRenderer(r.warm); }).catch(() => undefined); return () => { live = false; }; }, [id]);
+  const adminQueues = useSession((s) => s.adminQueues);
 
   const load = useCallback(() => {
     // A reply for another project (the shell was replaced meanwhile) is ignored by the unmount; one for an older request of this one is
@@ -121,7 +121,7 @@ function ProjectShellFor({ id }: { id: string }) {
             <JumpButton compact onClick={() => switcher.setOpen(true)} />
             <span className="topbar-actions row" ref={setActionsEl} />
             <ThemeToggle />
-            <AccountMenu railPin={{ pinned, toggle: togglePin }} />
+            <AccountMenu railPin={{ pinned, toggle: togglePin }} waiting={adminQueues ? adminQueues.resets + adminQueues.releases : 0} />
           </header>
         )}
         <aside className={`activity v2-rail${pinned ? ' is-pinned' : ''}`} aria-label="Project navigation">
@@ -143,11 +143,9 @@ function ProjectShellFor({ id }: { id: string }) {
           <footer className="statusbar" data-testid="project-status-bar">
             <span className="page-status" ref={setStatusEl} />
             <span className="default-status">
-              <span className="item"><span className={`dot ${unreachable ? 'danger' : renderer === false ? 'warning' : 'success'}`} />{unreachable ? 'Server not answering' : renderer === false ? 'Renderer starts with the first build' : 'Renderer ready'}</span>
+              {unreachable ? <span className="item"><span className="dot danger" />Server not answering</span> : null}
               <span className="item">{formatLabel(summary.project)}</span>
               <span className="item">{summary.dataModules.total} data module{summary.dataModules.total === 1 ? '' : 's'}</span>
-              <span className="grow" />
-              <span className="item">Offline · on-premises</span>
             </span>
           </footer>
         )}
