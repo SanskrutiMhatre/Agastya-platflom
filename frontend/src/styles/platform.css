@@ -131,6 +131,13 @@ html.v2-compact .v2-page { padding: var(--page-pad); }
 .v2-auth-gap { height: var(--space-3); }
 .v2-auth-submit { justify-content: center; width: 100%; margin-top: var(--space-1); }
 .v2-auth-alt { margin: var(--space-4) 0 0; display: flex; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+/* P3-6: the standalone first launch screen (default credentials) - the same auth card, a little wider for the three columns */
+.v2-auth-card-wide { width: 520px; }
+.v2-auth-creds { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.v2-auth-creds th { text-align: left; font-weight: var(--fw-semibold); color: var(--text-secondary); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border-default); }
+.v2-auth-creds td { padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border-subtle); }
+.v2-auth-creds code { font-family: var(--font-mono); color: var(--text-primary); }
+.v2-auth-actions { gap: var(--space-3); justify-content: flex-end; flex-wrap: wrap; }
 .v2-auth-foot { margin: var(--space-4) 0 0; text-align: center; font-size: var(--fs-xs); color: var(--text-tertiary); }
 .v2-linkbtn { min-height: 24px; padding: 2px 0; border: 0; background: none; color: var(--text-link); font: inherit; cursor: pointer; }
 .v2-linkbtn:hover { text-decoration: underline; }

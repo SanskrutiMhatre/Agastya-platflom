@@ -11,8 +11,16 @@ export interface User { id: string; username: string; fullName: string; role: Gl
   /** WP-27: where the account signs in, why it is disabled ('directory' = offboarded by the directory), the read-only auditor flag. */
   authSource?: 'local' | 'directory'; disabledReason?: string | null; auditor?: boolean;
   /** When the person last signed in (the newest session they started); null = never. Administrators' users list only. */
-  lastSignInAt?: string | null }
-export interface Gates { onboarding: boolean; mustChangePassword: boolean }
+  lastSignInAt?: string | null;
+  /** P3-6: created as a standalone default account (fixed published password), and whether it still has that password. */
+  defaultAccount?: boolean; defaultPassword?: boolean }
+/** P3-6: `defaultPassword` = the forced change is a standalone default account's first one (the screen says so). */
+export interface Gates { onboarding: boolean; mustChangePassword: boolean; defaultPassword?: boolean }
+/** P3-6: how the accounts of this installation began (the installer sets it). */
+export type AccountDeployment = 'standalone' | 'server';
+/** P3-6: a standalone default account the first launch screen shows (fixed, published credentials). */
+export interface DefaultCredential { username: string; password: string; role: GlobalRole; label: string }
+export interface SetupState { setupRequired: boolean; deployment?: AccountDeployment; defaultCredentials?: DefaultCredential[] }
 export interface AdminQueues { approvals: number; changes: number; folderRequests: number; resets: number; ownerless: number; releases: number }
 
 export interface FormatInfo { id: 's1000d' | 'jss' | 'jsg'; label: string; description: string; ready: boolean; domains: Array<{ id: string; label: string; manualTypes: Array<{ id: string; label: string; ready: boolean; notReady?: string; note?: string }> }> }
@@ -102,7 +110,9 @@ export interface Summary {
 // ── Auth ──────────────────────────────────────────────────────────────────
 
 export const authApi = {
-  setupRequired: () => get<{ setupRequired: boolean }>('/api/auth/setup', { quiet401: true }),
+  setupRequired: () => get<SetupState>('/api/auth/setup', { quiet401: true }),
+  /** P3-6: the standalone first launch screen was acknowledged ("I have stored them"): the credentials are not shown again. */
+  acknowledgeDefaultCredentials: () => post<{ ok: true }>('/api/auth/default-credentials/acknowledge', {}, { quiet401: true }),
   setup: (b: { username: string; password: string; fullName: string }) => post<{ user: User; gates: Gates }>('/api/auth/setup', b, { quiet401: true }),
   login: (username: string, password: string) => post<{ user: User; gates: Gates }>('/api/auth/login', { username, password }, { quiet401: true }),
   logout: () => post('/api/auth/logout'),
@@ -305,7 +315,9 @@ export const platformApi = {
   saveSecurityPolicy: (b: Partial<SecurityPolicy>) => put<{ policy: SecurityPolicy }>('/api/admin/security-policy', b).then((r) => r.policy),
   health: () => get<{ audit: { failures: number; last: { at: string; action: string; error: string } | null; lastVerification?: { at: string; ok: boolean; summary: string } | null } | null;
     /** uptime and the data disk (UI redesign screen 6: the Service tile and the Storage card); null on an older server */
-    system?: { uptimeSeconds: number; startedAt: string; disk: { totalBytes: number; freeBytes: number } | null } | null }>('/api/admin/health'),
+    system?: { uptimeSeconds: number; startedAt: string; disk: { totalBytes: number; freeBytes: number } | null } | null;
+    /** P3-6: how the accounts began (read-only) and the standalone default accounts, with whether each still has its default password */
+    deployment?: { mode: AccountDeployment; defaultAccounts: Array<{ id: string; username: string; role: GlobalRole; auditor: boolean; defaultPassword: boolean; disabled: boolean }> } }>('/api/admin/health'),
 };
 
 /** WP-29: the audit viewer's and the export's filters (backend/src/routes/audit.ts auditFilterOf). */

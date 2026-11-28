@@ -12,6 +12,12 @@ Port=@PORT@
 ; Or give one specific IPv4 address of this computer.
 ; Anything other than loopback is a server on the network (Mode B) and needs a certificate under [tls]: the server does not start without one.
 Bind=@BIND@
+; How the accounts of this installation began (set by Setup; shown on the administration page, read-only there).
+; standalone = this computer only: the first start created one account per role with the published default passwords
+;              (admin/Admin@123, manager/Manager@123, author/Author@123, auditor/Auditor@123), each changed at its first sign-in.
+; server     = a common server: no default accounts; the administrator is created at the first start, everyone else under Administration.
+; Changing it later never creates or removes accounts on a data folder that already has some.
+Deployment=@DEPLOYMENT@
 ; Other names people use to reach this server, comma-separated (the names in the certificate are always accepted).
 ;ServerNames=docs.example.local
 ; Team server (Mode B, OPERATIONS.md "Team server"): live connections at most (the next one gets 503), and how long a check-out lasts.

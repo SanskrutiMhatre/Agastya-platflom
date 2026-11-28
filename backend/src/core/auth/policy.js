@@ -23,6 +23,24 @@ const PASSWORD_MIN = 8;
 const PASSWORD_MAX = 128;
 
 /*
+  Phase 3 decision P3-6 (docs/phase3/DECISIONS.md, docs/phase3/standalone.md): the standalone EXE creates one account per global role with
+  these FIXED credentials on the first start of a fresh data folder (core/auth/defaultAccounts.js). They are an owner decision, published
+  in the installer and the documentation, so they protect nothing by themselves: every one is created behind the forced-password-change gate,
+  refused from any address but this computer's while it still has its default password, and none of these passwords is ever accepted as a
+  NEW password by validatePassword below (so a default password can never be chosen again, by anyone).
+  The roles are the platform's global roles (GLOBAL_ROLES below) plus the read-only auditor flag (migration 024). Reviewer, editor, viewer,
+  manager and owner are PROJECT roles, given per project, so they have no account of their own here.
+  packaging/installer/agastya.iss repeats this list for its finish page; test/standalone-accounts.test.js keeps the two the same.
+*/
+const DEFAULT_ACCOUNTS = Object.freeze([
+  Object.freeze({ username: 'admin', password: 'Admin@123', role: 'admin', auditor: false, fullName: 'Administrator', label: 'Administrator' }),
+  Object.freeze({ username: 'manager', password: 'Manager@123', role: 'project_manager', auditor: false, fullName: 'Project Manager', label: 'Project Manager' }),
+  Object.freeze({ username: 'author', password: 'Author@123', role: 'author', auditor: false, fullName: 'Author', label: 'Author' }),
+  Object.freeze({ username: 'auditor', password: 'Auditor@123', role: 'author', auditor: true, fullName: 'Auditor', label: 'Auditor (read-only)' }),
+]);
+const DEFAULT_PASSWORDS = new Set(DEFAULT_ACCOUNTS.map((a) => a.password.toLowerCase()));
+
+/*
   Central policy. Returns { ok: true } or { ok: false, error }.
   There is explicitly NO "must not contain the username" rule, and no composition rule (NIST SP 800-63B-4).
 
@@ -35,6 +53,10 @@ const PRODUCT_WORDS = ['agastya', 'agastyaplatform', 'jsspublisher', 's1000d', '
 function validatePassword(password, { min = PASSWORD_MIN, context = [] } = {}) {
   if (typeof password !== 'string' || password.length === 0) {
     return { ok: false, error: 'A password is required.' };
+  }
+  // P3-6: before the length rule, so the person changing a default password is told the real reason (it is the published default)
+  if (DEFAULT_PASSWORDS.has(password.toLowerCase())) {
+    return { ok: false, error: 'That is one of the default passwords of a new installation, which anyone can know. Choose your own password.', code: 'DEFAULT_PASSWORD' };
   }
   if (password.length < min) {
     return { ok: false, error: `Password must be at least ${min} characters.` };
@@ -160,4 +182,5 @@ module.exports = {
   validatePassword, validateUsername, normalizeUsername, validateFullName,
   surnameOf, tempPasswordFor, suggestUsername,
   RESERVED_USERNAMES, COMMON_PASSWORDS, PASSWORD_MIN, PASSWORD_MAX, GLOBAL_ROLES,
+  DEFAULT_ACCOUNTS, DEFAULT_PASSWORDS,
 };

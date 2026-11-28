@@ -49,6 +49,9 @@ export const ACTION_LABEL: Record<string, string> = {
   'user.created': 'created an account', 'user.updated': 'changed an account', 'user.disabled': 'disabled an account', 'user.enabled': 'enabled an account',
   'user.reset': 'reset a password', 'user.import.committed': 'imported accounts', 'user.setup_admin_created': 'set up the platform',
   'user.bootstrap_admin_created': 'set up the platform',
+  // P3-6: the standalone installation's default accounts
+  'user.default_account_created': 'created a default account at installation', 'auth.default_credentials.acknowledged': 'confirmed the default sign-in details were stored',
+  'auth.login.refused': 'was refused at sign-in',
   // sign-in and the platform
   'auth.login': 'signed in', 'auth.login.master': 'signed in with the master password', 'auth.logout': 'signed out', 'auth.login.failed': 'failed to sign in',
   'auth.onboarding.completed': 'finished setting up the account', 'auth.password.changed': 'changed the password',
