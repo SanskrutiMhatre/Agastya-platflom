@@ -92,7 +92,7 @@ export function resetLogging(): void {
 }
 
 /** The route template of a request ("/api/projects/:id/dm"), never the concrete path with its ids or file names. */
-function routeOf(req: Request): string {
+export function routeOf(req: Request): string {
   const r = (req as Request & { route?: { path?: unknown } }).route;
   if (r && typeof r.path === 'string') return `${req.baseUrl ?? ''}${r.path}`;
   return req.path.startsWith('/api/') ? '(unmatched api)' : '(static)';

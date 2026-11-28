@@ -58,6 +58,8 @@ export const resourceRootsFor = (projectId: string): string[] => [projectDirFor(
 
 export function stopRenderer(): void { try { fopd.stop(); } catch { /* nothing to stop */ } }
 export const rendererStatus = () => ({ warm: !!fopd.isAvailable(), java: paths.JAVA, bundledJre: !!paths.hasBundledJre });
+/** The process id of this process's warm FOP JVM, or null (GET /api/admin/perf; in worker mode the JVMs belong to the job workers). */
+export const rendererPid = (): number | null => { try { return fopd.pid() ?? null; } catch { return null; } };
 
 // ── Serialisation ─────────────────────────────────────────────────────────
 

@@ -51,6 +51,7 @@
   "GET /api/admin/jobs": "requireAdmin :: 401 403 403 403 403 ok 403 | 403 403 403 403 403",
   "GET /api/admin/maintenance/audit.csv": "requireGlobal(audit.read) :: 401 403 403 403 403 ok ok | 403 403 403 403 403",
   "GET /api/admin/metrics": "requireAdmin :: 401 403 403 403 403 ok 403 | 403 403 403 403 403",
+  "GET /api/admin/perf": "requireAdmin :: 401 403 403 403 403 ok 403 | 403 403 403 403 403",
   "GET /api/admin/projects": "requireAdmin :: 401 403 403 403 403 ok 403 | 403 403 403 403 403",
   "GET /api/admin/projects/ownerless": "requireAdmin :: 401 403 403 403 403 ok 403 | 403 403 403 403 403",
   "GET /api/admin/releases": "requireAdmin :: 401 403 403 403 403 ok 403 | 403 403 403 403 403",
