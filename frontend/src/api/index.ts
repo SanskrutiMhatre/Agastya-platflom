@@ -144,6 +144,12 @@ export const workspaceApi = {
 
 // ── Project content ───────────────────────────────────────────────────────
 
+/** WP-14: a job of a project as GET /api/projects/:id/jobs lists it (backend/src/services/jobs JobView) */
+export interface JobView {
+  id: string; kind: string; projectId: string | null; state: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | string; createdAt: string; startedAt: string | null; finishedAt: string | null;
+  actor: string | null; position?: number; error?: { message: string; code?: string; status?: number } | null; cached?: boolean;
+}
+
 const P = (id: string) => `/api/projects/${id}`;
 
 export const IMPORT_MAX_FILES = 1000;
@@ -193,6 +199,8 @@ export const contentApi = {
     return res.blob();
   },
   pdfUrl: (id: string, download = false) => `${P(id)}/publish/pdf${download ? '?download=1' : ''}`,
+  /** WP-14: the project's jobs, newest first (the Publication page lists its builds from them) */
+  jobs: (id: string, limit = 50) => get<{ jobs: JobView[] }>(`${P(id)}/jobs?limit=${limit}`).then((r) => r.jobs),
 
   settings: (id: string) => get<any>(`${P(id)}/settings`),
   saveSettings: (id: string, body: { house?: unknown; project?: unknown; baseHash: string }) => put<{ ok: boolean; templateRef: string; version: string }>(`${P(id)}/settings`, body),
