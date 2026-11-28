@@ -4,7 +4,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Icon, type IconName } from '../components/Icon';
-import { PageHeader } from '../components/PageHeader';
+import '../styles/pages/admin.css';   // UI redesign screen 6: the administration look of the global pages
+import { AdmHead } from './adminParts';
 import { Empty, Loading, ago, fmtDate } from '../components/ui';
 import '../styles/pages/notifications.css';   // WP-35 second pass: this page's styles load with its chunk
 import { useInbox } from '../store/inbox';
@@ -33,13 +34,13 @@ export function Notifications() {
   };
 
   return (
-    <div className="v2-page">
-      <PageHeader icon="bell" title="Notifications" sub={unread ? `${unread} unread` : 'You are all caught up.'}
+    <div className="v2-page adm">
+      <AdmHead icon="bell" title="Notifications" sub={unread ? `${unread} unread` : 'You are all caught up.'}
         actions={<>
           <div className="v2-seg" role="group" aria-label="Show"><button className={filter === 'all' ? 'on' : ''} onClick={() => setFilter('all')}>All</button><button className={filter === 'unread' ? 'on' : ''} onClick={() => setFilter('unread')}>Unread</button></div>
           <button className="btn" disabled={!unread} onClick={() => void markRead()} data-testid="mark-all-read"><Icon name="check" />Mark all as read</button>
         </>} />
-      <div className="v2-card" data-testid="notifications">
+      <section className="card" data-testid="notifications" aria-label="Notifications">
         {!loaded ? <Loading /> : shown.length === 0 ? <Empty title={filter === 'unread' ? 'Nothing unread' : 'No notifications yet'} /> : shown.map((n) => (
           <div key={n.id} className={`v2-note ${n.read ? '' : 'unread'}`} data-testid="notification" data-read={n.read}>
             <span className={`v2-note-icon ${KIND_TONE[n.kind] ?? ''}`}><Icon name={KIND_ICON[n.kind] ?? 'info'} size={16} /></span>
@@ -51,7 +52,7 @@ export function Notifications() {
             {n.read ? null : <button className="icon-btn" title="Mark as read" aria-label="Mark as read" onClick={() => void markRead([n.id])}><Icon name="check" /></button>}
           </div>
         ))}
-      </div>
+      </section>
     </div>
   );
 }

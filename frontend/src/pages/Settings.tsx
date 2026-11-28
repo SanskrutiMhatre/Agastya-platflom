@@ -8,7 +8,7 @@ import { adminApi, auditApi, auditQueryString, authApi, teamApi, type AuditQuery
 import { globalLabel } from '../lib/roles';
 import { Icon } from '../components/Icon';
 import { ThemeChoiceControl } from '../components/ThemeToggle';
-import { Alert, Badge, ConfirmModal, Empty, Field, Loading, Modal, ago, errText, fmtDate, useAsync } from '../components/ui';
+import { Alert, Badge, ConfirmModal, Empty, Field, Loading, Modal, ago, errText, fmtDate, initialsOf, Pill, useAsync } from '../components/ui';
 import '../styles/pages/admin.css';   // WP-35 second pass: Users and Audit logs share the administrator styles
 import { useSession } from '../store/session';
 import { useUi } from '../store/ui';
@@ -17,6 +17,7 @@ import { actionLabel } from '../lib/activity';
 import { MoreRows, useProgressive } from '../components/windowing';
 import { tablistKeys } from '../components/a11y';
 import { PasswordInput } from '../components/PasswordInput';
+import { AdmHead } from './adminParts';
 
 function Account() {
   const { user, logout } = useSession();
@@ -37,29 +38,32 @@ function Account() {
 
   return (
     <div className="v2-stack v2-maxw-560">
-      <div className="v2-card v2-card-pad">
-        <h3 className="v2-mt0">Profile</h3>
-        <div className="v2-stack">
+      <section className="card" aria-labelledby="acct-profile">
+        <div className="card-head"><h3 id="acct-profile"><Icon name="user" />Profile</h3></div>
+        <div className="card-body v2-stack">
+          <div className="user-cell"><span className="avatar" aria-hidden="true">{initialsOf(user?.fullName || user?.username || '')}</span><div className="who"><strong>{user?.fullName}</strong><span className="v2-mono">@{user?.username}</span></div></div>
           <Field label="Name"><input className="v2-input" value={user?.fullName ?? ''} readOnly /></Field>
           <Field label="Username"><input className="v2-input" value={user?.username ?? ''} readOnly /></Field>
           <div className="v2-row"><Badge tone={user?.role === 'author' ? undefined : 'accent'}>{globalLabel(user?.role)}</Badge></div>
         </div>
-      </div>
-      <div className="v2-card v2-card-pad">
-        <h3 className="v2-mt0">Change password</h3>
-        <form className="v2-stack" onSubmit={(e) => { e.preventDefault(); void change(); }}>
+      </section>
+      <section className="card" aria-labelledby="acct-pw">
+        <div className="card-head"><h3 id="acct-pw"><Icon name="key" />Change password</h3></div>
+        <form className="card-body v2-stack" onSubmit={(e) => { e.preventDefault(); void change(); }}>
           <Field label="Current password"><PasswordInput value={cur} onChange={(e) => setCur(e.target.value)} autoComplete="current-password" /></Field>
           <Field label="New password" hint="At least 15 characters (a few words make a good one), and not a common password or your name."><PasswordInput value={p} onChange={(e) => setP(e.target.value)} autoComplete="new-password" /></Field>
           <Field label="Repeat new password" error={mismatch && p !== p2 ? 'The new passwords do not match.' : undefined}><PasswordInput id={repeatId} value={p2} onChange={(e) => setP2(e.target.value)} autoComplete="new-password" /></Field>
           {err ? <Alert tone="bad">{err}</Alert> : null}
           <div><button className="btn btn-primary" disabled={busy || !cur || !p}>Change password</button></div>
         </form>
-      </div>
-      <div className="v2-card v2-card-pad" data-testid="appearance">
-        <h3 className="v2-mt0">Appearance</h3>
-        <p className="v2-sub v2-mt0">Theme on this computer. "Follow the system" uses your organisation's default, or else the Windows setting.</p>
+      </section>
+      <section className="card" data-testid="appearance" aria-labelledby="acct-look">
+        <div className="card-head"><h3 id="acct-look"><Icon name="monitor" />Appearance</h3></div>
+        <div className="card-body v2-stack">
+        <p className="v2-sub v2-m0">Theme on this computer. "Follow the system" uses your organisation's default, or else the Windows setting.</p>
         <ThemeChoiceControl />
-      </div>
+        </div>
+      </section>
       <div><button className="btn" onClick={() => void logout()}><Icon name="logout" />Sign out</button></div>
     </div>
   );
@@ -68,11 +72,13 @@ function Account() {
 function Backup() {
   const role = useSession((s) => s.user?.role);
   return (
-    <div className="v2-card v2-card-pad v2-maxw-560">
-      <h3 className="v2-mt0">Backup</h3>
-      <p className="v2-sub">{role === 'admin' ? 'Every project, the people and memberships, and the activity log, as one ZIP file.' : role === 'project_manager' ? 'Every project you can open, as one ZIP file.' : 'Every project you can open, as one ZIP file.'}</p>
-      <BackupButton label={role === 'admin' ? 'Back up the platform' : 'Back up my projects'} />
-    </div>
+    <section className="card v2-maxw-560" aria-labelledby="set-backup">
+      <div className="card-head"><h3 id="set-backup"><Icon name="download" />Backup</h3></div>
+      <div className="card-body v2-stack">
+      <p className="v2-sub v2-m0">{role === 'admin' ? 'Every project, the people and memberships, and the activity log, as one ZIP file.' : role === 'project_manager' ? 'Every project you can open, as one ZIP file.' : 'Every project you can open, as one ZIP file.'}</p>
+      <div><BackupButton label={role === 'admin' ? 'Back up the platform' : 'Back up my projects'} /></div>
+      </div>
+    </section>
   );
 }
 
@@ -95,22 +101,29 @@ export function Users() {
   // FE-012: a role change takes effect at once (what the person may see and do), so it is confirmed first
   const [roleChange, setRoleChange] = useState<{ user: User; role: string } | null>(null);
   const ROLE_NAME: Record<string, string> = { author: 'Author', project_manager: 'Project Manager', admin: 'Software administrator' };
+  const [q, setQ] = useState('');                    // the mockup's user search: narrows the list on this page
 
   const act = async (fn: () => Promise<unknown>, ok: string) => { try { await fn(); toast(ok, 'success'); users.reload(); } catch (e) { toast(errText(e), 'error'); } };
 
+  const all = users.data ?? [];
+  const needle = q.trim().toLowerCase();
+  const shown = needle ? all.filter((u) => `${u.fullName} ${u.username}`.toLowerCase().includes(needle)) : all;
   return (
     <>
-      <div className="v2-row v2-spread v2-mb14">
-        <span />
-        <button className="btn btn-primary" onClick={() => setCreating(true)}><Icon name="invite" />New user</button>
-      </div>
-      <div className="v2-card">
-        {users.loading && !users.data ? <Loading /> : (
-          <table className="v2-table">
-            <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Status</th><th /></tr></thead>
-            <tbody>{(users.data ?? []).map((u) => (
+      <section className="card" aria-labelledby="users-h" data-testid="users-card">
+        <div className="card-head">
+          <h3 id="users-h"><Icon name="users" />Users <span className="count">{all.length}</span></h3>
+          <div className="row wrap">
+            <input className="v2-input v2-w-220" type="search" placeholder="Search users…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search users" data-testid="users-search" />
+            <button className="btn btn-primary" onClick={() => setCreating(true)}><Icon name="invite" />New user</button>
+          </div>
+        </div>
+        {users.loading && !users.data ? <Loading /> : shown.length === 0 ? <Empty title={needle ? 'Nobody matches' : 'No users yet'} /> : (
+          <div className="table-wrap"><table className="v2-table">
+            <thead><tr><th>User</th><th>Role</th><th>Status</th><th><span className="v2-sr">Actions</span></th></tr></thead>
+            <tbody>{shown.map((u) => (
               <tr key={u.id}>
-                <td><strong>{u.fullName}</strong></td><td className="v2-mono">@{u.username}</td>
+                <td><div className="user-cell"><span className="avatar" aria-hidden="true">{initialsOf(u.fullName || u.username)}</span><div className="who"><strong>{u.fullName}</strong><span className="v2-mono">@{u.username}</span></div></div></td>
                 <td>
                   <select className="v2-select v2-w-190" value={u.role} disabled={u.id === me?.id} aria-label={`Role of ${u.username}`}
                     onChange={(e) => setRoleChange({ user: u, role: e.target.value })}>
@@ -127,9 +140,10 @@ export function Users() {
                     : <button className="btn btn-sm" disabled={u.id === me?.id} onClick={() => setConfirm({ user: u, action: 'disable' })}>Disable</button>}
                 </td>
               </tr>))}</tbody>
-          </table>
+          </table></div>
         )}
-      </div>
+        {users.data ? <div className="card-foot"><span className="faint" data-testid="users-shown">{shown.length} of {all.length} shown</span></div> : null}
+      </section>
 
       {creating ? <CreateUser roles={[['author', 'Author'], ['project_manager', 'Project Manager']]} create={(b) => adminApi.createUser(b)} onClose={() => setCreating(false)} onCreated={(name, pw) => { setCreating(false); users.reload(); setTemp({ title: 'Account created', name, password: pw }); }} /> : null}
       {temp ? <TempPassword {...temp} onClose={() => setTemp(null)} /> : null}
@@ -210,7 +224,7 @@ function Approvals() {
   return (
     <div className="v2-stack">
       <div className="v2-card">
-        <div className="v2-card-head">Release requests</div>
+        <div className="card-head"><h3><Icon name="stamp" />Release requests</h3></div>
         {releases.loading && !releases.data ? <Loading /> : !releases.data?.length ? <Empty title="No release requests waiting" /> : (
           <table className="v2-table"><thead><tr><th>Project</th><th>Requested by</th><th>Takes effect</th><th>Note</th><th /></tr></thead>
             <tbody>{releases.data.map((r) => (
@@ -221,7 +235,7 @@ function Approvals() {
         )}
       </div>
       <div className="v2-card">
-        <div className="v2-card-head">Password reset requests</div>
+        <div className="card-head"><h3><Icon name="key" />Password reset requests</h3></div>
         {resets.loading && !resets.data ? <Loading /> : !resets.data?.length ? <Empty title="No reset requests waiting" /> : (
           <table className="v2-table"><thead><tr><th>Person</th><th>Requested</th><th /></tr></thead>
             <tbody>{resets.data.map((r) => (
@@ -253,6 +267,15 @@ function Sessions() {
 
 /** "::ffff:127.0.0.1" is an IPv4 address written as IPv6; the log shows it as 127.0.0.1 (WP-22, UX-025). */
 export const plainIp = (ip: string | null): string => (ip ?? '').replace(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i, '$1');
+
+/** The mockup's Type column: what kind of event a row is, from its action name (sign-in trouble and access changes are Security, settings
+ *  and reference data are Config, everything else is Info). */
+export function auditKind(action: string): { label: string; tone: 'danger' | 'warning' | 'info' } {
+  const a = action.toLowerCase();
+  if (/(fail|denied|refused|locked|lockout|offboard|revoke|disable|reset|password|session\.ended|auth\.)/.test(a)) return { label: 'Security', tone: 'danger' };
+  if (/(setting|config|policy|accent|theme|backup|restore|access\.|role|group|directory|maintenance)/.test(a)) return { label: 'Config', tone: 'warning' };
+  return { label: 'Info', tone: 'info' };
+}
 
 export function Audit() {
   const [typed, setTyped] = useState<AuditQuery>({});
@@ -298,13 +321,14 @@ export function Audit() {
           {!report.ok ? <ul className="v2-mt6">{report.problems.slice(0, 20).map((p, i) => <li key={i}>{p.message}</li>)}{report.problemCount > 20 ? <li>… and {report.problemCount - 20} more (run AgastyaCtl --verify-audit for the full list)</li> : null}</ul> : null}
         </Alert>
       ) : null}
-      <div className="v2-card">
+      <section className="card" aria-labelledby="audit-h">
+        <div className="card-head"><h3 id="audit-h"><Icon name="history" />Entries <span className="count">{rows.length}</span></h3><span className="faint">Newest first · at most 300 shown</span></div>
         {a.loading && !a.data ? <Loading /> : !rows.length ? <Empty title="No entries" /> : (
-          <table className="v2-table"><thead><tr><th>When</th><th>Who</th><th>Action</th><th>Project</th><th>From</th></tr></thead>
-            <tbody>{rows.slice(0, drawn.limit).map((e) => <tr key={e.id}><td title={fmtDate(e.at)}>{ago(e.at)}</td><td>{e.actor ?? '—'}</td><td title={e.action}>{actionLabel(e.action)} <span className="v2-hint v2-mono">{e.action}</span></td><td className="v2-mono">{e.projectId ?? ''}</td><td className="v2-mono">{plainIp(e.ip)}</td></tr>)}
-              <MoreRows as="tr" colSpan={5} shown={drawn.limit} total={rows.length} onMore={drawn.more} onAll={drawn.all} /></tbody></table>
+          <div className="table-wrap"><table className="v2-table"><thead><tr><th>When</th><th>Who</th><th>Action</th><th>Type</th><th>Project</th><th>From</th></tr></thead>
+            <tbody>{rows.slice(0, drawn.limit).map((e) => { const k = auditKind(e.action); return <tr key={e.id}><td title={fmtDate(e.at)} className="faint">{ago(e.at)}</td><td>{e.actor ?? '—'}</td><td title={e.action}>{actionLabel(e.action)} <span className="v2-hint v2-mono">{e.action}</span></td><td><Pill tone={k.tone}>{k.label}</Pill></td><td className="v2-mono">{e.projectId ?? ''}</td><td className="v2-mono">{plainIp(e.ip)}</td></tr>; })}
+              <MoreRows as="tr" colSpan={6} shown={drawn.limit} total={rows.length} onMore={drawn.more} onAll={drawn.all} /></tbody></table></div>
         )}
-      </div>
+      </section>
     </div>
   );
 }
@@ -325,8 +349,8 @@ export function Settings() {
   ].filter((t) => isAdmin || !t.admin);
 
   return (
-    <div className="v2-page">
-      <div className="v2-page-head"><div><h2>Settings</h2><p className="v2-sub">{isAdmin ? 'Account, people and platform administration.' : isManager ? 'Your account and your authors.' : 'Your account and preferences.'}</p></div></div>
+    <div className="v2-page adm">
+      <AdmHead title="Settings" sub={isAdmin ? 'Account, people and platform administration.' : isManager ? 'Your account and your authors.' : 'Your account and preferences.'} />
       <div className="v2-tabs" role="tablist" aria-label="Settings sections" onKeyDown={tablistKeys}>
         {tabs.map((t) => <NavLink key={t.to} to={t.to} className={({ isActive }) => `v2-tab ${isActive ? 'active' : ''}`} role="tab" style={{ textDecoration: 'none' }}>{t.label}</NavLink>)}
       </div>
