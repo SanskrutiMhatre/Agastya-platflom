@@ -4,7 +4,7 @@
    reach another page. The cards, tables, badges, segmented filters and stat tiles are components.css.
    ========================================================================= */
 
-.dash .page-head h2 { font-size: var(--fs-2xl); line-height: var(--lh-tight); font-weight: var(--fw-semibold); margin: 0; }
+.dash .page-head h1, .dash .page-head h2 { font-size: var(--fs-xl); line-height: var(--lh-tight); font-weight: var(--fw-semibold); margin: 0; }   /* the mockup's h1 */
 .dash .page-head p { margin: var(--space-1) 0 0; }
 .dash .page-head .row { flex-wrap: wrap; justify-content: flex-end; }
 .dash .kpis { margin-bottom: var(--space-4); }
@@ -24,7 +24,7 @@
 .resume > a:hover, .resume > button:hover { border-color: var(--border-control); box-shadow: var(--shadow-1); text-decoration: none; }
 .resume .t { font-weight: var(--fw-semibold); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .resume .c { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.resume .row { flex-wrap: wrap; gap: var(--space-1); }
+.resume .row { flex-wrap: nowrap; overflow: hidden; }   /* the mockup's badge row: one line */
 @media (max-width: 900px) { .resume { grid-template-columns: minmax(0, 1fr); } }
 
 /* the projects card: filters row, then the table */
@@ -34,6 +34,7 @@
 .dash table.table td.proj-cell { max-width: 0; width: 100%; }
 .dash table.table tr.clickable { cursor: pointer; }
 .dash .proj-link { display: flex; align-items: center; gap: var(--space-3); color: var(--text-primary); min-width: 0; text-decoration: none; }
+.dash .proj-link .v2-row-link { color: var(--text-primary); text-decoration: none; min-width: 0; }   /* the mockup's names are text, not link blue */
 .dash .proj-link:hover .proj-name { text-decoration: underline; }
 .dash .proj-link .avatar { width: 24px; height: 24px; font-size: var(--fs-2xs); flex: none; }
 .dash .proj-name { font-weight: var(--fw-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

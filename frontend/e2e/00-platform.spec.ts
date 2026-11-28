@@ -59,7 +59,7 @@ test('first run: set up the administrator and land on the platform overview', as
   await page.getByLabel('Password', { exact: true }).fill(PW);
   await page.getByLabel('Repeat password').fill(PW);
   await page.getByRole('button', { name: 'Create administrator' }).click();
-  await expect(page.getByRole('heading', { name: /Welcome back, Site/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Good (morning|afternoon|evening), Site/ })).toBeVisible();
   await expect(page.getByText('Platform overview')).toBeVisible();
   await shot(page, '02-admin-overview');
 });
@@ -100,7 +100,7 @@ test('the Author signs in with it, chooses a password and lands on her own dashb
   await page.getByLabel('New password').fill(PW);
   await page.getByLabel('Repeat password').fill(PW);
   await page.getByRole('button', { name: 'Finish' }).click();
-  await expect(page.getByRole('heading', { name: /Welcome back, Asha/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Good (morning|afternoon|evening), Asha/ })).toBeVisible();
   await shot(page, '02-overview-empty');
 });
 
@@ -681,7 +681,7 @@ test.describe('a second person: account creation, onboarding, sharing and read-o
     await page2.getByLabel('New password').fill(PW);
     await page2.getByLabel('Repeat password').fill(PW);
     await page2.getByRole('button', { name: 'Finish' }).click();
-    await expect(page2.getByRole('heading', { name: /Welcome back, Priya/ })).toBeVisible();
+    await expect(page2.getByRole('heading', { name: /Good (morning|afternoon|evening), Priya/ })).toBeVisible();
     await expect(page2.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Activity' })).toHaveCount(0);   // authors get no oversight page
     await page2.getByRole('link', { name: 'Workspace' }).click();
     await expect(page2.getByTestId('project-card')).toHaveCount(0);
@@ -826,7 +826,7 @@ test.describe('roles: administrator -> Project Manager -> Author', () => {
     await p.getByLabel('New password').fill(PW);
     await p.getByLabel('Repeat password').fill(PW);
     await p.getByRole('button', { name: 'Finish' }).click();
-    await expect(p.getByRole('heading', { name: new RegExp(`Welcome back, ${name}`) })).toBeVisible();
+    await expect(p.getByRole('heading', { name: new RegExp(`Good (morning|afternoon|evening), ${name}`) })).toBeVisible();
     return p;
   };
 
@@ -1006,7 +1006,7 @@ test.describe('roles: administrator -> Project Manager -> Author', () => {
     await mgr.getByLabel('Password').fill(PW);
     await mgr.getByRole('button', { name: 'Sign in' }).click();
     await expect(mgr).toHaveURL(/\/overview$/);
-    await expect(mgr.getByRole('heading', { name: /Welcome back, Priya/ })).toBeVisible();
+    await expect(mgr.getByRole('heading', { name: /Good (morning|afternoon|evening), Priya/ })).toBeVisible();
     await mgr.context().close();
     await auth.context().close();
   });

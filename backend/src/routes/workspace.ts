@@ -31,6 +31,14 @@ import { projectDirFor } from '../context';
 import { PDF_NAME } from '../services/publisher';
 import { notify, adminIds } from '../services/notifications';
 
+/** The dashboard's facts of one project (display only, WP-18 reuse): its release status and the counts of its last validation run. */
+export function dashboardFacts(id: string): { release: 'released' | 'pending' | 'unreleased'; changedSinceRelease: boolean; validation: { error: number; warn: number; ranAt: string } | null } {
+  let release: 'released' | 'pending' | 'unreleased' = 'unreleased'; let changedSinceRelease = false;
+  try { const st = releaseStateOf(id, { reuse: true }); release = st.released ? 'released' : st.pending ? 'pending' : 'unreleased'; changedSinceRelease = !!st.staleRelease; } catch { /* no release data */ }
+  const run = lastRun(id);
+  return { release, changedSinceRelease, validation: run ? { error: run.summary.error, warn: run.summary.warn, ranAt: run.ranAt } : null };
+}
+
 export function registerWorkspaceRoutes(app: Express): void {
   // ── Overview ────────────────────────────────────────────────────────────
   app.get('/api/overview', requireAuth(), wrap((req, res) => {
@@ -38,12 +46,20 @@ export function registerWorkspaceRoutes(app: Express): void {
     const cards = P.listProjectsFor(user);
     const ids = new Set(cards.map((c) => c.id));
     const folders = P.workspaceFor(user, cards).folders;          // the cards just built, not a second pass over every project (WP-17)
-    const recent = [...cards].sort((a, b) => String(b.lastOpened ?? b.updatedAt).localeCompare(String(a.lastOpened ?? a.updatedAt))).slice(0, 6);
+    const recent = [...cards].sort((a, b) => String(b.lastOpened ?? b.updatedAt).localeCompare(String(a.lastOpened ?? a.updatedAt))).slice(0, 6)
+      // UI redesign (screen 1, the mockup's Projects table): each recent project's release status and its last validation run, display only
+      .map((c) => ({ ...c, ...dashboardFacts(c.id) }));
+    const fullNames = new Map<string, string | null>();
+    const nameOf = (actorId: string | null | undefined): string | null => {
+      if (!actorId) return null;
+      if (!fullNames.has(actorId)) { try { fullNames.set(actorId, (store.getUser(actorId) as { full_name?: string } | null)?.full_name || null); } catch { fullNames.set(actorId, null); } }
+      return fullNames.get(actorId) ?? null;
+    };
 
     const activity = store.listAudit({ limit: 300 })
       .filter((a: any) => (a.project_id && ids.has(a.project_id)) || a.actor_id === user.id)
       .slice(0, 12)
-      .map((a: any) => ({ id: a.id, at: a.at, actor: a.actor_username, action: a.action, projectId: a.project_id, meta: safeJson(a.meta) }));
+      .map((a: any) => ({ id: a.id, at: a.at, actor: a.actor_username, actorName: nameOf(a.actor_id), action: a.action, projectId: a.project_id, meta: safeJson(a.meta) }));
 
     const names = new Map(cards.map((c) => [c.id, c.name]));
     res.json({
