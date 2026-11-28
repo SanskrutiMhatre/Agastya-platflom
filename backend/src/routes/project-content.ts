@@ -48,6 +48,8 @@ const { CATALOGUE } = vendor('engine/frontMatterPages');
 // WP-11 (REL-007, PERF-010): uploads stream to disk with a cap on each file and on the whole request; the files are removed when the response is over.
 const MAX_IMPORT_TOTAL = 1024 * 1024 * 1024;
 const IMAGE_EXT = /\.(png|jpe?g|gif|svg|bmp|webp)$/i;
+/** phase 7: the last GET /dms answer per project (see the route) */
+const dmsAnswers = new Map<string, { key: string; body: string }>();
 
 /** Most data modules one import request may carry. A bigger set is imported in batches. */
 export const MAX_IMPORT_FILES = 1000;
@@ -92,7 +94,14 @@ export function registerProjectContentRoutes(app: Express): void {
   app.get(`${base}/dms`, view('viewer'), wrap((req, res) => {
     const want = pageRequest(req); const q = searchText(req);
     const slim = req.query.fields === 'list';
-    const locked = new Set<string>(store.listLockedPaths(req.project.id));
+    const lockedList: string[] = store.listLockedPaths(req.project.id);
+    const locked = new Set<string>(lockedList);
+    // phase 7: the answer for the same listing version, lock set and query is kept (one per project): the full list at 1,000 modules is
+    // 795 KB of JSON, and stringifying it was most of this route's time
+    const token = csdb.listingToken(req.project.id);
+    const key = token === null ? null : JSON.stringify([token, [...lockedList].sort(), q, slim, want]);
+    const kept = key === null ? undefined : dmsAnswers.get(req.project.id);
+    if (kept && kept.key === key) { res.type('application/json').send(kept.body); return; }
     const pj = readProjectJson(req.project.id);
     let all = csdb.listDms(req.project.id);
     if (q) all = all.filter((d) => [d.file, d.dmc, d.techName, d.infoName, d.title].some((v) => typeof v === 'string' && v.toLowerCase().includes(q)));
@@ -103,7 +112,9 @@ export function registerProjectContentRoutes(app: Express): void {
       return { file: d.file, dmc: d.dmc, techName: d.techName, infoName: d.infoName, title: d.title, issueNumber: d.issueNumber, inWork: d.inWork,
         language: d.language, issue: d.issue, security: d.security, size: d.size, modified: d.modified, locked: isLocked };
     });
-    res.json(w ? { dms: rows, ...w.page } : { dms: rows });
+    const body = JSON.stringify(w ? { dms: rows, ...w.page } : { dms: rows });
+    if (key !== null) { dmsAnswers.delete(req.project.id); dmsAnswers.set(req.project.id, { key, body }); if (dmsAnswers.size > 16) { const first = dmsAnswers.keys().next().value; if (first !== undefined) dmsAnswers.delete(first); } }
+    res.type('application/json').send(body);
   }));
 
   app.get(`${base}/dms/:file`, view('viewer'), wrap((req, res) => { res.json(csdb.readDm(req.project.id, param(req, 'file'))); }));
@@ -265,8 +276,7 @@ export function registerProjectContentRoutes(app: Express): void {
 
   app.get(`${base}/pmc`, view('viewer'), wrap((req, res) => {
     const { meta, entries, warnings, counts, pool } = pm.readPm(req.project.id);
-    const abs = pm.pmPath(req.project.id);
-    res.json({ meta, entries, warnings, counts, pool, hash: fs.existsSync(abs) ? csdb.sha(fs.readFileSync(abs, 'utf8')) : null });     // hash: the version a save names (WP-11)
+    res.json({ meta, entries, warnings, counts, pool, hash: pm.pmFileHash(req.project.id) });     // hash: the version a save names (WP-11); kept per file version (phase 7)
   }));
 
   app.put(`${base}/pmc`, view('editor', 'pm.write'), versionGuard('publication'), wrap((req, res) => {

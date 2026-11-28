@@ -52,7 +52,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---- the server under test --------------------------------------------------------------------------------------------------------
 function startServer() {
-  const env = { ...process.env, PORT: String(PORT), AGASTYA_HOST: '127.0.0.1', AGASTYA_WORKSPACE_DIR: WS_DIR, AGASTYA_SHUTDOWN_ON_STDIN_CLOSE: '1' };
+  const env = { ...process.env, PORT: String(PORT), AGASTYA_HOST: '127.0.0.1', AGASTYA_WORKSPACE_DIR: WS_DIR, AGASTYA_SHUTDOWN_ON_STDIN_CLOSE: '1',
+    // phase 7: the db detail of Server-Timing is for administrators only by default; the bench measures as authors, so it asks for all
+    AGASTYA_SERVER_TIMING: process.env.AGASTYA_SERVER_TIMING || 'full' };
   const dist = path.join(ROOT, 'frontend', 'dist'); if (fs.existsSync(path.join(dist, 'index.html'))) env.AGASTYA_CLIENT_DIST = dist;
   const prof = CPUPROF ? ['--cpu-prof', `--cpu-prof-dir=${path.resolve(CPUPROF)}`] : [];
   const child = spawn(process.execPath, [...prof, path.join(BACKEND, 'dist', 'index.js')], { cwd: BACKEND, env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });

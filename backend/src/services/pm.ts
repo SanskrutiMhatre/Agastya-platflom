@@ -67,8 +67,28 @@ export function parseModel(text: string): { meta: any; entries: PmEntry[]; warni
 // WP-17 (PERF-005): a page view read the publication module three times (the release fingerprint, the raw references, the explorer), each a
 // full parse (about 50-90 ms for 1000 entries). The parse is kept until the file changes (size, modification or change time) and handed out as
 // a copy, so a caller that changes its model changes nothing kept.
+// Phase 7 (docs/phase3/performance.md, item 2): the kept parse is deep-frozen and SHARED instead of copied on every read (structuredClone of
+// a 1,000-entry model was the largest single cost of /pmc, /explore and /summary: 4.2 s in the baseline profile). Every reader of it is
+// read-only (the explorer, the JSON answers, the fingerprint inputs, the annexure list); a writer builds a new model (writePm serialises
+// without changing its input), so freezing turns any accidental change into an error instead of a silently changed cache.
+function deepFreeze<T>(v: T): T {
+  if (v && typeof v === 'object' && !Object.isFrozen(v)) {
+    Object.freeze(v);
+    for (const k of Object.keys(v as object)) deepFreeze((v as Record<string, unknown>)[k]);
+  }
+  return v;
+}
 const modelMemo = new FileMemo<ReturnType<typeof parseModel>>(64);
-const readModel = (abs: string): ReturnType<typeof parseModel> => structuredClone(modelMemo.get(abs, fs.statSync(abs), () => parseModel(fs.readFileSync(abs, 'utf8'))));
+const readModel = (abs: string): ReturnType<typeof parseModel> => modelMemo.get(abs, fs.statSync(abs), () => deepFreeze(parseModel(fs.readFileSync(abs, 'utf8'))));
+
+// the hash of the publication file a save names (GET /pmc), per file version
+const pmHashMemo = new FileMemo<string>(64);
+/** sha256 of the publication module file as it is on disk, or null when there is none (kept per file version). */
+export function pmFileHash(projectId: string): string | null {
+  const abs = pmPath(projectId);
+  let st: fs.Stats; try { st = fs.statSync(abs); } catch { return null; }
+  return pmHashMemo.get(abs, st, () => sha(fs.readFileSync(abs, 'utf8')));
+}
 
 /** `known`: the module list the caller has just read in the same request (WP-18: the summary lists the modules once, not three times). */
 export function readPm(projectId: string, known?: DmSummary[]) {
@@ -82,9 +102,10 @@ export function readPm(projectId: string, known?: DmSummary[]) {
   return { ...model, counts: pmc.countEntries(model.entries), pool: unplaced(model.entries, dms), dms };
 }
 
-// pmc.parsePm of a publication file, kept per file version (size, times, file id) and handed out as a copy (placeNewDm changes what it gets)
+// pmc.parsePm of a publication file, kept per file version (size, times, file id); frozen and shared (phase 7): placeNewDm appends to a
+// new entries array instead of changing the kept one
 const pmParseMemo = new FileMemo<{ meta?: unknown; entries: PmEntry[] }>(64);
-const parsedPm = (abs: string) => structuredClone(pmParseMemo.get(abs, fs.statSync(abs), () => pmc.parsePm(fs.readFileSync(abs, 'utf8'))));
+const parsedPm = (abs: string) => pmParseMemo.get(abs, fs.statSync(abs), () => deepFreeze(pmc.parsePm(fs.readFileSync(abs, 'utf8'))));
 
 const NOT_PRINTED = new Set(['022', '00W', '00Q', '00P']);   // BREX and the applicability tables are project data, not pages of the book
 
@@ -96,11 +117,11 @@ const NOT_PRINTED = new Set(['022', '00W', '00Q', '00P']);   // BREX and the app
 export function placeNewDm(projectId: string, file: string): boolean {
   try {
     if (readProjectJson(projectId).autoAddToPublication === false || !fs.existsSync(pmPath(projectId))) return false;
-    const model = parsedPm(pmPath(projectId));                        // WP-17: the kept parse of this file version, as a copy
+    const kept = parsedPm(pmPath(projectId));                         // WP-17: the kept parse of this file version (frozen, shared)
     const d = dmSummaryOf(projectId, file);                         // WP-17 (PERF-005): this module, not a listing of all of them
     if (!d || NOT_PRINTED.has(d.dmCodeAttrs.infoCode)) return false;
-    if (!unplaced(model.entries, [d]).length) return false;
-    model.entries.push({ type: 'dm', title: d.techName || d.dmc, dmCode: d.dmCodeAttrs, techName: d.techName, infoName: d.infoName });
+    if (!unplaced(kept.entries, [d]).length) return false;
+    const model = { ...kept, entries: [...kept.entries, { type: 'dm' as const, title: d.techName || d.dmc, dmCode: d.dmCodeAttrs, techName: d.techName, infoName: d.infoName }] };
     writePm(projectId, model, true);
     return true;
   } catch { return false; }
@@ -174,7 +195,21 @@ export function writePm(projectId: string, model: { meta?: unknown; entries: PmE
   content.writeText(projectId, abs, xml);
   // WP-17 (PERF-005): the read-back just made IS the parse of the file as written (when nothing was added to the text after it), so the next
   // module created does not parse the whole publication again
-  if (xml === written) { try { pmParseMemo.get(abs, fs.statSync(abs), () => reread); } catch { /* the memo is a convenience */ } }
+  // Phase 7: when the header was completed (completePmStatus) or the importer's mark carried over, the text differs from `written` only in
+  // the identification and status section and a leading comment: the entries (everything under <content>) are the ones just read back, and
+  // the header is read from the written text with its <content> left out (a few hundred bytes instead of the whole publication). Before,
+  // every create paid a second full parse here (the next placeNewDm missed the memo).
+  try {
+    const st = fs.statSync(abs);
+    if (xml === written) pmParseMemo.get(abs, st, () => deepFreeze(reread));
+    else {
+      const head = xml.replace(/<content\b[\s\S]*<\/content>/, '');
+      if (head.length < xml.length) {
+        const h = pmc.parsePm(head);
+        if (h.entries.length === 0) pmParseMemo.get(abs, st, () => deepFreeze({ meta: h.meta, entries: reread.entries, warnings: reread.warnings }));
+      }
+    }
+  } catch { /* the memo is a convenience */ }
   return { counts, backup: path.basename(abs) + '.bak', hash: sha(xml) };
 }
 

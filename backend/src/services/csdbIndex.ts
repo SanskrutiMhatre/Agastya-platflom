@@ -144,6 +144,13 @@ function summaryFrom(abs: string, f: string, st: fs.Stats): DmSummary {
   };
 }
 
+/** Phase 7: a summary that is shared between requests is frozen (its attribute maps too), so no caller can change it for the next one. */
+function frozen(d: DmSummary): DmSummary {
+  Object.freeze(d.dmCodeAttrs); Object.freeze(d.issueInfoAttrs); Object.freeze(d.languageAttrs);
+  if (d.identExtension) Object.freeze(d.identExtension);
+  return Object.freeze(d);
+}
+
 /*
   WP-17 (PERF-005): the identity index behind the uniqueness check of every save and create. Listing the CSDB costs one file-system stat per
   module (about 55 ms at 1000 modules on Windows), and every save and create paid it. The index keeps, per CSDB folder, identity key -> files,
@@ -201,6 +208,7 @@ export function identityClash(projectId: string, file: string, key: string): str
  */
 export function noteDmWritten(projectId: string, file: string, xml: string | null): void {
   const dir = csdbDir(projectId);
+  noteListed(dir, file, xml);
   const idx = identIndexes.get(dir);
   if (!idx) return;
   const t = dirTime(dir);
@@ -211,20 +219,114 @@ export function noteDmWritten(projectId: string, file: string, xml: string | nul
 }
 
 /** Forget every identity index (tests; a restore or import that rewrote a whole CSDB may call it too, though the folder time already does). */
-export function clearIdentityIndexes(): void { identIndexes.clear(); }
+export function clearIdentityIndexes(): void { identIndexes.clear(); listings.clear(); }
 
-export function listDms(projectId: string): DmSummary[] {
-  const dir = csdbDir(projectId);
-  if (!fs.existsSync(dir)) return [];
-  const out: DmSummary[] = [];
+/*
+  Phase 7 (docs/phase3/performance.md, item 2): the LISTING is kept per CSDB folder too. Before, every `listDms` stat-ed every module (1,000
+  stats, about 55 ms on Windows, plus a locale sort and a copy of every summary), and one project read calls it once or several times. Now:
+    * the kept listing is trusted while the folder's own modification time is unchanged (one stat per call): every write the platform makes
+      is an atomic rename inside the folder (storage/atomicWrite.ts), and an added, removed or renamed file changes the folder's time, so the
+      collaboration write-back, the importer, a restore and anything outside the platform that adds or removes a file make the next call list
+      the folder again;
+    * the platform's own create, save and delete (csdb.ts -> noteDmWritten) replace that one entry in place (one stat) instead of a re-listing;
+    * a file edited IN PLACE by a tool outside the platform leaves the folder time alone: it is picked up within LIST_MAX_AGE_MS
+      (`AGASTYA_CSDB_LIST_TTL_MS`, default 5 s), after which the folder is listed again in full (the per-file identity memo keeps that cheap);
+    * the summaries handed out are frozen and shared (no copy per request); each call gets its own array, so a caller may sort or filter it.
+  Callers that must see a change made a moment ago outside the platform call `invalidateListing(projectId)`.
+*/
+interface Listing { dirMtimeMs: number; checkedAt: number; byFile: Map<string, DmSummary>; sorted: DmSummary[] | null; version: number }
+const listings = new Map<string, Listing>();
+const LIST_MAX_AGE_MS = Math.max(0, Number(process.env.AGASTYA_CSDB_LIST_TTL_MS ?? 5000) || 0);
+const LIST_MAX = 64;
+let listingScans = 0;
+/** How many full folder listings have run (tests and the perf report). */
+export function listingScanCount(): number { return listingScans; }
+
+const sameFile = (a: fs.Stats | undefined, b: fs.Stats): boolean =>
+  !!a && a.size === b.size && a.mtimeMs === b.mtimeMs && a.ctimeMs === b.ctimeMs && a.ino === b.ino;
+
+/** List the folder. A module whose file is unchanged keeps its summary object; when NOTHING changed, the previous listing itself is kept. */
+function scanFolder(dir: string, t: number, prev: Listing | undefined): Listing {
+  listingScans++;
+  const byFile = new Map<string, DmSummary>();
+  let changed = !prev;
   for (const f of fs.readdirSync(dir)) {
     if (!DM_FILE_RE.test(f)) continue;
     const abs = path.join(dir, f);
     let st: fs.Stats;
     try { st = fs.statSync(abs); } catch { continue; }
-    const d = summaryFrom(abs, f, st);
+    const old = prev?.byFile.get(f);
+    if (old && sameFile(statOf.get(old), st)) { byFile.set(f, old); continue; }
+    changed = true;
+    const d = frozen(summaryFrom(abs, f, st));
     statOf.set(d, st);
-    out.push(d);
+    byFile.set(f, d);
   }
-  return out.sort((a, b) => a.file.localeCompare(b.file));
+  if (prev && !changed && byFile.size === prev.byFile.size) { prev.dirMtimeMs = t; prev.checkedAt = Date.now(); return prev; }
+  return { dirMtimeMs: t, checkedAt: Date.now(), byFile, sorted: null, version: 0 };
+}
+
+function listingOf(dir: string): Listing | null {
+  const t = dirTime(dir);
+  if (t === null) { listings.delete(dir); return null; }
+  const had = listings.get(dir);
+  if (had && had.dirMtimeMs === t && Date.now() - had.checkedAt < LIST_MAX_AGE_MS) return had;
+  const l = scanFolder(dir, t, had);                                     // the time read BEFORE the listing
+  listings.delete(dir); listings.set(dir, l);
+  if (listings.size > LIST_MAX) { const first = listings.keys().next().value; if (first !== undefined) listings.delete(first); }
+  return l;
+}
+
+/** After the platform wrote or deleted one module of this folder: replace that entry (one stat) instead of listing the folder again. */
+function noteListed(dir: string, file: string, xml: string | null): void {
+  const l = listings.get(dir);
+  if (!l) return;
+  const t = dirTime(dir);
+  if (t === null) { listings.delete(dir); return; }
+  // the folder spells the name its own way; a save may address it in another letter case
+  const lower = file.toLowerCase();
+  let name = file;
+  for (const k of [...l.byFile.keys()]) if (k.toLowerCase() === lower) { name = k; l.byFile.delete(k); }
+  if (xml !== null && DM_FILE_RE.test(name)) {
+    const abs = path.join(dir, name);
+    try {
+      const st = fs.statSync(abs);
+      // the identity from the text just written, read the way listDms reads a file: opening a file that was just written waits for the
+      // virus scanner on Windows (the profile showed 5 s of `open` over 1,000 creates)
+      identMemo.get(abs, st, () => parseIdent(headOfText(xml), name));
+      const d = frozen(summaryFrom(abs, name, st)); statOf.set(d, st); l.byFile.set(name, d);
+    } catch { /* gone again */ }
+  }
+  l.sorted = null; l.version++;
+  l.dirMtimeMs = t;
+}
+
+/**
+ * A token that changes whenever the kept listing of this project changes (a new scan, a module written or deleted through the platform);
+ * null when the folder is missing. Validates the listing first, exactly like `listDms`. For memos of values derived from the whole listing.
+ */
+export function listingToken(projectId: string): string | null {
+  const l = listingOf(csdbDir(projectId));
+  if (!l) return null;
+  let id = listingIds.get(l); if (id === undefined) { id = ++listingSeq; listingIds.set(l, id); }
+  return `${id}.${l.version}`;
+}
+const listingIds = new WeakMap<Listing, number>();
+let listingSeq = 0;
+
+/** Forget the kept listing of one project (the next `listDms` lists the folder again). */
+export function invalidateListing(projectId: string): void {
+  try { listings.delete(csdbDir(projectId)); } catch { /* no project record */ }
+}
+
+/**
+ * The data modules of a project, sorted by file name. The summaries are shared and FROZEN (see above): copy one before changing it.
+ * The array itself is the caller's own.
+ */
+export function listDms(projectId: string): DmSummary[] {
+  const dir = csdbDir(projectId);
+  const l = listingOf(dir);
+  if (!l) return [];
+  if (!l.sorted) l.sorted = [...l.byFile.values()].sort((a, b) => a.file.localeCompare(b.file));
+  return l.sorted.slice();
 }
