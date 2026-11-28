@@ -55,6 +55,13 @@ The format must meet these rules:
    * XML formats can reuse `services/collab/xml.ts`: an `XmlFragment('xml')` holding the elements, text in `XmlText`, attributes as Y
      attributes, and the doctype and XML declaration in `Map('meta')`.
    * The browser binding must use the same schema (`backend/src/shared/collab/ydom.ts` is shared).
+   * **Schema 2 (Phase 8): blocks and placements.** A movable element is a block in `Map('blocks')` (id -> `Y.XmlElement`); the tree holds
+     a placeholder `#ref {id, tok}`, and `Map('place')` maps the id to the token of the live placeholder. A move writes a new placeholder
+     and sets `place`; the content element is never re-created, so concurrent typing in a moved block is kept (concurrent moves: last
+     writer wins on `place`; undo of a move restores the token). Read the tree only through `ychildren` / `liveKids` / `treeParent` /
+     `rawIndex` / `liveIndex` / `liveAt`, observe it with `observeTree`, and give undo `undoScope(ydoc)`. Schema-1 rooms read unchanged and
+     become blocks lazily on the first move (no epoch change, no migration); a browser bundle from before schema 2 must be reloaded after
+     the deploy. Record: `docs/phase3/cleanup-collab.md`.
 5. **No import cycles.** The core reaches broadcast, release and content through hooks, which are checked by ARC-006.
    * A format module may import its own services.
    * Nothing the core imports at load time may import `services/collab/*`.

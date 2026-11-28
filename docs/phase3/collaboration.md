@@ -148,7 +148,8 @@ These existing tests assume that every S1000D save goes by version. They will ne
 
 ## 6. Known gaps
 
-* Element-level selection (a selected figure or table) is not re-mapped on a remote structural change. Text carets are.
+* ~~Element-level selection (a selected figure or table) is not re-mapped on a remote structural change.~~ Fixed in Phase 8
+  (`remapElementSelection`, `docs/phase3/cleanup-collab.md`). A moved block keeps concurrent edits (Yjs schema 2, same record).
 * Pending IndexedDB updates from another epoch are dropped at join. This happens only after the room was rebuilt from the file, which is
   rare, and the person is told by the reset.
 * ACK covers the highest stored sequence number. A refused update is taken back on the client from the room's state; it is not re-sent.
