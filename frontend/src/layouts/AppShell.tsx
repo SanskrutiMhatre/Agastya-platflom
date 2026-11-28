@@ -107,7 +107,7 @@ export function AppShell() {
           <NavLink key={n.to} to={n.to} title={n.hint ?? n.label} className="nav-item">
             <Icon name={n.icon} /><span className="nav-label">{n.label}</span>
             {n.to === '/overview' && pendingInvitations > 0 ? <span className="count" title="Pending project invitations">{pendingInvitations}</span> : null}
-            {n.to === '/projects' && projectCount !== null ? <span className="count" title="Projects you can open" data-testid="nav-project-count">{projectCount}</span> : null}
+            {n.to === '/projects' && projectCount !== null ? <span className="count" aria-hidden="true" title="Projects you can open" data-testid="nav-project-count">{projectCount}</span> : null}
             {n.to === '/settings' && queued > 0 ? <span className="count" title="Items waiting for an administrator">{queued}</span> : null}
           </NavLink>,
         ])}
