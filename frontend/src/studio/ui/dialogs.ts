@@ -543,11 +543,15 @@ export class Dialogs {
 
   palette() {
     const ed = this.app.active;
-    const items: PickItem[] = this.app.commands.filter((c) => c.global || ed).map((c) => ({
+    // the page's own commands (its panel toggles and layout), each in place of the Studio command it replaces
+    const extra = this.app.host?.commands?.() ?? [];
+    const replaced = new Set(extra.map((c) => c.replaces).filter(Boolean));
+    const items: PickItem[] = this.app.commands.filter((c) => (c.global || ed) && !replaced.has(c.id)).map((c) => ({
       id: c.id, label: c.label, detail: c.group, hint: c.keys?.[0] ? shortcutLabel(c.keys[0]) : c.description ?? '', icon: c.icon,
       disabled: !!(ed && c.enabled && !c.enabled(this.app, ed)),
     }));
-    picker('Command palette', items, (id) => this.app.run(id), { placeholder: 'Type a command…' });
+    items.push(...extra.map((c) => ({ id: `host:${c.id}`, label: c.label, detail: c.group, hint: c.keys?.[0] ? shortcutLabel(c.keys[0]) : '', icon: 'props' })));
+    picker('Command palette', items, (id) => { const x = id.startsWith('host:') ? extra.find((c) => `host:${c.id}` === id) : null; if (x) x.run(); else this.app.run(id); }, { placeholder: 'Type a command…' });
   }
 
   gotoTarget() {
@@ -1187,7 +1191,9 @@ export class Dialogs {
   shortcuts() {
     const groups = new Map<string, HTMLElement>();
     const body = h('div', { class: 'shortcuts' });
-    for (const c of this.app.commands) {
+    const extra = this.app.host?.commands?.() ?? [];
+    const replaced = new Set(extra.map((c) => c.replaces).filter(Boolean));
+    for (const c of [...this.app.commands.filter((x) => !replaced.has(x.id)), ...extra.filter((x) => x.keys?.length).map((x) => ({ ...x, description: undefined as string | undefined }))]) {
       if (!c.keys?.length && !c.description) continue;
       let g = groups.get(c.group);
       if (!g) {

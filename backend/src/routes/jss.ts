@@ -5,6 +5,7 @@
 //   GET  /api/projects/:id/jss             the project's JSS document (XML), its type, and a fresh validation report   (viewer)
 //   PUT  /api/projects/:id/jss             save the XML { xml, baseHash } (baseHash mandatory, WP-11) - malformed refused, schema-invalid kept as a draft   (editor)
 //   POST /api/projects/:id/jss/validate    check { xml? } (default: the saved document) against the schema and the stencil's rules   (viewer)
+//   POST /api/projects/:id/jss/preview     the editor's Quick preview: the saved document as a draft PDF (not the publication)   (reviewer)
 //   GET  /api/projects/:id/ancillary            the ancillary pages (title pages, foreword, record of changes ...): which are printed, their headings, which were edited   (viewer)
 //   PUT  /api/projects/:id/ancillary            { pages: [{ id, enabled?, title? }] } choose the pages that are printed and their headings   (editor)
 //   GET  /api/projects/:id/ancillary/:page      one page's XML   (viewer)
@@ -25,6 +26,7 @@ import { listAncillary, readAncillary, resetAncillary, saveAncillaryChoices, wri
 import { JSS_XSD, isJssAuthored, jssTypeOfProject, readSource, writeSource, validateJss, sourceHistory, sourceRevision, sourceRel } from '../services/jss/service';
 import { versionGuard } from '../services/versionGuard';
 import { registerOneFileDocumentRoutes, actorOf } from './documentHistory';
+import * as jobs from '../services/jobs';
 
 export function registerJssRoutes(app: Express): void {
   app.get('/api/jss/types', requireAuth(), wrap((_req, res) => {
@@ -68,6 +70,15 @@ export function registerJssRoutes(app: Express): void {
     needJss(req);
     const xml = typeof req.body?.xml === 'string' ? req.body.xml : readSource(req.project.id).xml;
     res.json(await validateJss(req.project.id, xml));
+  }));
+
+  // The editor's Quick preview: the saved document rendered as Generate renders it, as a draft beside the publication's PDF (a job in the
+  // build lane, like S1000D's POST /publish/preview/:file). Nothing is published: no release, no build state, no publication history.
+  app.post(`${base}/preview`, requireProject('reviewer', { from: 'param', cap: 'publish.preview' }), wrap(async (req, res) => {
+    needJss(req);
+    const out = await jobs.run<{ pdf: string; totalMs?: number; jobId?: string }>({ kind: 'doc-preview', projectId: req.project.id, params: {}, actor: actorOf(req) });
+    res.set('X-Build-Ms', String(out.totalMs ?? '')).set('X-Job-Id', String(out.jobId ?? ''));
+    res.type('application/pdf').sendFile(out.pdf);
   }));
 
   // used by the editor to say what a type looks like before one exists

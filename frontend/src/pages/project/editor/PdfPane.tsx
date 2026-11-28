@@ -7,7 +7,7 @@
 // Both are rendered by the server from the saved file, exactly as the final PDF prints them; "Refresh on save" re-renders the preview after each save.
 // Release, watermark and publication settings are not here.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { contentApi } from '../../../api';
 import { onlyRuleBreaks } from '../../../lib/ruleBreaks';
@@ -21,6 +21,7 @@ import { useProgress } from '../../../lib/progress';
 import { studio, useStudio } from '../../../lib/studioSession';
 import { channelFor, openPopout, type Mode, type ToEditor, type ToPopout } from '../../../lib/previewBus';
 import { refusalOf, type Refusal } from '../../../lib/waivers';
+import { QuickPreview } from '../../../editors/host/ChromeControls';
 
 /**
  * `onlyRules`: the build failed only because modules break business rules, so the author may choose to generate anyway.
@@ -30,11 +31,10 @@ import { refusalOf, type Refusal } from '../../../lib/waivers';
 interface Problem { message: string; hint?: string; file?: string; line?: number; onlyRules?: boolean; refusal?: Refusal; mode?: Mode }
 
 /**
- * WP-21: while the pane is closed (the editor is shown alone, the default of a new session) Quick preview and Generate are drawn into `slot`, a
- * place in the editor's header, so they stay one click away; pressing one there opens the pane (`onReveal`) to show the result. They are drawn
- * in one place at a time, with the same names and test ids.
+ * WP-21: Quick preview and Generate are drawn into `slot`, a place in the editor's top bar (UI redesign, second pass: in every view, not only
+ * while the pane is closed), so they stay one click away; pressing one there opens the pane (`onReveal`) to show the result.
  */
-export function PdfPane({ ctx, savedTick, onOpenAt, onPopped, slot = null, onReveal }: { ctx: ProjectCtx; savedTick: number; onOpenAt: (file: string, line?: number) => void; onPopped?: (both: boolean) => void; slot?: HTMLElement | null; onReveal?: () => void }) {
+export function PdfPane({ ctx, savedTick, onOpenAt, onPopped, slot = null, onReveal, viewSwitch }: { ctx: ProjectCtx; savedTick: number; onOpenAt: (file: string, line?: number) => void; onPopped?: (both: boolean) => void; slot?: HTMLElement | null; onReveal?: () => void; viewSwitch?: ReactNode }) {
   const { id, role, can, summary } = ctx;
   const active = useStudio((s) => s.docs.find((d) => d.active));
   const progress = useProgress(id);
@@ -137,28 +137,23 @@ export function PdfPane({ ctx, savedTick, onOpenAt, onPopped, slot = null, onRev
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedTick]);
 
-  // UI redesign (mockup editor.html): in the top bar Quick preview is an icon button and Generate the primary button (the mockup's Build PDF)
-  const quickBtn = <button className={slot ? 'icon-btn' : 'btn btn-sm btn-primary'} aria-label={slot ? 'Quick preview' : undefined} onClick={() => { onReveal?.(); void quick(); }} disabled={busy !== null || !active} data-testid="quick-preview-btn" title="Preview the data module you are editing">
-    {busy === 'quick' ? <Spinner /> : <Icon name="play" size={slot ? 16 : 12} />}{slot ? null : 'Quick preview'}
-  </button>;
-  const generateBtn = summary.project.type === 'CIR' ? null : <button className={slot ? 'btn primary' : 'btn btn-sm'} onClick={() => { onReveal?.(); void generate(); }} disabled={busy !== null} data-testid="generate-btn" title="Build the whole publication">
-    {busy === 'build' ? <Spinner /> : <Icon name="rocket" size={slot ? 16 : 12} />}Generate
+  // UI redesign, second pass (owner's request): Quick preview (with its Refresh on save toggle) and Generate are always in the top bar, next to
+  // Validate, in every view; pressing one opens the PDF pane to show the result. The pane keeps only what is about viewing: the pop-out windows
+  // and the download.
+  const quickBtn = <QuickPreview onRun={() => { onReveal?.(); void quick(); }} busy={busy === 'quick'} disabled={busy !== null || !active} auto={auto} setAuto={setAuto}
+    testId="quick-preview-btn" autoTestId="preview-autorefresh" title="Save, then preview the data module you are editing, rendered by the server" />;
+  const generateBtn = summary.project.type === 'CIR' ? null : <button className="btn primary" onClick={() => { onReveal?.(); void generate(); }} disabled={busy !== null} data-testid="generate-btn" title="Build the whole publication">
+    {busy === 'build' ? <Spinner /> : <Icon name="rocket" size={16} />}Generate
   </button>;
   return (
     <>
       {slot ? createPortal(<>{quickBtn}{generateBtn}</>, slot) : null}
       <div className="v2-pdfbar" role="toolbar" aria-label="PDF controls">
-        <span className="v2-btngroup">
-          {slot ? null : quickBtn}
-          <button className={`btn btn-sm btn-primary ${popped.quick ? 'is-on' : ''}`} onClick={() => pop('quick')} title="Open Quick preview in its own window" aria-label="Open Quick preview in a separate window" data-testid="popout-quick"><Icon name="external" size={12} /></button>
-        </span>
-        {summary.project.type === 'CIR' ? null : <span className="v2-btngroup">
-          {slot ? null : generateBtn}
-          <button className={`btn btn-sm ${popped.build ? 'is-on' : ''}`} onClick={() => pop('build')} title="Open Generate in its own window" aria-label="Open Generate in a separate window" data-testid="popout-build"><Icon name="external" size={12} /></button>
-        </span>}
+        <button className={`btn btn-sm ${popped.quick ? 'is-on' : ''}`} onClick={() => pop('quick')} title="Open Quick preview in its own window" aria-label="Open Quick preview in a separate window" data-testid="popout-quick"><Icon name="external" size={12} />Preview window</button>
+        {summary.project.type === 'CIR' ? null : <button className={`btn btn-sm ${popped.build ? 'is-on' : ''}`} onClick={() => pop('build')} title="Open Generate in its own window" aria-label="Open Generate in a separate window" data-testid="popout-build"><Icon name="external" size={12} />Publication window</button>}
         <span className="spacer" />
-        <label className="v2-row" style={{ fontSize: 12, gap: 4 }} title="Re-render the Quick preview every time you save"><input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} />Refresh on save</label>
         {summary.build && summary.project.type !== 'CIR' ? <a className="btn btn-sm" href={contentApi.pdfUrl(id, true)} title="Download the last built publication"><Icon name="download" size={12} />PDF</a> : null}
+        {viewSwitch}
       </div>
       {problem?.refusal ? (
         <div style={{ margin: 8 }}><PublishRefusal refusal={problem.refusal} projectId={id} can={can} mode="draft" onDismiss={() => setProblem(null)}
@@ -181,7 +176,7 @@ export function PdfPane({ ctx, savedTick, onOpenAt, onPopped, slot = null, onRev
             <ol>
               <li>{active ? <>Press <strong>Quick preview</strong> to proof <em>{active.title}</em>.</> : <>Open a data module from the list on the left.</>}</li>
               {summary.project.type === 'CIR' ? null : <li>Press <strong>Generate</strong> to build the whole publication.</li>}
-              <li>Tip: <strong>Ctrl+S</strong> saves, and with “Refresh on save” the preview updates itself.</li>
+              <li>Tip: <strong>Ctrl+S</strong> saves, and with “Refresh on save” (the arrows beside Quick preview) the preview updates itself.</li>
             </ol>
           </div></div>} />
       </div>

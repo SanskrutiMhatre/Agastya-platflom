@@ -50,6 +50,36 @@
       "decision": "owner approved mockups 2026-11-28 (UI redesign): the default state must be the mockup's",
       "batch": "UI redesign: editor workspace",
       "date": "2026-11-28"
+    },
+    {
+      "category": "testids",
+      "key": "toggle-side",
+      "reason": "Moved, not removed: the S1000D page's single explorer toggle before the crumbs became the first of the three shared VS Code-style panel toggles of the top bar (explorer, Problems, Properties) in all three editors; the button keeps data-testid toggle-side, now given by the shared component (frontend/src/editors/host/ChromeControls.tsx PanelToggles, testId: 'toggle-side'), so the scanner no longer sees it as a JSX literal. Ctrl+Shift+B toggles it too",
+      "newHome": "Editor top bar > Panels group > Explorer toggle (data-testid toggle-side, ChromeControls.tsx PanelToggles)",
+      "checklistRow": "Editors: chrome, layout, focus",
+      "decision": "owner's editor-chrome requests 2026-11-28 (panel toggles in the top bar, as VS Code)",
+      "batch": "UI redesign: editor chrome second pass",
+      "date": "2026-11-28"
+    },
+    {
+      "category": "testids",
+      "key": "quick-preview-btn",
+      "reason": "Moved, not removed: the S1000D Quick preview button left the PDF pane's toolbar for the top bar next to Validate and Generate (in every view, not only Editor-only), together with its Refresh on save choice (now a pressed/unpressed toggle beside it, same localStorage key agastya.pdf.auto); it is drawn by the shared QuickPreview component (frontend/src/editors/host/ChromeControls.tsx) that JSS and JSG use too, with the test id passed as a prop (testId=\"quick-preview-btn\"), so the scanner no longer sees it as a JSX literal",
+      "newHome": "Editor top bar > Quick preview (data-testid quick-preview-btn; Refresh on save = data-testid preview-autorefresh)",
+      "checklistRow": "Editors: chrome, layout, focus",
+      "decision": "owner's editor-chrome requests 2026-11-28 (S1000D Quick preview and Refresh in the top bar)",
+      "batch": "UI redesign: editor chrome second pass",
+      "date": "2026-11-28"
+    },
+    {
+      "category": "tests",
+      "key": "e2e 00-platform.spec.ts > editor: Quick preview and Generate live together in the panel on the right",
+      "reason": "Renamed, not removed: Quick preview, its Refresh on save toggle and Generate moved from the PDF pane's toolbar to the editor top bar (next to Validate) in every view, at the owner's request; the test now checks them there, checks the PDF controls no longer hold them, and keeps every other assertion (the server-rendered preview, the note, the screenshots)",
+      "newHome": "e2e 00-platform.spec.ts > editor: Quick preview and Generate live together in the top bar, next to Validate",
+      "checklistRow": "Editors: chrome, layout, focus",
+      "decision": "owner's editor-chrome requests 2026-11-28 (S1000D Quick preview and Refresh in the top bar)",
+      "batch": "UI redesign: editor chrome second pass",
+      "date": "2026-11-28"
     }
   ]
 }

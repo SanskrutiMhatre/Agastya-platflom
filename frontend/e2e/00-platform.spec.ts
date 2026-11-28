@@ -201,13 +201,18 @@ test('editor: import data modules, open one in the Studio, edit it and save to t
   expect((await res.json()).xml).toContain('EDITED Description of how it is made');
 });
 
-test('editor: Quick preview and Generate live together in the panel on the right', async () => {
-  // WP-21: a new session opens in Write (the editor alone, Quick preview and Generate in the header); Split brings the PDF panel back
+test('editor: Quick preview and Generate live together in the top bar, next to Validate', async () => {
+  // WP-21: a new session opens in Write (the editor alone); UI redesign second pass (owner's request 2026-11-28): Quick preview, its Refresh on
+  // save toggle and Generate stay in the top bar in every view (they used to move into the PDF pane in Split); the pane keeps the viewing controls
   await expect(page.getByTestId('chrome-preview-slot').getByTestId('quick-preview-btn')).toBeVisible();
-  await page.getByRole('group', { name: 'Editor layout' }).getByRole('button', { name: 'Split' }).click();
+  await page.getByTestId('view-switch').getByRole('button', { name: 'Split' }).click();
+  const top = page.getByTestId('chrome-preview-slot');
+  await expect(top.getByRole('button', { name: 'Quick preview', exact: true })).toBeVisible();
+  await expect(top.getByRole('button', { name: 'Generate', exact: true })).toBeVisible();
+  await expect(top.getByRole('button', { name: 'Refresh on save', exact: true })).toBeVisible();
   const panel = page.getByRole('toolbar', { name: 'PDF controls' });
-  await expect(panel.getByRole('button', { name: 'Quick preview', exact: true })).toBeVisible();
-  await expect(panel.getByRole('button', { name: 'Generate', exact: true })).toBeVisible();
+  await expect(panel.getByRole('button', { name: 'Quick preview', exact: true })).toHaveCount(0);
+  await expect(panel.getByTestId('popout-quick')).toBeVisible();
   await expect(page.getByRole('region', { name: 'Quick preview' })).toHaveCount(0);   // no longer a card on the left
 
   // Quick preview is always rendered by the server (Apache FOP): exactly what the final PDF prints. There is no engine switch any more.

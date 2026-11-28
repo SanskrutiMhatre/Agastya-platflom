@@ -1,7 +1,10 @@
 // WP-21 (UX-003 stage 1, 06 section 7.1): the one header of the three editor pages, drawn as the owner-approved mockup's top bar
 // (docs/audit/mockups/editor.html, UI redesign): it spans the window over the activity bar (a shell slot, Workspace.tsx useShellSlot).
 //
-//   [brand] Project / section / DOCUMENT [badge]          [team] [Commands Ctrl K] [actions: Validate, Build]  [layout] [?] [focus] [theme] [account]
+//   [brand] Project / section / DOCUMENT [badge]   [team] [Commands Ctrl K] [actions: Validate, Quick preview, Build]  [panels] [?] [focus] [theme] [account]
+//
+// UI redesign, second pass: [panels] are the VS Code-style toggles of the explorer, the Problems panel and the Properties panel; the
+// Editor | Split | PDF switch moved to the right end of the document tab row (ChromeControls.tsx ViewSwitch), where view modes are looked for.
 //
 // Each page supplies what is its own (the document's place and code, the S1000D data-module panel toggle, Check / Validate, Save, Generate and
 // the package actions); the state words, the palette, the shortcuts, focus mode and the layout switch are the host's and behave the same in all
@@ -18,6 +21,7 @@ import { saveStateLabel, type SaveStateInput } from './saveState';
 import type { EditorLayout } from './useEditorLayout';
 import type { TestId } from './testIds';
 import { useShellSlot } from './Workspace';
+import { PanelToggles, type PanelId, type PanelToggle } from './ChromeControls';
 
 /** The save state, as the mockup's status-bar item (`.save-state`, `.dirty` while there are unsaved changes). */
 export function SaveStateChip({ state, ids }: { state: SaveStateInput; ids: TestId }) {
@@ -53,12 +57,12 @@ export interface EditorHeaderProps {
   onShortcuts: () => void;
   /** WP-22: beside the palette button, also in focus mode (the check-out, the review comments) */
   extra?: ReactNode;
-  /** the layout switch can offer Split (not on a narrow window) */
-  canSplit?: boolean;
+  /** UI redesign: the panel toggles (explorer, Problems, Properties); the Editor | Split | PDF switch is on the document tab row (ViewSwitch) */
+  panels?: Partial<Record<PanelId, PanelToggle>>;
 }
 
-export function EditorHeader({ layout, title, homeHref, section, doc, badge, lead, state, actions, extra, onPalette, onShortcuts, canSplit = true }: EditorHeaderProps) {
-  const { view, setView, narrow, focus, toggleFocus } = layout;
+export function EditorHeader({ layout, title, homeHref, section, doc, badge, lead, state, actions, extra, onPalette, onShortcuts, panels }: EditorHeaderProps) {
+  const { focus, toggleFocus } = layout;
   const slot = useShellSlot('top');
   const bar = (
     <header className={`topbar ed-topbar${focus ? ' is-focus' : ''}`} data-testid="editor-header">
@@ -77,11 +81,7 @@ export function EditorHeader({ layout, title, homeHref, section, doc, badge, lea
         <Icon name="search" size={16} className="ico" /><span className="ed-cmd-label">Commands…</span><span className="kbd-group"><kbd>Ctrl</kbd><kbd>K</kbd></span>
       </button>
       {focus ? null : actions}
-      {focus ? null : <div className="seg ed-layout" role="group" aria-label="Editor layout">
-        <button type="button" onClick={() => setView('edit')} aria-pressed={view === 'edit'} aria-label="Editor" title="Editor: write only"><Icon name="editor" size={14} className="ico sm" /></button>
-        {narrow || !canSplit ? null : <button type="button" onClick={() => setView('split')} aria-pressed={view === 'split'} aria-label="Split" title="Split: write and see the PDF side by side"><Icon name="split" size={14} className="ico sm" /></button>}
-        <button type="button" onClick={() => setView('pdf')} aria-pressed={view === 'pdf'} aria-label="PDF" title="PDF only"><Icon name="pdf" size={14} className="ico sm" /></button>
-      </div>}
+      {focus || !panels ? null : <PanelToggles panels={panels} />}
       <button type="button" className="icon-btn" onClick={onShortcuts} data-testid="chrome-shortcuts" title="Keyboard shortcuts (F1)" aria-label="Keyboard shortcuts" aria-keyshortcuts="F1"><Icon name="keyboard" size={16} className="ico" /></button>
       <button type="button" className="icon-btn" onClick={toggleFocus} data-testid="chrome-focus" aria-pressed={focus} aria-keyshortcuts="Control+Period"
         title={focus ? 'Leave focus mode (Ctrl+. or Esc)' : 'Focus mode: only the document (Ctrl+.)'} aria-label={focus ? 'Leave focus mode' : 'Focus mode'}><Icon name={focus ? 'unfocus' : 'focus'} size={16} className="ico" /></button>

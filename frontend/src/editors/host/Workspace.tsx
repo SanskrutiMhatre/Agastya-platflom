@@ -6,6 +6,7 @@
 import { useCallback, useLayoutEffect, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon } from '../../components/Icon';
+import { PanelClose } from './ChromeControls';
 
 const read = (key: string): string | null => { try { return localStorage.getItem(key); } catch { return null; } };
 const write = (key: string, v: string): void => { try { localStorage.setItem(key, v); } catch { /* private mode */ } };
@@ -103,7 +104,7 @@ export function ProblemsPanel({ items, onClose, onPick, onCheck, checking }: { i
         <button className="tab" role="tab" aria-selected="true" type="button">Problems{errors ? <span className="badge danger">{errors}</span> : warnings ? <span className="badge warning">{warnings}</span> : null}</button>
         <span className="grow-r">
           {onCheck ? <button className="btn sm subtle" type="button" onClick={onCheck} disabled={checking} title="Check the document again">Check again</button> : null}
-          <button className="icon-btn" type="button" onClick={onClose} aria-label="Collapse the Problems panel" title="Collapse (Esc)"><Icon name="down" size={14} className="ico sm" /></button>
+          <PanelClose panel="problems" onClose={onClose} testId="problems-close" />
         </span>
       </div>
       <ul className="plist" aria-label="Problems in this document">
@@ -124,15 +125,18 @@ export function ProblemsPanel({ items, onClose, onPick, onCheck, checking }: { i
 export interface PropsTab { id: string; label: string; badge?: number }
 
 /** The Properties panel at the right of the workspace: the mockup's tab strip (Element, Document, Comments) over the panel body. */
-export function PropsPanel({ tabs, tab, onTab, children }: { tabs: PropsTab[]; tab: string; onTab: (id: string) => void; children: ReactNode }) {
+export function PropsPanel({ tabs, tab, onTab, onClose, children }: { tabs: PropsTab[]; tab: string; onTab: (id: string) => void; onClose?: () => void; children: ReactNode }) {
   return (
     <aside className="pane props" aria-label="Properties" data-testid="doc-props">
-      <div className="tabs" role="tablist" aria-label="Properties">
-        {tabs.map((t) => (
-          <button key={t.id} type="button" className="tab" role="tab" aria-selected={t.id === tab} onClick={() => onTab(t.id)} data-testid={`props-tab-${t.id}`}>
-            {t.label}{t.badge ? <span className="badge accent">{t.badge}</span> : null}
-          </button>
-        ))}
+      <div className="props-head">
+        <div className="tabs" role="tablist" aria-label="Properties">
+          {tabs.map((t) => (
+            <button key={t.id} type="button" className="tab" role="tab" aria-selected={t.id === tab} onClick={() => onTab(t.id)} data-testid={`props-tab-${t.id}`}>
+              {t.label}{t.badge ? <span className="badge accent">{t.badge}</span> : null}
+            </button>
+          ))}
+        </div>
+        {onClose ? <PanelClose panel="props" onClose={onClose} testId="props-close" /> : null}
       </div>
       <div className="props-body">{children}</div>
     </aside>

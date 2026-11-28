@@ -48,6 +48,9 @@ export async function runKind(kind: JobKind, projectId: string | null, p: Record
       return { result: { ...out, bytes: fs.statSync(out.pdf).size } };
     }
     case 'preview': return { result: await publisher.buildPreview(pid(), String(p.file)) };
+    // the JSS and JSG editors' Quick preview: the whole document as a draft beside its PDF (no release, no build state)
+    case 'doc-preview': return { result: await publisher.buildDocumentPreview(pid()) };
+    case 'jsg-preview': return { result: await buildJsgPdf(pid(), { preview: true }) };
     case 'configured': return { result: await publisher.buildConfiguredPublication(pid(), { productId: str(p.productId), values: Array.isArray(p.values) ? p.values : undefined }) };
     case 'html': return { result: await buildHtmlPublication(pid(), (p.input ?? undefined) as Parameters<typeof buildHtmlPublication>[1], { allowRuleBreaks: p.allowRuleBreaks === true }) };
     case 'jsg': return { result: await buildJsgPdf(pid()) };

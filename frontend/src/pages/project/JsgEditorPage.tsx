@@ -15,6 +15,12 @@ import { ConfirmModal, Spinner, errText } from '../../components/ui';
 import { canBuild, useProject } from '../../layouts/ProjectShell';
 import { JsgEditor } from '../../jsg/editor';
 import { IsplEditor } from '../../jsg/ispl-editor';
+import { META_FIELDS, type JsgDoc } from '../../jsg/model';
+import type { ElementInfo } from '../../editors/host/DocEditorShell';
+import { QuickPreview } from '../../editors/host/ChromeControls';
+
+/** what the Properties panel reads from the editor on show (the parts-list editor has no inspect(): the panel then says where the caret is) */
+type Readable = { getDoc(): JsgDoc; inspect?: () => ElementInfo | null };
 import type { GraphicInfo, JsgEditorLike } from '../../jsg/shared';
 import { JsgParseError, parseJsg, serializeJsg } from '../../jsg/xml';
 import { useUi } from '../../store/ui';
@@ -29,6 +35,7 @@ const ADAPTER: DocAdapter<JsgDocument> = {
   save: (id, xml, hash) => jsgApi.save(id, xml, hash),
   validate: (id, xml) => jsgApi.validate(id, xml),
   build: (id) => jsgApi.build(id),
+  preview: (id) => jsgApi.preview(id),
   pdfUrl: (id, download) => jsgApi.pdfUrl(id, download),
   builtNote: (out) => `Built in ${((out.totalMs ?? 0) / 1000).toFixed(1)} s by the JSG engine`,
   findingsWhere: 'listed in the outline',
@@ -42,7 +49,7 @@ export function JsgEditorPage() {
   const toast = useUi((s) => s.toast);
   const layout = useEditorLayout({ format: 'jsg', split: [30, 80, 58] });
   const host = useDocEditor(ctx, ADAPTER, layout);
-  const { loaded, setLoaded, writable, dirty, saving, checking, building, savedAt } = host;
+  const { loaded, setLoaded, writable, dirty, saving, checking, building, savedAt, previewing } = host;
   const hostRef = useRef<HTMLDivElement>(null);
   const [importing, setImporting] = useState(false);
   const [wordFile, setWordFile] = useState<File | null>(null);
@@ -126,11 +133,15 @@ export function JsgEditorPage() {
       crumb={loaded ? <span className="v2-badge accent" title={`JSG document type ${loaded.docType}, from the stencil ${loaded.stencil}`}>JSG · {loaded.label}</span> : null}
       saveState={host.saveState} guard={host.guard} banners={host.banners(recover)}
       docName={loaded?.label ?? undefined} findings={host.findings}
+      inspect={() => (host.editorRef.current as Readable | null)?.inspect?.() ?? null}
+      identity={() => { const m = (host.editorRef.current as Readable | null)?.getDoc().meta ?? {}; return META_FIELDS.filter((f) => m[f.key]).map((f) => [f.label, m[f.key]] as [string, string]); }}
       meta={loaded ? [['Type', `JSG · ${loaded.label}`], ['Type code', <span className="mono">{loaded.docType}</span>], ['Stencil', <span className="mono">{loaded.stencil}</span>], ['Auto-save', writable ? (autosave ? 'On' : 'Off') : 'Not available']] : []}
       section={loaded ? <span>JSG</span> : undefined}
       topActions={<>
         <button className="btn" onClick={() => void host.check()} disabled={!loaded || checking} data-testid="jsg-check" title="Check the document for problems without saving or building">{checking ? <Spinner /> : <Icon name="shield" size={16} className="ico" />}Check</button>
-        <button className="btn primary" onClick={() => void host.generate()} disabled={!canBuild(can) || building || !loaded} data-testid="jsg-generate" title={!canBuild(can) ? 'Reviewers, editors and owners can build the PDF' : 'Save, then build the document as a PDF'}>{building ? <Spinner /> : <Icon name="play" size={16} className="ico" />}{building ? 'Building…' : 'Generate PDF'}</button>
+        <QuickPreview onRun={() => void host.preview()} busy={previewing} disabled={!canBuild(can) || building || !loaded} testId="jsg-quick-preview" autoTestId="jsg-preview-auto" auto={host.autoPreview} setAuto={host.setAutoPreview}
+          title={!canBuild(can) ? 'Reviewers, editors and owners can preview the PDF' : 'Save, then render this document as a draft PDF beside the editor (not the document build: nothing is released or recorded)'} />
+        <button className="btn primary" onClick={() => void host.generate()} disabled={!canBuild(can) || building || previewing || !loaded} data-testid="jsg-generate" title={!canBuild(can) ? 'Reviewers, editors and owners can build the PDF' : 'Save, then build the document as a PDF'}>{building ? <Spinner /> : <Icon name="play" size={16} className="ico" />}{building ? 'Building…' : 'Generate PDF'}</button>
       </>}
       actions={<>
         {loaded?.docType === 'uhb' && writable ? <>
@@ -143,7 +154,7 @@ export function JsgEditorPage() {
         <ExportProjectButton id={id} dirty={dirty} saveFirst={host.save} />
       </>}
       pdf={<DocPdfPane kind="jsg" src={host.src} downloadHref={jsgApi.pdfUrl(id, true)} downloadName={`${summary.project.name}.pdf`} builtBy="the JSG engine" what="the document"
-        note={host.note} building={building} progressLines={host.progress.lines} />} />
+        note={host.note} building={building} progressLines={host.progress.lines} shown={host.shown} />} />
     {wordFile ? <ConfirmModal title="Replace this handbook?" danger confirmLabel="Replace with the Word file"
       body={<p>Replace this handbook with “{wordFile.name}”? The whole document and its front matter are replaced by what the Word file contains (its pictures are added to the project). The handbook as it is now is kept in the project folder as jsg-document.before-import.bak.</p>}
       onClose={() => setWordFile(null)} onConfirm={() => { const f = wordFile; setWordFile(null); void importWord(f); }} /> : null}

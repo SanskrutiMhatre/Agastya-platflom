@@ -752,7 +752,7 @@ export class ProblemsPanel {
       h('span', { class: 'spacer' }),
       this.summary,
       h('button', { class: 'btn btn-sm', title: 'Validate (F7)', on: { click: () => this.app.run('review.validate') } }, icon('validate', 14), ' Validate'),
-      h('button', { class: 'icon-btn', title: 'Hide problems pane', 'aria-label': 'Hide the Problems panel', on: { click: () => this.app.togglePane('bottom') } }, icon('close', 14)),
+      h('button', { class: 'icon-btn', title: this.app.host ? 'Close the Problems panel (Ctrl+J)' : 'Hide problems pane', 'aria-label': 'Hide the Problems panel', 'data-testid': 'problems-close', on: { click: () => this.app.togglePane('bottom') } }, icon('close', 14)),
     );
     this.el = h('section', { class: 'panel problems-panel', 'aria-label': 'Problems' }, bar, this.list);
     // WP-22 (06 section 7.2): the drawer closes with Escape while the keyboard is in it

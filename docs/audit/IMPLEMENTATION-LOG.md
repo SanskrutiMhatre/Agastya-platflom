@@ -2564,3 +2564,49 @@ there, for the screen 6 owner to use or drop.
 * The dashboard's "Modules complete" and "Validation" columns are not drawn. The oversight API has no per-project validation or
   completion figure, so the table shows Data modules and People instead.
 * No new backend endpoint.
+
+## UI redesign: editor chrome, second pass (owner's requests 2026-11-28)
+
+The same chrome in the S1000D, JSS and JSG editors. Nothing about editing, WP-05 data-loss protection, check-out or autosave changed (D16).
+The JSS/JSG paper and canvas styles were not touched.
+
+* **Panel toggles.** The top bar has three VS Code-style toggles: explorer, Problems and Properties
+  (`editors/host/ChromeControls.tsx` PanelToggles). Pressed means open. Each has `aria-pressed` and a tooltip with its key.
+  * Every panel head has a close button (PanelClose): the explorer, the JSG Problems panel, the JSS Problems drawer, the React
+    Properties panel, and the Studio's Properties and Problems panes.
+  * Keys: Ctrl+Shift+B (explorer), Ctrl+J (Problems), Ctrl+Alt+Shift+B (Properties). Ctrl+B is Bold in all three editors and
+    Ctrl+Alt+B is the Studio's bulleted list, so VS Code's own keys could not be used.
+  * The keys are answered in `useHostKeys.ts` and listed in `lib/editorShortcuts.ts`. The palette has them: in JSS/JSG through
+    the host commands, in the Studio through the new `StudioHost.commands`, which replace `view.props` / `view.problems`.
+  * The state is remembered per format in the existing keys (`agastya.{jss,jsg}.explorer/.props.v2/.problems`,
+    `agastya.editor.side`, Studio `studio.layout`). Default: everything open.
+  * The S1000D `toggle-side` button moved from before the crumbs into this group. Its test id is kept.
+* **S1000D Quick preview, Refresh, Generate.** These are now in the top bar next to Validate in every view (`chrome-preview-slot`).
+  * Refresh on save is a pressed/unpressed toggle beside Quick preview (testid `preview-autorefresh`, same `agastya.pdf.auto` key).
+  * The PDF pane keeps only viewing controls: the two pop-out windows, the download and, in PDF-only view, the layout switch.
+  * Test ids `quick-preview-btn` and `generate-btn` are kept.
+* **Quick preview for JSS and JSG.** New routes POST `/api/projects/:id/jss/preview` and `/jsg/preview`. They run as the WP-14
+  jobs `doc-preview` and `jsg-preview` (build lane), at reviewer level with `publish.preview`, like the S1000D preview.
+  * Each renders the saved document to `_quick-preview.pdf` through the same pipeline as Generate.
+  * No release stamp, no build state, no reload broadcast. These job kinds are not listed in the Publication history.
+    `_`-files are left out of project archives and cleared with the other previews.
+  * The top bar has Quick preview with its Refresh on save toggle. The PDF pane labels what it shows ("Quick preview (draft)"
+    or "Generated PDF") and downloads that PDF.
+  * Guard tests: authz snapshot regenerated with two reviewed rows (same as the S1000D preview row); wp29 reasons added.
+    New test: `backend/test/editor-quick-preview.test.js`.
+* **JSS/JSG Properties panel.** Same widths as S1000D (288 px), tabs Element / Document / Comments.
+  * Element shows the editor's own reading of the block at the cursor: the new read-only `inspect()` in `jss/editor.ts` and
+    `jsg/editor.ts`, with element, attributes, the list item or table cell, and the section it is in. It is not editable there;
+    the toolbar edits.
+  * Document adds the identification written in the document (its cover fields).
+  * Comments is the existing review-comments panel with its empty state.
+* **Editor | Split | PDF.** A labelled segmented control (icon and word, tooltips "Editor only", "Editor and PDF side by side",
+  "PDF only"; Ctrl+Shift+1/2/3) at the right end of the document tab row, in all three editors.
+  * In S1000D it is placed in a slot after the Studio's tabs. In PDF-only view it heads the PDF pane, because the Studio is hidden.
+  * WP-21 layout logic is unchanged. The group is still named "Editor layout".
+* **Tests.**
+  * `e2e/wp21-editor-chrome.spec.ts`: the switch is now looked for in the tab row (`view-switch`), not in the header. New tests:
+    toggles + close buttons + keys + reload, per editor; switch labels/tooltips/keys, per editor; JSS/JSG Quick preview
+    (draft PDF, no publication made); S1000D buttons in the top bar in every view.
+  * `e2e/00-platform.spec.ts`: Quick preview and Generate are expected in the top bar, not the PDF controls.
+  * Parity: two explanation rows (`toggle-side`, `quick-preview-btn`, now given by the shared component).

@@ -114,11 +114,22 @@ export function lastJsgBuildState(projectId: string): JsgBuildState | null {
 
 export interface JsgBuild { pdf: string; totalMs: number; pages?: number; warnings: string[]; releaseLabel: string; released: boolean; warmFop: boolean }
 
-export function buildJsgPdf(projectId: string): Promise<JsgBuild> {
+/** The JSG editor's Quick preview: the same build, kept beside the document's PDF as a draft (the leading underscore keeps it out of a project archive). */
+export const QUICK_PREVIEW_PDF = '_quick-preview.pdf';
+const QUICK_PREVIEW_FO = '_quick-preview.fo';
+
+/**
+ * Build the document's PDF. `preview` (the editor's Quick preview) renders the same document through the same gate and stylesheet, but as a
+ * draft: into _quick-preview.pdf, never claiming a release (the NOT RELEASED marks), with no build state and no reload of the PDF views, so the
+ * document's PDF, its download and the release flow are untouched. It waits in the same queue as a build (the two share the watermark file).
+ */
+export function buildJsgPdf(projectId: string, opts: { preview?: boolean } = {}): Promise<JsgBuild> {
+  const preview = !!opts.preview;
+  const PDF_OUT = preview ? QUICK_PREVIEW_PDF : PDF_NAME; const FO_OUT = preview ? QUICK_PREVIEW_FO : FO_NAME;
   return serial(`${projectId}:jsg`, async () => {
-    const log = (message: string, extra: Record<string, unknown> = {}): void => { console.log(`[jsg:${projectId}] ${message}`); broadcast(projectId, { type: 'progress', message, ...extra } as any); };
+    const log = (message: string, extra: Record<string, unknown> = {}): void => { console.log(`[jsg:${projectId}] ${message}`); broadcast(projectId, { type: 'progress', message, ...extra, ...(preview ? { preview: true } : {}) } as any); };
     const t0 = Date.now();
-    log('Validating the JSG document against its schema...');
+    log(preview ? 'Quick preview: validating the JSG document against its schema...' : 'Validating the JSG document against its schema...');
     let gate;
     try { gate = await assertJsgPublishable(projectId); }
     catch (e) { log((e as Error).message, { error: true, done: true }); throw e; }
@@ -136,7 +147,9 @@ export function buildJsgPdf(projectId: string): Promise<JsgBuild> {
     const assetsUrl = pathToFileURL(path.join(JSG_ENGINE_DIR, 'assets')).href;
 
     // WP-15 (PUB-011): the release decides the watermark, as for the other two formats
-    const rendered = releaseStateOf(projectId);
+    const state = releaseStateOf(projectId);
+    // a Quick preview is a draft: it never claims the release, whatever the document's state
+    const rendered = preview ? { ...state, released: false, staleRelease: false } : state;
     const releaseLabel = rendered.released ? `Release ${rendered.approved.release_number}` : '';
     let wm: { uri: string; repeat: string; text: string; style: string } | null = null;
     try {
@@ -149,16 +162,16 @@ export function buildJsgPdf(projectId: string): Promise<JsgBuild> {
     let warmFop = false;
     // WP-30 (QA-008, found by the chaos suite): FOP writes a temporary sibling, renamed to the PDF only when complete (commitFile): a server
     // killed mid-build never leaves a torn jsg-output.pdf
-    const pdfTmp = tempNameFor(path.join(dir, PDF_NAME)); const pdfTmpName = path.basename(pdfTmp);
+    const pdfTmp = tempNameFor(path.join(dir, PDF_OUT)); const pdfTmpName = path.basename(pdfTmp);
 
     try {
       const render = async (total?: number): Promise<void> => {
         log('Rendering XSL-FO (JSG engine)...');
         const params = ['--stringparam', 'classification', classification, '--stringparam', 'assets.url', assetsUrl, ...(total ? ['--stringparam', 'pages.total', String(total)] : [])];
-        const x = await run(paths.XSLTPROC, ['--nonet', ...params, '-o', FO_NAME, stylesheet, SOURCE_NAME], dir);
+        const x = await run(paths.XSLTPROC, ['--nonet', ...params, '-o', FO_OUT, stylesheet, SOURCE_NAME], dir);
         for (const l of x.stderr.split(/\r?\n/)) if (l.trim()) warnings.push(l.trim());
         gate.verifyUnchanged();                       // what is rendered is what was validated
-        const foAbs = path.join(dir, FO_NAME);
+        const foAbs = path.join(dir, FO_OUT);
         { const m = foGuard.formatConfine(foGuard.confineFo(foAbs, { baseDir: dir, roots: [JSG_ENGINE_DIR, path.join(workspaceDir, 'templates')] })); if (m) { log(`Security: ${m}`); warnings.push(m); } }   // WP-02 / SEC-003
         if (wm) markFo(foAbs, wm.uri, wm.repeat);
         try { injectPdfInfo(foAbs, info); } catch (e) { log(`PDF document properties not written: ${(e as Error).message}`); }
@@ -172,7 +185,7 @@ export function buildJsgPdf(projectId: string): Promise<JsgBuild> {
           const fopArgs: string[] = paths.FOP_ARGS.slice();
           const conf = fontConf.fopConf();
           if (conf) fopArgs.push('-c', conf);
-          fopArgs.push('-fo', FO_NAME, '-pdf', pdfTmpName);
+          fopArgs.push('-fo', FO_OUT, '-pdf', pdfTmpName);
           await run(paths.JAVA, fopArgs, dir);
         }
         warmFop = used;
@@ -192,13 +205,13 @@ export function buildJsgPdf(projectId: string): Promise<JsgBuild> {
       throw new HttpError(500, message, 'BUILD_FAILED', { details: String((e as any)?.stderr ?? '').slice(-4000) });
     }
 
-    const abs = path.join(dir, PDF_NAME);
+    const abs = path.join(dir, PDF_OUT);
     if (!fs.existsSync(pdfTmp) || fs.statSync(pdfTmp).size === 0) { discardTemp(pdfTmp); throw new HttpError(500, 'Build failed: FOP wrote no PDF.', 'BUILD_FAILED'); }
     commitFile(pdfTmp, abs);
-    try { fs.writeFileSync(path.join(dir, BUILD_STATE), JSON.stringify({ fingerprint: rendered.fingerprint, released: rendered.released, builtAt: new Date().toISOString() }), 'utf8'); } catch { /* the PDF is then reported as stale */ }
+    if (!preview) try { fs.writeFileSync(path.join(dir, BUILD_STATE), JSON.stringify({ fingerprint: rendered.fingerprint, released: rendered.released, builtAt: new Date().toISOString() }), 'utf8'); } catch { /* the PDF is then reported as stale */ }
     const totalMs = Date.now() - t0;
     log(`Done in ${(totalMs / 1000).toFixed(1)}s (${warmFop ? 'warm FOP' : 'FOP via java'})`, { done: true });
-    broadcast(projectId, { type: 'reload', kind: 'pdf' } as any);
+    if (!preview) broadcast(projectId, { type: 'reload', kind: 'pdf' } as any);
     return { pdf: abs, totalMs, warnings, releaseLabel, released: rendered.released, warmFop };
   });
 }

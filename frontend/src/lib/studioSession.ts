@@ -25,7 +25,7 @@ import { onSignedOut, useSession } from '../store/session';
 import { downloadText } from './localDraft';
 import { setGrammarBase } from '../studio/core/grammar';
 import type { EditorDocument } from '../studio/core/document';
-import { App, type StudioHost } from '../studio/ui/app';
+import { App, type HostCommand, type StudioHost } from '../studio/ui/app';
 import { DesignView } from '../studio/view/design';
 import { formatDmc } from '../studio/core/s1000d';
 import type { DocumentEditor } from '../studio/ui/editor';
@@ -34,8 +34,9 @@ import type { PublicationSettings } from '../studio/export/pdf-settings';
 
 export interface OpenDoc { key: string; file: string | null; title: string; dirty: boolean; active: boolean }
 
-interface StudioState { docs: OpenDoc[]; ready: boolean; projectId: string | null }
-export const useStudio = create<StudioState>(() => ({ docs: [], ready: false, projectId: null }));
+/** `panes`: whether the Studio's Properties (right) and Problems (bottom) panes are open (the editor page's top-bar toggles show it). */
+interface StudioState { docs: OpenDoc[]; ready: boolean; projectId: string | null; panes: { right: boolean; bottom: boolean } }
+export const useStudio = create<StudioState>(() => ({ docs: [], ready: false, projectId: null, panes: { right: true, bottom: true } }));
 
 /** `object` = a CSDB object (comment, update file, ICN metadata, SCORM package) rather than a data module: saved through the objects API. */
 interface Ref { file: string; hash: string; object?: boolean; /** WP-21 (PRD-004): the text the hash stands for, the base of a compare-and-merge */ base?: string }
@@ -92,7 +93,7 @@ class StudioSession {
     this.root.remove();
     this.refs = new WeakMap();
     this.projectId = null; this.media = []; this.serverDms = []; this.settingsCache = undefined; this.projectRefs = null; this.reference = null;
-    useStudio.setState({ docs: [], ready: false, projectId: null });
+    useStudio.setState({ docs: [], ready: false, projectId: null, panes: { right: true, bottom: true } });
   }
 
   private host(): StudioHost {
@@ -110,7 +111,18 @@ class StudioSession {
       draftScope: () => this.draftScope(),
       toggleFocus: () => this.focus?.toggle(),
       isFocus: () => !!this.focus?.isOn(),
+      panesChanged: (p) => { const was = useStudio.getState().panes; if (was.right !== p.right || was.bottom !== p.bottom) useStudio.setState({ panes: { right: p.right, bottom: p.bottom } }); },
+      commands: () => this.pageCommands?.() ?? [],
     };
+  }
+
+  /** UI redesign: the editor page's own commands (panel toggles, Editor / Split / PDF), for the Studio's palette and shortcuts dialog. */
+  pageCommands: (() => HostCommand[]) | null = null;
+
+  /** Open or close the Studio's Properties (right) or Problems (bottom) pane: the top bar's toggles, their keys and the palette. */
+  setPane(p: 'right' | 'bottom', open: boolean): void {
+    const app = this.app; if (!app) return;
+    if (app.layout[p] !== open) app.togglePane(p);
   }
 
   /** Run a Studio command by id (the page header's palette and shortcuts buttons; WP-21). */

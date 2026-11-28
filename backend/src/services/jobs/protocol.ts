@@ -6,7 +6,7 @@
 import { HttpError } from '../http';
 
 export type JobKind =
-  | 'validate' | 'gate' | 'publish' | 'preview' | 'configured' | 'html' | 'jsg'
+  | 'validate' | 'gate' | 'publish' | 'preview' | 'doc-preview' | 'jsg-preview' | 'configured' | 'html' | 'jsg'
   | 'test.sleep' | 'test.busy' | 'test.crash' | 'test.alloc' | 'test.spawn' | 'test.progress';
 
 export type Lane = 'validation' | 'build';
@@ -14,7 +14,7 @@ export type Lane = 'validation' | 'build';
 /** Which admission lane a kind uses: "validation" (validation and the publish gate) or "build" (anything that runs FOP). */
 export const LANE_OF: Record<JobKind, Lane> = {
   validate: 'validation', gate: 'validation',
-  publish: 'build', preview: 'build', configured: 'build', html: 'build', jsg: 'build',
+  publish: 'build', preview: 'build', 'doc-preview': 'build', 'jsg-preview': 'build', configured: 'build', html: 'build', jsg: 'build',
   'test.sleep': 'validation', 'test.busy': 'validation', 'test.crash': 'validation', 'test.alloc': 'validation', 'test.spawn': 'validation', 'test.progress': 'validation',
 };
 export const isJobKind = (k: string): k is JobKind => Object.prototype.hasOwnProperty.call(LANE_OF, k);

@@ -7,6 +7,7 @@ import {
   Keyboard, Maximize2, Minimize2, GitCompare, Command,
   Palette, ScrollText,
   Flag, Funnel, CircleX, Cpu, Database, HardDrive, Archive, WifiOff, BookOpen, Ban, ListOrdered, Ellipsis, ZoomIn, ZoomOut, ChevronLeft, Save, Link, ListChecks, Hash, FileCheck, Printer, Columns2,
+  PanelBottom, PanelRight,
 } from 'lucide';
 
 const ICONS: Record<string, IconNode> = {
@@ -25,6 +26,8 @@ const ICONS: Record<string, IconNode> = {
   listOrdered: ListOrdered, more: Ellipsis, zoomIn: ZoomIn, zoomOut: ZoomOut, left: ChevronLeft, save: Save, link: Link, listChecks: ListChecks, hash: Hash, fileCheck: FileCheck, print: Printer,
   // UI redesign (editor workspace): the Editor | Split | PDF switch
   split: Columns2,
+  // the top bar's panel toggles (left sidebar = panel, bottom panel, right panel)
+  panelBottom: PanelBottom, panelRight: PanelRight,
 };
 
 export type IconName = keyof typeof ICONS;

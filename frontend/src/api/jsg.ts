@@ -17,6 +17,8 @@ export const jsgApi = {
   save: (id: string, xml: string, baseHash?: string) => put<{ hash: string; report: JsgReport; merged?: boolean; xml?: string }>(P(id), { xml, baseHash }),
   validate: (id: string, xml?: string) => post<JsgReport>(`${P(id)}/validate`, xml === undefined ? {} : { xml }),
   build: (id: string) => post<JsgBuild>(`${P(id)}/build`, {}),
+  /** The editor's Quick preview: the saved document built by the JSG engine as a draft PDF (not the document's PDF; nothing is published). */
+  preview: async (id: string): Promise<Blob> => (await request<Response>('POST', `${P(id)}/preview`, {}, { raw: true })).blob(),
   /** Replace the document with a Word file written in the JSG User Handbook styles; its pictures go to the project. */
   importDocx: (id: string, file: File) => { const fd = new FormData(); fd.append('file', file); return request<{ ok: boolean; hash: string; report: JsgReport; import: JsgImportReport; pictures: number }>('POST', `${P(id)}/import-docx`, fd); },
   pdfUrl: (id: string, download = false) => `${P(id)}/pdf${download ? '?download=1' : ''}`,
