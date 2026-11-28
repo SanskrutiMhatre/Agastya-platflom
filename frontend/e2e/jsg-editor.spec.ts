@@ -1,10 +1,14 @@
 // The two JSG editors in a real browser, against the real server: an author creates a User Handbook and an Illustrated Spare Parts List, edits each, saves, reloads (the work is
 // still there), and the server builds the PDF with the JSG engine. Nothing is mocked: the editors, the picture chooser, the save, the schema check and the FOP render are all the real ones.
+// Phase 3 / Phase 8: the editor opens the document live (co-editing): every change reaches the server as it is typed ("Saved", never
+// "Unsaved"), auto-save is not needed (its box is off and disabled), Save writes the file through the room. The classic save-by-version
+// editor is the fallback when the room cannot be joined (C24): one test opens it on a page whose joins are answered DISABLED (support/live.ts).
 
 import { test, expect, request as pwRequest, type Page, type APIRequestContext } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { classicOnly } from './support/live';
 
 const PW = 'Correct-Horse-9!';
 const SHOTS = path.join('test-results', 'jsg-shots');
@@ -56,7 +60,8 @@ test('UHB: opens the JSG editor (not the Studio, not the JSS editor) with the st
   await expect(page.locator('.jsg-chapter')).toHaveCount(5);
   await expect(page.getByTestId('studio-host')).toHaveCount(0);
   await expect(page.getByTestId('jss-paper')).toHaveCount(0);
-  await expect(state()).toContainText('All changes saved');
+  await expect(state()).toHaveText(/^Saved/, { timeout: 20_000 });                    // live: the server has every change
+  await expect(page.getByTestId('jsg-autosave')).toBeDisabled();                       // live: every change is sent, auto-save is not needed
   await page.screenshot({ path: path.join(SHOTS, 'uhb-1-open.png') });
 });
 
@@ -67,7 +72,8 @@ test('UHB: edit a paragraph, a heading, a table and a list; Ctrl+S saves valid J
   await page.locator('[data-cmd="heading"]').click();
   await page.locator('[data-cmd="table"]').click();
   await page.locator('[data-cmd="list"]').click(); await page.getByRole('menuitem', { name: /\(a\) \(b\) \(c\) lettered/ }).click();
-  await expect(state()).toContainText('Unsaved');
+  await expect(state()).toHaveText(/^(Saved|Syncing)/);                                 // live: sent as it is typed
+  await expect(state()).not.toContainText('Unsaved');
   await page.keyboard.press('Control+s');
   await expect(state()).toContainText('Saved', { timeout: 15_000 });
   const d = await doc(uhb);
@@ -85,6 +91,20 @@ test('UHB: reload - the saved work is there; the PDF is built by the JSG engine'
   const pdf = await api.get(`/api/projects/${uhb}/jsg/pdf`);
   expect(pdf.ok()).toBeTruthy(); expect((await pdf.body()).subarray(0, 5).toString()).toBe('%PDF-');
   await page.screenshot({ path: path.join(SHOTS, 'uhb-2-built.png') });
+});
+
+test('UHB (classic): the fallback editor saves by version: all saved on opening, unsaved after an edit, auto-save on, Ctrl+S saves', async () => {
+  const c = await page.context().newPage(); c.on('pageerror', (e) => { throw new Error(`page error: ${e.message}`); }); await classicOnly(c);
+  try {
+    await c.goto(`/projects/${uhb}/editor`); await expect(c.getByTestId('jsg-sheet')).toBeVisible({ timeout: 30_000 });
+    await expect(c.getByTestId('jsg-state')).toContainText('All changes saved', { timeout: 20_000 });
+    await expect(c.getByTestId('jsg-autosave')).toBeEnabled(); await expect(c.getByTestId('jsg-autosave')).toBeChecked();
+    await c.locator('.jsg-p').first().click(); await c.keyboard.press('End'); await c.keyboard.type(' CLASSICJSG');
+    await expect(c.getByTestId('jsg-state')).toContainText('Unsaved');
+    await c.keyboard.press('Control+s');
+    await expect(c.getByTestId('jsg-state')).toContainText('Saved', { timeout: 15_000 });
+    expect((await doc(uhb)).xml).toContain('CLASSICJSG');
+  } finally { await c.close(); }
 });
 
 test('UHB: a problem is shown, not hidden - a draft that breaks the schema is saved and a PDF is refused', async () => {
