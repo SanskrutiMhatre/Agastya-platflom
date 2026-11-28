@@ -1,70 +1,85 @@
 /* =========================================================================
-   UI redesign screen 5, the Validation report (owner approved mockup docs/audit/mockups/validation.html): the severity summary whose
-   cards are the filters, the issue table, the selected finding with its source excerpt, the errors counted by check.
-   The shared components (.card, .stat, .seg, .table, .badge, .kv, .progress, .field, .check, .btn, .sr, .trunc, .faint) come from
-   styles/components.css; this file holds only the page's own rules from the mockup's <style> block. Tokens only.
+   UI redesign screen 5, the Validation report (owner approved mockup docs/audit/mockups/validation.html), drawn exactly: the mockup's
+   <style> block (.sum, .layout, .bar, .issues, .detail, .kv, .src, .byrule), scoped to the page. The shared components (.page-head, .card,
+   .stat, .seg, .table, .badge, .progress, .field, .check, .btn, .sr, .trunc, .faint) come from styles/components.css. Tokens only.
    ========================================================================= */
-.v2-val-notes { margin-bottom: var(--space-3); }
-.v2-val-issue-sel { width: 210px; }
+
+/* the page box of the mockup: .page is --content-max wide INCLUDING its --space-8 side padding (platform.css .v2-page leaves the padding
+   out above --content-max, so the report would be 64 px wider than drawn) */
+.val-page { padding-left: max(var(--space-8), calc((100% - var(--content-max)) / 2 + var(--space-8)));
+  padding-right: max(var(--space-8), calc((100% - var(--content-max)) / 2 + var(--space-8))); }
+@media (max-width: 1180px) { .val-page { padding-left: var(--space-5); padding-right: var(--space-5); } }
+
+.val-notes { margin-bottom: var(--space-3); }
+.val-head-tools .select { width: 210px; }
 
 /* severity icons */
-.val-page .sevic { display: inline-flex; vertical-align: middle; }
+.val-page .sevic { display: inline-flex; }
 .val-page .sevic.danger { color: var(--danger); } .val-page .sevic.warning { color: var(--warning); } .val-page .sevic.info { color: var(--info); }
 
-/* the severity summary (mockup .sum): each card is a label holding its filter checkbox */
-.val-sum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); margin-bottom: var(--space-4); }
-.val-stat { display: flex; flex-direction: column; cursor: pointer; user-select: none;
+/* the severity summary (mockup .sum): each card is the filter of its severity; its checkbox covers the card (pressed = shown) */
+.val-page .sum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); margin-bottom: var(--space-4); }
+.val-page .sum .stat { position: relative; display: block; cursor: pointer; user-select: none; text-align: left;
   background: var(--surface-panel); border: 1px solid var(--border-default); border-left: 3px solid var(--border-default); border-radius: var(--radius-lg); }
-.val-stat:hover { background: var(--surface-hover); }
-.val-stat[data-on="true"] { background: var(--surface-selected); }
-.val-stat.e { border-left-color: var(--danger); } .val-stat.w { border-left-color: var(--warning); } .val-stat.i { border-left-color: var(--info); } .val-stat.s { border-left-color: var(--success); }
-.val-stat:has(input:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
-.val-stat-top { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-2); }
-.val-stat-top input { margin: var(--space-1) 0 0; }
+.val-page .sum .stat:hover { background: var(--surface-hover); }
+.val-page .sum .stat[data-on="true"] { background: var(--surface-selected); border-color: var(--accent); }
+.val-page .sum .stat.e { border-left-color: var(--danger); } .val-page .sum .stat.w { border-left-color: var(--warning); }
+.val-page .sum .stat.i { border-left-color: var(--info); } .val-page .sum .stat.s { border-left-color: var(--success); }
+.val-page .sum .stat > input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.val-page .sum .stat:has(input:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
-/* the report: issues beside the selected finding */
-.val-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: var(--space-4); align-items: start; }
-@media (max-width: 1280px) { .val-layout { grid-template-columns: minmax(0, 1fr); } .val-sum { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* the report: issues beside the selected finding (mockup .layout) */
+.val-layout { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: var(--space-4); align-items: start; }
+@media (max-width: 1280px) { .val-layout { grid-template-columns: minmax(0, 1fr); } .val-page .sum { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .val-page .card-head h3 { min-width: 0; }
-.val-issues { overflow: hidden; }
-.val-count { font-weight: var(--fw-regular); font-size: var(--fs-xs); }
-.val-bar { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border-subtle); }
-.val-bar .input { width: 240px; }
-.val-seg { flex-wrap: wrap; }
+.val-count { font-weight: var(--fw-regular); }
+.val-bar { display: flex; gap: var(--space-2); align-items: center; padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border-subtle); flex-wrap: wrap; }
+/* one line, as drawn: the search and the module list give way before anything wraps (a wrapping flex line breaks before it shrinks) */
+.val-bar:not(.val-pager) { flex-wrap: nowrap; }
+.val-bar .val-q { width: 240px; flex: 0 1 240px; min-width: 140px; }
+.val-bar .val-mod { width: 170px; flex: 0 1 170px; min-width: 110px; }
+.val-bar .seg, .val-bar .check { flex: none; }
+@media (max-width: 720px) { .val-bar:not(.val-pager) { flex-wrap: wrap; } }
+.val-pager { border-top: 1px solid var(--border-subtle); border-bottom: 0; }
 
 /* the issue table (mockup .table.issues) */
-.val-table tbody tr[data-testid="issue"] { cursor: pointer; }
-.val-table tbody tr[aria-selected="true"]:hover td { background: var(--surface-selected); }
-.val-table tbody tr[aria-selected="true"] td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
-.val-table tbody tr[data-testid="issue"]:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
-.val-table td { padding-top: var(--space-1h); padding-bottom: var(--space-1h); }
-.val-table tr.done .val-msg { opacity: .55; }
+.val-page .issues tbody tr[data-testid="issue"] { cursor: pointer; }
+.val-page .issues tr[aria-selected="true"] td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+.val-page .issues tr[aria-selected="true"]:hover td { background: var(--surface-selected); }
+.val-page .issues tbody tr[data-testid="issue"]:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.val-page .issues tr.done .val-msg { opacity: .6; }
 .val-sevcol { width: 32px; }
-.val-msg { max-width: 0; width: 60%; }
-.val-title { font-weight: var(--fw-medium); }
-.val-loc { font-size: var(--fs-2xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.val-file { max-width: 180px; }
-.val-file .trunc { display: block; }
+.val-msg { max-width: 0; width: 100%; }
+.val-title { max-width: 420px; }
+.val-done { margin-left: var(--space-2); vertical-align: middle; }
+.val-loc { font-size: var(--fs-2xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 420px; }
+.val-rule { max-width: 160px; }
+.val-rule .trunc { display: block; }
+.val-page .issues td, .val-page .issues th { white-space: nowrap; }
 .val-group td { background: var(--surface-inset); font-weight: var(--fw-semibold); }
 .val-group td > * { vertical-align: middle; }
 .val-group .trunc { display: inline-block; max-width: calc(100% - 80px); margin: 0 var(--space-2); }
 
-/* the selected finding */
-.val-side { gap: var(--space-4); position: sticky; top: 0; }
-.val-detail .card-body { display: flex; flex-direction: column; gap: var(--space-3); }
-.val-detail .card-head h3 { overflow-wrap: anywhere; }
-.v2-val-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
-.val-src { margin: 0; padding: var(--space-3); background: var(--surface-inset); border: 1px solid var(--border-default); border-radius: var(--radius-md);
-  font-family: var(--font-mono); font-size: var(--fs-xs); line-height: 1.6; overflow: auto; white-space: pre; }
-.val-src .ln { display: inline-block; width: 36px; color: var(--text-tertiary); user-select: none; }
-.val-src .hit { display: block; background: var(--danger-subtle); box-shadow: inset 2px 0 0 var(--danger); }
-.val-src .t { color: var(--syntax-tag); } .val-src .a { color: var(--syntax-attr); } .val-src .v { color: var(--syntax-value); }
-.val-src .b { color: var(--syntax-bracket); } .val-src .c { color: var(--syntax-comment); }
+/* the selected finding (mockup .detail) */
+.val-side { gap: var(--space-4); }
+.val-page .detail .card-body { display: flex; flex-direction: column; gap: var(--space-3); }
+.val-page .detail .card-head h3 { overflow-wrap: anywhere; }
+/* the mockup's list keeps the browser's 1em margin of a <dl> (12 px at --fs-xs): the space above and below it */
+.val-page .detail .kv { grid-template-columns: 96px 1fr; margin: var(--space-3) 0; }
+.val-rule-text, .val-note { white-space: pre-wrap; }
+.val-page .src { margin: 0; padding: var(--space-3); background: var(--surface-inset); border: 1px solid var(--border-default); border-radius: var(--radius-md);
+  font-family: var(--font-mono); font-size: var(--fs-xs); line-height: 1.6; overflow: auto; }
+.val-page .src .ln { display: inline-block; width: 28px; color: var(--text-tertiary); user-select: none; }
+.val-page .src .hit { background: var(--danger-subtle); display: block; box-shadow: inset 2px 0 0 var(--danger); }
+.val-page .src .t { color: var(--syntax-tag); } .val-page .src .a { color: var(--syntax-attr); } .val-page .src .v { color: var(--syntax-value); }
+.val-page .src .b { color: var(--syntax-bracket); } .val-page .src .c { color: var(--syntax-comment); }
 .val-src-note { margin: 0; font-size: var(--fs-xs); }
-.val-review { border-top: 1px solid var(--border-subtle); padding-top: var(--space-3); align-items: flex-start; }
+.val-review { border-top: 1px solid var(--border-subtle); padding-top: var(--space-3); }
+/* the mockup's textarea is one control high (rows=2 inside --control-h); components.css gives textareas 72 px */
+.val-review textarea.input { min-height: var(--control-h); height: var(--control-h); padding: var(--space-1h) var(--space-3); }
+.val-mark { align-self: stretch; }
 
-/* errors by check (mockup .byrule) */
-.val-page .byrule { list-style: none; margin: 0; padding: 0; }
+/* errors by rule (mockup .byrule) */
 .val-page .byrule li { display: grid; grid-template-columns: minmax(0, 1fr) 120px 28px; gap: var(--space-3); align-items: center; padding: var(--space-2) var(--space-4); font-size: var(--fs-xs); }
 .val-page .byrule li + li { border-top: 1px solid var(--border-subtle); }
 .val-page .byrule .progress > i { background: var(--danger-solid); }

@@ -1,4 +1,4 @@
-// WP-28 (PRD-003): the Project Home's "Working now" card: who is in the project and on what, and which documents are checked out by whom
+// WP-28 (PRD-003): the Project Home's "Working now": who is in the project and on what, and which documents are checked out by whom
 // until when. A project owner, a manager or an administrator can break a check-out from here (audited on the server).
 
 import { useState } from 'react';
@@ -31,30 +31,30 @@ export function WorkingNow({ projectId, format, canBreak }: { projectId: string;
     try { await del(url); team.reload(); } catch (e) { toast(errText(e), 'error'); } finally { setBusy(''); }
   };
 
+  // UI redesign screen 2 (mockup project.html): the foot of the Home's Team card, in the mockup's classes; when nothing is going on it is
+  // one quiet line ("Working now: nobody else is here · no document is checked out")
   return (
-    <section className="v2-card" aria-labelledby="home-team-h" data-testid="home-team">
-      <div className="v2-card-head"><h2 id="home-team-h" className="v2-card-title">Working now</h2></div>
-      <div style={{ padding: '10px 16px', display: 'grid', gap: 12 }}>
-        {others.length ? (
-          <ul className="v2-team-list" aria-label="People in this project now" data-testid="home-team-people">
-            {others.map((p) => (
-              <li key={`${p.userId}-${p.doc?.path ?? ''}`}><span className={`v2-face${p.mode === 'editing' ? ' is-here' : ''}`} aria-hidden="true">{initials(p.name)}</span>
-                <span className="v2-trunc"><b>{p.name}</b> <span className="v2-hint">{activityText(p)}</span></span></li>
-            ))}
-          </ul>
-        ) : <p className="v2-hint" style={{ margin: 0 }} data-testid="home-team-alone">Nobody else is in this project right now.</p>}
-        {team.leases.length ? (
-          <ul className="v2-team-list" aria-label="Checked-out documents" data-testid="home-team-leases">
-            {team.leases.map((l) => (
-              <li key={l.documentId + l.part}>
-                <span className="v2-trunc" title={l.path ?? ''}>{docName(l)}</span>
-                <span className="v2-badge" title={untilText(l.expiresAt)}>{l.mine ? 'you' : l.holder ?? 'another author'}</span>
-                {canBreak && !l.mine ? <button className="btn btn-sm" disabled={busy === l.documentId + l.part} onClick={() => void breakIt(l)} data-testid="home-team-break">Break</button> : null}
-              </li>
-            ))}
-          </ul>
-        ) : <p className="v2-hint" style={{ margin: 0 }} data-testid="home-team-noleases">No document is checked out.</p>}
-      </div>
+    <section className="now" aria-labelledby="home-team-h" data-testid="home-team">
+      <h4 id="home-team-h" className="now-h">Working now</h4>
+      {others.length ? (
+        <ul className="now-list v2-team-list" aria-label="People in this project now" data-testid="home-team-people">
+          {others.map((p) => (
+            <li key={`${p.userId}-${p.doc?.path ?? ''}`}><span className={`avatar sm${p.mode === 'editing' ? ' here' : ''}`} aria-hidden="true">{initials(p.name)}</span>
+              <span className="trunc grow"><b>{p.name}</b> <span className="faint">{activityText(p)}</span></span></li>
+          ))}
+        </ul>
+      ) : <span className="faint" data-testid="home-team-alone">Nobody else is in this project right now.</span>}
+      {team.leases.length ? (
+        <ul className="now-list v2-team-list" aria-label="Checked-out documents" data-testid="home-team-leases">
+          {team.leases.map((l) => (
+            <li key={l.documentId + l.part}>
+              <span className="trunc grow" title={l.path ?? ''}>{docName(l)}</span>
+              <span className="badge" title={untilText(l.expiresAt)}>{l.mine ? 'you' : l.holder ?? 'another author'}</span>
+              {canBreak && !l.mine ? <button className="btn sm" disabled={busy === l.documentId + l.part} onClick={() => void breakIt(l)} data-testid="home-team-break">Break</button> : null}
+            </li>
+          ))}
+        </ul>
+      ) : <span className="faint" data-testid="home-team-noleases">No document is checked out.</span>}
     </section>
   );
 }

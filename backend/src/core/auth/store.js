@@ -289,6 +289,13 @@ class AuthStore {
     return Number(r.changes);
   }
 
+  /** When each person last signed in: the newest session they started (sessions are kept until retention removes ended ones). */
+  lastSignIns() {
+    const out = new Map();
+    for (const r of this.stmt('SELECT user_id, MAX(created_at) AS at FROM sessions GROUP BY user_id').all()) out.set(r.user_id, r.at);
+    return out;
+  }
+
   listActiveSessions(nowIso) {
     return this.stmt(`
       SELECT s.id, s.user_id, s.created_at, s.expires_at, s.last_seen_at, s.ip, s.user_agent,

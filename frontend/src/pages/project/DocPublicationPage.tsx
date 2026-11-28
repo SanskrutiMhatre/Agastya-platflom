@@ -7,7 +7,7 @@
 // lib/docPublication.ts); the page shows the tree with the edits applied, and Save writes the same edits into the document through the same model the editor uses, then the server
 // keeps the codes of the sections that moved. Where the stencil fixes the chapters or the sections of a document type, they are shown and cannot be moved.
 
-import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent } from 'react';
 import '../../styles/pages/structure.css';   // WP-35: this page's styles load with its chunk
 import { useNavigate } from 'react-router-dom';
 import { contentApi } from '../../api';
@@ -18,7 +18,9 @@ import { xengineApi, type DocCodes, type DocCodesPatch } from '../../api/xengine
 import { ConvertButton, ExportProjectButton } from '../../components/DocCodes';
 import { Icon } from '../../components/Icon';
 import { LazyPdfViewer } from '../../components/pdf/LazyPdfViewer';
-import { Alert, Badge, ConfirmModal, Empty, Loading, PromptModal, Spinner, ago, errText, useAsync } from '../../components/ui';
+import type { OutlinePage, PdfView } from '../../components/pdf/PdfJsViewer';
+import { BuildList, LastBuildBadge, PubStatus, PubTopbar, pagesFromOutline, paperShort, sheetWidth, useBuilds, type PageNode } from './pubChrome';
+import { Alert, ConfirmModal, Empty, Loading, PromptModal, Spinner, errText, useAsync } from '../../components/ui';
 import { canBuild, canWrite, useProject } from '../../layouts/ProjectShell';
 import { JsgParseError, parseJsg } from '../../jsg/xml';
 import { serializeJsg } from '../../jsg/xml';
@@ -67,6 +69,23 @@ export function DocPublicationPage() {
   const [builtAt, setBuiltAt] = useState<string | null>(null);   // a build made on this page (a JSG project has no build record of its own)
   const [hasPdf, setHasPdf] = useState(false);
   const [side, setSide] = useState<'build' | 'history'>('build');
+  const [closed, setClosed] = useState<Set<string>>(() => new Set());
+  const [outline, setOutline] = useState<OutlinePage[] | null>(null);
+  const [pdfView, setPdfView] = useState<PdfView | null>(null);
+  const [startW] = useState(sheetWidth);
+  const jobs = useBuilds(id, `${summary.build?.builtAt ?? ''}|${builtAt ?? ''}|${busy}`);
+  // the page each chapter and section starts on in the built PDF (its bookmarks), shown at the right of the row as the mockup does ("p.19")
+  const pages = useMemo(() => {
+    if (!view) return new Map<string, number>();
+    const nodes: PageNode[] = [
+      ...view.chapters.map((ch) => ({ key: ch.key, title: ch.title, kids: ch.modules.map((m) => ({ key: m.key, title: m.title })) })),
+      ...view.appendices.map((m) => ({ key: m.key, title: m.title })), ...view.plates.map((m) => ({ key: m.key, title: m.title })),
+    ];
+    const map = pagesFromOutline(outline, nodes);
+    // a chapter's page is its first section's when the bookmarks have no row of the chapter's own
+    for (const ch of view.chapters) if (!map.has(ch.key)) { const first = ch.modules.find((m) => map.has(m.key)); if (first) map.set(ch.key, map.get(first.key)!); }
+    return map;
+  }, [outline, view]);
   const dirty = edits.length > 0;
   const saveRef = useRef<() => Promise<boolean>>();
   const guard = useLeaveGuard(dirty, { what: 'changes to the arrangement of the document', save: () => saveRef.current?.() ?? Promise.resolve(false) });
@@ -162,22 +181,32 @@ export function DocPublicationPage() {
   const pics = c.pictures.filter((p) => !q || `${p.file} ${p.icn} ${p.packageFile}`.toLowerCase().includes(q.toLowerCase()));
   const titleOf = (key: string): string => c.modules.find((m) => m.key === key)?.title ?? '';
   const build_ = summary.build;
-  const builtText = build_ ? `Last built ${ago(build_.builtAt)} · ${(build_.size / 1048576).toFixed(1)} MB` : builtAt ? `Built ${ago(builtAt)}` : hasPdf ? 'A PDF has been built.' : 'Not built yet.';
   const pdfHref = jss ? contentApi.pdfUrl(id, true) : jsgApi.pdfUrl(id, true);
-  const grip = (on: boolean) => (on ? <span className="v2-grip" aria-hidden="true">⋮⋮</span> : null);
-  const code = (m: PubModule) => (m.fresh ? <Badge tone="warn">code on save</Badge> : <span className="v2-mono v2-mod-code" data-testid="pub-code" title={m.file} style={{ maxWidth: 330 }}>{m.dmc}</span>);
+  // the document code of a row: in the row's tooltip and read out to a screen reader (the mockup's rows show the title and the page only)
+  const code = (m: PubModule) => <span className="pub-sronly" data-testid="pub-code">{m.fresh ? 'code made on save' : m.dmc}</span>;
+  const tip = (m: PubModule) => [m.title, detail(m), m.fresh ? 'Code made on save' : m.dmc, m.origin === 'imported' ? 'Code kept from the imported package' : ''].filter(Boolean).join('\n');
+  const tick = <span className="pub-tick" aria-hidden="true" title="In the publication" />;
+  const twist = (key: string, title: string) => {
+    const open = !closed.has(key);
+    return <button type="button" className="twist" aria-expanded={open} aria-label={`${open ? 'Collapse' : 'Expand'} ${title}`} title={open ? "Collapse" : "Expand"} onClick={(ev) => { ev.stopPropagation(); setClosed((s) => { const n = new Set(s); if (n.has(key)) n.delete(key); else n.add(key); return n; }); }}><Icon name={open ? 'down' : 'right'} size={14} /></button>;
+  };
+  const depth = (d: number) => ({ '--depth': d }) as CSSProperties;
+  const meta = (m: PubModule) => { const pg = pages.get(m.key); return <span className="meta">{pg ? `p.${pg}` : m.fresh ? 'new' : ''}</span>; };
 
   const moduleRow = (m: PubModule, ci: number, si: number | null) => {
     const k = si === null ? `i${ci}` : `s${ci}.${si}`; const hintW = over?.key === k ? over.where : null; const movable = si !== null && sectionsFree;
     return (
-      <div key={m.key} className={`v2-mod ${hintW === 'before' ? 'drop-before' : ''} ${hintW === 'after' ? 'drop-after' : ''}`} data-testid="pub-module" data-code={m.dmc} draggable={movable}
+      <div key={m.key} className={`node v2-mod ${hintW === 'before' ? 'drop-before' : ''} ${hintW === 'after' ? 'drop-after' : ''}`} data-testid="pub-module" data-code={m.dmc} draggable={movable} style={depth(1)} title={tip(m)}
         onDragStart={(ev) => { if (!movable) return; ev.dataTransfer.effectAllowed = 'move'; ev.stopPropagation(); setDrag({ kind: 'section', ch: ci, at: si! }); }} onDragEnd={end}
         onDragOver={(ev) => { if (!movable || drag?.kind !== 'section') return; ev.preventDefault(); ev.stopPropagation(); hint(k, half(ev)); }}
         onDrop={(ev) => { if (drag?.kind !== 'section') return; ev.preventDefault(); ev.stopPropagation(); const w = half(ev); const same = drag.ch === ci; const at = landing(nSecs(ci), same ? drag.at : null, si!, w); push({ op: 'moveSection', from: { ch: drag.ch, at: drag.at }, to: { ch: ci, at } }); end(); }}>
-        {grip(movable)}
+        <span className="twist" />
+        {tick}
         <span className="v2-mod-no">{m.label}</span>
-        <div className="v2-mod-main"><div className="v2-mod-title">{m.title || '(untitled)'}{m.origin === 'imported' ? <Badge title="The code was kept from the imported package">imported code</Badge> : null}</div><div className="v2-hint v2-trunc">{detail(m)}</div></div>
+        <span className="label trunc"><span className="v2-mod-title">{m.title || '(untitled)'}</span></span>
+        {m.fresh ? <span className="dot warning" title="New: its code is made when you save" /> : null}
         {code(m)}
+        {meta(m)}
         <span className="v2-mod-actions">
           {!m.fresh ? <button className="icon-btn" aria-label={`Open ${m.title} in the editor`} title="Open in editor" onClick={() => openInEditor(m.key)}><Icon name="editor" size={14} /></button> : null}
           {movable ? <>
@@ -206,25 +235,29 @@ export function DocPublicationPage() {
           else if (drag.kind === 'section') { const same = drag.ch === ci; push({ op: 'moveSection', from: { ch: drag.ch, at: drag.at }, to: { ch: ci, at: same ? nSecs(ci) - 1 : nSecs(ci) } }); }
           end();
         }}>
-        <header className="v2-chapter-head" draggable={chaptersFree} style={{ cursor: chaptersFree ? undefined : 'default' }}
+        <header className="node group v2-chapter-head" draggable={chaptersFree} style={{ ...depth(0), cursor: chaptersFree ? undefined : 'default' }} title={`${ch.modules.length} module${ch.modules.length === 1 ? '' : 's'}${ch.fresh ? ' · new: its code is made when you save' : ''}`}
           onDragStart={(ev) => { if (!chaptersFree) return; ev.dataTransfer.effectAllowed = 'move'; setDrag({ kind: 'chapter', ch: ci }); }} onDragEnd={end}>
-          {grip(chaptersFree)}
+          {twist(ch.key, ch.title)}
+          {tick}
           <span className="v2-chapter-no">{ch.label}</span>
-          <h3>{ch.title || '(untitled chapter)'}</h3>
-          <Badge>{ch.modules.length} module{ch.modules.length === 1 ? '' : 's'}</Badge>
-          {ch.fresh ? <Badge tone="warn">new</Badge> : null}
-          <span className="spacer" />
-          {chaptersFree ? <>
-            <button className="icon-btn" aria-label={`Move ${ch.title} up`} title="Move up" onClick={() => shiftChapter(ci, -1)}><Icon name="up" size={14} /></button>
-            <button className="icon-btn" aria-label={`Move ${ch.title} down`} title="Move down" onClick={() => shiftChapter(ci, 1)}><Icon name="down" size={14} /></button>
-            <button className="icon-btn" aria-label={`Rename ${ch.title}`} title="Rename" onClick={() => setRename({ ch: ci, at: null, title: ch.title })}><Icon name="edit" size={14} /></button>
-            <button className="icon-btn" aria-label={`Delete ${ch.title}`} title={view.chapters.length > 1 ? 'Delete this chapter and its sections' : 'A document needs at least one chapter'} disabled={view.chapters.length < 2} onClick={() => setDel({ ch: ci, at: null, title: ch.title, n: ch.modules.length })}><Icon name="trash" size={14} /></button>
-          </> : null}
-          {sectionsFree ? <button className="icon-btn" aria-label={`Add a section to ${ch.title}`} title="Add a section at the end of this chapter" onClick={() => setAdding({ kind: 'section', ch: ci })} data-testid="add-section"><Icon name="plus" size={14} /></button> : null}
+          <h3 className="label trunc">{ch.title || '(untitled chapter)'}</h3>
+          {ch.fresh ? <span className="dot warning" title="New chapter" /> : null}
+          <span className="meta">{ch.modules.length}</span>
+          {chaptersFree || sectionsFree ? <span className="v2-mod-actions">
+            {chaptersFree ? <>
+              <button className="icon-btn" aria-label={`Move ${ch.title} up`} title="Move up" onClick={() => shiftChapter(ci, -1)}><Icon name="up" size={14} /></button>
+              <button className="icon-btn" aria-label={`Move ${ch.title} down`} title="Move down" onClick={() => shiftChapter(ci, 1)}><Icon name="down" size={14} /></button>
+              <button className="icon-btn" aria-label={`Rename ${ch.title}`} title="Rename" onClick={() => setRename({ ch: ci, at: null, title: ch.title })}><Icon name="edit" size={14} /></button>
+              <button className="icon-btn" aria-label={`Delete ${ch.title}`} title={view.chapters.length > 1 ? 'Delete this chapter and its sections' : 'A document needs at least one chapter'} disabled={view.chapters.length < 2} onClick={() => setDel({ ch: ci, at: null, title: ch.title, n: ch.modules.length })}><Icon name="trash" size={14} /></button>
+            </> : null}
+            {sectionsFree ? <button className="icon-btn" aria-label={`Add a section to ${ch.title}`} title="Add a section at the end of this chapter" onClick={() => setAdding({ kind: 'section', ch: ci })} data-testid="add-section"><Icon name="plus" size={14} /></button> : null}
+          </span> : null}
         </header>
-        <div className="v2-chapter-body">
-          {ch.modules.length === 0 ? <div className="v2-chapter-empty">This chapter has no section of its own yet.</div> : ch.modules.map((m) => moduleRow(m, ci, m.kind === 'section' ? ++si : null))}
-        </div>
+        {closed.has(ch.key) ? null : (
+          <div className="v2-chapter-body">
+            {ch.modules.length === 0 ? <div className="v2-chapter-empty">This chapter has no section of its own yet.</div> : ch.modules.map((m) => moduleRow(m, ci, m.kind === 'section' ? ++si : null))}
+          </div>
+        )}
       </section>
     );
   };
@@ -232,14 +265,16 @@ export function DocPublicationPage() {
   const appendixRow = (m: PubModule, ai: number) => {
     const k = `a${ai}`; const hintW = over?.key === k ? over.where : null;
     return (
-      <div key={m.key} className={`v2-mod ${hintW === 'before' ? 'drop-before' : ''} ${hintW === 'after' ? 'drop-after' : ''}`} data-testid="pub-appendix" draggable={appendicesFree}
+      <div key={m.key} className={`node v2-mod ${hintW === 'before' ? 'drop-before' : ''} ${hintW === 'after' ? 'drop-after' : ''}`} data-testid="pub-appendix" draggable={appendicesFree} style={depth(1)} title={tip(m)}
         onDragStart={(ev) => { if (!appendicesFree) return; ev.dataTransfer.effectAllowed = 'move'; setDrag({ kind: 'appendix', at: ai }); }} onDragEnd={end}
         onDragOver={(ev) => { if (drag?.kind !== 'appendix' || !appendicesFree) return; ev.preventDefault(); hint(k, half(ev)); }}
         onDrop={(ev) => { if (drag?.kind !== 'appendix') return; ev.preventDefault(); push({ op: 'moveAppendix', from: drag.at, to: landing(view.appendices.length, drag.at, ai, half(ev)) }); end(); }}>
-        {grip(appendicesFree)}
+        <span className="twist" />
+        {tick}
         <span className="v2-mod-no">{m.label}</span>
-        <div className="v2-mod-main"><div className="v2-mod-title">{m.title}</div><div className="v2-hint v2-trunc">{detail(m)}</div></div>
+        <span className="label trunc"><span className="v2-mod-title">{m.title}</span></span>
         {code(m)}
+        {meta(m)}
         <span className="v2-mod-actions">
           {!m.fresh ? <button className="icon-btn" aria-label={`Open ${m.title} in the editor`} title="Open in editor" onClick={() => openInEditor(m.key)}><Icon name="editor" size={14} /></button> : null}
           {appendicesFree ? <>
@@ -257,57 +292,64 @@ export function DocPublicationPage() {
   const stamp = build_ ? Date.parse(build_.builtAt) || 0 : builtAt ? Date.parse(builtAt) || 0 : 0;
   const viewSrc = hasBuild ? `${jss ? contentApi.pdfUrl(id) : jsgApi.pdfUrl(id)}?t=${stamp}` : null;
   const released = summary.review?.state === 'approved';
+  const lastPdf = hasBuild ? { builtAt: build_?.builtAt ?? builtAt, size: build_?.size ?? null } : null;
+  const profile = jss ? `JSS ${summary.project.domain === 'naval' ? 'Naval' : 'Land'}${summary.project.manualType ? ` ${summary.project.manualType.toUpperCase()}` : ''} stencil` : `JSG ${summary.project.manualType === 'ispl' ? 'ISPL' : 'UHB'} layout`;
   // UI redesign 2026-11-28 (mockup 4): structure on the left, the built PDF on a themed canvas in the middle, build settings and history on the right
   return (
     <div className="pub" data-testid="pub-layout">
       <h1 className="pub-sr">Publication</h1>
+      <PubTopbar downloadHref={hasBuild ? pdfHref : null} downloadTestId="download-pdf" canBuild={canBuild(can)} busy={busy !== null} onBuild={() => void build()} />
+      <PubStatus jobs={jobs} pdf={lastPdf} view={pdfView} busy={busy === 'build'} />
       <aside className="pane" aria-label="Publication structure">
         <div className="pane-head">
-          <span className="trunc">Structure</span>
-          <span className="pane-count">{view.chapters.length} ch · {total} DM</span>
+          <span className="trunc" title={`${view.chapters.length} chapters, ${total} modules`}>Structure</span>
           <span className="grow" />
-          {chaptersFree ? <button className="icon-btn" onClick={() => setNaming(true)} data-testid="add-chapter" aria-label="Add chapter" title="Add chapter"><Icon name="plus" size={15} /></button> : null}
-          {writable ? <button className="icon-btn" onClick={undo} disabled={!dirty} data-testid="undo-arrangement" aria-label="Undo" title="Undo"><Icon name="undo" size={15} /></button> : null}
-          {writable ? <button className="icon-btn" onClick={redo} disabled={!undone.length} data-testid="redo-arrangement" aria-label="Redo" title="Redo"><Icon name="undo" size={15} className="pub-flip" /></button> : null}
+          {chaptersFree ? <button className="icon-btn" onClick={() => setNaming(true)} data-testid="add-chapter" aria-label="Add chapter" title="Add chapter"><Icon name="plus" /></button> : null}
+          {writable ? <button className="icon-btn" onClick={undo} disabled={!dirty} data-testid="undo-arrangement" aria-label="Undo" title="Undo"><Icon name="undo" /></button> : null}
+          {writable ? <button className="icon-btn" onClick={redo} disabled={!undone.length} data-testid="redo-arrangement" aria-label="Redo" title="Redo"><Icon name="undo" className="pub-flip" /></button> : null}
         </div>
         {dirty ? (
           <div className="v2-savebar" role="status" data-testid="unsaved-bar">
             <span><Icon name="alert" size={14} /> Unsaved changes to the arrangement</span>
             <span className="spacer" />
-            <button className="btn btn-sm" onClick={() => setEdits([])}>Discard</button>
-            <button className="btn btn-sm btn-primary" onClick={() => void save()} disabled={busy !== null} data-testid="save-publication">{busy === 'save' ? <Spinner /> : null}Save changes</button>
+            <button className="btn sm" onClick={() => setEdits([])}>Discard</button>
+            <button className="btn sm primary" onClick={() => void save()} disabled={busy !== null} data-testid="save-publication">{busy === 'save' ? <Spinner /> : null}Save changes</button>
           </div>
         ) : null}
-        {locked ? <div className="pub-note" data-testid="pub-locked"><Alert>{jss ? `The stencil of this document type fixes ${!chaptersFree && !sectionsFree ? 'the chapters and the sections' : !chaptersFree ? 'the chapters' : 'the sections'}, so ${!chaptersFree && !sectionsFree ? 'they' : 'these'} cannot be moved or renamed here.` : 'A parts list is arranged by its plate references, not here.'}</Alert></div> : null}
         <div className="scroll">
-          <div className="v2-pub-main" data-testid="pub-tree">
+          <div className="tree focused v2-pub-main" data-testid="pub-tree">
             {view.chapters.length === 0 && view.appendices.length === 0 && view.plates.length === 0 ? (
-              <Empty title="The document has no chapters yet">{chaptersFree ? <>Add a chapter to start the publication.<div style={{ marginTop: 12 }}><button className="btn btn-primary btn-sm" onClick={() => setNaming(true)}><Icon name="plus" size={15} />Add the first chapter</button></div></> : 'Open the editor to start writing.'}</Empty>
+              <Empty title="The document has no chapters yet">{chaptersFree ? <>Add a chapter to start the publication.<div style={{ marginTop: 12 }}><button className="btn primary sm" onClick={() => setNaming(true)}><Icon name="plus" />Add the first chapter</button></div></> : 'Open the editor to start writing.'}</Empty>
             ) : view.chapters.map(chapterCard)}
             {view.appendices.length || (appendicesFree && view.chapters.length) ? (
               <section className="v2-chapter" data-testid="appendices" aria-label="Appendices">
-                <header className="v2-chapter-head" style={{ cursor: 'default' }}><h3>Appendices</h3><Badge>{view.appendices.length}</Badge><span className="spacer" />
-                  {appendicesFree ? <button className="btn btn-sm" onClick={() => setAdding({ kind: 'appendix' })} data-testid="add-appendix"><Icon name="plus" size={13} />Add appendix</button> : null}
+                <header className="node group v2-chapter-head" style={{ ...depth(0), cursor: 'default' }}>
+                  {twist('appendices', 'Appendices')}
+                  {tick}
+                  <h3 className="label trunc">Appendices</h3>
+                  <span className="meta">{view.appendices.length}</span>
+                  {appendicesFree ? <span className="v2-mod-actions"><button className="icon-btn" onClick={() => setAdding({ kind: 'appendix' })} data-testid="add-appendix" aria-label="Add appendix" title="Add appendix"><Icon name="plus" size={14} /></button></span> : null}
                 </header>
-                <div className="v2-chapter-body">{view.appendices.length ? view.appendices.map(appendixRow) : <div className="v2-chapter-empty">No appendices.</div>}</div>
+                {closed.has('appendices') ? null : <div className="v2-chapter-body">{view.appendices.length ? view.appendices.map(appendixRow) : <div className="v2-chapter-empty">No appendices.</div>}</div>}
               </section>
             ) : null}
             {view.plates.length ? (
               <section className="v2-chapter" data-testid="plates" aria-label="Plates">
-                <header className="v2-chapter-head" style={{ cursor: 'default' }}><h3>Plates</h3><Badge>{view.plates.length}</Badge></header>
-                <div className="v2-chapter-body">{view.plates.map((m) => (
-                  <div key={m.key} className="v2-mod" data-testid="pub-plate"><span className="v2-mod-no">{m.label}</span><div className="v2-mod-main"><div className="v2-mod-title">{m.title}</div><div className="v2-hint v2-trunc">{detail(m)}</div></div>{code(m)}</div>
-                ))}</div>
+                <header className="node group v2-chapter-head" style={{ ...depth(0), cursor: 'default' }}>{twist('plates', 'Plates')}{tick}<h3 className="label trunc">Plates</h3><span className="meta">{view.plates.length}</span></header>
+                {closed.has('plates') ? null : <div className="v2-chapter-body">{view.plates.map((m) => (
+                  <div key={m.key} className="node v2-mod" data-testid="pub-plate" style={depth(1)} title={tip(m)}><span className="twist" />{tick}<span className="v2-mod-no">{m.label}</span><span className="label trunc"><span className="v2-mod-title">{m.title}</span></span>{code(m)}{meta(m)}</div>
+                ))}</div>}
               </section>
             ) : null}
-            {chaptersFree && view.chapters.length > 0 ? <button className="v2-add-chapter" onClick={() => setNaming(true)}><Icon name="plus" size={14} />Add chapter</button> : null}
           </div>
         </div>
-        {!writable ? <div className="pub-note"><Alert tone="warn">You have {role} access: you can look at the publication, but only editors, managers and owners can change it.</Alert></div> : null}
+        {locked ? <div className="alert info pub-note" data-testid="pub-locked"><Icon name="lock" /><div>{jss ? `The stencil of this document type fixes ${!chaptersFree && !sectionsFree ? 'the chapters and the sections' : !chaptersFree ? 'the chapters' : 'the sections'}, so ${!chaptersFree && !sectionsFree ? 'they' : 'these'} cannot be moved or renamed here.` : 'A parts list is arranged by its plate references, not here.'}</div></div>
+          : <div className="alert success pub-note"><Icon name="ok" /><div>{sections} section{sections === 1 ? '' : 's'} in {view.chapters.length} chapter{view.chapters.length === 1 ? '' : 's'} · {c.counts.pictures} picture{c.counts.pictures === 1 ? '' : 's'}{c.counts.imported ? ` · ${c.counts.imported} code${c.counts.imported === 1 ? '' : 's'} from import` : ''}. Every section is in the publication.</div></div>}
+        {!writable ? <div className="alert warning pub-note"><Icon name="warn" /><div>You have {role} access: you can look at the publication, but only editors, managers and owners can change it.</div></div> : null}
       </aside>
 
       <section className="pane viewer" aria-label="PDF preview" data-testid="pub-preview">
-        <LazyPdfViewer src={viewSrc} downloadName={jss ? 'publication.pdf' : 'document.pdf'}
+        <LazyPdfViewer src={viewSrc} downloadName={jss ? 'publication.pdf' : 'document.pdf'} download={false} startWidth={startW} onView={setPdfView} onOutline={setOutline}
           placeholder={<div className="pub-empty"><Icon name="pdf" size={30} /><p>{canBuild(can) ? 'Not built yet. Press Build publication to make the PDF.' : 'Not built yet.'}</p></div>} />
       </section>
 
@@ -320,59 +362,57 @@ export function DocPublicationPage() {
           {side === 'build' ? <>
             <div className="opt">
               {error ? <Alert tone="bad">{error}</Alert> : null}
-              <div className="field"><span className="field-label">Publication</span><div className="pub-value">{c.pmc.title || summary.project.name}</div></div>
-              <div className="field"><span className="field-label">Watermark</span><div className="pub-value">{released ? 'Release settings (project released)' : 'NOT RELEASED (project not released)'}</div><span className="hint">{released ? 'Set on Review and release.' : 'Added automatically until the project is released.'}</span></div>
-              <div className="field"><span className="field-label">Output</span>
-                <div className="v2-row wrap">
-                  {hasBuild ? <a className="btn btn-sm" href={pdfHref} data-testid="download-pdf"><Icon name="download" size={13} />Download PDF</a> : null}
-                  <button className="btn btn-sm" onClick={() => openInEditor()}><Icon name="editor" size={13} />View in editor</button>
-                  <ExportProjectButton id={id} dirty={dirty} saveFirst={save} label="Export project" />
-                  <ConvertButton id={id} from={jss ? 'jss' : 'jsg'} name={summary.project.name} dirty={dirty} saveFirst={save} />
+              <div className="field"><label htmlFor="pub-layout">Output profile</label>
+                <select className="select" id="pub-layout" value="own" onChange={() => undefined}><option value="own">{profile}{paperShort(pdfView) ? ` - ${paperShort(pdfView)}` : ''}</option></select>
+              </div>
+              <div className="field"><label htmlFor="pub-wm">Watermark</label>
+                <select className="select" id="pub-wm" value="auto" onChange={() => undefined}><option value="auto">{released ? 'Release settings (project released)' : 'NOT RELEASED (project not released)'}</option></select>
+                <span className="hint">{released ? 'Set on Review and release.' : 'Added automatically until the project is released.'}</span>
+              </div>
+              <div className="field"><label htmlFor="pub-pmc">Publication code</label>
+                <div className="input code" id="pub-pmc" data-testid="doc-codes-pmc" title={`${c.pmc.code}\n${c.pmc.issue} · ${c.pmc.language} · ${c.pmc.origin === 'imported' ? 'kept from the imported package' : 'made by the platform'}`}>{c.pmc.code}</div>
+              </div>
+              <label className="check" title="Writes each section's document code beside its heading. It is not part of the document."><input type="checkbox" checked={c.show.dmc} disabled={!writable} onChange={(e) => void showDmc(e.target.checked)} data-testid="doc-codes-show-dmc" />Show the code in the editor</label>
+            </div>
+            <div className="card-head"><h3>Last build</h3><LastBuildBadge jobs={jobs} pdf={lastPdf} busy={busy === 'build'} /></div>
+            <BuildList jobs={jobs} pdf={lastPdf} pages={pdfView?.numPages ?? 0} limit={2} />
+
+            <details className="pub-sect" data-testid="pub-identity">
+              <summary><Icon name="right" size={14} />Publication identity<span className="grow" /><span className="faint">{c.pmc.issue}</span></summary>
+              <div className="opt">
+                <div className="pub-idgrid">
+                  {([['modelIdentCode', 'Model code'], ['pmIssuer', 'Issuer'], ['pmNumber', 'Number'], ['pmVolume', 'Volume']] as const).map(([k, label]) => (
+                    <div key={k} className="field"><label htmlFor={`pub-id-${k}`}>{label}</label><input className="input" id={`pub-id-${k}`} value={form[k] ?? ''} disabled={!writable} data-testid={`identity-${k}`} onChange={(e) => setForm({ ...form, [k]: e.target.value.toUpperCase() })} /></div>
+                  ))}
                 </div>
-                <span className="hint">{sections} section{sections === 1 ? '' : 's'} in {view.chapters.length} chapter{view.chapters.length === 1 ? '' : 's'} · {c.counts.pictures} picture{c.counts.pictures === 1 ? '' : 's'}{c.counts.imported ? ` · ${c.counts.imported} code${c.counts.imported === 1 ? '' : 's'} from import` : ''}</span>
+                {writable ? <div><button className="btn sm" onClick={() => void saveIdentity()} disabled={busy !== null} data-testid="identity-save">{busy === 'identity' ? <Spinner /> : null}Save identity</button></div> : null}
               </div>
-            </div>
-
-            <div className="card-head"><h3>Publication code</h3></div>
-            <div className="opt" data-testid="pub-identity">
-              <div><code className="v2-mono" data-testid="doc-codes-pmc" style={{ wordBreak: 'break-all' }}>{c.pmc.code}</code><div className="v2-hint">{c.pmc.issue} · {c.pmc.language} · {c.pmc.origin === 'imported' ? 'kept from the imported package' : 'made by the platform'}</div></div>
-              <div className="pub-idgrid">
-                {([['modelIdentCode', 'Model code'], ['pmIssuer', 'Issuer'], ['pmNumber', 'Number'], ['pmVolume', 'Volume']] as const).map(([k, label]) => (
-                  <label key={k} className="v2-field"><span>{label}</span><input className="v2-input" value={form[k] ?? ''} disabled={!writable} data-testid={`identity-${k}`} onChange={(e) => setForm({ ...form, [k]: e.target.value.toUpperCase() })} /></label>
+            </details>
+            <details className="pub-sect" data-testid="pub-pictures">
+              <summary><Icon name="right" size={14} />Picture names (ICN)<span className="grow" /><span className="badge">{c.pictures.length}</span></summary>
+              {c.pictures.length > 6 || q ? <div className="pub-pool-search"><input className="input search" placeholder="Search pictures…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search pictures" /></div> : null}
+              <ul className="hist pub-pics">
+                {pics.length === 0 ? <li><Icon name="image" /><div className="faint">{c.pictures.length === 0 ? 'No pictures in this document.' : 'No picture matches.'}</div><span /></li> : pics.map((p) => (
+                  <li key={p.file} data-testid="pub-picture"><Icon name="image" /><div><strong>{p.file}</strong><div className="faint mono">{p.icn}</div><div className="faint">{titleOf(p.module)}</div></div><span /></li>
                 ))}
-              </div>
-              {writable ? <div><button className="btn btn-sm" onClick={() => void saveIdentity()} disabled={busy !== null} data-testid="identity-save">{busy === 'identity' ? <Spinner /> : null}Save identity</button></div> : null}
-              <label className="v2-row" style={{ gap: 8, alignItems: 'flex-start' }}>
-                <input type="checkbox" checked={c.show.dmc} disabled={!writable} onChange={(e) => void showDmc(e.target.checked)} data-testid="doc-codes-show-dmc" />
-                <span><strong>Show the code in the editor</strong><br /><span className="v2-hint">Writes each section's document code beside its heading. It is not part of the document.</span></span>
-              </label>
-            </div>
-
-            <div data-testid="pub-pictures">
-              <div className="card-head"><h3>Picture names (ICN)</h3><Badge>{c.pictures.length}</Badge></div>
-              <div className="pub-pool-search"><input className="v2-input" placeholder="Search pictures…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search pictures" /></div>
-              <div className="v2-pool">
-                {pics.length === 0 ? <div className="v2-hint" style={{ padding: 12 }}>{c.pictures.length === 0 ? 'No pictures in this document.' : 'No picture matches.'}</div> : pics.map((p) => (
-                  <div key={p.file} className="v2-pool-item" data-testid="pub-picture"><div style={{ minWidth: 0, flex: 1 }}><div className="v2-mod-title">{p.file}</div><div className="v2-mono v2-hint" style={{ wordBreak: 'break-all' }}>{p.icn}</div><div className="v2-hint v2-trunc">{titleOf(p.module)}</div></div></div>
-                ))}
-              </div>
-            </div>
+              </ul>
+            </details>
+            <details className="pub-sect">
+              <summary><Icon name="right" size={14} />Export and convert</summary>
+              <div className="opt"><div className="v2-row wrap"><ExportProjectButton id={id} dirty={dirty} saveFirst={save} label="Export project" /><ConvertButton id={id} from={jss ? 'jss' : 'jsg'} name={summary.project.name} dirty={dirty} saveFirst={save} /></div></div>
+            </details>
           </> : (
             <div data-testid="pub-history">
-              <div className="card-head"><h3>Builds</h3>{hasBuild ? <span className="badge success"><Icon name="ok" size={12} />Built</span> : <span className="badge">Never</span>}</div>
-              <ul className="hist">
-                {hasBuild ? <li><Icon name="ok" size={14} /><div><strong>Last build</strong><div className="faint">{builtText}</div></div><span /></li>
-                  : <li><Icon name="clock" size={14} /><div><strong>Not built yet</strong></div><span /></li>}
-              </ul>
+              <div className="card-head"><h3>Builds</h3><LastBuildBadge jobs={jobs} pdf={lastPdf} busy={busy === 'build'} /></div>
+              <BuildList jobs={jobs} pdf={lastPdf} pages={pdfView?.numPages ?? 0} />
             </div>
           )}
         </div>
         <div className="build">
-          <div className={`progress${busy === 'build' ? ' busy' : ''}`} role="progressbar" aria-label="Build progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={busy === 'build' ? undefined : hasBuild ? 100 : 0}><i style={{ width: busy === 'build' ? '40%' : hasBuild ? '100%' : '0%' }} /></div>
+          <div className={`progress${busy === 'build' ? ' busy' : ''}`} role="progressbar" aria-label="Build progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={busy === 'build' ? undefined : 0}><i style={{ width: busy === 'build' ? '40%' : '0%' }} /></div>
           {busy === 'build' && progress.lines.length ? <div className="v2-log">{progress.lines.slice(-5).map((l, i) => <div key={i}>{l}</div>)}</div> : null}
-          <div className="faint">{builtText}</div>
           <button className="btn primary" onClick={() => void build()} disabled={busy !== null || !canBuild(can)} data-testid="build-publication" title={canBuild(can) ? 'Save the arrangement, then build the PDF' : 'Reviewers, editors and owners can build the PDF'}>{busy === 'build' ? <Spinner /> : <Icon name="play" />}Build publication</button>
-          <button className="btn" onClick={() => nav('../release')}><Icon name="external" size={14} />Review and release</button>
+          <button className="btn" onClick={() => nav('../release')}><Icon name="external" />Review and release</button>
         </div>
       </aside>
 

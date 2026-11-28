@@ -80,7 +80,9 @@ const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]):not([t
 /** WP-23 (UX-004, FE-014): the open dialogs, innermost last. Escape closes only the top one (a waiver over a refusal, a confirm over the wizard). */
 const openDialogs: object[] = [];
 
-export function Modal({ title, onClose, children, buttons, width, sticky }: { title: string; onClose: () => void; children: ReactNode; buttons?: ReactNode; width?: number; sticky?: boolean }) {
+export function Modal({ title, onClose, children, buttons, width, sticky, icon, tone }: { title: string; onClose: () => void; children: ReactNode; buttons?: ReactNode; width?: number; sticky?: boolean;
+  /** The mockup's confirm dialog (docs/audit/mockups/admin.html): a round tinted icon before the title, no close button (Cancel and Escape close it). */
+  icon?: IconId; tone?: 'danger' | 'warning' | 'info' }) {
   const box = useRef<HTMLDivElement>(null);
   const [me] = useState(() => ({}));
   useEffect(() => {
@@ -116,8 +118,10 @@ export function Modal({ title, onClose, children, buttons, width, sticky }: { ti
   };
   return (
     <div className="modal-backdrop" onMouseDown={(e) => { if (!sticky && e.target === e.currentTarget) onClose(); }}>
-      <div className="modal" role="dialog" aria-modal="true" aria-label={title} style={width ? { width } : undefined} ref={box} tabIndex={-1} onKeyDown={trap}>
-        <div className="modal-head"><h2 className="modal-title">{title}</h2><IconButton label="Close" icon="close" onClick={onClose} /></div>
+      <div className={`modal${icon ? ' modal-confirm' : ''}`} role="dialog" aria-modal="true" aria-label={title} style={width ? { width } : undefined} ref={box} tabIndex={-1} onKeyDown={trap}>
+        {icon
+          ? <div className="modal-head"><span className={`ico-wrap ${tone ?? 'danger'}`} aria-hidden="true"><Icon name={icon} size={20} /></span><h2 className="modal-title">{title}</h2></div>
+          : <div className="modal-head"><h2 className="modal-title">{title}</h2><IconButton label="Close" icon="close" onClick={onClose} /></div>}
         <div className="modal-body">{children}</div>
         {buttons ? <div className="modal-buttons">{buttons}</div> : null}
       </div>
@@ -125,13 +129,15 @@ export function Modal({ title, onClose, children, buttons, width, sticky }: { ti
   );
 }
 
-export function ConfirmModal({ title, body, confirmLabel = 'Confirm', danger, busy, onConfirm, onClose }: {
+export function ConfirmModal({ title, body, confirmLabel = 'Confirm', danger, busy, onConfirm, onClose, icon, tone }: {
   title: string; body: ReactNode; confirmLabel?: string; danger?: boolean; busy?: boolean; onConfirm: () => void; onClose: () => void;
+  /** The mockup's confirm dialog look: the icon in a tinted circle before the title, and on the confirm button. */
+  icon?: IconId; tone?: 'danger' | 'warning' | 'info';
 }) {
   return (
-    <Modal title={title} onClose={onClose} width={460} buttons={<>
+    <Modal title={title} onClose={onClose} width={460} icon={icon} tone={tone ?? (danger ? 'danger' : 'info')} buttons={<>
       <button className="btn" onClick={onClose}>Cancel</button>
-      <button className={`btn btn-primary ${danger ? 'btn-danger-solid' : ''}`} disabled={busy} aria-busy={busy || undefined} onClick={onConfirm}>{confirmLabel}</button>
+      <button className={`btn btn-primary ${danger ? 'btn-danger-solid' : ''}`} disabled={busy} aria-busy={busy || undefined} onClick={onConfirm}>{icon && danger ? <Icon name={icon} size={14} /> : null}{confirmLabel}</button>
     </>}>{body}</Modal>
   );
 }
@@ -187,8 +193,10 @@ function ToastItem({ toast: t, onDismiss }: { toast: Toast; onDismiss: () => voi
   return (
     <div className={'v2-toast ' + t.kind} role={t.kind === 'error' ? 'alert' : undefined} onClick={onDismiss}
       onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} onFocus={() => setPaused(true)} onBlur={() => setPaused(false)}>
+      {/* the mockup toast (admin.html): the kind's icon first, an icon dismiss button last */}
+      <span className="v2-toast-ico" aria-hidden="true"><Icon name={t.kind === 'error' ? 'xcircle' : t.kind === 'success' ? 'ok' : 'info'} /></span>
       <span className="v2-toast-text">{t.text}</span>
-      <button type="button" className="v2-toast-x" aria-label="Dismiss" title="Dismiss" onClick={(e) => { e.stopPropagation(); onDismiss(); }}>×</button>
+      <button type="button" className="v2-toast-x" aria-label="Dismiss" title="Dismiss" onClick={(e) => { e.stopPropagation(); onDismiss(); }}><Icon name="close" size={14} /></button>
     </div>
   );
 }

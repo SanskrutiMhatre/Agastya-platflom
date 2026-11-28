@@ -65,6 +65,9 @@ input[type='checkbox']:disabled, input[type='radio']:disabled { cursor: not-allo
 /* ---------------------------------------------------------------- toasts (DS-005): a dismiss button */
 .v2-toast { display: flex; align-items: flex-start; gap: 10px; }
 .v2-toast > .v2-toast-text { flex: 1; min-width: 0; }
+/* UI redesign screen 6: the mockup toast's icon, in the kind's colour */
+.v2-toast > .v2-toast-ico { flex: none; display: inline-grid; margin-top: 1px; color: var(--info); }
+.v2-toast.success > .v2-toast-ico { color: var(--success); } .v2-toast.error > .v2-toast-ico { color: var(--danger); }
 /* WP-20: full-strength ink (opacity 0.85 fell to 4.0:1 on the success toast) and a 24 px target (WCAG 2.5.8) that does not grow the toast */
 .v2-toast-x { flex: none; display: inline-grid; place-items: center; min-width: 24px; min-height: 24px; margin: -5px -6px -5px 0; border: 0; border-radius: 4px; background: none; color: inherit; cursor: pointer; padding: 0 2px; font-size: 15px; line-height: 1; }
 .v2-toast-x:hover { background: color-mix(in srgb, currentColor 16%, transparent); }
@@ -74,17 +77,12 @@ input[type='checkbox']:disabled, input[type='radio']:disabled { cursor: not-allo
 .v2-ktip { position: fixed; z-index: var(--z-tooltip); max-width: 320px; padding: 5px 9px; border-radius: 6px; background: var(--text); color: var(--bg-elev);
   font-size: 12px; font-weight: 500; line-height: 1.35; box-shadow: var(--shadow-2); pointer-events: none; white-space: normal; }
 
-/* ---------------------------------------------------------------- administrator accent preview (TH-003) */
-.v2-accent-prev { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); min-width: 220px; flex: 1; }
-.v2-accent-prev[data-theme-preview='light'] { background: var(--p-white); color: var(--p-gray-900); --text-faint: var(--p-gray-600); }
-.v2-accent-prev[data-theme-preview='dark'] { background: var(--p-ink-870); color: var(--p-ink-50); --text-faint: var(--p-ink-250); }
-.v2-accent-btn { align-self: flex-start; height: 28px; padding: 0 12px; border-radius: 6px; display: inline-grid; place-items: center; font-weight: 600; font-size: 12.5px; }
 
 /* ---------------------------------------------------------------- Windows High Contrast (TH-006) */
 @media (forced-colors: active) {
   .btn, .x-btn, .v2-seg, .v2-card, .modal, .ctx-menu, .jsg-menu, .file-menu, .v2-toast, .toast, .v2-badge, .v2-alert, .v2-rail-badge, .v2-count, .v2-bell-count { border: 1px solid CanvasText; }
   .input, .v2-input, .v2-select, .v2-textarea, .x-input, .x-select, .attr-input, .panel-filter, .find-input { border-color: FieldText; }
-  .v2-rail-item.active, .act-btn[aria-current="page"], .nav-item[aria-current="page"], .v2-tnode.sel, .v2-anc-row.sel, .v2-admin-nav a.active, .outline-row.current,
+  .v2-rail-item.active, .act-btn[aria-current="page"], .nav-item[aria-current="page"], .v2-tnode.sel, .v2-anc-row.sel, .outline-row.current,
   .problem.active, .v2-tab.active, .ribbon-tab.active, .panel-tab.active, .jsg-tab.on, .jsg-bar .jsg-tb.on, .v2-seg button.on, .doc-tab.active,
   .vs-btn.pressed, .rb.pressed, .icon-btn.pressed, .picker-item.active, .v2-chapter.sel, [aria-selected='true'], [aria-current='page'] { outline: 2px solid Highlight; outline-offset: -2px; }
   .btn:disabled, .x-btn:disabled, .icon-btn:disabled, .rb:disabled, .v2-input:disabled, .input:disabled, .v2-select:disabled { color: GrayText; border-color: GrayText; }

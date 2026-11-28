@@ -25,10 +25,11 @@ import { lastRun, type Issue } from './validation';
 import { listWaivers } from './publishWaivers';
 
 export type ProblemState = 'open' | 'reviewed' | 'waived';
-export interface ReviewMark { key: string; by: string; byName: string | null; at: string }
+/** `note`: what the reviewer wrote when marking (optional, at most 500 characters; the review form of the Validation report, UI redesign screen 5). */
+export interface ReviewMark { key: string; by: string; byName: string | null; at: string; note?: string }
 export interface Problem {
   key: string; id: string; source: Issue['source']; severity: Issue['sev']; file: string; line: number; rule: string; message: string; detail: string;
-  location: string; state: ProblemState; reviewedBy: string | null; reviewedAt: string | null; waivedBy: string | null;
+  location: string; state: ProblemState; reviewedBy: string | null; reviewedAt: string | null; reviewNote: string | null; waivedBy: string | null;
 }
 
 const FILE = 'problem-reviews.json';
@@ -57,19 +58,31 @@ const cleanKey = (k: unknown): string => {
   return key;
 };
 
+const MAX_NOTE = 500;
+/** The reviewer's note: text, trimmed, no control characters other than line breaks, at most MAX_NOTE characters; empty is no note. */
+const cleanNote = (n: unknown): string => {
+  if (n === undefined || n === null) return '';
+  if (typeof n !== 'string') throw bad('The note is text.', 'BAD_REVIEW_NOTE');
+  const note = n.replace(/\r\n?/g, '\n').trim();
+  if (note.length > MAX_NOTE) throw bad(`The note is at most ${MAX_NOTE} characters.`, 'BAD_REVIEW_NOTE');
+  if (/[\u0000-\u0009\u000b-\u001f]/.test(note)) throw bad('The note holds a control character.', 'BAD_REVIEW_NOTE');
+  return note;
+};
+
 /**
  * Marks (reviewed = true) or unmarks findings, for the whole team. Returns the marks after the change. Marking a finding that is already
- * marked keeps the first mark (who reviewed it first stays on record).
+ * marked keeps the first mark (who reviewed it first stays on record). `note` (optional) is kept with each new mark.
  */
-export function setReviewed(projectId: string, keys: unknown, reviewed: boolean, who: { username: string; fullName?: string | null }): ReviewMark[] {
+export function setReviewed(projectId: string, keys: unknown, reviewed: boolean, who: { username: string; fullName?: string | null }, note?: unknown): ReviewMark[] {
   const list = (Array.isArray(keys) ? keys : [keys]).map(cleanKey);
+  const text = reviewed ? cleanNote(note) : '';
   if (!list.length) throw bad('Say which findings.', 'BAD_PROBLEM_KEY');
   if (list.length > 2000) throw bad('At most 2000 findings at a time.', 'TOO_MANY_KEYS');
   const marks = listMarks(projectId);
   const have = new Map(marks.map((m) => [m.key, m]));
   const at = new Date().toISOString();
   for (const k of list) {
-    if (reviewed) { if (!have.has(k)) have.set(k, { key: k, by: who.username, byName: who.fullName ?? null, at }); }
+    if (reviewed) { if (!have.has(k)) have.set(k, { key: k, by: who.username, byName: who.fullName ?? null, at, ...(text ? { note: text } : {}) }); }
     else have.delete(k);
   }
   if (have.size > MAX_MARKS) throw bad(`A project keeps at most ${MAX_MARKS} reviewed marks.`, 'TOO_MANY_MARKS');
@@ -90,7 +103,7 @@ export function problemsOf(projectId: string): { ranAt: string | null; problems:
     const key = problemKey(i); const m = marks.get(key); const w = waiverOf(i);
     return {
       key, id: i.id, source: i.source, severity: i.sev, file: i.rel, line: i.line, rule: i.source, message: i.title, detail: i.detail, location: i.loc,
-      state: w ? 'waived' : m ? 'reviewed' : 'open', reviewedBy: m?.byName ?? m?.by ?? null, reviewedAt: m?.at ?? null, waivedBy: w?.by ?? null,
+      state: w ? 'waived' : m ? 'reviewed' : 'open', reviewedBy: m?.byName ?? m?.by ?? null, reviewedAt: m?.at ?? null, reviewNote: m?.note ?? null, waivedBy: w?.by ?? null,
     };
   });
   const summary = { open: 0, reviewed: 0, waived: 0, error: 0, warn: 0, info: 0 };

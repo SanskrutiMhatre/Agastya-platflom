@@ -9,7 +9,9 @@ export type ProjectRole = 'viewer' | 'reviewer' | 'editor' | 'manager' | 'owner'
 export type GlobalRole = 'admin' | 'project_manager' | 'author';
 export interface User { id: string; username: string; fullName: string; role: GlobalRole; createdBy?: string | null; disabled?: boolean; onboardingPending?: boolean; mustChangePassword?: boolean; createdAt?: string;
   /** WP-27: where the account signs in, why it is disabled ('directory' = offboarded by the directory), the read-only auditor flag. */
-  authSource?: 'local' | 'directory'; disabledReason?: string | null; auditor?: boolean }
+  authSource?: 'local' | 'directory'; disabledReason?: string | null; auditor?: boolean;
+  /** When the person last signed in (the newest session they started); null = never. Administrators' users list only. */
+  lastSignInAt?: string | null }
 export interface Gates { onboarding: boolean; mustChangePassword: boolean }
 export interface AdminQueues { approvals: number; changes: number; folderRequests: number; resets: number; ownerless: number; releases: number }
 
@@ -85,7 +87,10 @@ export interface Summary {
   publication: { totals: Explore['totals']; chapters: number; title: string } | null;
   validation: { ranAt: string; error: number; warn: number; info: number } | null;
   release: { released: boolean; stale: boolean; number: number | null; pending: boolean; scheduledAt: string | null } | null;
-  build: { builtAt: string; size: number } | null;
+  /** `pages`: the page count of the last PDF (null when it cannot be read) */
+  build: { builtAt: string; size: number; pages?: number | null } | null;
+  /** S1000D projects: the issue (4.2, 5.0 ...) and the model identification code, for the Project Home header; null for JSS, JSG and the shared repository */
+  s1000d?: { issue: string; mic: string | null } | null;
   members: number;
   /** WP-22: the review loop (state, round, open comments) and how many findings of the last check the team marked reviewed; null when unknown */
   review?: { state: ReviewState; round: number; open: number } | null;
@@ -144,6 +149,12 @@ export const workspaceApi = {
 
 // ── Project content ───────────────────────────────────────────────────────
 
+/** WP-14: a job of a project as GET /api/projects/:id/jobs lists it (backend/src/services/jobs JobView) */
+export interface JobView {
+  id: string; kind: string; projectId: string | null; state: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | string; createdAt: string; startedAt: string | null; finishedAt: string | null;
+  actor: string | null; position?: number; error?: { message: string; code?: string; status?: number } | null; cached?: boolean;
+}
+
 const P = (id: string) => `/api/projects/${id}`;
 
 export const IMPORT_MAX_FILES = 1000;
@@ -193,6 +204,8 @@ export const contentApi = {
     return res.blob();
   },
   pdfUrl: (id: string, download = false) => `${P(id)}/publish/pdf${download ? '?download=1' : ''}`,
+  /** WP-14: the project's jobs, newest first (the Publication page lists its builds from them) */
+  jobs: (id: string, limit = 50) => get<{ jobs: JobView[] }>(`${P(id)}/jobs?limit=${limit}`).then((r) => r.jobs),
 
   settings: (id: string) => get<any>(`${P(id)}/settings`),
   saveSettings: (id: string, body: { house?: unknown; project?: unknown; baseHash: string }) => put<{ ok: boolean; templateRef: string; version: string }>(`${P(id)}/settings`, body),
@@ -228,15 +241,15 @@ export const BACKUP_URL = '/api/backup';
 
 // WP-22 (UX-008, FE-015): the one problems model of a project and the team's "reviewed" marks (backend services/problems.ts)
 export type ProblemState = 'open' | 'reviewed' | 'waived';
-export interface ReviewMark { key: string; by: string; byName: string | null; at: string }
+export interface ReviewMark { key: string; by: string; byName: string | null; at: string; note?: string }
 export interface ProblemRow {
   key: string; id: string; source: ValidationIssue['source'] | 'applic'; severity: ValidationIssue['sev']; file: string; line: number; rule: string; message: string; detail: string;
-  location: string; state: ProblemState; reviewedBy: string | null; reviewedAt: string | null; waivedBy: string | null;
+  location: string; state: ProblemState; reviewedBy: string | null; reviewedAt: string | null; reviewNote?: string | null; waivedBy: string | null;
 }
 export const problemsApi = {
   list: (id: string) => get<{ ranAt: string | null; problems: ProblemRow[]; summary: Record<ProblemState | 'error' | 'warn' | 'info', number> }>(`${P(id)}/problems`),
   marks: (id: string) => get<{ marks: ReviewMark[] }>(`${P(id)}/problems/reviewed`).then((r) => r.marks),
-  setReviewed: (id: string, keys: string[], reviewed: boolean) => put<{ marks: ReviewMark[] }>(`${P(id)}/problems/reviewed`, { keys, reviewed }).then((r) => r.marks),
+  setReviewed: (id: string, keys: string[], reviewed: boolean, note?: string) => put<{ marks: ReviewMark[] }>(`${P(id)}/problems/reviewed`, note ? { keys, reviewed, note } : { keys, reviewed }).then((r) => r.marks),
 };
 
 export const graphicsApi = {
@@ -285,7 +298,9 @@ export const platformApi = {
   AUDIT_CSV: '/api/admin/maintenance/audit.csv',
   securityPolicy: () => get<{ policy: SecurityPolicy; defaults: SecurityPolicy }>('/api/admin/security-policy'),
   saveSecurityPolicy: (b: Partial<SecurityPolicy>) => put<{ policy: SecurityPolicy }>('/api/admin/security-policy', b).then((r) => r.policy),
-  health: () => get<{ audit: { failures: number; last: { at: string; action: string; error: string } | null; lastVerification?: { at: string; ok: boolean; summary: string } | null } | null }>('/api/admin/health'),
+  health: () => get<{ audit: { failures: number; last: { at: string; action: string; error: string } | null; lastVerification?: { at: string; ok: boolean; summary: string } | null } | null;
+    /** uptime and the data disk (UI redesign screen 6: the Service tile and the Storage card); null on an older server */
+    system?: { uptimeSeconds: number; startedAt: string; disk: { totalBytes: number; freeBytes: number } | null } | null }>('/api/admin/health'),
 };
 
 /** WP-29: the audit viewer's and the export's filters (backend/src/routes/audit.ts auditFilterOf). */
