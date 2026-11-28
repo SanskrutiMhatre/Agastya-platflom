@@ -51,7 +51,7 @@ input[type='file'].input { padding: 4px; height: auto; }
 .form-section:first-child { margin-top: 0; }
 .form-errors { color: var(--danger); font-size: 12px; }
 .form-errors ul { margin: 6px 0 0; padding-left: 18px; }
-.check { display: flex; align-items: center; gap: 6px; padding: 4px 0; cursor: pointer; }
+.check { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 
 /* ---------------------------------------------------------------- modal */
 .modal-backdrop { position: fixed; inset: 0; background: var(--scrim); display: grid; place-items: center; z-index: 100; animation: fade 0.12s ease-out; }
