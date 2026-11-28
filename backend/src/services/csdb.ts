@@ -144,9 +144,9 @@ export async function createDm(projectId: string, file: string, xml: string, act
   // A NEW module must fit the project's S1000D configuration (MIC, issue, offered types and codes, SNS). The server decides this, not the form.
   // Imports (lenient) are brought in as they are: validation and the publication gate report what does not fit.
   if (!lenient && !opts.fromRepository && !opts.revisionOf) assertNewDmAllowed(projectId, xml);   // a revision of a module the project already holds is not a NEW module
-  // WP-11: atomic, and refused when its revision cannot be recorded. Phase 8: through the grouped writer (a group of one), so the flush runs
-  // off the event loop; the uniqueness and existence checks run again right before the rename (another create may have come in meanwhile)
-  await saveNewRevisionedBatch(projectId, [{ relOrAbs: at, text: xml }], actor, 'create', () => assertUnique(projectId, file, xml));
+  // WP-11: atomic, and refused when its revision cannot be recorded. (Phase 8 measured a single create through the grouped writer: slower,
+  // median 46-50 ms against 24 ms at 1,000 modules, docs/phase3/cleanup-backend.md item 3; the one-file writer stays.)
+  await saveRevisioned(projectId, at, xml, actor, 'create');
   noteDmWritten(projectId, file, xml);                                   // WP-17: the identity index learns the new module
   return { file, hash: sha(xml), modified: modifiedOf(projectId, at) };
 }

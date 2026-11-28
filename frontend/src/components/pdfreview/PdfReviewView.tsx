@@ -189,8 +189,8 @@ export function PdfReviewView({ projectId, initialKey, initialId, onKeyChange }:
           {key ? <a className="btn sm subtle" href={pdfReviewApi.exportUrl(projectId, 'csv', key)} download data-testid="pdf-export-csv" title="The comments of this PDF as a spreadsheet"><Icon name="download" size={14} />CSV</a> : null}
           {key ? <a className="btn sm subtle" href={pdfReviewApi.exportUrl(projectId, 'xfdf', key)} download data-testid="pdf-export-xfdf" title="The comments as XFDF, for Acrobat or another PDF reader"><Icon name="download" size={14} />XFDF</a> : null}
           {key && can?.create ? (
-            <label className="btn sm subtle" data-testid="pdf-import-xfdf" title="Comments made in Acrobat or another PDF reader (an .xfdf file) become comments on this PDF">
-              <Icon name="upload" size={14} />Import XFDF
+            <label className="btn sm subtle" data-testid="pdf-import-xfdf" aria-label="Import XFDF" title="Import XFDF: comments made in Acrobat or another PDF reader (an .xfdf file) become comments on this PDF">
+              <Icon name="upload" size={14} />
               <input type="file" accept=".xfdf,application/vnd.adobe.xfdf,text/xml" hidden data-testid="pdf-import-xfdf-file" onChange={(e) => {
                 const f = e.target.files?.[0]; e.target.value = ''; if (!f || !key) return;
                 void f.text().then((xfdf) => pdfReviewApi.importXfdf(projectId, key, xfdf)).then((r) => {
