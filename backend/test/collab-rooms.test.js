@@ -305,7 +305,9 @@ test('structural edits merge deterministically: an element added by one and anot
   Y.applyUpdate(one, Y.encodeStateAsUpdate(base)); Y.applyUpdate(two, Y.encodeStateAsUpdate(base));
   const paraOf = (d) => findEl(d.getXmlFragment('xml'), 'para');
   // one adds a new paragraph after the first; two splits nothing but removes the first paragraph's text and adds its own
-  const p1 = paraOf(one); const parent1 = p1.parent; const at = parent1.toArray().indexOf(p1);
+  // the paragraph is a block (schema 2): its place among its siblings is its placeholder's
+  const ydom = require('../dist/shared/collab/ydom');
+  const p1 = paraOf(one); const parent1 = ydom.treeParent(p1); const at = ydom.liveKids(parent1).find((k) => k.y === p1).raw;
   const np = new Y.XmlElement('para'); const nt = new Y.XmlText(); nt.insert(0, 'NEW PARAGRAPH'); np.insert(0, [nt]);
   parent1.insert(at + 1, [np]);
   const t2 = firstText(paraOf(two)); t2.delete(0, t2.length); t2.insert(0, 'REWRITTEN');
@@ -315,6 +317,46 @@ test('structural edits merge deterministically: an element added by one and anot
   assert.equal(s1, s2, 'the same document on both sides');
   assert.match(s1, /REWRITTEN/); assert.match(s1, /NEW PARAGRAPH/);
   assert.ok(s1.indexOf('REWRITTEN') < s1.indexOf('NEW PARAGRAPH'), 'the new paragraph stays after the one it followed');
+});
+
+// Phase 8: rooms stored before schema 2 (no blocks, no placeholders) are read exactly as before and migrate lazily (docs/phase3/cleanup-collab.md)
+test('a room stored before schema 2 reads unchanged; a reconcile and a move work in it, and the moved element becomes a block', () => {
+  const xmlMod = require('../dist/services/collab/xml');
+  const ydom = require('../dist/shared/collab/ydom');
+  const once = xmlMod.serializeY(xmlMod.yFromText(h.sample(DM)));
+  // a schema-1 document: the tree holds every element itself (what loadInto wrote before Phase 8)
+  const legacy = new Y.Doc();
+  const parsed = xmlMod.parse(once);
+  legacy.transact(() => {
+    const kids = ydom.domChildren(parsed.doc).map((c) => ydom.yFromDom(c)).filter(Boolean);
+    legacy.getXmlFragment('xml').insert(0, kids);
+    ydom.writeXmlDecl(legacy, parsed.xmlDecl); ydom.writeDoctype(legacy, parsed.doctype); legacy.getMap('meta').set('schema', 1);
+  });
+  assert.equal(legacy.getMap('blocks').size, 0);
+  assert.equal(xmlMod.serializeY(legacy), once, 'read byte for byte as before');
+  // an old client (a pending update made against schema 1) types in it while the server moves the first paragraph down
+  const other = new Y.Doc(); Y.applyUpdate(other, Y.encodeStateAsUpdate(legacy));
+  const t = firstText(findEl(other.getXmlFragment('xml'), 'para')); const words = t.toString(); t.insert(t.length, ' LEGACY-TYPING');
+  const paras = once.match(/<para>[^<]*<\/para>/g);
+  const moved = once.replace(paras[0], '').replace(paras[1], `${paras[1]}${paras[0]}`);
+  xmlMod.reconcileText(legacy, moved);
+  assert.equal(xmlMod.serializeY(legacy), xmlMod.serializeY(xmlMod.yFromText(moved)), 'the move lands');
+  assert.ok(legacy.getMap('blocks').size >= 1, 'the element moved is now a block');
+  Y.applyUpdate(legacy, Y.encodeStateAsUpdate(other, Y.encodeStateVector(legacy)));
+  Y.applyUpdate(other, Y.encodeStateAsUpdate(legacy, Y.encodeStateVector(other)));
+  assert.equal(xmlMod.serializeY(legacy), xmlMod.serializeY(other), 'converged');
+  assert.ok(xmlMod.serializeY(legacy).includes(words), 'the paragraph is there');
+  // after the first move it is a block: a second move keeps concurrent typing
+  const third = new Y.Doc(); Y.applyUpdate(third, Y.encodeStateAsUpdate(legacy));
+  const cur = xmlMod.serializeY(legacy); const ps = cur.match(/<para>[^<]*<\/para>/g); const mine = ps.find((p) => p.includes(words.slice(0, 20)));
+  const back = cur.replace(mine, '').replace(ps[0] === mine ? ps[1] : ps[0], (m) => `${mine}${m}`);
+  const yt = (() => { let hit = null; const walk = (n) => ydom.ychildren(n).forEach((c) => { if (hit) return; if (c instanceof Y.XmlText && c.toString().startsWith(words.slice(0, 20))) hit = c; else if (c instanceof Y.XmlElement) walk(c); }); walk(third.getXmlFragment('xml')); return hit; })();
+  assert.ok(yt); yt.insert(0, 'SECOND-TYPING ');
+  xmlMod.reconcileText(legacy, back);
+  Y.applyUpdate(legacy, Y.encodeStateAsUpdate(third, Y.encodeStateVector(legacy)));
+  Y.applyUpdate(third, Y.encodeStateAsUpdate(legacy, Y.encodeStateVector(third)));
+  assert.equal(xmlMod.serializeY(legacy), xmlMod.serializeY(third));
+  assert.equal(xmlMod.serializeY(legacy).split('SECOND-TYPING').length - 1, 1, 'the second move keeps the typing, once');
 });
 
 test('the server form is stable: every sample module round-trips Y -> XML -> Y -> XML unchanged, and a reconcile lands on the new text', () => {

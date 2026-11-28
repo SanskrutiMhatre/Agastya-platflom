@@ -121,7 +121,7 @@ test('a reconcile changes only what differs: an untouched paragraph keeps its id
   const target = firstPara(m, 1); assert.ok(target, 'chapter 2 has a paragraph');
   const before = plainOf(target.inline);
   // find the Y text of that paragraph
-  const findText = (ydoc, s) => { let hit = null; const walk = (n) => n.forEach((c) => { if (hit) return; if (c instanceof Y.XmlText && c.toString() === s) hit = c; else if (c instanceof Y.XmlElement) walk(c); }); walk(ydoc.getXmlFragment('xml')); return hit; };
+  const findText = (ydoc, s) => { let hit = null; const walk = (n) => require('../dist/shared/collab/ydom').ychildren(n).forEach((c) => { if (hit) return; if (c instanceof Y.XmlText && c.toString() === s) hit = c; else if (c instanceof Y.XmlElement) walk(c); }); walk(ydoc.getXmlFragment('xml')); return hit; };
   const yt = findText(base, before); assert.ok(yt, 'the paragraph text is one Y text');
   // another person's unwritten typing in it
   const other = fork(base); findText(other, before).insert(0, 'UNWRITTEN ');
@@ -180,6 +180,50 @@ test('concurrent edits merge deterministically: one paragraph character by chara
   exchange(e, f);
   assert.equal(jsg.jsgFromY(e), jsg.jsgFromY(f));
   assert.ok(['3', '4'].includes(view(modelOf(e)).parts[0].qty));
+});
+
+// Phase 8: a moved block or plate is re-placed, not deleted and re-created (ydom.ts schema 2), so an edit inside it at the same time is kept
+test('a handbook block moved (Move down) and a section reordered by one author while the other types in them: converged, the typing kept once', () => {
+  const a = new Y.Doc(); jsg.jsgToY(SAMPLE('jsg-uhb'), a); const b = fork(a);
+  const sec = (m) => m.chapters[0].sections[0];
+  assert.equal(sec(modelOf(a)).children[0].k, 'para');
+  const words = plainOf(sec(modelOf(a)).children[0].inline);
+  // Ann: the section's opening paragraph down one place (below the first clause), and the chapter's last section to the front
+  edit(a, (m) => { const ch = sec(m).children; const [p] = ch.splice(0, 1); ch.splice(1, 0, p); });
+  const lastTitle = modelOf(a).chapters[1].sections.at(-1).title;
+  edit(a, (m) => { const ss = m.chapters[1].sections; ss.unshift(ss.pop()); });
+  // Ben, at the same moment: types in that paragraph and in the moved section's opening paragraph
+  edit(b, (m) => { const p = sec(m).children[0]; p.inline = [{ t: 'text', text: `${plainOf(p.inline)} MOVED-TYPING` }]; });
+  edit(b, (m) => { const p = m.chapters[1].sections.at(-1).children[0]; p.inline = [{ t: 'text', text: `SECTION-TYPING ${plainOf(p.inline)}` }]; });
+  exchange(a, b);
+  const text = jsg.jsgFromY(a);
+  assert.equal(text, jsg.jsgFromY(b), 'the same document on both sides');
+  assert.equal(text.split('MOVED-TYPING').length - 1, 1, 'the moved paragraph once, with the typing');
+  assert.equal(text.split('SECTION-TYPING').length - 1, 1, 'the moved section once, with the typing');
+  const m = modelOf(a);
+  assert.equal(sec(m).children[0].k, 'clause'); assert.equal(sec(m).children[1].k, 'para');
+  assert.equal(plainOf(sec(m).children[1].inline), `${words} MOVED-TYPING`, 'the paragraph is one place down, with the typing');
+  assert.equal(m.chapters[1].sections[0].title, lastTitle, 'the section is first');
+  assert.ok(plainOf(m.chapters[1].sections[0].children[0].inline).startsWith('SECTION-TYPING'), 'with the typing');
+  assert.equal(m.chapters[1].sections.length, 3);
+  assert.equal(jsg.canonicalJsg(text), text, 'still the editor\'s form');
+});
+
+test('an ISPL plate moved by one author while the other edits a parts row in it: converged, the edit kept, the plate there once', () => {
+  const c = new Y.Doc(); jsg.jsgToY(SAMPLE('jsg-ispl'), c); const d = fork(c);
+  const plates = modelOf(c).plates; assert.ok(plates.length >= 2, 'the reference parts list has plates to move');
+  const ref = plates[0].ref;
+  edit(c, (m) => { const [p] = m.plates.splice(0, 1); m.plates.splice(1, 0, p); });       // Move down (the plate toolbar's arrow)
+  edit(d, (m) => { m.plates[0].views[0].parts[0].designation = 'PART-EDIT-WHILE-MOVED'; m.plates[0].title = `${m.plates[0].title} RETITLED`; });
+  exchange(c, d);
+  const text = jsg.jsgFromY(c);
+  assert.equal(text, jsg.jsgFromY(d));
+  const m = modelOf(c);
+  assert.equal(m.plates.length, plates.length, 'no plate lost or doubled');
+  assert.equal(m.plates[1].ref, ref, 'the plate moved down');
+  assert.equal(m.plates[1].views[0].parts[0].designation, 'PART-EDIT-WHILE-MOVED', 'the row edit is in the moved plate');
+  assert.ok(m.plates[1].title.endsWith(' RETITLED'));
+  assert.equal(text.split('PART-EDIT-WHILE-MOVED').length - 1, 1);
 });
 
 test('two editors in one handbook paragraph over the socket: merged, acknowledged, written to the project file in the editor\'s form; a reviewer is read-only', async () => {

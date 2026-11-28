@@ -24,9 +24,11 @@ import { toBase64, fromBase64 } from '../../../backend/src/shared/collab/protoco
 
 type YAny = Y.XmlElement | Y.XmlText | Y.XmlFragment;
 const isY = (c: unknown): c is ydom.YNode => c instanceof Y.XmlElement || c instanceof Y.XmlText;
-const ykids = (y: YAny): ydom.YNode[] => (y instanceof Y.XmlText ? [] : y.toArray().filter(isY));
-const yParent = (y: ydom.YNode): unknown => (y as unknown as { parent: unknown }).parent;
-const yDeleted = (y: unknown): boolean => !!(y as { _item?: { deleted?: boolean } | null })._item?.deleted;
+// the tree as the document has it (schema 2): a block's element stands where its live placeholder is
+const ykids = (y: YAny): ydom.YNode[] => ydom.ychildren(y);
+const yDeleted = (y: unknown): boolean => ydom.isDeleted(y);
+/** a Y node's depth in the document's tree (events are applied parents first) */
+const yDepth = (y: unknown): number => { let k = 0; for (let p = ydom.treeParent(y); p && k < 10_000; p = ydom.treeParent(p)) k++; return k; };
 const asX = (n: Node): XNode => n as unknown as XNode;
 const asNode = (n: XNode): Node => n as unknown as Node;
 
@@ -61,20 +63,23 @@ export class DomBinding {
   readonly undo: Y.UndoManager;
   private readonly frag: Y.XmlFragment;
   private readonly onChange = (e: Event): void => this.local((e as CustomEvent<ChangeEvent>).detail);
-  private readonly onDeep = (events: Array<Y.YEvent<YAny>>, tr: Y.Transaction): void => this.remote(events, tr);
   private readonly onMeta = (_e: unknown, tr: Y.Transaction): void => this.remoteMeta(tr);
+  private unobserve: (() => void) | null = null;
+  /** the blocks of the local change being pushed (one per transaction) and the moved DOM nodes whose content follows the move */
+  private blocks: ydom.Blocks | null = null;
+  private moved: Node[] = [];
 
   constructor(readonly doc: EditorDocument, readonly ydoc: Y.Doc, private opts: BindingOptions) {
     this.frag = ydoc.getXmlFragment(ydom.ROOT);
     this.bindAll();
-    this.undo = new Y.UndoManager([this.frag, ydoc.getMap(ydom.META), ydoc.getArray(ydom.DECLS)], { trackedOrigins: new Set([ORIGIN_LOCAL]), captureTimeout: 600 });
+    this.undo = new Y.UndoManager(ydom.undoScope(ydoc, ydoc.getMap(ydom.META), ydoc.getArray(ydom.DECLS)), { trackedOrigins: new Set([ORIGIN_LOCAL]), captureTimeout: 600 });
     // the caret goes back to where the undone change was
     this.undo.on('stack-item-added', (ev: { stackItem: { meta: Map<string, unknown> } }) => { const r = this.relOf(this.doc.selection?.focus ?? null); if (r) ev.stackItem.meta.set('sel', r); });
     this.undo.on('stack-item-popped', (ev: { stackItem: { meta: Map<string, unknown> } }) => {
       const r = ev.stackItem.meta.get('sel'); const p = typeof r === 'string' ? this.posOf(r) : null;
       if (p) this.doc.selection = { anchor: p, focus: p };
     });
-    this.frag.observeDeep(this.onDeep);
+    this.unobserve = ydom.observeTree(ydoc, (events, tr) => this.remote(events, tr));
     ydoc.getMap(ydom.META).observe(this.onMeta);
     ydoc.getArray(ydom.DECLS).observe(this.onMeta);
     doc.addEventListener('change', this.onChange);
@@ -82,7 +87,7 @@ export class DomBinding {
 
   destroy(): void {
     this.doc.removeEventListener('change', this.onChange);
-    this.frag.unobserveDeep(this.onDeep);
+    this.unobserve?.(); this.unobserve = null;
     this.ydoc.getMap(ydom.META).unobserve(this.onMeta);
     this.ydoc.getArray(ydom.DECLS).unobserve(this.onMeta);
     this.undo.destroy();
@@ -110,7 +115,11 @@ export class DomBinding {
     let fi = 0;
     for (const yc of ykids(y)) {
       let dc = this.y2d.get(yc);
-      if (dc && dc.parentNode !== d) dc = undefined;
+      if (dc && dc.parentNode !== d) {
+        // a block someone moved: its element moves here as it is (the caret in it and its identity stay), brought up to date first
+        if (dc.nodeType === 1 && ydom.blockId(yc) !== null && !dc.contains(d)) this.pullNode(yc, dc, true);
+        else dc = undefined;
+      }
       if (!dc) {
         // an unbound DOM node of the same kind at this place is the same node (binding a document opened from the room's own text)
         while (fi < free.length && free[fi].parentNode !== d) fi++;
@@ -181,10 +190,28 @@ export class DomBinding {
     if (next2.anchor !== sel.anchor || next2.focus !== sel.focus) this.doc.selection = next2;
   }
 
-  private remote(events: Array<Y.YEvent<YAny>>, tr: Y.Transaction): void {
+  private remote(events: Array<Y.YEvent<Y.AbstractType<unknown>>>, tr: Y.Transaction): void {
     if (tr.origin === ORIGIN_LOCAL) return;
     const kind = tr.origin === this.undo ? (this.historyKind ?? 'undo') : 'remote';
-    const sorted = [...events].sort((a, b) => a.path.length - b.path.length);
+    const blocksMap = this.ydoc.getMap(ydom.BLOCKS); const placeMap = this.ydoc.getMap(ydom.PLACE);
+    // a block placed elsewhere (a move; or two people moving it at once, where the placement decides which placeholder counts): the
+    // parents of its old and its new placeholder are drawn again
+    const replaced = new Set<YAny>();
+    const tree: Array<Y.YEvent<Y.AbstractType<unknown>>> = [];
+    for (const ev of events) {
+      if (ev.target === blocksMap) continue;                       // a block added or dropped: its placeholder's parent says where
+      if (ev.target === placeMap) {
+        for (const id of (ev as unknown as Y.YMapEvent<unknown>).keysChanged) {
+          const was = ydom.lastPlacementParent(this.ydoc, id);         // first: placeholderOf() below updates what was last seen
+          if (was) replaced.add(was);
+          const ph = ydom.placeholderOf(this.ydoc, id); const now = ph ? ydom.treeParent(ph) : null;
+          if (now) replaced.add(now);
+        }
+        continue;
+      }
+      tree.push(ev);
+    }
+    const sorted = tree.map((ev) => ({ ev, depth: yDepth(ev.target) })).sort((a, b) => a.depth - b.depth).map((x) => x.ev);
     this.applying = true;
     try {
       this.doc.applyRemote(kind === 'remote' ? 'Change by another author' : kind === 'undo' ? 'Undo' : 'Redo', () => {
@@ -194,8 +221,13 @@ export class DomBinding {
           const d = t === this.frag ? this.doc.xml : this.y2d.get(t);
           if (!d || (d !== this.doc.xml && !this.doc.xml.contains(d))) continue;
           if (t instanceof Y.XmlText) { this.setText(d, ydom.textValue(t)); continue; }
-          if (t instanceof Y.XmlElement && (ev as Y.YXmlEvent).attributesChanged.size) this.pullNode(t, d, false);
-          if (ev.changes.delta.length) this.pull(t, d, false);
+          if (t instanceof Y.XmlElement && (ev as unknown as Y.YXmlEvent).attributesChanged.size) this.pullNode(t, d, false);
+          if (ev.changes.delta.length && (t instanceof Y.XmlElement || t instanceof Y.XmlFragment)) { this.pull(t, d, false); replaced.delete(t); }
+        }
+        for (const p of [...replaced].sort((a, b) => yDepth(a) - yDepth(b))) {
+          if (yDeleted(p)) continue;
+          const d = p === this.frag ? this.doc.xml : this.y2d.get(p);
+          if (d && (d === this.doc.xml || this.doc.xml.contains(d))) this.pull(p, d, false);
         }
       }, kind);
     } finally { this.applying = false; }
@@ -231,7 +263,13 @@ export class DomBinding {
     const typing = /^(Typing|Delete backward|Delete forward)$/.test(ev.label);
     if (!typing) this.undo.stopCapturing();
     this.ydoc.transact(() => {
-      for (const t of targets) this.push(t);
+      this.blocks = new ydom.Blocks(this.ydoc); this.moved = [];
+      try {
+        for (const t of targets) this.push(t);
+        // an element moved (Move up/down, nest, un-nest, a header row): its block was re-placed; what changed inside it goes now
+        for (let i = 0; i < this.moved.length; i++) if (this.doc.xml.contains(this.moved[i])) this.pushDeep(this.moved[i]);
+        this.blocks.commit();
+      } finally { this.blocks = null; this.moved = []; }
       if (ev.doctypeChanged) ydom.writeDoctype(this.ydoc, this.doc.doctype);
       ydom.writeXmlDecl(this.ydoc, this.doc.xmlDecl);
     }, ORIGIN_LOCAL);
@@ -269,8 +307,14 @@ export class DomBinding {
     for (const c of ydom.domChildren(asX(t)).map(asNode)) this.pushDeep(c);
   }
 
-  /** Make the Y children of `y` those of `d`: keep the longest run of children still there in the same order, delete and insert the rest. */
+  /**
+   * Make the Y children of `y` those of `d`: keep the longest run of children still there in the same order; a child bound to a block that
+   * stands elsewhere (moved here, or out of order here) re-places that block (schema 2: its content, and anyone's typing in it, stays);
+   * delete and insert the rest.
+   */
   private pushChildren(d: Node, y: Y.XmlElement | Y.XmlFragment): void {
+    const own = !this.blocks;
+    const blocks = this.blocks ?? new ydom.Blocks(this.ydoc);
     const dk = ydom.domChildren(asX(d)).map(asNode);
     const yk = ykids(y);
     const index = new Map<unknown, number>(); yk.forEach((c, i) => index.set(c, i));
@@ -278,29 +322,26 @@ export class DomBinding {
     const cand: Array<{ di: number; yi: number }> = [];
     dk.forEach((c, di) => {
       const b = this.d2y.get(c);
-      if (b && isY(b) && yParent(b) === y && !yDeleted(b) && ydom.kindOfDom(asX(c)) === ydom.kindOfY(b)) { const yi = index.get(b); if (yi !== undefined) cand.push({ di, yi }); }
+      if (b && isY(b) && !yDeleted(b) && ydom.kindOfDom(asX(c)) === ydom.kindOfY(b)) { const yi = index.get(b); if (yi !== undefined) cand.push({ di, yi }); }
     });
     const keepIdx = lis(cand.map((c) => c.yi));
-    const keptY = new Set<number>(); const keptD = new Set<number>();
-    cand.forEach((c, i) => { if (keepIdx.has(i)) { keptY.add(c.yi); keptD.add(c.di); } });
-    // delete what is not kept, from the end (runs at once)
-    for (let i = yk.length - 1; i >= 0;) {
-      if (keptY.has(i)) { i--; continue; }
-      let j = i; while (j - 1 >= 0 && !keptY.has(j - 1)) j--;
-      y.delete(j, i - j + 1);
-      i = j - 1;
-    }
-    // insert the new ones at their places (consecutive new ones in one insert)
-    let at = 0; let run: ydom.YNode[] = []; let runAt = 0;
-    const flush = (): void => { if (run.length) { y.insert(runAt, run); at += run.length; run = []; } };
+    const keptD = new Map<number, ydom.YNode>();
+    cand.forEach((c, i) => { if (keepIdx.has(i)) keptD.set(c.di, yk[c.yi]); });
+    const reuse = (n: XNode): Y.XmlElement | null => {
+      const b = this.d2y.get(asNode(n));
+      if (!(b instanceof Y.XmlElement) || yDeleted(b) || ydom.blockId(b) === null || b.nodeName !== n.nodeName) return null;
+      this.moved.push(asNode(n));
+      return b;
+    };
+    const seq: Array<{ keep: ydom.YNode } | { add: ydom.YNode }> = [];
     dk.forEach((c, di) => {
-      if (keptD.has(di)) { flush(); at++; return; }
-      const made = ydom.yFromDom(asX(c), this.binder);
-      if (!made) return;
-      if (!run.length) runAt = at;
-      run.push(made);
+      const k = keptD.get(di);
+      if (k) { seq.push({ keep: k }); return; }
+      const made = blocks.make(asX(c), asX(d), this.binder, reuse);
+      if (made) seq.push({ add: made });
     });
-    flush();
+    ydom.setChildren(y, seq, blocks);
+    if (own) blocks.commit();
   }
 
   // ------------------------------------------------------------- history and positions
@@ -325,7 +366,9 @@ export class DomBinding {
     if (!pos || !pos.node.isConnected) return null;
     const y = this.d2y.get(pos.node);
     if (!y || yDeleted(y)) return null;
-    try { return toBase64(Y.encodeRelativePosition(Y.createRelativePositionFromTypeIndex(y, pos.offset))); } catch { return null; }
+    // a point between an element's children: the DOM index is a live one (a stale placeholder is not a child); Y counts raw children
+    const index = y instanceof Y.XmlText ? pos.offset : ydom.rawIndex(y, pos.offset);
+    try { return toBase64(Y.encodeRelativePosition(Y.createRelativePositionFromTypeIndex(y, index))); } catch { return null; }
   }
   posOf(rel: string): ModelPos | null {
     try {
@@ -333,7 +376,8 @@ export class DomBinding {
       if (!abs) return null;
       const d = abs.type === this.frag ? this.doc.xml : this.y2d.get(abs.type);
       if (!d || !d.isConnected) return null;
-      return { node: d, offset: abs.index };
+      const t = abs.type as unknown;
+      return { node: d, offset: t instanceof Y.XmlElement || t instanceof Y.XmlFragment ? ydom.liveIndex(t, abs.index) : abs.index };
     } catch { return null; }
   }
   /** The Y node of a DOM node (comments anchor to it). */

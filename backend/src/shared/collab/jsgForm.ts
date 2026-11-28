@@ -48,8 +48,8 @@ export function normalizeJsgDom(el: XNode, parent: string | null = null): void {
   }
 }
 
-const isY = (c: unknown): c is ydom.YNode => c instanceof Y.XmlElement || c instanceof Y.XmlText;
-export const ykids = (y: ydom.YParent): ydom.YNode[] => y.toArray().filter(isY);
+/** The children of a Y parent as the document has them (a block where its live placeholder is, ydom.ts schema 2). */
+export const ykids = (y: ydom.YParent): ydom.YNode[] => ydom.ychildren(y);
 
 /** The longest common subsequence of a and b under eq (index pairs, increasing). Quadratic: only for the changed middle of one parent. */
 function lcs<A, B>(a: A[], b: B[], eq: (x: A, y: B) => boolean): Array<[number, number]> {
@@ -64,56 +64,90 @@ function lcs<A, B>(a: A[], b: B[], eq: (x: A, y: B) => boolean): Array<[number, 
 }
 const LCS_LIMIT = 40_000;
 
+type Eq = (a: XNode, b: XNode) => boolean;
+
 /**
  * Make the Y parent `y` hold the content of the DOM node `next`, changing as little as possible. `cur` is a DOM form of what `y` holds now, child
  * for child (domChildren(cur)[i] stands for ykids(y)[i]): the browser keeps one (its shadow of the room), the server builds one from Y. `eq` says
  * whether two DOM subtrees are the same (the browser: Node.isEqualNode; the server: their canonical text). Call inside a transaction.
+ *
+ * A child that is unchanged but stands somewhere else among its siblings (a block or a plate moved up or down) is MOVED: its block is re-placed
+ * (ydom.ts schema 2), so what another person types in it at that moment is kept. New elements become blocks.
  */
-export function reconcileKeyed(y: ydom.YParent, cur: XNode, next: XNode, eq: (a: XNode, b: XNode) => boolean): void {
+export function reconcileKeyed(y: ydom.YParent, cur: XNode, next: XNode, eq: Eq, blocks?: ydom.Blocks): void {
+  const b = blocks ?? new ydom.Blocks(y.doc as Y.Doc);
+  keyed(y, cur, next, eq, b);
+  if (!blocks) b.commit();
+}
+
+function keyed(y: ydom.YParent, cur: XNode, next: XNode, eq: Eq, blocks: ydom.Blocks): void {
   if (y instanceof Y.XmlElement && next.nodeType === 1) ydom.syncAttributes(y, next);
   const yk = ykids(y);
   const ck = ydom.domChildren(cur);
   const nk = ydom.domChildren(next);
   if (ck.length !== yk.length) {
     // the form does not stand for Y child for child (should not happen): rebuild this parent's children from scratch
-    if (yk.length) y.delete(0, yk.length);
-    const fresh = nk.map((n) => ydom.yFromDom(n)).filter((x): x is ydom.YNode => !!x);
-    if (fresh.length) y.insert(0, fresh);
+    const seq = nk.map((n) => blocks.make(n, next)).filter((x): x is ydom.YNode => !!x).map((add) => ({ add }));
+    ydom.setChildren(y, seq, blocks);
     return;
   }
   let s = 0;
   while (s < ck.length && s < nk.length && eq(ck[s], nk[s])) s++;
   let e = 0;
   while (e < ck.length - s && e < nk.length - s && eq(ck[ck.length - 1 - e], nk[nk.length - 1 - e])) e++;
+  const stale = y.length !== yk.length;                 // placeholders of a block two people moved at once: tidied away
+  if (s === ck.length && s === nk.length && !stale) return;
+  // newTo[j]: the old child new child j is (equal: 'same'; edited in place: 'pair'; equal but moved: 'move'), or -1 (new)
+  const newTo = new Array<number>(nk.length).fill(-1);
+  const mode = new Array<'same' | 'pair' | 'move' | ''>(nk.length).fill('');
+  for (let i = 0; i < s; i++) { newTo[i] = i; mode[i] = 'same'; }
+  for (let i = 0; i < e; i++) { newTo[nk.length - 1 - i] = ck.length - 1 - i; mode[nk.length - 1 - i] = 'same'; }
   const midC = ck.slice(s, ck.length - e); const midN = nk.slice(s, nk.length - e);
-  if (!midC.length && !midN.length) return;
   const anchors = midC.length && midN.length && midC.length * midN.length <= LCS_LIMIT ? lcs(midC, midN, eq) : [];
-  // the gaps between the anchors, last first (so the Y indices of the earlier ones stay where they are)
+  const usedOld = new Set<number>();
+  for (const [ci, ni] of anchors) { newTo[s + ni] = s + ci; mode[s + ni] = 'same'; usedOld.add(s + ci); }
+  // moves: an unanchored new child equal to an unanchored old one that is a block
+  const freeOld: number[] = []; for (let i = s; i < ck.length - e; i++) if (!usedOld.has(i) && ydom.blockId(yk[i]) !== null) freeOld.push(i);
+  const freeNew: number[] = []; for (let j = s; j < nk.length - e; j++) if (newTo[j] < 0) freeNew.push(j);
+  if (freeOld.length && freeNew.length && freeOld.length * freeNew.length <= LCS_LIMIT) {
+    for (const j of freeNew) {
+      const k = freeOld.findIndex((i) => !usedOld.has(i) && ydom.kindOfDom(ck[i]) === ydom.kindOfDom(nk[j]) && eq(ck[i], nk[j]));
+      if (k >= 0) { newTo[j] = freeOld[k]; mode[j] = 'move'; usedOld.add(freeOld[k]); }
+    }
+  }
+  // the gaps between the anchors: same-kind children at both ends of a gap are the same child edited (an edited paragraph is the same paragraph)
   const gaps: Array<{ c0: number; c1: number; n0: number; n1: number }> = [];
   let pc = 0, pn = 0;
   for (const [ci, ni] of anchors) { gaps.push({ c0: pc, c1: ci, n0: pn, n1: ni }); pc = ci + 1; pn = ni + 1; }
   gaps.push({ c0: pc, c1: midC.length, n0: pn, n1: midN.length });
-  for (let g = gaps.length - 1; g >= 0; g--) {
-    const { c0, c1, n0, n1 } = gaps[g];
-    const oc = midC.slice(c0, c1); const on = midN.slice(n0, n1);
-    if (!oc.length && !on.length) continue;
-    const base = s + c0;
+  for (const g of gaps) {
+    const oc: number[] = []; for (let i = s + g.c0; i < s + g.c1; i++) if (!usedOld.has(i)) oc.push(i);
+    const on: number[] = []; for (let j = s + g.n0; j < s + g.n1; j++) if (newTo[j] < 0) on.push(j);
     const kind = (d: XNode) => ydom.kindOfDom(d);
-    // pair same-kind nodes from both ends of the gap (an edited paragraph is the same paragraph), replace the rest
-    let p = 0; while (p < oc.length && p < on.length && kind(oc[p]) === kind(on[p])) p++;
-    let q = 0; while (q < oc.length - p && q < on.length - p && kind(oc[oc.length - 1 - q]) === kind(on[on.length - 1 - q])) q++;
-    for (let k = q - 1; k >= 0; k--) pairNode(yk[base + oc.length - 1 - k], oc[oc.length - 1 - k], on[on.length - 1 - k], eq);
-    const drop = oc.length - p - q;
-    if (drop > 0) y.delete(base + p, drop);
-    const add = on.slice(p, on.length - q).map((n) => ydom.yFromDom(n)).filter((x): x is ydom.YNode => !!x);
-    if (add.length) y.insert(base + p, add);
-    for (let k = p - 1; k >= 0; k--) pairNode(yk[base + k], oc[k], on[k], eq);
+    let p = 0; while (p < oc.length && p < on.length && kind(ck[oc[p]]) === kind(nk[on[p]])) p++;
+    let q = 0; while (q < oc.length - p && q < on.length - p && kind(ck[oc[oc.length - 1 - q]]) === kind(nk[on[on.length - 1 - q]])) q++;
+    for (let k = 0; k < p; k++) { newTo[on[k]] = oc[k]; mode[on[k]] = 'pair'; usedOld.add(oc[k]); }
+    for (let k = 0; k < q; k++) { const j = on[on.length - 1 - k]; const i = oc[oc.length - 1 - k]; newTo[j] = i; mode[j] = 'pair'; usedOld.add(i); }
   }
+  const seq: Array<{ keep: ydom.YNode } | { add: ydom.YNode }> = [];
+  const later: Array<[ydom.YNode, XNode, XNode]> = [];
+  for (let j = 0; j < nk.length; j++) {
+    const i = newTo[j];
+    if (i >= 0 && mode[j] !== 'move') { seq.push({ keep: yk[i] }); if (mode[j] === 'pair') later.push([yk[i], ck[i], nk[j]]); continue; }
+    if (i >= 0) {
+      const ph = blocks.replace(yk[i] as Y.XmlElement);
+      if (ph) { seq.push({ add: ph }); later.push([yk[i], ck[i], nk[j]]); continue; }
+    }
+    const made = blocks.make(nk[j], next);
+    if (made) seq.push({ add: made });
+  }
+  ydom.setChildren(y, seq, blocks);
+  for (const [yy, c, n] of later) pairNode(yy, c, n, eq, blocks);
 }
 
-function pairNode(y: ydom.YNode, cur: XNode, next: XNode, eq: (a: XNode, b: XNode) => boolean): void {
+function pairNode(y: ydom.YNode, cur: XNode, next: XNode, eq: Eq, blocks: ydom.Blocks): void {
   if (y instanceof Y.XmlText) { ydom.diffText(y, next.nodeValue ?? ''); return; }
-  if (next.nodeType === 1) reconcileKeyed(y, cur, next, eq);
+  if (next.nodeType === 1) keyed(y, cur, next, eq, blocks);
   else ydom.syncAttributes(y, next);
 }
 
@@ -164,8 +198,8 @@ export function yAt(y: ydom.YParent, path: number[]): ydom.YNode | ydom.YParent 
 export function yPathOf(root: ydom.YParent, y: ydom.YNode | ydom.YParent): number[] | null {
   const out: number[] = [];
   for (let c: unknown = y; c && c !== root;) {
-    const p = (c as { parent: unknown }).parent as ydom.YParent | null;
-    if (!p || !(p instanceof Y.XmlElement || p instanceof Y.XmlFragment)) return null;
+    const p = ydom.treeParent(c);
+    if (!p) return null;
     const i = ykids(p).indexOf(c as ydom.YNode); if (i < 0) return null;
     out.unshift(i);
     c = p;

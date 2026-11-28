@@ -18,6 +18,7 @@
 import * as Y from 'yjs';
 import { roomName, toBase64, fromBase64, type RoomState, type CollabError, type AwarenessState } from '../../../backend/src/shared/collab/protocol';
 import * as yj from '../../../backend/src/shared/jss/yjss';
+import * as ydom from '../../../backend/src/shared/collab/ydom';
 import { LiveRoom, ORIGIN_LOCAL, type LiveStatus } from '../collab/client';
 import { colorFor, PRESENCE_COLORS } from '../collab/cursors';
 import type { JssDoc, Para, Part, KeyItem } from './model';
@@ -66,6 +67,7 @@ export class LiveJss {
     this.publishSoon();
   };
   private readonly observer = (events: Array<Y.YEvent<Y.AbstractType<unknown>>>, txn: Y.Transaction): void => this.onY(events, txn);
+  private unobserve: (() => void) | null = null;
 
   constructor(readonly room: LiveRoom, private readonly user: LiveUser, private readonly events: LiveJssEvents) {
     this.frag = room.doc.getXmlFragment(yj.ROOT);
@@ -74,8 +76,9 @@ export class LiveJss {
     const d = this.reader.doc(this.frag);
     if (!d) throw Object.assign(new Error('The live document holds no JSS document.'), { code: 'NOT_WELL_FORMED' });
     this.model = d;
-    this.undo = new Y.UndoManager(this.frag, { trackedOrigins: new Set([ORIGIN_LOCAL]), captureTimeout: 600 });
-    this.frag.observeDeep(this.observer);
+    // the tree, its blocks and their placements (ydom.ts schema 2: a moved block is re-placed, its content stays)
+    this.undo = new Y.UndoManager(ydom.undoScope(room.doc), { trackedOrigins: new Set([ORIGIN_LOCAL]), captureTimeout: 600 });
+    this.unobserve = ydom.observeTree(room.doc, this.observer);
     room.setEvents({
       state: (s) => this.onState(s),
       status: () => this.events.changed(),
@@ -184,7 +187,7 @@ export class LiveJss {
   /** The text place a Y node is in: a paragraph's or run's inline text, a title, a key item's text. Null: it is structure. */
   private textPlace(t: Y.AbstractType<unknown>): { slot: TextSlot; y: Y.XmlElement } | null {
     let title = false;
-    for (let n: Y.AbstractType<unknown> | null = t; n; n = (n as unknown as { parent: Y.AbstractType<unknown> | null }).parent) {
+    for (let n: unknown = t; n; n = yj.upOf(n)) {
       if (!(n instanceof Y.XmlElement)) { if (n instanceof Y.XmlText) continue; return null; }
       const m = this.maps.yToModel.get(n);
       if (!m) { if (n.nodeName === 'title') { title = true; continue; } if (/^(b|i|u|sup|sub|xref|br)$/.test(n.nodeName)) continue; return null; }
@@ -286,9 +289,9 @@ export class LiveJss {
     const host = (sel.anchorNode?.nodeType === 1 ? (sel.anchorNode as Element) : sel.anchorNode?.parentElement)?.closest('[data-edit]') ?? null;
     const slot = this.editor.slotOf(host); const y = slot ? this.maps.modelToY.get(slot.node) : undefined;
     const parts: number[] = [];
-    for (let n = (y ?? null) as unknown as Y.AbstractType<unknown> | null; n && n !== (this.frag as unknown);  n = (n as unknown as { parent: Y.AbstractType<unknown> | null }).parent) {
-      const p = (n as unknown as { parent: Y.XmlElement | Y.XmlFragment | null }).parent; if (!p) break;
-      parts.unshift(p.toArray().indexOf(n as Y.XmlElement));
+    for (let n: unknown = y ?? null; n && n !== (this.frag as unknown); n = yj.upOf(n)) {
+      const p = yj.upOf(n); if (!p) break;
+      parts.unshift(ydom.ychildren(p).indexOf(n as Y.XmlElement));
     }
     const text = (sel.toString() || host?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 200);
     return { path: parts.length ? parts.join('/') : '0', tag: y?.nodeName ?? 'jssbook', text, y: { start, end } };
@@ -351,7 +354,7 @@ export class LiveJss {
   close(): void {
     if (this.presenceTimer !== null) window.clearTimeout(this.presenceTimer);
     document.removeEventListener('selectionchange', this.onSelection);
-    this.frag.unobserveDeep(this.observer);
+    this.unobserve?.(); this.unobserve = null;
     this.cursors?.destroy();
     this.undo.destroy();
     this.editor?.setCollab(null);

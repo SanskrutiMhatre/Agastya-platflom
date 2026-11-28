@@ -133,18 +133,21 @@ class CollabClient {
   close() { try { this.ws.close(); } catch { /* closed */ } for (const r of this.rooms.values()) { r.awareness.destroy(); r.doc.destroy(); } }
 }
 
+// The tree as the document has it (schema 2, shared/collab/ydom.ts): a block's element where its live placeholder is.
+const kids = (node) => require('../dist/shared/collab/ydom').ychildren(node);
+
 /** The text content of a Y XML tree (for assertions): every Y.XmlText under `node`, in order. */
 function textOf(node) {
   if (node instanceof Y.XmlText) return node.toString().replace(/<[^>]*>/g, '');
   let s = '';
-  node.forEach((c) => { s += textOf(c); });
+  kids(node).forEach((c) => { s += textOf(c); });
   return s;
 }
 
 /** The first Y.XmlElement named `name` (depth first). */
 function findEl(node, name) {
   let hit = null;
-  node.forEach((c) => {
+  kids(node).forEach((c) => {
     if (hit) return;
     if (c instanceof Y.XmlElement) { if (c.nodeName === name) hit = c; else hit = findEl(c, name); }
   });
@@ -154,7 +157,7 @@ function findEl(node, name) {
 /** The first Y.XmlText under `node`. */
 function firstText(node) {
   let hit = null;
-  node.forEach((c) => {
+  kids(node).forEach((c) => {
     if (hit) return;
     if (c instanceof Y.XmlText) hit = c; else if (c instanceof Y.XmlElement) hit = firstText(c);
   });

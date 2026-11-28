@@ -108,8 +108,9 @@ export function reconcileDoc(ydoc: Y.Doc, d: JssDoc, origin?: unknown): void {
 export interface Maps { yToModel: WeakMap<Y.XmlElement, object>; modelToY: WeakMap<object, Y.XmlElement> }
 export const newMaps = (): Maps => ({ yToModel: new WeakMap(), modelToY: new WeakMap() });
 
-const kids = (y: Y.XmlElement | Y.XmlFragment): Array<Y.XmlElement | Y.XmlText> => y.toArray().filter((c): c is Y.XmlElement | Y.XmlText => c instanceof Y.XmlElement || c instanceof Y.XmlText);
-const elems = (y: Y.XmlElement | Y.XmlFragment): Y.XmlElement[] => y.toArray().filter((c): c is Y.XmlElement => c instanceof Y.XmlElement);
+// the tree as the document has it: a block (schema 2) where its live placeholder is (ydom.ts)
+const kids = (y: Y.XmlElement | Y.XmlFragment): Array<Y.XmlElement | Y.XmlText> => ydom.ychildren(y);
+const elems = (y: Y.XmlElement | Y.XmlFragment): Y.XmlElement[] => ydom.ychildren(y).filter((c): c is Y.XmlElement => c instanceof Y.XmlElement);
 const attr = (y: Y.XmlElement, name: string): string | undefined => { const v = y.getAttribute(name) as unknown; return typeof v === 'string' && v !== '' ? v : undefined; };
 /** The characters under an element (its text nodes, in order). */
 export const textIn = (y: Y.XmlElement): string => kids(y).map((c) => (c instanceof Y.XmlText ? ydom.textValue(c) : '')).join('');
@@ -269,15 +270,42 @@ export const readDoc = (ydoc: Y.Doc): JssDoc | null => new Reader().doc(ydoc.get
 /** Elements whose children are reconciled by position (text and inline markup, no model objects among them). */
 const LEAF = new Set(['para', RUN, 'title', 'keyitem', 'graphic', 'pageBreak', 'bookmeta']);
 
-const live = (y: Y.XmlElement): boolean => !!y.doc && !(y as unknown as { _item: { deleted: boolean } | null })._item?.deleted;
+const live = (y: Y.XmlElement): boolean => !!y.doc && !ydom.isDeleted(y);
 
 export class Sync {
   constructor(private readonly maps: Maps) {}
+  /** the blocks of the merge running now (one per public call, committed at its end) */
+  private blocks: ydom.Blocks | null = null;
+  /** blocks re-placed by a merge (a moved section, block, item, row): their content is brought up to date after the move */
+  private moved: Array<[Y.XmlElement, VNode]> = [];
 
   private bind = (d: XNode, y: ydom.YNode): void => {
     const m = (d as unknown as VNode).model;
     if (m && y instanceof Y.XmlElement) { this.maps.yToModel.set(y, m); this.maps.modelToY.set(m, y); }
   };
+
+  /** A model object whose element is a block in the tree: a moved object re-places that block (its content and concurrent edits stay). */
+  private reuse = (d: XNode): Y.XmlElement | null => {
+    const v = d as unknown as VNode;
+    const y = v.model ? this.maps.modelToY.get(v.model) : undefined;
+    if (!y || !live(y) || y.nodeName !== v.nodeName || ydom.blockId(y) === null) return null;
+    this.moved.push([y, v]);
+    return y;
+  };
+
+  /** Run `fn` with one Blocks for the whole merge (nested calls share it). */
+  private run<T>(ydoc: Y.Doc, fn: () => T): T {
+    if (this.blocks) return fn();
+    this.blocks = new ydom.Blocks(ydoc);
+    this.moved = [];
+    try {
+      const out = fn();
+      // a re-placed block's content: what the model holds now (usually unchanged: a move changes no words)
+      for (let i = 0; i < this.moved.length; i++) { const [y, v] = this.moved[i]; this.el(y, v); }
+      this.blocks.commit();
+      return out;
+    } finally { this.blocks = null; this.moved = []; }
+  }
 
   private keyOfY(y: Y.XmlElement | Y.XmlText): unknown {
     if (y instanceof Y.XmlText) return null;
@@ -287,35 +315,50 @@ export class Sync {
 
   /** Make the element `y` what `v` describes. */
   el(y: Y.XmlElement, v: VNode): void {
-    if (LEAF.has(v.nodeName)) { ydom.reconcile(y, asX(v), this.bind); return; }
-    ydom.syncAttributes(y, asX(v));
-    if (v.model) { this.maps.yToModel.set(y, v.model); this.maps.modelToY.set(v.model, y); }
-    this.children(y, v.childNodes);
+    this.run(y.doc as Y.Doc, () => {
+      if (LEAF.has(v.nodeName)) { ydom.reconcile(y, asX(v), this.bind, this.blocks!); return; }
+      ydom.syncAttributes(y, asX(v));
+      if (v.model) { this.maps.yToModel.set(y, v.model); this.maps.modelToY.set(v.model, y); }
+      this.children(y, v.childNodes, v);
+    });
   }
 
-  /** The children of `y` made `want`: a child is kept (and merged) when it stands for the same model object or is the same fixed element. */
-  children(y: Y.XmlElement | Y.XmlFragment, want: VNode[]): void {
-    const cur = kids(y);
-    const at = new Map<unknown, number>();
-    cur.forEach((c, i) => { const k = this.keyOfY(c); if (k !== null && !at.has(k)) at.set(k, i); });
-    const idx = want.map((v) => { const i = at.get(this.keyOfV(v)); return i === undefined || (cur[i] instanceof Y.XmlElement && (cur[i] as Y.XmlElement).nodeName !== v.nodeName) ? -1 : i; });
-    const keep = lis(idx);
-    const kept = new Set<number>(); idx.forEach((i, j) => { if (keep.has(j)) kept.add(i); });
-    for (let i = cur.length - 1; i >= 0; i--) if (!kept.has(i)) y.delete(i, 1);
-    let pos = 0;
-    for (let j = 0; j < want.length; j++) {
-      if (keep.has(j)) { const c = cur[idx[j]]; if (c instanceof Y.XmlElement) this.el(c, want[j]); pos++; continue; }
-      const fresh = ydom.yFromDom(asX(want[j]), this.bind);
-      if (fresh) { y.insert(pos, [fresh]); pos++; }
-    }
+  /**
+   * The children of `y` made `want` (the children of `parent`): a child is kept (and merged) when it stands for the same model object or is
+   * the same fixed element; a model object whose block is elsewhere (moved here, or out of order here) is re-placed, never copied.
+   */
+  children(y: Y.XmlElement | Y.XmlFragment, want: VNode[], parent: VNode | null = null): void {
+    this.run(y.doc as Y.Doc, () => {
+      const cur = kids(y);
+      const at = new Map<unknown, number>();
+      cur.forEach((c, i) => { const k = this.keyOfY(c); if (k !== null && !at.has(k)) at.set(k, i); });
+      const idx = want.map((v) => { const i = at.get(this.keyOfV(v)); return i === undefined || (cur[i] instanceof Y.XmlElement && (cur[i] as Y.XmlElement).nodeName !== v.nodeName) ? -1 : i; });
+      const keep = lis(idx);
+      const seq: Array<{ keep: ydom.YNode } | { add: ydom.YNode }> = [];
+      const merge: Array<[Y.XmlElement, VNode]> = [];
+      for (let j = 0; j < want.length; j++) {
+        if (keep.has(j)) { const c = cur[idx[j]]; seq.push({ keep: c }); if (c instanceof Y.XmlElement) merge.push([c, want[j]]); continue; }
+        const fresh = this.blocks!.make(asX(want[j]), parent ? asX(parent) : null, this.bind, this.reuse);
+        if (fresh) seq.push({ add: fresh });
+      }
+      ydom.setChildren(y, seq, this.blocks!);
+      for (const [c, v] of merge) this.el(c, v);
+    });
   }
 
   /** The whole document (inside a transaction). */
   doc(ydoc: Y.Doc, d: JssDoc): void {
-    const frag = ydoc.getXmlFragment(ROOT);
-    const book = elems(frag).find((c) => c.nodeName === 'jssbook');
-    if (!book) { if (frag.length) frag.delete(0, frag.length); const y = ydom.yFromDom(asX(bookV(d)), this.bind); if (y) frag.insert(0, [y]); return; }
-    this.el(book, bookV(d));
+    this.run(ydoc, () => {
+      const frag = ydoc.getXmlFragment(ROOT);
+      const book = elems(frag).find((c) => c.nodeName === 'jssbook');
+      if (!book) {
+        this.blocks!.del(frag, 0, frag.length);
+        const y = this.blocks!.make(asX(bookV(d)), null, this.bind);
+        if (y) frag.insert(0, [y]);
+        return;
+      }
+      this.el(book, bookV(d));
+    });
   }
 
   /** One model node and what is inside it; false when it is not in the tree (the caller merges the whole document). */
@@ -352,8 +395,14 @@ function lis(a: number[]): Set<number> {
 }
 
 /** The model element that holds a Y node (the node itself or its nearest paired ancestor). */
+/** The node above a Y node in the document: a text's element, an element's parent in the tree (a block: where its placeholder is). */
+export function upOf(n: unknown): Y.XmlElement | Y.XmlFragment | null {
+  if (n instanceof Y.XmlText) { const p = (n as unknown as { parent: unknown }).parent; return p instanceof Y.XmlElement || p instanceof Y.XmlFragment ? p : null; }
+  return ydom.treeParent(n);
+}
+
 export function ownerOf(maps: Maps, y: Y.AbstractType<unknown> | null): { y: Y.XmlElement; model: object } | null {
-  for (let n: Y.AbstractType<unknown> | null = y; n; n = (n as unknown as { parent: Y.AbstractType<unknown> | null }).parent) {
+  for (let n: unknown = y; n; n = upOf(n)) {
     if (n instanceof Y.XmlElement) { const m = maps.yToModel.get(n); if (m) return { y: n, model: m }; }
   }
   return null;
