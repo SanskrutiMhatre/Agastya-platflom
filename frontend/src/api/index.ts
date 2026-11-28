@@ -87,7 +87,10 @@ export interface Summary {
   publication: { totals: Explore['totals']; chapters: number; title: string } | null;
   validation: { ranAt: string; error: number; warn: number; info: number } | null;
   release: { released: boolean; stale: boolean; number: number | null; pending: boolean; scheduledAt: string | null } | null;
-  build: { builtAt: string; size: number } | null;
+  /** `pages`: the page count of the last PDF (null when it cannot be read) */
+  build: { builtAt: string; size: number; pages?: number | null } | null;
+  /** S1000D projects: the issue (4.2, 5.0 ...) and the model identification code, for the Project Home header; null for JSS, JSG and the shared repository */
+  s1000d?: { issue: string; mic: string | null } | null;
   members: number;
   /** WP-22: the review loop (state, round, open comments) and how many findings of the last check the team marked reviewed; null when unknown */
   review?: { state: ReviewState; round: number; open: number } | null;
@@ -230,15 +233,15 @@ export const BACKUP_URL = '/api/backup';
 
 // WP-22 (UX-008, FE-015): the one problems model of a project and the team's "reviewed" marks (backend services/problems.ts)
 export type ProblemState = 'open' | 'reviewed' | 'waived';
-export interface ReviewMark { key: string; by: string; byName: string | null; at: string }
+export interface ReviewMark { key: string; by: string; byName: string | null; at: string; note?: string }
 export interface ProblemRow {
   key: string; id: string; source: ValidationIssue['source'] | 'applic'; severity: ValidationIssue['sev']; file: string; line: number; rule: string; message: string; detail: string;
-  location: string; state: ProblemState; reviewedBy: string | null; reviewedAt: string | null; waivedBy: string | null;
+  location: string; state: ProblemState; reviewedBy: string | null; reviewedAt: string | null; reviewNote?: string | null; waivedBy: string | null;
 }
 export const problemsApi = {
   list: (id: string) => get<{ ranAt: string | null; problems: ProblemRow[]; summary: Record<ProblemState | 'error' | 'warn' | 'info', number> }>(`${P(id)}/problems`),
   marks: (id: string) => get<{ marks: ReviewMark[] }>(`${P(id)}/problems/reviewed`).then((r) => r.marks),
-  setReviewed: (id: string, keys: string[], reviewed: boolean) => put<{ marks: ReviewMark[] }>(`${P(id)}/problems/reviewed`, { keys, reviewed }).then((r) => r.marks),
+  setReviewed: (id: string, keys: string[], reviewed: boolean, note?: string) => put<{ marks: ReviewMark[] }>(`${P(id)}/problems/reviewed`, note ? { keys, reviewed, note } : { keys, reviewed }).then((r) => r.marks),
 };
 
 export const graphicsApi = {
