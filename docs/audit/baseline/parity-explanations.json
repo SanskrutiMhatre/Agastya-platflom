@@ -70,6 +70,16 @@
       "decision": "owner's editor-chrome requests 2026-11-28 (S1000D Quick preview and Refresh in the top bar)",
       "batch": "UI redesign: editor chrome second pass",
       "date": "2026-11-28"
+    },
+    {
+      "category": "tests",
+      "key": "e2e 00-platform.spec.ts > editor: Quick preview and Generate live together in the panel on the right",
+      "reason": "Renamed, not removed: Quick preview, its Refresh on save toggle and Generate moved from the PDF pane's toolbar to the editor top bar (next to Validate) in every view, at the owner's request; the test now checks them there, checks the PDF controls no longer hold them, and keeps every other assertion (the server-rendered preview, the note, the screenshots)",
+      "newHome": "e2e 00-platform.spec.ts > editor: Quick preview and Generate live together in the top bar, next to Validate",
+      "checklistRow": "Editors: chrome, layout, focus",
+      "decision": "owner's editor-chrome requests 2026-11-28 (S1000D Quick preview and Refresh in the top bar)",
+      "batch": "UI redesign: editor chrome second pass",
+      "date": "2026-11-28"
     }
   ]
 }
