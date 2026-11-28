@@ -7,11 +7,10 @@
 
 import { useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { teamApi, workspaceApi, type Oversight, type ProjectCard } from '../api';
+import { teamApi, workspaceApi, type Oversight, type Overview as OverviewData, type ProjectCard } from '../api';
 import { Icon } from '../components/Icon';
-import { SampleMenu } from '../components/SampleButton';
-import { AttentionList, BackupButton, FeedList, ProjectStatusTable, StatusBadge, SystemCard, TeamTable, type Todo } from '../components/Oversight';
-import { CreateProjectModal, RoleBadge, formatLabel } from '../components/project';
+import { AttentionList, BackupButton, FeedList, ProjectStatusTable, StatusBadge, SystemCard, TeamTable, type DashProject, type Todo } from '../components/Oversight';
+import { CreateProjectModal, formatLabel } from '../components/project';
 import { Alert, Card, Loading, Pill, StatTile, ago, useAsync } from '../components/ui';
 import { useHeadingLevel } from '../components/a11y';
 import { isFeedNoise } from '../lib/activity';
@@ -19,6 +18,9 @@ import { useSession } from '../store/session';
 import '../styles/pages/dashboard.css';   // UI redesign step 1: the dashboard's own parts load with this page
 
 const firstName = (full?: string) => full?.split(' ')[0] ?? '';
+/** The mockup's greeting: "Good afternoon, Rita" (the time of day on this computer). */
+export const greeting = (full?: string, at = new Date()): string => `${at.getHours() < 12 ? 'Good morning' : at.getHours() < 18 ? 'Good afternoon' : 'Good evening'}, ${firstName(full)}`;
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 /** The page head: the greeting (the page title), one sub line, the page's actions. */
 function Head({ title, sub, actions }: { title: string; sub: ReactNode; actions: ReactNode }) {
@@ -32,7 +34,7 @@ function Resume({ items, all }: { items: Array<{ id: string; name: string; badge
   if (items.length === 0) return null;
   const open = (id: string) => { void workspaceApi.open(id).catch(() => undefined); nav(`/projects/${id}`); };
   return (
-    <Card title="Continue where you left off" icon="history" flush testId="resume" actions={<Link to={all}>All projects</Link>}>
+    <Card title="Continue where you left off" icon="history" flush testId="resume" actions={<Link to={all}>All recent</Link>}>
       <div className="resume">
         {items.slice(0, 3).map((r) => (
           <a key={r.id} href={`/projects/${r.id}`} onClick={(e) => { e.preventDefault(); open(r.id); }} data-testid="resume-item">
@@ -45,12 +47,14 @@ function Resume({ items, all }: { items: Array<{ id: string; name: string; badge
 }
 
 const byActivity = (ps: Oversight['projects']) => [...ps].sort((a, b) => String(b.lastActivityAt ?? '').localeCompare(String(a.lastActivityAt ?? ''))).filter((p) => p.lastActivityAt);
+/** The short format badge of a resume card, as the mockup's ("S1000D", "JSS Land", "JSG"): the format and its domain. */
+const fmtOf = (p: { format?: string; domain?: string | null }) => formatLabel({ format: (p.format ?? 's1000d') as ProjectCard['format'], domain: p.domain ?? null, manualType: null });
 const oversightResume = (ps: Oversight['projects']) => byActivity(ps).map((p) => ({
-  id: p.id, name: p.name, badges: <><StatusBadge status={p.status} stale={p.changedSinceRelease} /></>,
+  id: p.id, name: p.name, badges: <><Pill tone="accent">{fmtOf(p)}</Pill><StatusBadge status={p.status} stale={p.changedSinceRelease} /></>,
   code: `${p.dataModules} data module${p.dataModules === 1 ? '' : 's'}${p.folder ? ` · ${p.folder}` : ''}`, when: `Active ${ago(p.lastActivityAt)}`,
 }));
-const cardResume = (ps: ProjectCard[]) => ps.map((p) => ({
-  id: p.id, name: p.name, badges: <><Pill tone="accent">{formatLabel(p)}</Pill>{p.hasPdf ? <Pill tone="success">PDF built</Pill> : null}</>,
+const cardResume = (ps: OverviewData['recent']) => ps.map((p) => ({
+  id: p.id, name: p.name, badges: <><Pill tone="accent" title={formatLabel(p)}>{fmtOf(p)}</Pill>{p.release ? <StatusBadge status={p.release} stale={p.changedSinceRelease} /> : null}{p.validation?.error ? <Pill tone="danger">{p.validation.error} error{p.validation.error === 1 ? '' : 's'}</Pill> : null}{p.hasPdf ? <Pill tone="success">PDF built</Pill> : null}</>,
   code: `${p.dmCount} data module${p.dmCount === 1 ? '' : 's'}${p.folder ? ` · ${p.folder}` : ''}`, when: `Opened ${ago(p.lastOpened ?? p.updatedAt)}`,
 }));
 
@@ -69,7 +73,7 @@ function AdminOverview() {
   if (c.pending) todo.push({ key: 'pending', tone: 'info', icon: 'clock', title: `${c.pending} project${c.pending === 1 ? '' : 's'} awaiting release approval` });
   return (
     <div className="v2-page dash">
-      <Head title={`Welcome back, ${firstName(user?.fullName)}`} sub={<>Platform overview · {c.projects} project{c.projects === 1 ? '' : 's'}, {c.people} people</>}
+      <Head title={greeting(user?.fullName)} sub={<>Platform overview · {todo.length ? <>{plural(todo.length, 'item')} need{todo.length === 1 ? 's' : ''} your attention</> : 'nothing needs your attention'} · {c.projects} project{c.projects === 1 ? '' : 's'}, {c.people} people · all services running offline</>}
         actions={<><BackupButton label="Back up platform" /><button className="btn primary btn-primary" onClick={() => nav('/settings/users')}><Icon name="invite" />Manage users</button></>} />
       <section className="kpis" aria-label="Summary">
         <StatTile value={c.projects} label="Projects" detail={`${c.managers} project manager${c.managers === 1 ? '' : 's'} · ${c.authors} author${c.authors === 1 ? '' : 's'}`} tone="muted" />
@@ -111,7 +115,7 @@ function ManagerOverview() {
   }));
   return (
     <div className="v2-page dash">
-      <Head title={`Welcome back, ${firstName(user?.fullName)}`} sub={<>Your team and projects{waiting ? <> · {waiting} release request{waiting === 1 ? '' : 's'} waiting for you</> : null}</>}
+      <Head title={greeting(user?.fullName)} sub={<>Your team and projects · {waiting ? <>{plural(waiting, 'release request')} waiting for you</> : 'nothing needs your attention'} · all services running offline</>}
         actions={<>
           <BackupButton label="Back up projects" />
           <button className="btn" onClick={() => nav('/settings/authors')}><Icon name="invite" />New author</button>
@@ -151,7 +155,7 @@ function AuthorOverview() {
   const user = useSession((s) => s.user);
   const ov = useAsync(() => workspaceApi.overview(), []);
   const inv = useAsync(() => workspaceApi.invitations(), []);
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState<false | 'new' | 'import'>(false);
 
   if (ov.loading && !ov.data) return <Loading />;
   if (ov.error || !ov.data) return <div className="v2-page"><Alert tone="bad">{ov.error || 'Could not load the overview.'}</Alert></div>;
@@ -169,8 +173,8 @@ function AuthorOverview() {
 
   return (
     <div className="v2-page dash">
-      <Head title={`Welcome back, ${firstName(user?.fullName)}`} sub={<>Your projects{todo.length ? <> · {todo.length} invitation{todo.length === 1 ? '' : 's'} waiting</> : null}</>}
-        actions={<><SampleMenu /><BackupButton /><button className="btn" onClick={() => nav('/workspace')}><Icon name="folderOpen" />Workspace</button><button className="btn primary btn-primary" onClick={() => setCreating(true)}><Icon name="plus" />New project</button></>} />
+      <Head title={greeting(user?.fullName)} sub={<>{todo.length ? <>{plural(todo.length, 'item')} need{todo.length === 1 ? 's' : ''} your attention</> : 'Nothing needs your attention'} · {plural(counts.projects, 'project')} in {plural(counts.folders, 'folder')} · all services running offline</>}
+        actions={<><button className="btn" onClick={() => setCreating('import')} data-testid="overview-import"><Icon name="upload" />Import package</button><button className="btn primary btn-primary" onClick={() => setCreating('new')}><Icon name="plus" />New project</button></>} />
       <section className="kpis" aria-label="Summary">
         <StatTile value={counts.projects} label="Projects" detail={`in ${counts.folders} folder${counts.folders === 1 ? '' : 's'}`} tone="muted" />
         <StatTile value={counts.dataModules} label="Data modules" detail="across your projects" tone="muted" />
@@ -180,32 +184,32 @@ function AuthorOverview() {
       <div className="wk">
         <div className="stack">
           <Resume items={cardResume(recent)} all="/projects" />
-          <Card title="Recent projects" icon="folder" flush testId="recent-projects" actions={<Link to="/projects">All projects</Link>}>
-            {recent.length === 0 ? <div className="empty-state"><strong>No projects yet</strong><p className="muted">Create your first project, or ask your Project Manager to assign you to one.</p></div> : (
-              <div className="table-wrap"><table className="table">
-                <thead><tr><th>Project</th><th>Your role</th><th>Data modules</th><th>Engine</th><th>Opened</th></tr></thead>
-                <tbody>{recent.map((p) => (
-                  <tr key={p.id} className="clickable" onClick={() => { void workspaceApi.open(p.id).catch(() => undefined); nav(`/projects/${p.id}`); }} data-testid="recent-row">
-                    <td className="proj-cell"><span className="proj-link"><span className="avatar" aria-hidden="true">{p.name.charAt(0).toUpperCase()}</span><span className="proj-text">
-                      <a href={`/projects/${p.id}`} onClick={(e) => e.preventDefault()}><span className="proj-name">{p.name}</span></a>
-                      <span className="faint">{p.folder || 'No folder'}{p.hasPdf ? ' · PDF built' : ''}</span></span></span></td>
-                    <td><RoleBadge role={p.role} /></td><td className="num">{p.dmCount}</td><td style={{ whiteSpace: 'nowrap' }}>{formatLabel(p)}</td>
-                    <td className="faint" style={{ whiteSpace: 'nowrap' }}>{ago(p.lastOpened ?? p.updatedAt)}</td>
-                  </tr>))}</tbody>
-              </table></div>
-            )}
-          </Card>
+          {recent.length === 0 ? (
+            <Card title="Projects" icon="folder" flush testId="recent-projects" actions={<Link to="/projects">All projects</Link>}>
+              <div className="empty-state"><strong>No projects yet</strong><p className="muted">Create your first project, or ask your Project Manager to assign you to one.</p></div>
+            </Card>
+          ) : (
+            <ProjectStatusTable rows={recent.slice(0, 5).map(authorRow)} mine
+              actions={<Link className="btn sm" to="/projects"><Icon name="folder" size={14} />All projects</Link>} />
+          )}
         </div>
         <aside className="stack" aria-label="Attention and activity">
           <AttentionList items={todo} />
-          <FeedList feed={activity} />
+          <FeedList feed={activity} actions={<Link to="/notifications">Notifications</Link>} />
           <SystemCard />
         </aside>
       </div>
-      {creating ? <CreateProjectModal folders={[]} onClose={() => setCreating(false)} onCreated={(p) => nav(`/projects/${p.id}`)} /> : null}
+      {creating ? <CreateProjectModal folders={[]} startWith={creating === 'import' ? 'import' : undefined} onClose={() => setCreating(false)} onCreated={(p) => nav(`/projects/${p.id}`)} /> : null}
     </div>
   );
 }
+
+/** An author's recent project as a row of the mockup's Projects table; the author's role on it follows the format under the name. */
+const authorRow = (p: OverviewData['recent'][number]): DashProject => ({
+  id: p.id, name: p.name, status: p.release ?? 'unreleased', stale: p.changedSinceRelease, who: p.owners[0] ?? p.name,
+  sub: [formatLabel(p), p.folder, `your role: ${p.role}`].filter(Boolean).join(' · '),
+  dataModules: p.dmCount, validation: p.validation ?? null, validates: p.format === 's1000d', updated: p.lastOpened ?? p.updatedAt,
+});
 
 export function Overview() {
   const role = useSession((s) => s.user?.role);

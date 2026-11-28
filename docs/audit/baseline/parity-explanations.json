@@ -33,12 +33,12 @@
     },
     {
       "category": "tests",
-      "key": "e2e 00-platform.spec.ts > main dashboard has Overview, Workspace, Projects, Graphics, CIR, Backup and Settings; Notifications is a bell beside an icon-only account menu; the theme is one icon button",
-      "reason": "Renamed, not removed: the approved mockups draw the theme control as a three-state icon switch (Follow system, Light, Dark) in every top bar, so the single toggle button became that switch; the test keeps every other assertion and now checks the switch (icons only, three buttons, aria-pressed, both themes)",
-      "newHome": "e2e 00-platform.spec.ts > main dashboard has Overview, Workspace, Projects, Graphics, CIR, Backup and Settings; Notifications is a bell beside an icon-only account menu; the theme is an icon-only switch",
+      "key": "e2e zz-theme-states.spec.ts > Account settings can return the theme to \"Follow the system\" (TH-004)",
+      "reason": "Renamed and rewritten, not removed: the owner ruled (2026-11-28) that there are two themes only, light and dark, with one icon button that toggles them; there is no \"Follow the system\" state any more, so the test now checks that Account settings offer exactly Light and Dark, that each is remembered, and that a new person (an OS that prefers dark, an old stored \"system\") starts in light",
+      "newHome": "e2e zz-theme-states.spec.ts > Account settings offer exactly Light and Dark, and a new person starts in light whatever the OS says (owner rule)",
       "checklistRow": "Shell, navigation, theme",
-      "decision": "owner approved mockups 2026-11-28 (UI redesign)",
-      "batch": "UI redesign step 1",
+      "decision": "owner instruction 2026-11-28: only light and dark, one toggle button (overrides the mockups' three-state switch)",
+      "batch": "UI redesign exact pass (shell, tokens, dashboard)",
       "date": "2026-11-28"
     }
   ]

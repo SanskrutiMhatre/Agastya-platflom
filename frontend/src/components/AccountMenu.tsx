@@ -9,7 +9,8 @@ import { Icon } from './Icon';
 import { useSession } from '../store/session';
 import { globalLabel } from '../lib/roles';
 
-export function AccountMenu() {
+/** `railPin`: inside a project, the menu also holds the rail's "names beside the icons" switch (the mockups' rail has no pin button). */
+export function AccountMenu({ railPin }: { railPin?: { pinned: boolean; toggle: () => void } } = {}) {
   const user = useSession((s) => s.user);
   const logout = useSession((s) => s.logout);
   const nav = useNavigate();
@@ -21,7 +22,7 @@ export function AccountMenu() {
     document.addEventListener('mousedown', close);
     return () => document.removeEventListener('mousedown', close);
   }, []);
-  const menuItems = () => Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
+  const menuItems = () => Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"], [role="menuitemcheckbox"]') ?? []);
   useEffect(() => { if (menu) menuItems()[0]?.focus(); }, [menu]);
   const menuKeys = (e: ReactKeyboardEvent) => {
     if (!menu) { if (e.key === 'ArrowDown' && e.target === menuButton.current) { e.preventDefault(); setMenu(true); } return; }
@@ -41,6 +42,8 @@ export function AccountMenu() {
         <div className="menu v2-acct-menu" role="menu" aria-label="Account">
           <div className="v2-acct-who"><span className="faint">Signed in as</span><strong>{globalLabel(user?.role)}</strong></div>
           <button className="item" role="menuitem" tabIndex={-1} onClick={() => { setMenu(false); nav('/settings'); }}><Icon name="settings" />Account settings</button>
+          {railPin ? <button className="item" role="menuitemcheckbox" aria-checked={railPin.pinned} tabIndex={-1} data-testid="rail-pin" onClick={() => { setMenu(false); railPin.toggle(); }}>
+            <Icon name={railPin.pinned ? 'collapse' : 'panel'} />{railPin.pinned ? 'Show the project icons only' : 'Show names beside the project icons'}</button> : null}
           <div className="sep" role="separator" />
           <button className="item" role="menuitem" tabIndex={-1} onClick={() => void logout()}><Icon name="logout" />Sign out</button>
         </div>

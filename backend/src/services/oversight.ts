@@ -10,6 +10,7 @@ import { store } from '../context';
 import { activityFor, monitoredProjects } from './activity';
 import { releaseStateOf } from './release';
 import { readProjectJson } from './projects';
+import { lastRun } from './validation';
 
 type Row = Record<string, any>;
 interface Actor { id: string; role: string }
@@ -28,6 +29,9 @@ export function oversightFor(user: Actor) {
     const a = byId.get(id);
     return {
       id, name: pj.name || id, folder: String(pj.group || ''), status,
+      // UI redesign (screen 1): the format under the name and the last validation run in the Validation column, as the mockup's table shows them
+      format: String(pj.format || (pj.type === 'JSS' || pj.templateRef === 'uhb' ? 'jss' : 's1000d')), domain: pj.domain ? String(pj.domain) : null, manualType: pj.manualType ? String(pj.manualType) : (pj.templateRef === 'uhb' ? 'uhb' : null),
+      validation: (() => { const run = lastRun(id); return run ? { error: run.summary.error, warn: run.summary.warn, ranAt: run.ranAt } : null; })(),
       releaseNumber: st.released ? st.approved?.release_number ?? null : null,
       changedSinceRelease: st.staleRelease,
       dataModules: a?.dataModules ?? 0, lastActivityAt: a?.lastActivityAt ?? null,
@@ -63,6 +67,7 @@ export function oversightFor(user: Actor) {
       authors: team.filter((t) => t.role === 'author').length,
       edits: report.totals.edits, days: report.days,
     },
-    projects, team, feed: report.feed.slice(0, 15),
+    // the dashboard's Recent activity names people by their full name (the mockup's "Paul Manager approved ..."); the username stays in actor
+    projects, team, feed: report.feed.slice(0, 15).map((f) => ({ ...f, actorName: (all.find((u) => u.username === f.actor)?.full_name as string | undefined) || null })),
   };
 }

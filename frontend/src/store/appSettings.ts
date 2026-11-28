@@ -18,7 +18,7 @@ export function applyAccent(hex: string): void {
   }
 }
 
-const DEFAULTS: AppSettings = { appName: 'Agastya', organisation: '', accent: '', compact: false, theme: 'system' };
+const DEFAULTS: AppSettings = { appName: 'Agastya', organisation: '', accent: '', compact: false, theme: 'light' };
 
 /** Put the settings on the page: accent colour, compact spacing, and the default theme (only until a person picks their own). */
 export function applySettings(s: AppSettings): void {
@@ -26,10 +26,11 @@ export function applySettings(s: AppSettings): void {
   applyAccent(s.accent);
   root.classList.toggle('v2-compact', s.compact);
   // TH-008: remember the organisation default so theme-init.js can paint it before the next sign-in (only while the person has no choice of their own).
-  try { if (s.theme === 'system') localStorage.removeItem('agastya.theme.default'); else localStorage.setItem('agastya.theme.default', s.theme); } catch { /* private mode */ }
+  const def = s.theme === 'dark' ? 'dark' : 'light';   // two themes only (owner rule 2026-11-28); an old server's "system" counts as light
+  try { localStorage.setItem('agastya.theme.default', def); } catch { /* private mode */ }
   let chosen: string | null = null;
   try { chosen = localStorage.getItem('agastya.theme'); } catch { /* private mode */ }
-  if (!chosen && s.theme !== 'system') { useUi.setState({ theme: s.theme }); applyTheme(s.theme); }
+  if (chosen !== 'light' && chosen !== 'dark') { useUi.setState({ theme: def }); applyTheme(def); }
 }
 
 interface AppState { settings: AppSettings; load: () => Promise<void>; set: (s: AppSettings) => void }

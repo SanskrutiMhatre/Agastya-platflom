@@ -59,7 +59,7 @@ test('first run: set up the administrator and land on the platform overview', as
   await page.getByLabel('Password', { exact: true }).fill(PW);
   await page.getByLabel('Repeat password').fill(PW);
   await page.getByRole('button', { name: 'Create administrator' }).click();
-  await expect(page.getByRole('heading', { name: /Welcome back, Site/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Good (morning|afternoon|evening), Site/ })).toBeVisible();
   await expect(page.getByText('Platform overview')).toBeVisible();
   await shot(page, '02-admin-overview');
 });
@@ -100,11 +100,11 @@ test('the Author signs in with it, chooses a password and lands on her own dashb
   await page.getByLabel('New password').fill(PW);
   await page.getByLabel('Repeat password').fill(PW);
   await page.getByRole('button', { name: 'Finish' }).click();
-  await expect(page.getByRole('heading', { name: /Welcome back, Asha/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /Good (morning|afternoon|evening), Asha/ })).toBeVisible();
   await shot(page, '02-overview-empty');
 });
 
-test('main dashboard has Overview, Workspace, Projects, Graphics, CIR, Backup and Settings; Notifications is a bell beside an icon-only account menu; the theme is an icon-only switch', async () => {
+test('main dashboard has Overview, Workspace, Projects, Graphics, CIR, Backup and Settings; Notifications is a bell beside an icon-only account menu; the theme is one icon button', async () => {
   const nav = page.getByRole('navigation', { name: 'Main navigation' });
   for (const n of ['Overview', 'Workspace', 'Projects', 'Graphics', 'CIR', 'Backup', 'Settings']) await expect(nav.getByRole('link', { name: n, exact: true })).toBeVisible();
   await expect(nav.getByRole('link', { name: 'Administrator' })).toHaveCount(0);
@@ -118,17 +118,19 @@ test('main dashboard has Overview, Workspace, Projects, Graphics, CIR, Backup an
   await expect(page.getByRole('menuitem', { name: 'Sign out' })).toBeVisible();
   await expect(page.getByRole('menu')).not.toContainText(/asha/i);                            // neither name nor username
   await page.getByTestId('account-menu').click();
-  // UI redesign step 1 (owner-approved mockups 2026-11-28): the theme control is the mockups' three-state switch (Follow system, Light,
-  // Dark), icons only, in the top bar; it replaced the single toggle button
+  // owner rule 2026-11-28: two themes only (light, dark) and ONE icon button in the top bar; it names the theme it switches to
   const sw = page.getByTestId('theme-toggle');
-  await expect(sw.getByRole('button')).toHaveCount(3);
-  await expect(sw).toHaveText('');                                                             // icons, no words
+  await expect(page.locator('header.v2-top [data-testid="theme-toggle"]')).toHaveCount(1);
+  await expect(sw).toHaveText('');                                                             // an icon, no words
+  await expect(page.locator('[data-testid="theme-system"]')).toHaveCount(0);                  // no "follow the system"
   const before = await page.evaluate(() => document.documentElement.dataset.theme);
+  expect(before === 'light' || before === 'dark').toBe(true);
   const other = before === 'dark' ? 'light' : 'dark';
-  await page.getByTestId(`theme-${other}`).click();
+  await expect(sw).toHaveAccessibleName(`Switch to ${other} theme`);
+  await sw.click();
   expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe(other);
-  await expect(page.getByTestId(`theme-${other}`)).toHaveAttribute('aria-pressed', 'true');
-  await page.getByTestId(`theme-${before}`).click();
+  await expect(sw).toHaveAccessibleName(`Switch to ${before} theme`);
+  await sw.click();
   expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe(before);
 });
 
@@ -700,7 +702,7 @@ test.describe('a second person: account creation, onboarding, sharing and read-o
     await page2.getByLabel('New password').fill(PW);
     await page2.getByLabel('Repeat password').fill(PW);
     await page2.getByRole('button', { name: 'Finish' }).click();
-    await expect(page2.getByRole('heading', { name: /Welcome back, Priya/ })).toBeVisible();
+    await expect(page2.getByRole('heading', { name: /Good (morning|afternoon|evening), Priya/ })).toBeVisible();
     await expect(page2.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Activity' })).toHaveCount(0);   // authors get no oversight page
     await page2.getByRole('link', { name: 'Workspace' }).click();
     await expect(page2.getByTestId('project-card')).toHaveCount(0);
@@ -845,7 +847,7 @@ test.describe('roles: administrator -> Project Manager -> Author', () => {
     await p.getByLabel('New password').fill(PW);
     await p.getByLabel('Repeat password').fill(PW);
     await p.getByRole('button', { name: 'Finish' }).click();
-    await expect(p.getByRole('heading', { name: new RegExp(`Welcome back, ${name}`) })).toBeVisible();
+    await expect(p.getByRole('heading', { name: new RegExp(`Good (morning|afternoon|evening), ${name}`) })).toBeVisible();
     return p;
   };
 
@@ -1026,7 +1028,7 @@ test.describe('roles: administrator -> Project Manager -> Author', () => {
     await mgr.getByLabel('Password').fill(PW);
     await mgr.getByRole('button', { name: 'Sign in' }).click();
     await expect(mgr).toHaveURL(/\/overview$/);
-    await expect(mgr.getByRole('heading', { name: /Welcome back, Priya/ })).toBeVisible();
+    await expect(mgr.getByRole('heading', { name: /Good (morning|afternoon|evening), Priya/ })).toBeVisible();
     await mgr.context().close();
     await auth.context().close();
   });

@@ -132,14 +132,25 @@ test('toasts can be dismissed with the keyboard (DS-005)', async () => {
   }
 });
 
-test('Account settings can return the theme to "Follow the system" (TH-004)', async () => {
+test('Account settings offer exactly Light and Dark, and a new person starts in light whatever the OS says (owner rule)', async ({ browser, baseURL }) => {
   const page = author.page;
   await page.goto('/settings');
   const group = page.getByTestId('theme-choice');
+  await expect(group.getByRole('radio')).toHaveText(['Light', 'Dark']);
   await group.getByRole('radio', { name: 'Dark' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-  await group.getByRole('radio', { name: 'Follow the system' }).click();
-  expect(await page.evaluate(() => localStorage.getItem('agastya.theme'))).toBeNull();
+  expect(await page.evaluate(() => localStorage.getItem('agastya.theme'))).toBe('dark');
+  await group.getByRole('radio', { name: 'Light' }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  expect(await page.evaluate(() => localStorage.getItem('agastya.theme'))).toBe('light');
+  // a fresh browser whose OS prefers dark, with an old stored "system": light (the OS is not followed; "system" is migrated away)
+  const ctx = await browser.newContext({ baseURL, colorScheme: 'dark' });
+  try {
+    const fresh = await ctx.newPage();
+    await fresh.addInitScript(() => { try { if (!sessionStorage.getItem('seeded')) { localStorage.setItem('agastya.theme', 'system'); sessionStorage.setItem('seeded', '1'); } } catch { /* none */ } });
+    await fresh.goto('/');
+    await expect(fresh.locator('html')).toHaveAttribute('data-theme', 'light');
+  } finally { await ctx.close(); }
 });
 
 test('a keyboard user sees the hint of an icon button (UID-003)', async () => {

@@ -13,8 +13,7 @@ import { App } from './App';
 import { applyTheme, useUi } from './store/ui';
 
 applyTheme(useUi.getState().theme);
-// Follow the OS when the user has not chosen a theme explicitly.
-matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { if (useUi.getState().theme === 'system') applyTheme('system'); });
+// Two themes only, light and dark (owner rule 2026-11-28): the page does not follow the OS setting.
 
 // A data router (not <BrowserRouter>): only it can hold a page back while it has unsaved work (lib/leaveGuard.tsx). The app's own <Routes> live inside the one splat route.
 const router = createBrowserRouter([{ path: '*', element: <App /> }]);

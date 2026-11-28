@@ -86,7 +86,6 @@
 .pub .pub-waivers .v2-empty { padding: 0; text-align: left; color: var(--text-tertiary); }
 .pub .pub-waivers .v2-empty-title { display: inline; margin: 0 var(--space-1) 0 0; color: var(--text-secondary); font-weight: var(--fw-medium); }
 .pub .pub-waivers .v2-table { display: block; overflow-x: auto; font-size: var(--fs-xs); }
-.pub .opt .check { padding: 0; }
 .pub .pane-head .pub-more { position: relative; }
 .pub .pane-head .pub-more .menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; min-width: 200px; text-transform: none; letter-spacing: 0; font-weight: var(--fw-regular); font-size: var(--fs-sm); color: var(--text-primary); }
 .v2-chapter-no, .v2-mod-no { margin-right: calc(0.28em - var(--space-1h)); }

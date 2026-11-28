@@ -39,7 +39,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .btn-danger { color: var(--danger); }
 .btn-danger:hover { background: var(--danger-soft); }
 .input { width: 100%; height: var(--studio-input-h); padding: 0 8px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--bg-elev); outline: none; }
-.input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.input:focus { border-color: var(--focus-ring); outline: 2px solid var(--focus-ring); outline-offset: -1px; }   /* the mockup's .input:focus-visible ring (a text field shows it on any focus), no glow */
 input[type='file'].input { padding: 4px; height: auto; }
 .field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .field label { font-size: 12px; font-weight: 500; color: var(--text-muted); }
@@ -51,7 +51,7 @@ input[type='file'].input { padding: 4px; height: auto; }
 .form-section:first-child { margin-top: 0; }
 .form-errors { color: var(--danger); font-size: 12px; }
 .form-errors ul { margin: 6px 0 0; padding-left: 18px; }
-.check { display: flex; align-items: center; gap: 6px; padding: 4px 0; cursor: pointer; }
+.check { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 
 /* ---------------------------------------------------------------- modal */
 .modal-backdrop { position: fixed; inset: 0; background: var(--scrim); display: grid; place-items: center; z-index: 100; animation: fade 0.12s ease-out; }

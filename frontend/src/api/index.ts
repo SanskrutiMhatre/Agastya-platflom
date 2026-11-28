@@ -31,10 +31,12 @@ export interface ProjectCard {
   missingSince?: string | null;
 }
 export interface FolderView { key: string; name: string; owner: { id: string; username: string; fullName: string } | null; canManage: boolean; accessRole: string | null; projects: ProjectCard[] }
+/** UI redesign (screen 1): what the dashboard's Projects table shows of a project beside its card (display only). */
+export interface DashboardFacts { release: ReleaseStatus; changedSinceRelease: boolean; validation: { error: number; warn: number; ranAt: string } | null }
 export interface Overview {
   counts: { projects: number; folders: number; dataModules: number; published: number; invitations: number };
-  recent: ProjectCard[];
-  activity: Array<{ id: number; at: string; actor: string | null; action: string; projectId: string | null; projectName: string | null; meta: unknown }>;
+  recent: Array<ProjectCard & Partial<DashboardFacts>>;
+  activity: Array<{ id: number; at: string; actor: string | null; actorName?: string | null; action: string; projectId: string | null; projectName: string | null; meta: unknown }>;
 }
 
 export interface DmSummary {
@@ -79,7 +81,7 @@ export interface CirModule { id: string; file: string; title: string | null; inf
 export interface ConfigField { key: string; label: string; type?: 'text' | 'boolean'; required?: boolean; mono?: boolean; width?: number | string }
 export interface ConfigSpec { id: string; title: string; noun: string; description: string; fields: ConfigField[] }
 export interface ConfigItem { id: string; [k: string]: unknown }
-export interface AppSettings { appName: string; organisation: string; accent: string; compact: boolean; theme: 'system' | 'light' | 'dark' }
+export interface AppSettings { appName: string; organisation: string; accent: string; compact: boolean; theme: 'light' | 'dark' }
 
 export interface Summary {
   project: ProjectCard; role: ProjectRole;
@@ -121,6 +123,8 @@ export const workspaceApi = {
   overview: () => get<Overview>('/api/overview'),
   workspace: () => get<{ folders: FolderView[]; ungrouped: ProjectCard[] }>('/api/workspace'),
   projects: () => get<{ projects: ProjectCard[] }>('/api/projects').then((r) => r.projects),
+  /** How many projects the person can open (the count beside Projects in the side navigation): one-row page, background, reused for 30 s. */
+  projectCount: () => get<{ total?: number; projects: unknown[] }>('/api/projects?limit=1', { background: true, ttl: 30_000 }).then((r) => r.total ?? r.projects.length),
   createFolder: (name: string) => post<{ name: string; key: string }>('/api/folders', { name }),
   renameFolder: (key: string, name: string) => patch<{ name: string }>(`/api/folders/${encodeURIComponent(key)}`, { name }),
   deleteFolder: (key: string, withProjects = false) => del<{ removedProjects: number }>(`/api/folders/${encodeURIComponent(key)}?withProjects=${withProjects ? 1 : 0}`),
@@ -203,6 +207,8 @@ export const contentApi = {
     const res = await request<Response>('POST', `${P(id)}/publish/preview/${encodeURIComponent(file)}`, {}, { raw: true });
     return res.blob();
   },
+  /** Whether the PDF renderer is warm (the project status bar: "Renderer ready"). */
+  rendererStatus: (id: string) => get<{ warm: boolean }>(`${P(id)}/publish/status`, { background: true, ttl: 30_000 }),
   pdfUrl: (id: string, download = false) => `${P(id)}/publish/pdf${download ? '?download=1' : ''}`,
   /** WP-14: the project's jobs, newest first (the Publication page lists its builds from them) */
   jobs: (id: string, limit = 50) => get<{ jobs: JobView[] }>(`${P(id)}/jobs?limit=${limit}`).then((r) => r.jobs),
@@ -225,9 +231,10 @@ export interface ActivityReport {
 export type ReleaseStatus = 'released' | 'pending' | 'unreleased';
 export interface Oversight {
   counts: { projects: number; released: number; pending: number; unreleased: number; people: number; managers: number; authors: number; edits: number; days: number };
-  projects: Array<{ id: string; name: string; folder: string; status: ReleaseStatus; releaseNumber: number | null; changedSinceRelease: boolean; dataModules: number; lastActivityAt: string | null; owners: string[]; members: number }>;
+  projects: Array<{ id: string; name: string; folder: string; status: ReleaseStatus; releaseNumber: number | null; changedSinceRelease: boolean; dataModules: number; lastActivityAt: string | null; owners: string[]; members: number;
+    format?: string; domain?: string | null; manualType?: string | null; validation?: { error: number; warn: number; ranAt: string } | null }>;
   team: Array<{ userId: string; username: string; fullName: string; role: GlobalRole; disabled: boolean; createdAt: string; createdByYou: boolean; edits: number; builds: number; lastActiveAt: string | null; projects: Array<{ id: string; name: string; role: ProjectRole }> }>;
-  feed: ActivityReport['feed'];
+  feed: Array<ActivityReport['feed'][number] & { actorName?: string | null }>;
 }
 
 export interface Notice { id: number; kind: string; title: string; body: string | null; projectId: string | null; at: string; read: boolean }

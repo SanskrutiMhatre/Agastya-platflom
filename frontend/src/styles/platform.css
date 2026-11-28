@@ -27,7 +27,8 @@ a:hover { text-decoration: underline; }
 .v2-row-link:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 2px; }
 .v2-top { display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 20px; background: var(--bg-elev); border-bottom: 1px solid var(--border); flex: none; }
 .v2-top h1 { font-size: 16px; margin: 0; font-weight: 650; }
-.v2-page { flex: 1; min-height: 0; overflow: auto; padding: var(--space-6) max(var(--space-8), calc((100% - var(--content-max)) / 2)) var(--space-10); }
+/* the mockup's .page: at most --content-max wide INCLUDING its 32 px side padding, centred (so the content is 1216 px at most) */
+.v2-page { flex: 1; min-height: 0; overflow: auto; padding: var(--space-6) max(var(--space-8), calc((100% - var(--content-max)) / 2 + var(--space-8))) var(--space-10); }
 @media (max-width: 1180px) { .v2-page { padding: var(--space-5) var(--space-5) var(--space-8); } }
 html.v2-compact .v2-page { padding: var(--page-pad); }
 .v2-sub { color: var(--text-secondary); margin: var(--space-1) 0 0; font-size: var(--fs-sm); }
@@ -82,8 +83,6 @@ html.v2-compact .v2-page { padding: var(--page-pad); }
 .v2-gap-b { margin-bottom: 18px; }
 .v2-cols-main { grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); align-items: start; }
 @media (max-width: 1100px) { .v2-cols-main { grid-template-columns: minmax(0, 1fr); } }
-.v2-feed-item { padding: 9px 14px; border-bottom: 1px solid var(--border); min-width: 0; }
-.v2-feed-item:last-child { border-bottom: 0; }
 /* UX-025 (rest): a long project title on an Activity card ends in an ellipsis and never runs under the Open button */
 .v2-grow-min { flex: 1; min-width: 0; }
 .v2-no-shrink { flex: none; }
@@ -261,8 +260,8 @@ html.v2-compact .v2-table th { padding-top: 5px; padding-bottom: 5px; }
 /* JSS editor: narrow windows get one pane at a time, and the outline gets out of the way. */
 
 /* the PDF viewer is dark in both themes (a recorded decision, TH-007: tokens viewer-*): its empty-state text must read on it */
-[data-testid="pdf-pane"] .v2-empty, [data-testid="pdf-pane"] .v2-empty h3, [data-testid="pdf-pane"] .v2-empty > svg { color: var(--viewer-text); }
-[data-testid="pdf-pane"] .v2-empty strong { color: var(--viewer-text-strong); font-weight: 600; }
+[data-testid="pdf-pane"] .v2-empty, [data-testid="pdf-pane"] .v2-empty h3, [data-testid="pdf-pane"] .v2-empty > svg { color: var(--text-secondary); }
+[data-testid="pdf-pane"] .v2-empty strong { color: var(--text-primary); font-weight: 600; }
 
 /* FE-004: the server is not answering; the page stays usable. */
 .v2-offline-banner { position: fixed; left: 50%; top: 8px; transform: translateX(-50%); z-index: 1000; padding: 6px 14px; border-radius: 6px;
@@ -286,9 +285,6 @@ html.v2-compact .v2-table th { padding-top: 5px; padding-bottom: 5px; }
 .v2-team-pop { position: absolute; top: calc(100% + 6px); right: 0; z-index: var(--z-menu); display: flex; flex-direction: column; gap: 4px; min-width: 240px; max-width: 360px;
   padding: 8px 10px; background: var(--bg-elev); color: var(--text); border: 1px solid var(--border); border-radius: 6px; box-shadow: var(--shadow-menu); font-size: 12px; cursor: default; }
 .v2-team-row { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.v2-team-list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 13px; }
-.v2-team-list li { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.v2-team-list .v2-trunc { flex: 1; min-width: 0; }
 
 /* the command palette */
 .v2-palette { list-style: none; margin: 8px 0 0; padding: 0; max-height: min(52vh, 420px); overflow: auto; border: 1px solid var(--border); border-radius: 6px; }

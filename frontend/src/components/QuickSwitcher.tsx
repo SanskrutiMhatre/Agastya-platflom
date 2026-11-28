@@ -38,7 +38,7 @@ export function JumpButton({ onClick, compact }: { onClick: () => void; /** the 
   // UI redesign step 1: the mockups' `.search-trigger` in the top bar (a well with the hint and the Ctrl K keys)
   return (
     <button type="button" className={`search-trigger v2-jump${compact ? ' compact' : ''}`} onClick={onClick} data-testid="jump-open" title="Jump to a project, a page or a data module (Ctrl+K)" aria-keyshortcuts="Control+K">
-      <Icon name="search" /><span className="v2-jump-label trunc">{compact ? 'Jump to…' : 'Jump to a project, page or data module…'}</span><span className="kbd-group"><kbd>Ctrl</kbd><kbd>K</kbd></span>
+      <Icon name="search" /><span className="v2-jump-label trunc">{compact ? 'Jump to…' : 'Search projects, pages, modules…'}</span><span className="kbd-group"><kbd>Ctrl</kbd><kbd>K</kbd></span>
     </button>
   );
 }
