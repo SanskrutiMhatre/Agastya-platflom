@@ -24,6 +24,7 @@ import { bad, conflict, HttpError } from '../http';
 import { newId } from '../../core/auth/crypto';
 import { readProjectJson } from '../projectRecord';
 import { releaseDocumentRel } from '../release';
+import { exportProjectArchive, archiveFileName } from '../projectArchive';
 import { gitlabRequest, seg, GitlabError, type GitlabAuth } from './http';
 import { activeSettings, endpointOf } from './settings';
 import { authFor, serviceAuth } from './accounts';
@@ -108,8 +109,6 @@ export async function uploadRelease(projectId: string, user: Who, body: { kind?:
   const pdfName = `${slug(String(meta.projectName))}${meta.released ? '' : '-not-released'}.pdf`;
   files.push({ name: pdfName, buf: fs.readFileSync(pdf), type: 'application/pdf' });
   if (body.includeArchive === true) {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { exportProjectArchive, archiveFileName } = require('../projectArchive') as typeof import('../projectArchive');
     const tmp = path.join(os.tmpdir(), `agastya-gl-${newId()}.zip`);
     try {
       await exportProjectArchive(projectId, fs.createWriteStream(tmp));

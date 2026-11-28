@@ -387,7 +387,7 @@ export function registerProjectContentRoutes(app: Express): void {
   // A release only becomes real when the project's Project Manager (or an administrator) approves it.
   // Phase 3 (P3-5): the decision is one function, so a GitLab merge-request approval that counts toward the Agastya approval
   // (services/releaseEvents.ts decideReleaseAs) runs exactly these steps under the approver's own account.
-  const decision = async (req: any, relId: string, approve: boolean, via?: string): Promise<void> => {
+  const decision = async (req: Request, relId: string, approve: boolean, via?: string): Promise<void> => {
     if (!canApprove(req.auth.user, req.project.role)) throw forbidden('Only the Project Manager of this project, or an administrator, can decide a release.', 'APPROVER_ONLY');
     const requester = store.getRelease(relId)?.requested_by;
     if (approve) { const sod = securityPolicy.approverConflict(requester, req.auth.user.id); if (sod) throw forbidden(sod, 'SEPARATION_OF_DUTIES'); }   // before any side effect (D7)
@@ -408,7 +408,7 @@ export function registerProjectContentRoutes(app: Express): void {
     notify([requester], { kind: approve ? 'approval.approved' : 'approval.rejected', title: approve ? 'Release approved' : 'Release rejected', body: `${pname(req.project.id)}: ${approve ? 'approved' : 'rejected'} by ${req.auth.user.fullName ?? req.auth.user.full_name}.`, projectId: req.project.id, actorId: req.auth.user.id });
     if (approve) emitReleaseApproved({ projectId: req.project.id, releaseId: relId, actor: actor(req) });
   };
-  setReleaseDecider((projectId, releaseId, who, via) => decision({ auth: { user: who.user }, project: { id: projectId, role: who.projectRole } }, releaseId, true, via));
+  setReleaseDecider((projectId, releaseId, who, via) => decision({ auth: { user: who.user }, project: { id: projectId, role: who.projectRole } } as unknown as Request, releaseId, true, via));
   const decide = (approve: boolean): RequestHandler[] => [view('manager', 'release.decide'), wrap(async (req, res) => {
     await decision(req, param(req, 'relId'), approve);
     res.json({ ok: true });
