@@ -498,7 +498,7 @@ export const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ src, downloadName = 'o
 
       {/* Body */}
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-        {tocOpen && (
+        {tocOpen && src && (
           <div style={{ width: 230, flexShrink: 0, overflow: 'auto', background: 'var(--viewer-sidebar)', padding: '8px 4px' }}>
             {!pdf ? null : outline.length === 0 ? (
               <div style={{ padding: 12, fontSize: 11.5, color: 'var(--viewer-ink-55)' }}>
