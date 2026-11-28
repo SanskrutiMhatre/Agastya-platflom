@@ -28,7 +28,6 @@ import { XREF_CLASS } from './inline';
 export interface LiveUser { id: string; name: string }
 /** The name of the JSS document in its room and in review comments. */
 export const JSS_DOC = 'book';
-export const JSS_COMMENT_FILE = `jss/${JSS_DOC}`;
 
 export interface LiveJssEvents {
   /** the save state, the lock or the people changed */

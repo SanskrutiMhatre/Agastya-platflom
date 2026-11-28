@@ -236,7 +236,11 @@ export function scanDeadCode(o = {}) {
   const pkgFile = path.join(fe, 'package.json');
   const runtimeDeps = fs.existsSync(pkgFile) ? Object.keys(JSON.parse(fs.readFileSync(pkgFile, 'utf8')).dependencies ?? {}) : [];
   const imported = new Set();
-  for (const f of codeFiles) for (const s of parseCode(f).specifiers) if (!s.startsWith('.') && !s.startsWith('/')) imported.add(s.startsWith('@') ? s.split('/').slice(0, 2).join('/') : s.split('/')[0]);
+  // the page also bundles backend/src/shared (the co-editing schema and protocol, the JSS/JSG serialisers): vite.config.ts resolves (dedupes)
+  // the packages those files import from the frontend's own dependencies, so they count as the frontend's imports (lib0: the wire protocol)
+  const sharedDir = path.join(root, 'backend', 'src', 'shared');
+  const sharedCode = fs.existsSync(sharedDir) ? walk(sharedDir, (f) => /\.tsx?$/.test(f) && !/\.d\.ts$/.test(f)) : [];
+  for (const f of [...codeFiles, ...sharedCode]) for (const s of parseCode(f).specifiers) if (!s.startsWith('.') && !s.startsWith('/')) imported.add(s.startsWith('@') ? s.split('/').slice(0, 2).join('/') : s.split('/')[0]);
   const deps = runtimeDeps.filter((d) => !imported.has(d));
 
   return {
