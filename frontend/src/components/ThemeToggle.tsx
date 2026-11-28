@@ -1,20 +1,25 @@
 import { Icon } from './Icon';
 import { useUi, type ThemeChoice } from '../store/ui';
 
-const isDark = (theme: ThemeChoice): boolean => theme === 'dark' || (theme === 'system' && document.documentElement.dataset.theme === 'dark');
+/**
+ * UI redesign step 1 (owner-approved mockups, every top bar): the colour theme is a three-state segmented switch, `.seg.theme-switch`
+ * (Follow system, Light, Dark), icons only, each a toggle button with aria-pressed. It replaces the single toggle button (WP-19/TH-004):
+ * the mockup draws the switch, and it can return to "Follow system" from the top bar as well as from Account settings > Appearance.
+ * The group keeps the old test hook `theme-toggle`; the buttons are `theme-system`, `theme-light`, `theme-dark`.
+ */
+const OPTS: Array<[ThemeChoice, string, 'monitor' | 'sun' | 'moon']> = [['system', 'Follow system', 'monitor'], ['light', 'Light', 'sun'], ['dark', 'Dark', 'moon']];
 
-/** One button: shows the mode you will switch to. The choice is remembered; Account settings > Appearance can return to "Follow the system" (TH-004). */
 export function ThemeToggle() {
   const theme = useUi((s) => s.theme);
   const setTheme = useUi((s) => s.setTheme);
-  const dark = typeof document !== 'undefined' && isDark(theme);
-  const now = theme === 'system' ? `following the system (${dark ? 'dark' : 'light'})` : dark ? 'dark' : 'light';
-  const label = dark ? 'Switch to light mode' : 'Switch to dark mode';
+  const resolved = typeof document !== 'undefined' && document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
   return (
-    <button className="icon-btn v2-theme-toggle" onClick={() => setTheme(dark ? 'light' : 'dark')} title={`${label} (now ${now})`}
-      aria-label={label} data-testid="theme-toggle">
-      <Icon name={dark ? 'sun' : 'moon'} size={17} />
-    </button>
+    <div className="seg theme-switch" role="group" aria-label="Colour theme" data-testid="theme-toggle">
+      {OPTS.map(([v, label, icon]) => (
+        <button key={v} type="button" aria-pressed={theme === v} aria-label={label} data-testid={`theme-${v}`} onClick={() => setTheme(v)}
+          title={v === 'system' ? `Follow system (now ${resolved})` : label}><Icon name={icon} size={14} /></button>
+      ))}
+    </div>
   );
 }
 

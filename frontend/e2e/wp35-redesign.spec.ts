@@ -84,7 +84,7 @@ test('projects: one Samples button holds the five samples; a row has a context m
     await page.goto('/projects');
     const nav = page.getByRole('navigation', { name: 'Main navigation' });
     await expect(nav.getByText('Library', { exact: true })).toBeVisible();
-    await expect(nav.getByText('Manage', { exact: true })).toBeVisible();
+    await expect(nav.getByText('Operations', { exact: true })).toBeVisible();   // UI redesign step 1: the mockups' groups (Library, Operations, Platform)
     await expect(nav.getByRole('link', { name: 'Projects', exact: true })).toHaveClass(/active/);
     for (const id of ['create-sample', 'create-jss-land-sample', 'create-jss-naval-sample', 'create-jsg-sample', 'create-jsg-ispl-sample']) await expect(page.getByTestId(id)).toHaveCount(0);
     const samples = page.getByTestId('samples-menu');

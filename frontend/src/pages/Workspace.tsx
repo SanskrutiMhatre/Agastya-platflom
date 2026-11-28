@@ -9,6 +9,7 @@ import { CreateProjectModal, ProjectCardView } from '../components/project';
 import { Alert, ConfirmModal, Empty, Loading, Modal, PromptModal, errText, useAsync } from '../components/ui';
 import { SampleMenu } from '../components/SampleButton';
 import { useContextMenu } from '../components/ContextMenu';
+import '../styles/pages/dashboard.css';   // UI redesign step 1: screen 1's folder sections and project tiles
 import { useSession } from '../store/session';
 import { useUi } from '../store/ui';
 
@@ -79,14 +80,14 @@ export function Workspace() {
   const total = folders.reduce((n, f) => n + f.projects.length, 0) + ungrouped.length;
 
   return (
-    <div className="v2-page">
-      <div className="v2-page-head">
-        <div><h2>Workspace</h2><p className="v2-sub">{total} project{total === 1 ? '' : 's'} in {folders.length} folder{folders.length === 1 ? '' : 's'}.</p></div>
-        <div className="v2-row">
-          <input className="v2-input" style={{ width: 220 }} placeholder="Filter projects…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Filter projects" />
+    <div className="v2-page dash">
+      <div className="page-head">
+        <div><h2>Workspace</h2><p>{total} project{total === 1 ? '' : 's'} in {folders.length} folder{folders.length === 1 ? '' : 's'}.</p></div>
+        <div className="row">
+          <input className="input search" placeholder="Filter projects…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Filter projects" />
           {isAdmin ? null : <SampleMenu onCreated={() => ws.reload()} />}
           <button className="btn" onClick={() => setNewFolder(true)}><Icon name="folderPlus" />New folder</button>
-          {isAdmin ? null : <button className="btn btn-primary" onClick={() => setCreating('')}><Icon name="plus" />New project</button>}
+          {isAdmin ? null : <button className="btn primary btn-primary" onClick={() => setCreating('')}><Icon name="plus" />New project</button>}
         </div>
       </div>
 

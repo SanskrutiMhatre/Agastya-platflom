@@ -1,0 +1,81 @@
+/* =========================================================================
+   Screen 1, the main dashboard (UI redesign step 1; docs/audit/mockups/workspace.html): Overview, Projects and Workspace.
+   The parts are the mockup's own page styles (.wk, .resume, .feed, .todo, .health, .filters), scoped under .dash so they never
+   reach another page. The cards, tables, badges, segmented filters and stat tiles are components.css.
+   ========================================================================= */
+
+.dash .page-head h2 { font-size: var(--fs-2xl); line-height: var(--lh-tight); font-weight: var(--fw-semibold); margin: 0; }
+.dash .page-head p { margin: var(--space-1) 0 0; }
+.dash .page-head .row { flex-wrap: wrap; justify-content: flex-end; }
+.dash .kpis { margin-bottom: var(--space-4); }
+.dash .card-head h3 { margin: 0; }
+.dash .card-head h3 .icon { color: var(--text-tertiary); }
+.dash .card-head a { font-size: var(--fs-sm); }
+.dash .card > .alert { margin: var(--space-3) var(--space-4); }
+
+.wk { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: var(--space-4); align-items: start; }
+.wk > .stack { gap: var(--space-4); min-width: 0; }
+@media (max-width: 1280px) { .wk { grid-template-columns: minmax(0, 1fr); } }
+
+/* "Continue where you left off": the three most recent projects */
+.resume { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); padding: var(--space-4); }
+.resume > a, .resume > button { display: flex; flex-direction: column; align-items: stretch; gap: var(--space-1h); min-width: 0; padding: var(--space-3); border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg); color: var(--text-primary); text-decoration: none; background: var(--surface-panel); font: inherit; text-align: left; cursor: pointer; }
+.resume > a:hover, .resume > button:hover { border-color: var(--border-control); box-shadow: var(--shadow-1); text-decoration: none; }
+.resume .t { font-weight: var(--fw-semibold); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.resume .c { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.resume .row { flex-wrap: wrap; gap: var(--space-1); }
+@media (max-width: 900px) { .resume { grid-template-columns: minmax(0, 1fr); } }
+
+/* the projects card: filters row, then the table */
+.filters { display: flex; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border-subtle); align-items: center; flex-wrap: wrap; }
+.dash .seg button .n { color: var(--text-tertiary); font-variant-numeric: tabular-nums; margin-left: var(--space-1); }
+.dash .seg button[aria-pressed="true"] .n { color: var(--text-secondary); }
+.dash table.table td.proj-cell { max-width: 0; width: 100%; }
+.dash table.table tr.clickable { cursor: pointer; }
+.dash .proj-link { display: flex; align-items: center; gap: var(--space-3); color: var(--text-primary); min-width: 0; text-decoration: none; }
+.dash .proj-link:hover .proj-name { text-decoration: underline; }
+.dash .proj-link .avatar { width: 24px; height: 24px; font-size: var(--fs-2xs); flex: none; }
+.dash .proj-name { font-weight: var(--fw-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash .proj-text { display: flex; flex-direction: column; min-width: 0; }
+.dash .proj-text .faint { font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash .search { width: 220px; max-width: 100%; }
+.dash .card-head .row { flex-wrap: wrap; }
+
+/* the side column: Needs your attention, Recent activity, System */
+.todo, .feed, .health { list-style: none; margin: 0; padding: 0; }
+.todo li { display: flex; gap: var(--space-3); padding: var(--space-3) var(--space-4); align-items: flex-start; }
+.todo li + li, .feed li + li, .health li + li { border-top: 1px solid var(--border-subtle); }
+.todo li .icon { margin-top: 2px; flex: none; }
+.todo li.danger > .icon { color: var(--danger); } .todo li.info > .icon { color: var(--info); } .todo li.warning > .icon { color: var(--warning); } .todo li.accent > .icon { color: var(--text-link); }
+.todo .t { font-weight: var(--fw-medium); }
+.todo .acts { display: flex; gap: var(--space-2); margin-top: var(--space-2); flex-wrap: wrap; }
+.todo li > div { min-width: 0; flex: 1; }
+.todo-empty { padding: var(--space-3) var(--space-4); }
+.feed li { display: flex; gap: var(--space-3); padding: var(--space-2) var(--space-4); align-items: flex-start; }
+.feed li > div { min-width: 0; }
+.feed .who { font-weight: var(--fw-medium); }
+.health li { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-4); }
+.health li .icon { color: var(--text-tertiary); flex: none; }
+.health .k { margin-left: auto; color: var(--text-secondary); text-align: right; }
+.health .k.warning { color: var(--warning); } .health .k.danger { color: var(--danger); }
+
+/* the team table (managers, administrators) */
+.dash .team-who { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.dash .team-who .avatar { width: 24px; height: 24px; font-size: var(--fs-2xs); flex: none; }
+
+/* Projects page: the toolbar in the card head */
+.dash .proj-tools { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; justify-content: flex-end; }
+.dash .proj-tools .select { width: 170px; }
+
+/* Workspace: each folder is a section with a card-style head; the projects are tiles like the mockup's resume links */
+.dash .v2-folder { margin-bottom: var(--space-5); }
+.dash .v2-folder-head { display: flex; align-items: center; gap: var(--space-2); min-height: var(--row-h); margin-bottom: var(--space-2); padding: 0 var(--space-1); }
+.dash .v2-folder-head > .icon { color: var(--text-tertiary); }
+.dash .v2-folder-head h3 { margin: 0; font-size: var(--fs-md); font-weight: var(--fw-semibold); }
+.dash .v2-folder-head .spacer { flex: 1; }
+.dash .v2-pcard { padding: var(--space-3); gap: var(--space-2); border-radius: var(--radius-lg); border-color: var(--border-default); background: var(--surface-panel); }
+.dash .v2-pcard:hover { border-color: var(--border-control); box-shadow: var(--shadow-1); }
+.dash .v2-pcard:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.dash .v2-pcard h3 { font-size: var(--fs-md); font-weight: var(--fw-semibold); }
+.dash .v2-grid.cols-3 { gap: var(--space-3); }

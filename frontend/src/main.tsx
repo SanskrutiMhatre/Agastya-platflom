@@ -7,6 +7,7 @@ import './styles/tokens/tokens.css';
 import './styles/base.css';
 import './styles/components.css';      // UI redesign step 1: the mockup components (docs/audit/mockups/components.css)
 import './styles/platform.css';
+import './styles/shell.css';          // UI redesign step 1: the global and project shells
 import './styles/states.css';
 import { App } from './App';
 import { applyTheme, useUi } from './store/ui';

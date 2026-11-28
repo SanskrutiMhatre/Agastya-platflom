@@ -7,7 +7,8 @@ import { Icon } from '../components/Icon';
 import { RowLink } from '../components/a11y';
 import { SampleMenu } from '../components/SampleButton';
 import { CreateProjectModal, RoleBadge, formatLabel } from '../components/project';
-import { Alert, Badge, Empty, Loading, PromptModal, ago, useAsync } from '../components/ui';
+import { Alert, Card, Loading, Pill, PromptModal, ago, useAsync } from '../components/ui';
+import '../styles/pages/dashboard.css';   // UI redesign step 1: screen 1's parts (the card head tools, the project cell)
 import { useUi } from '../store/ui';
 import { MoreRows, useProgressive } from '../components/windowing';
 import { useContextMenu, type MenuAction } from '../components/ContextMenu';
@@ -47,44 +48,47 @@ export function Projects() {
   ];
 
   return (
-    <div className="v2-page">
-      <div className="v2-page-head">
-        <div><h2>Projects</h2><p className="v2-sub">{rows.length} of {list.data?.length ?? 0} projects.</p></div>
-        {/* WP-07 (UX-006): the toolbar wraps, so New project never lies beyond the right edge at 1280 or 1366 px */}
-        <div className="v2-row wrap" style={{ justifyContent: 'flex-end' }}>
-          <input className="v2-input" style={{ width: 240, maxWidth: '100%' }} placeholder="Search by name or folder…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search projects" />
-          <select className="v2-select" style={{ width: 150 }} value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label="Sort projects">
-            <option value="recent">Recently opened</option><option value="name">Name</option><option value="dms">Most data modules</option>
-          </select>
+    <div className="v2-page dash">
+      <div className="page-head">
+        <div><h2>Projects</h2><p>{rows.length} of {list.data?.length ?? 0} projects.</p></div>
+        {/* WP-07 (UX-006): the actions wrap, so New project never lies beyond the right edge at 1280 or 1366 px */}
+        <div className="row">
           <BackupButton />
-          {role === 'admin' ? null : <><button className="btn" onClick={() => setImporting(true)} data-testid="import-as-open" title="Import a package of S1000D documents (or the older publishing tool's export), or a JSS / JSG document, as a new S1000D, JSS or JSG project"><Icon name="upload" />Import package</button><SampleMenu onCreated={() => list.reload()} /><button className="btn btn-primary" onClick={() => setCreating(true)}><Icon name="plus" />New project</button></>}
+          {role === 'admin' ? null : <><button className="btn" onClick={() => setImporting(true)} data-testid="import-as-open" title="Import a package of S1000D documents (or the older publishing tool's export), or a JSS / JSG document, as a new S1000D, JSS or JSG project"><Icon name="upload" />Import package</button><SampleMenu onCreated={() => list.reload()} /><button className="btn primary btn-primary" onClick={() => setCreating(true)}><Icon name="plus" />New project</button></>}
         </div>
       </div>
 
-      <div className="v2-card">
-        {rows.length === 0 ? <Empty title={q ? 'No project matches' : 'No projects yet'}>{q ? 'Try a different search.' : 'Create a project to start authoring S1000D data modules.'}</Empty> : (
-          <table className="v2-table">
-            <thead><tr><th>Name</th>{overseer ? <th>Status</th> : null}<th>Folder</th>{role === 'admin' ? <th>Owner</th> : <th>Your role</th>}<th>Data modules</th><th>Engine</th><th>Last opened</th><th /></tr></thead>
+      <Card title="All projects" icon="folder" flush testId="projects-card" actions={<div className="proj-tools">
+        <input className="input search" placeholder="Search by name or folder…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search projects" />
+        <select className="select" value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label="Sort projects">
+          <option value="recent">Recently opened</option><option value="name">Name</option><option value="dms">Most data modules</option>
+        </select>
+      </div>}>
+        {rows.length === 0 ? <div className="empty-state"><strong>{q ? 'No project matches' : 'No projects yet'}</strong><p className="muted">{q ? 'Try a different search.' : 'Create a project to start authoring S1000D data modules.'}</p></div> : (
+          <div className="table-wrap"><table className="table">
+            <thead><tr><th>Project</th>{overseer ? <th>Status</th> : null}{role === 'admin' ? <th>Owner</th> : <th>Your role</th>}<th>Data modules</th><th>Engine</th><th>Last opened</th><th><span className="sr">Actions</span></th></tr></thead>
             <tbody>
               {rows.slice(0, shown.limit).map((p) => (
                 <tr key={p.id} className="clickable" onClick={() => open(p.id)} data-testid="project-row" {...ctx.bind(`Project ${p.name}`, rowActions(p.id))}>
-                  <td><strong><RowLink href={`/projects/${p.id}`} onOpen={() => open(p.id)}>{p.name}</RowLink></strong>{p.hasPdf ? <> <Badge tone="ok">PDF built</Badge></> : null}{p.missingSince ? <> <Badge tone="bad">Folder missing</Badge></> : null}</td>
-                  {overseer ? <td>{status.data?.get(p.id) ? <StatusBadge status={status.data.get(p.id)!.status} stale={status.data.get(p.id)!.changedSinceRelease} /> : null}</td> : null}
-                  <td>{p.folder || <span className="v2-hint">—</span>}</td>
+                  <td className="proj-cell"><span className="proj-link"><span className="avatar" aria-hidden="true">{p.name.charAt(0).toUpperCase()}</span><span className="proj-text">
+                    <span className="row" style={{ gap: 'var(--space-2)', minWidth: 0 }}><RowLink href={`/projects/${p.id}`} onOpen={() => open(p.id)}><span className="proj-name">{p.name}</span></RowLink>{p.hasPdf ? <Pill tone="success">PDF built</Pill> : null}{p.missingSince ? <Pill tone="danger">Folder missing</Pill> : null}</span>
+                    <span className="faint">{p.folder || 'No folder'}</span>
+                  </span></span></td>
+                  {overseer ? <td style={{ whiteSpace: 'nowrap' }}>{status.data?.get(p.id) ? <StatusBadge status={status.data.get(p.id)!.status} stale={status.data.get(p.id)!.changedSinceRelease} /> : null}</td> : null}
                   {role === 'admin' ? <td>{p.owners[0] ?? '-'}</td> : <td><RoleBadge role={p.role} /></td>}
-                  <td>{p.dmCount}</td>
-                  <td>{formatLabel(p)}</td>
-                  <td>{ago(p.lastOpened ?? p.updatedAt)}</td>
+                  <td className="num">{p.dmCount}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>{formatLabel(p)}</td>
+                  <td className="faint" style={{ whiteSpace: 'nowrap' }}>{ago(p.lastOpened ?? p.updatedAt)}</td>
                   <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
                     {role === 'admin' ? null : <button className="icon-btn" title="Copy project" aria-label={`Copy ${p.name}`} onClick={() => setCopying(p.id)}><Icon name="copy" /></button>}
                   </td>
                 </tr>
               ))}
-              <MoreRows as="tr" colSpan={8} shown={shown.limit} total={rows.length} onMore={shown.more} onAll={shown.all} />
+              <MoreRows as="tr" colSpan={7} shown={shown.limit} total={rows.length} onMore={shown.more} onAll={shown.all} />
             </tbody>
-          </table>
+          </table></div>
         )}
-      </div>
+      </Card>
 
       {ctx.menu}
       {creating ? <CreateProjectModal folders={folders} onClose={() => setCreating(false)} onCreated={() => list.reload()} /> : null}
