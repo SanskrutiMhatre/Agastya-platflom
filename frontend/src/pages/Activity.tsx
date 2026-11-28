@@ -5,11 +5,11 @@ import { useState } from 'react';
 import { contentApi, teamApi } from '../api';
 import { ActivityView } from '../components/ActivityView';
 import { Icon } from '../components/Icon';
-import { Alert, Badge, Empty, Loading, errText, fmtDate, useAsync } from '../components/ui';
+import { Alert, Badge, Empty, Loading, StatTile, errText, fmtDate, useAsync } from '../components/ui';
 import { useSession } from '../store/session';
 import { useUi } from '../store/ui';
 import '../styles/pages/admin.css';   // UI redesign screen 6: the administration look of the global pages
-import { AdmHead, StatTile } from './adminParts';
+import { AdmHead } from './adminParts';
 
 export function Activity() {
   const user = useSession((s) => s.user);

@@ -8,7 +8,7 @@ import { adminApi, auditApi, auditQueryString, authApi, teamApi, type AuditQuery
 import { globalLabel } from '../lib/roles';
 import { Icon } from '../components/Icon';
 import { ThemeChoiceControl } from '../components/ThemeToggle';
-import { Alert, Badge, ConfirmModal, Empty, Field, Loading, Modal, ago, errText, fmtDate, useAsync } from '../components/ui';
+import { Alert, Badge, ConfirmModal, Empty, Field, Loading, Modal, ago, errText, fmtDate, initialsOf, Pill, useAsync } from '../components/ui';
 import '../styles/pages/admin.css';   // WP-35 second pass: Users and Audit logs share the administrator styles
 import { useSession } from '../store/session';
 import { useUi } from '../store/ui';
@@ -17,7 +17,7 @@ import { actionLabel } from '../lib/activity';
 import { MoreRows, useProgressive } from '../components/windowing';
 import { tablistKeys } from '../components/a11y';
 import { PasswordInput } from '../components/PasswordInput';
-import { AdmHead, initials } from './adminParts';
+import { AdmHead } from './adminParts';
 
 function Account() {
   const { user, logout } = useSession();
@@ -41,7 +41,7 @@ function Account() {
       <section className="card" aria-labelledby="acct-profile">
         <div className="card-head"><h3 id="acct-profile"><Icon name="user" />Profile</h3></div>
         <div className="card-body v2-stack">
-          <div className="user-cell"><span className="avatar" aria-hidden="true">{initials(user?.fullName || user?.username || '')}</span><div className="who"><strong>{user?.fullName}</strong><span className="v2-mono">@{user?.username}</span></div></div>
+          <div className="user-cell"><span className="avatar" aria-hidden="true">{initialsOf(user?.fullName || user?.username || '')}</span><div className="who"><strong>{user?.fullName}</strong><span className="v2-mono">@{user?.username}</span></div></div>
           <Field label="Name"><input className="v2-input" value={user?.fullName ?? ''} readOnly /></Field>
           <Field label="Username"><input className="v2-input" value={user?.username ?? ''} readOnly /></Field>
           <div className="v2-row"><Badge tone={user?.role === 'author' ? undefined : 'accent'}>{globalLabel(user?.role)}</Badge></div>
@@ -123,7 +123,7 @@ export function Users() {
             <thead><tr><th>User</th><th>Role</th><th>Status</th><th><span className="v2-sr">Actions</span></th></tr></thead>
             <tbody>{shown.map((u) => (
               <tr key={u.id}>
-                <td><div className="user-cell"><span className="avatar" aria-hidden="true">{initials(u.fullName || u.username)}</span><div className="who"><strong>{u.fullName}</strong><span className="v2-mono">@{u.username}</span></div></div></td>
+                <td><div className="user-cell"><span className="avatar" aria-hidden="true">{initialsOf(u.fullName || u.username)}</span><div className="who"><strong>{u.fullName}</strong><span className="v2-mono">@{u.username}</span></div></div></td>
                 <td>
                   <select className="v2-select v2-w-190" value={u.role} disabled={u.id === me?.id} aria-label={`Role of ${u.username}`}
                     onChange={(e) => setRoleChange({ user: u, role: e.target.value })}>
@@ -270,11 +270,11 @@ export const plainIp = (ip: string | null): string => (ip ?? '').replace(/^::fff
 
 /** The mockup's Type column: what kind of event a row is, from its action name (sign-in trouble and access changes are Security, settings
  *  and reference data are Config, everything else is Info). */
-export function auditKind(action: string): { label: string; tone?: 'bad' | 'warn' | 'accent' } {
+export function auditKind(action: string): { label: string; tone: 'danger' | 'warning' | 'info' } {
   const a = action.toLowerCase();
-  if (/(fail|denied|refused|locked|lockout|offboard|revoke|disable|reset|password|session\.ended|auth\.)/.test(a)) return { label: 'Security', tone: 'bad' };
-  if (/(setting|config|policy|accent|theme|backup|restore|access\.|role|group|directory|maintenance)/.test(a)) return { label: 'Config', tone: 'warn' };
-  return { label: 'Info', tone: 'accent' };
+  if (/(fail|denied|refused|locked|lockout|offboard|revoke|disable|reset|password|session\.ended|auth\.)/.test(a)) return { label: 'Security', tone: 'danger' };
+  if (/(setting|config|policy|accent|theme|backup|restore|access\.|role|group|directory|maintenance)/.test(a)) return { label: 'Config', tone: 'warning' };
+  return { label: 'Info', tone: 'info' };
 }
 
 export function Audit() {
@@ -325,7 +325,7 @@ export function Audit() {
         <div className="card-head"><h3 id="audit-h"><Icon name="history" />Entries <span className="count">{rows.length}</span></h3><span className="faint">Newest first · at most 300 shown</span></div>
         {a.loading && !a.data ? <Loading /> : !rows.length ? <Empty title="No entries" /> : (
           <div className="table-wrap"><table className="v2-table"><thead><tr><th>When</th><th>Who</th><th>Action</th><th>Type</th><th>Project</th><th>From</th></tr></thead>
-            <tbody>{rows.slice(0, drawn.limit).map((e) => { const k = auditKind(e.action); return <tr key={e.id}><td title={fmtDate(e.at)} className="faint">{ago(e.at)}</td><td>{e.actor ?? '—'}</td><td title={e.action}>{actionLabel(e.action)} <span className="v2-hint v2-mono">{e.action}</span></td><td><Badge tone={k.tone}>{k.label}</Badge></td><td className="v2-mono">{e.projectId ?? ''}</td><td className="v2-mono">{plainIp(e.ip)}</td></tr>; })}
+            <tbody>{rows.slice(0, drawn.limit).map((e) => { const k = auditKind(e.action); return <tr key={e.id}><td title={fmtDate(e.at)} className="faint">{ago(e.at)}</td><td>{e.actor ?? '—'}</td><td title={e.action}>{actionLabel(e.action)} <span className="v2-hint v2-mono">{e.action}</span></td><td><Pill tone={k.tone}>{k.label}</Pill></td><td className="v2-mono">{e.projectId ?? ''}</td><td className="v2-mono">{plainIp(e.ip)}</td></tr>; })}
               <MoreRows as="tr" colSpan={6} shown={drawn.limit} total={rows.length} onMore={drawn.more} onAll={drawn.all} /></tbody></table></div>
         )}
       </section>

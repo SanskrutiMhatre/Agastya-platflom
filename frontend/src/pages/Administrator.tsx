@@ -14,7 +14,7 @@ import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import { adminApi, backupApi, configApi, platformApi, workspaceApi, type AppSettings, type ConfigItem, type ConfigSpec, type SecurityPolicy } from '../api';
 import { Icon } from '../components/Icon';
 import { Alert, Badge, ConfirmModal, Empty, Field, Loading, Modal, errText, fmtDate, fmtSize, useAsync } from '../components/ui';
-import { AdmHead, Meter, StatTile } from './adminParts';
+import { AdmHead, HealthTile, Meter } from './adminParts';
 import tokens from '../styles/tokens/tokens.json';
 import '../styles/pages/admin.css';   // WP-35 second pass: the administrator screens' styles load with this chunk
 import { useApp } from '../store/appSettings';
@@ -77,15 +77,15 @@ function HealthTiles() {
   const active = u ? u.filter((x) => !x.disabled).length : 0;
   return (
     <section className="hh" aria-label="Health" data-testid="admin-health">
-      <StatTile label="Audit log" tone={auditTone} testId="health-audit"
+      <HealthTile label="Audit log" tone={auditTone} testId="health-audit"
         value={!audit ? '—' : audit.failures > 0 ? `${audit.failures} not recorded` : 'Recording'}
         line={audit?.lastVerification ? `Chain checked ${fmtDate(audit.lastVerification.at)}: ${audit.lastVerification.ok ? 'intact' : 'problems found'}` : 'Every action is chained and signed'} />
-      <StatTile label="Last backup" tone={!b ? undefined : b.stale || b.state.lastBackup?.ok === false ? 'warning' : 'success'} testId="health-backup"
+      <HealthTile label="Last backup" tone={!b ? undefined : b.stale || b.state.lastBackup?.ok === false ? 'warning' : 'success'} testId="health-backup"
         value={!b ? '—' : b.latest ? (b.latest.ageDays === 0 ? 'Today' : `${b.latest.ageDays} day${b.latest.ageDays === 1 ? '' : 's'} ago`) : 'None yet'}
         line={b ? (b.latest ? `${fmtSize(b.latest.bytes)} · ${b.backups.length} kept${b.intervalHours > 0 ? ` · every ${b.intervalHours} h` : ' · no schedule'}` : 'Back up now under Maintenance') : undefined}>
         {b && slots > 0 ? <div className="mt8"><Meter value={b.backups.length} max={slots} label="Backups kept of the retention slots" tone={b.stale ? 'warning' : 'success'} /></div> : null}
-      </StatTile>
-      <StatTile label="People" tone={u ? 'success' : undefined} testId="health-people"
+      </HealthTile>
+      <HealthTile label="People" tone={u ? 'success' : undefined} testId="health-people"
         value={u ? `${active} active` : '—'} line={u ? `${u.length} account${u.length === 1 ? '' : 's'} · offline, on-premises · no licence key required` : undefined} />
     </section>
   );
