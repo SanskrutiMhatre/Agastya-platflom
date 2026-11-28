@@ -60,16 +60,16 @@ export function PreviewWindow() {
     <div className="v2-popout">
       <header className="v2-popout-bar">
         <strong>{title}</strong>
-        <button className="btn btn-sm btn-primary" onClick={() => void run()} disabled={busy} data-testid="popout-run">
+        <button className="btn sm primary" onClick={() => void run()} disabled={busy} data-testid="popout-run">
           {busy ? <Spinner /> : <Icon name={mode === 'quick' ? 'play' : 'rocket'} size={12} />}{mode === 'quick' ? 'Refresh preview' : 'Generate'}
         </button>
         <span className="v2-hint v2-trunc" style={{ flex: 1 }}>{label}{note ? ` · ${note}` : ''}</span>
         <ThemeToggle />
       </header>
-      {mode === 'quick' && !editor ? <div className="v2-alert warn" style={{ margin: 8 }}>Keep the editor open in the main window: it provides the text to preview.</div> : null}
-      {problem ? <div className="v2-alert bad" style={{ margin: 8 }}>{problem}</div> : null}
+      {mode === 'quick' && !editor ? <div className="alert warning" style={{ margin: 8, fontSize: 'var(--fs-xs)' }}>Keep the editor open in the main window: it provides the text to preview.</div> : null}
+      {problem ? <div className="alert danger" style={{ margin: 8, fontSize: 'var(--fs-xs)' }}>{problem}</div> : null}
       <div style={{ flex: 1, minHeight: 0, position: 'relative' }} data-testid="popout-pdf">
-        <LazyPdfViewer autoFit src={src} downloadName={`${mode === 'quick' ? 'preview' : 'publication'}.pdf`}
+        <LazyPdfViewer autoFit compact={false} src={src} downloadName={`${mode === 'quick' ? 'preview' : 'publication'}.pdf`}
           placeholder={<div className="v2-center"><div style={{ textAlign: 'center', padding: 16 }}><Icon name="pdf" size={30} /><p>{mode === 'quick' ? 'Use Quick preview in the editor, or Refresh preview here.' : 'Press Generate to build the publication.'}</p></div></div>} />
       </div>
     </div>

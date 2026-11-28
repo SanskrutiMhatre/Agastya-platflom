@@ -41,9 +41,12 @@ interface PageSlotProps {
   matches: Match[];
   currentMatchKey?: string;
   onGoPage: (n: number) => void;
+  /** the full viewer (Publication page, pop-out): the page number is printed under the sheet ("Page 3 of 20"), as the mockup draws it */
+  full: boolean;
+  total: number;
 }
 
-const PageSlot: React.FC<PageSlotProps> = ({ pdf, pageNum, scale, active, registerEl, matches, currentMatchKey, onGoPage }) => {
+const PageSlot: React.FC<PageSlotProps> = ({ pdf, pageNum, scale, active, registerEl, matches, currentMatchKey, onGoPage, full, total }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const textLayerRef = useRef<HTMLDivElement>(null);
@@ -149,12 +152,13 @@ const PageSlot: React.FC<PageSlotProps> = ({ pdf, pageNum, scale, active, regist
   });
 
   return (
+    <>
     <div
       ref={wrapRef}
       data-page={pageNum}
+      className="pdfv-sheet"
       style={{
-        position: 'relative', margin: '20px auto', background: 'var(--viewer-page)',
-        boxShadow: 'var(--viewer-page-shadow)',
+        position: 'relative', flex: 'none', background: 'var(--viewer-page)',
         ...(size ? { width: size.width, height: size.height } : { width: '80%', aspectRatio: '210 / 297' }),
       }}
     >
@@ -176,10 +180,14 @@ const PageSlot: React.FC<PageSlotProps> = ({ pdf, pageNum, scale, active, regist
         }} />
       ))}
 
-      <div style={{ position: 'absolute', bottom: 4, right: 8, fontSize: 10, color: 'var(--viewer-page-label)', userSelect: 'none', pointerEvents: 'none' }}>
-        {pageNum}
-      </div>
+      {full ? null : (
+        <div style={{ position: 'absolute', bottom: 4, right: 8, fontSize: 10, color: 'var(--viewer-page-label)', userSelect: 'none', pointerEvents: 'none' }}>
+          {pageNum}
+        </div>
+      )}
     </div>
+    {full ? <span className="pageno">Page {pageNum} of {total}</span> : null}
+    </>
   );
 };
 
@@ -213,12 +221,12 @@ const TocRow: React.FC<{ item: TocItem; depth: number; pdf: PDFDocumentProxy; cu
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 6 + depth * 14, borderRadius: 4, background: active ? 'var(--viewer-active)' : undefined }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 6 + depth * 14, paddingRight: 8, borderRadius: 'var(--radius-md)', background: active ? 'var(--surface-selected)' : undefined }}>
         {hasKids ? (
           <button
             onClick={() => setOpen(o => !o)} aria-label={open ? "Collapse" : "Expand"} title={open ? "Collapse" : "Expand"} aria-expanded={open}
-            style={{ width: 16, height: 16, border: 'none', background: 'none', color: 'var(--viewer-ink-55)', cursor: 'pointer', padding: 0, transform: open ? 'rotate(90deg)' : undefined, transition: 'transform .12s' }}
-          >▶</button>
+            style={{ width: 16, height: 16, border: 'none', background: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0, display: 'grid', placeItems: 'center', transform: open ? 'rotate(90deg)' : undefined, transition: 'transform .12s' }}
+          ><Icon name="right" size={12} /></button>
         ) : <span style={{ width: 16, flexShrink: 0 }} />}
         <button
           onClick={() => page != null && onGoPage(page)}
@@ -227,12 +235,12 @@ const TocRow: React.FC<{ item: TocItem; depth: number; pdf: PDFDocumentProxy; cu
           style={{
             flex: 1, minWidth: 0, textAlign: 'left', padding: '6px 0', fontSize: 12,
             border: 'none', background: 'none', cursor: page == null ? 'default' : 'pointer',
-            color: active ? 'var(--viewer-accent)' : 'var(--viewer-ink-80)',
+            color: active ? 'var(--text-link)' : 'var(--text-primary)',
             fontWeight: active ? 600 : 400, opacity: page == null ? 0.4 : 1,
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}
         >{item.title}</button>
-        {page != null && <span style={{ fontSize: 10, color: 'var(--viewer-ink-55)' }}>{page}</span>}
+        {page != null && <span style={{ fontSize: 'var(--fs-2xs)', color: 'var(--text-tertiary)', fontVariantNumeric: 'tabular-nums' }}>{page}</span>}
       </div>
       {hasKids && open && item.items!.map((kid, i) => (
         <TocRow key={i} item={kid} depth={depth + 1} pdf={pdf} current={current} onGoPage={onGoPage} />
@@ -253,9 +261,35 @@ export interface PdfJsViewerProps {
   placeholder?: React.ReactNode;
   /** Fit the page to the width of the pane when a document loads and whenever the pane is resized. */
   autoFit?: boolean;
+  /** The narrow toolbar of the editor's PDF pane (default: when autoFit). The Publication page and the pop-out use the full one. */
+  compact?: boolean;
+  /** Show the Download button in the toolbar (default true; the Publication page has Download PDF in its top bar). */
+  download?: boolean;
+  /** The width in pixels the first page is drawn at when a document is first opened (the user's zoom is kept across reloads). */
+  startWidth?: number;
+  /** What is on screen: the current page, the first and last visible page, the page count and the page size in millimetres. */
+  onView?: (v: PdfView) => void;
+  /** The document's bookmarks with the page each one starts on, once they are resolved. */
+  onOutline?: (items: OutlinePage[]) => void;
 }
 
-export const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ src, downloadName = 'output.pdf', toolbarExtra, placeholder, autoFit }) => {
+export interface PdfView { page: number; first: number; last: number; numPages: number; widthMm: number; heightMm: number }
+export interface OutlinePage { title: string; page: number | null; items: OutlinePage[] }
+
+async function resolveOutline(pdf: PDFDocumentProxy, items: TocItem[]): Promise<OutlinePage[]> {
+  const out: OutlinePage[] = [];
+  for (const it of items) {
+    let page: number | null = null;
+    try {
+      const dest = typeof it.dest === 'string' ? await pdf.getDestination(it.dest) : it.dest;
+      if (dest?.[0]) page = (await pdf.getPageIndex(dest[0])) + 1;
+    } catch { /* unresolved */ }
+    out.push({ title: it.title, page, items: it.items?.length ? await resolveOutline(pdf, it.items) : [] });
+  }
+  return out;
+}
+
+export const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ src, downloadName = 'output.pdf', toolbarExtra, placeholder, autoFit, compact = !!autoFit, download = true, startWidth, onView, onOutline }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const pageEls = useRef(new Map<number, HTMLDivElement>());
   const pendingScrollPage = useRef<number | null>(null);
@@ -269,8 +303,14 @@ export const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ src, downloadName = 'o
   const [visible, setVisible] = useState<Set<number>>(() => new Set([1]));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [tocOpen, setTocOpen] = useState(!autoFit); // the compact (embedded) viewer starts with the pages, not the bookmarks
+  const [tocOpen, setTocOpen] = useState(false); // every viewer starts with the pages; the contents panel opens from the toolbar
   const [outline, setOutline] = useState<TocItem[]>([]);
+  const [findOpen, setFindOpen] = useState(compact);  // the full toolbar shows a Search button that opens the find box (mockup 4)
+  const [range, setRange] = useState<{ first: number; last: number }>({ first: 1, last: 1 });
+  const [pageMm, setPageMm] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
+  const startedRef = useRef(false);
+  const onViewRef = useRef(onView); onViewRef.current = onView;
+  const onOutlineRef = useRef(onOutline); onOutlineRef.current = onOutline;
 
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
@@ -304,8 +344,17 @@ export const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ src, downloadName = 'o
         pendingScrollPage.current = next;
         return next;
       });
-      try { setOutline((await doc.getOutline()) ?? []); } catch { setOutline([]); }
+      try {
+        const p1 = await doc.getPage(1);
+        const v = p1.getViewport({ scale: 1 });
+        setPageMm({ w: Math.round(v.width * 25.4 / 72), h: Math.round(v.height * 25.4 / 72) });
+        if (startWidth && !startedRef.current) { startedRef.current = true; const room = containerRef.current ? containerRef.current.clientWidth - 32 : startWidth; setScale(Math.max(0.4, Math.min(3, Math.min(startWidth, room > 120 ? room : startWidth) / v.width))); }
+      } catch { /* the size is shown when known */ }
+      let toc: TocItem[] = [];
+      try { toc = (await doc.getOutline()) ?? []; } catch { toc = []; }
+      setOutline(toc);
       setLoading(false);
+      if (onOutlineRef.current) { try { const r = await resolveOutline(doc, toc); if (!cancelled) onOutlineRef.current?.(r); } catch { /* no pages for the bookmarks */ } }
     }).catch(e => {
       if (cancelled) return;
       setError(e?.message ?? 'Could not open the PDF.');
@@ -331,6 +380,8 @@ export const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ src, downloadName = 'o
     const near = new Set<number>();
     let best = page;
     let bestOverlap = -1;
+    let first = Infinity;
+    let last = 0;
 
     for (const [n, el] of pageEls.current) {
       const elTop = el.offsetTop;
@@ -339,9 +390,11 @@ export const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ src, downloadName = 'o
       if (elBottom > top - box.clientHeight && elTop < bottom + box.clientHeight) near.add(n);
       const overlap = Math.min(elBottom, bottom) - Math.max(elTop, top);
       if (overlap > bestOverlap) { bestOverlap = overlap; best = n; }
+      if (overlap > 0) { first = Math.min(first, n); last = Math.max(last, n); }
     }
 
     setVisible(near);
+    if (last) setRange((r) => (r.first === first && r.last === last ? r : { first, last }));
     setPage(p => (p === best ? p : best));
   }, [numPages, page]);
 
@@ -356,18 +409,40 @@ export const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ src, downloadName = 'o
   }, [recompute]);
 
   useEffect(() => { setPageInput(String(page)); }, [page]);
+  // the pages take their real size once drawn (and again on zoom): measure what is on screen after that, not only on scroll
+  const recomputeRef = useRef(recompute); recomputeRef.current = recompute;
+  useEffect(() => {
+    const t = window.setTimeout(() => recomputeRef.current(), 400);
+    return () => window.clearTimeout(t);
+  }, [scale, numPages, pdf]);
+  useEffect(() => {
+    onViewRef.current?.({ page, first: Math.min(range.first, numPages || 1), last: Math.min(range.last, numPages || 1), numPages, widthMm: pageMm.w, heightMm: pageMm.h });
+  }, [page, range, numPages, pageMm]);
+
+  // Print: the browser prints the PDF itself from a hidden frame (its own print dialog); a new tab when the frame cannot print
+  const print = useCallback(() => {
+    if (!src) return;
+    const frame = document.createElement('iframe');
+    frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+    frame.src = src;
+    frame.onload = () => {
+      try { frame.contentWindow?.focus(); frame.contentWindow?.print(); } catch { window.open(src, '_blank', 'noopener'); }
+      window.setTimeout(() => frame.remove(), 60_000);
+    };
+    document.body.appendChild(frame);
+  }, [src]);
 
   const goPage = useCallback((n: number) => {
     const target = Math.min(Math.max(1, n), numPages || 1);
     const el = pageEls.current.get(target);
     if (el && containerRef.current) {
-      containerRef.current.scrollTo({ top: el.offsetTop - 8, behavior: 'smooth' });
+      containerRef.current.scrollTo({ top: el.offsetTop - (compact ? 8 : 20), behavior: 'smooth' });
     } else {
       // Not laid out yet — remember and jump once it is.
       pendingScrollPage.current = target;
     }
     setPage(target);
-  }, [numPages]);
+  }, [numPages, compact]);
 
   // Restore position after a reload, once the new pages have laid out.
   useEffect(() => {
@@ -375,10 +450,10 @@ export const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ src, downloadName = 'o
     if (want == null || !numPages) return;
     const el = pageEls.current.get(want);
     if (!el || !containerRef.current) return;
-    containerRef.current.scrollTop = Math.max(0, el.offsetTop - 8);
+    containerRef.current.scrollTop = Math.max(0, el.offsetTop - (compact ? 8 : 20));
     pendingScrollPage.current = null;
     recompute();
-  }, [numPages, visible, recompute]);
+  }, [numPages, visible, recompute, compact]);
 
   const fitWidth = useCallback(async () => {
     if (!pdf || !containerRef.current) return;
@@ -443,12 +518,12 @@ export const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ src, downloadName = 'o
   };
 
   return (
-    <div className={`pdfv${autoFit ? ' compact' : ''}`}>
-      {/* Toolbar: the mockup's viewer bar (contents, page, zoom, find); the paper below stays white in both themes */}
+    <div className={`pdfv${compact ? ' compact' : ''}`}>
+      {/* Toolbar: the mockup's viewer bar (contents, page, zoom, search, print); the paper below stays white in both themes */}
       <div className="vbar" role="toolbar" aria-label="PDF viewer">
-        <button className="icon-btn" onClick={() => setTocOpen(o => !o)} title="Table of contents" aria-label="Table of contents" aria-pressed={tocOpen}><Icon name="panel" size={15} /></button>
+        <button className="icon-btn" onClick={() => setTocOpen(o => !o)} title="Contents" aria-label="Table of contents" aria-pressed={tocOpen}><Icon name="panel" size={16} /></button>
         <span className="vsep" />
-        <button className="icon-btn" onClick={() => goPage(page - 1)} disabled={page <= 1} title="Previous page" aria-label="Previous page"><Icon name="up" size={15} /></button>
+        <button className="icon-btn" onClick={() => goPage(page - 1)} disabled={page <= 1} title="Previous page" aria-label="Previous page"><Icon name="up" size={16} /></button>
         <span className="pg">
           <input
             className="input"
@@ -458,28 +533,31 @@ export const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ src, downloadName = 'o
             onBlur={() => setPageInput(String(page))}
             aria-label="Page number"
           />
-          <span className="faint">/ {numPages || '—'}</span>
+          <span className="of">/ {numPages || '—'}</span>
         </span>
-        <button className="icon-btn" onClick={() => goPage(page + 1)} disabled={page >= numPages} title="Next page" aria-label="Next page"><Icon name="down" size={15} /></button>
+        <button className="icon-btn" onClick={() => goPage(page + 1)} disabled={page >= numPages} title="Next page" aria-label="Next page"><Icon name="down" size={16} /></button>
 
         <span className="vsep" />
-        <button className="icon-btn" onClick={() => setScale(s => Math.max(0.4, s - 0.15))} title="Zoom out" aria-label="Zoom out"><Icon name="zoomOut" size={15} /></button>
+        <button className="icon-btn" onClick={() => setScale(s => Math.max(0.4, s - 0.15))} title="Zoom out" aria-label="Zoom out"><Icon name="zoomOut" size={16} /></button>
         <span className="zoom">{Math.round(scale * 100)} %</span>
-        <button className="icon-btn" onClick={() => setScale(s => Math.min(3, s + 0.15))} title="Zoom in" aria-label="Zoom in"><Icon name="zoomIn" size={15} /></button>
+        <button className="icon-btn" onClick={() => setScale(s => Math.min(3, s + 0.15))} title="Zoom in" aria-label="Zoom in"><Icon name="zoomIn" size={16} /></button>
         <button className="btn sm subtle" onClick={fitWidth}>Fit width</button>
 
         <span className="grow" />
-        <span className="find">
-          <Icon name="search" size={13} />
-          <input
-            className="input"
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') runSearch(); }}
-            placeholder="Find…"
-            aria-label="Search in document"
-          />
-        </span>
+        {findOpen ? (
+          <span className="find">
+            {compact ? <Icon name="search" size={13} /> : null}
+            <input
+              className="input"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') runSearch(); if (e.key === 'Escape' && !compact) { setFindOpen(false); setQuery(''); setMatches([]); } }}
+              placeholder="Find…"
+              aria-label="Search in document"
+              autoFocus={!compact}
+            />
+          </span>
+        ) : null}
         {matches.length > 0 && (
           <>
             <button className="icon-btn" onClick={() => stepMatch(-1)} title="Previous match" aria-label="Previous match"><Icon name="up" size={14} /></button>
@@ -492,16 +570,18 @@ export const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ src, downloadName = 'o
           <span className="faint">no matches</span>
         )}
 
+        {compact ? null : <button className="icon-btn" onClick={() => setFindOpen((o) => { if (o) { setQuery(''); setMatches([]); } return !o; })} title="Search" aria-label={findOpen ? 'Close search' : 'Search'} aria-pressed={findOpen}><Icon name="search" size={16} /></button>}
+        {compact ? null : <button className="icon-btn" onClick={print} disabled={!src || !numPages} title="Print" aria-label="Print"><Icon name="print" size={16} /></button>}
         {toolbarExtra}
-        {src && !autoFit && <a className="btn sm" href={src} download={downloadName}><Icon name="download" size={13} />Download</a>}
+        {src && !autoFit && download && <a className="btn sm" href={src} download={downloadName}><Icon name="download" size={13} />Download</a>}
       </div>
 
       {/* Body */}
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         {tocOpen && src && (
-          <div style={{ width: 230, flexShrink: 0, overflow: 'auto', background: 'var(--viewer-sidebar)', padding: '8px 4px' }}>
+          <div className="pdfv-toc">
             {!pdf ? null : outline.length === 0 ? (
-              <div style={{ padding: 12, fontSize: 11.5, color: 'var(--viewer-ink-55)' }}>
+              <div style={{ padding: 12, fontSize: 'var(--fs-xs)', color: 'var(--text-tertiary)' }}>
                 This document has no table of contents.
               </div>
             ) : outline.map((item, i) => (
@@ -510,7 +590,7 @@ export const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ src, downloadName = 'o
           </div>
         )}
 
-        <div ref={containerRef} style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
+        <div ref={containerRef} className={numPages && src && !error ? 'pdfv-pages' : undefined} style={{ flex: 1, overflow: 'auto', position: 'relative' }}>
           {error ? (
             <div style={{ padding: 24, color: 'var(--danger)', fontSize: 13 }}>⚠ {error}</div>
           ) : !src ? (
@@ -533,6 +613,8 @@ export const PdfJsViewer: React.FC<PdfJsViewerProps> = ({ src, downloadName = 'o
                 matches={matches}
                 currentMatchKey={matches[matchIndex]?.key}
                 onGoPage={goPage}
+                full={!compact}
+                total={numPages}
               />
             ))
           )}
