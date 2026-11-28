@@ -58,11 +58,11 @@ export function ReviewReader({ projectId, file, comments, canComment, canResolve
   };
 
   const thread = (list: ReviewComment[]) => list.map((c) => (
-    <div key={c.id} className={`v2-rv ${c.resolved ? 'done' : ''}`} data-testid="pinned-comment" style={{ marginTop: 6 }}>
-      <div className="v2-rv-head"><b>{c.byName ?? c.by ?? 'Someone'}</b><span className="v2-hint">{ago(c.at)}</span>
+    <div key={c.id} className={`pp-cmt ${c.resolved ? 'done' : ''}`} data-testid="pinned-comment" style={{ marginTop: 6 }}>
+      <div className="pp-cmt-head"><b>{c.byName ?? c.by ?? 'Someone'}</b><span className="v2-hint">{ago(c.at)}</span>
         {canResolve ? <label className="v2-row" style={{ marginLeft: 'auto', gap: 6 }}><input type="checkbox" checked={c.resolved} onChange={(e) => void contentApi.resolveComment(projectId, c.id, e.target.checked).then(onChanged)} aria-label="Mark as done" />Done</label> : c.resolved ? <Badge tone="ok">Done</Badge> : null}
       </div>
-      <p className="v2-rv-body">{c.body}</p>
+      <p className="pp-cmt-body">{c.body}</p>
     </div>
   ));
 
@@ -92,9 +92,9 @@ export function ReviewReader({ projectId, file, comments, canComment, canResolve
         {here.length ? thread(here) : null}
         {sel ? (
           <form className="v2-stack" style={{ marginTop: 6 }} onSubmit={(e) => { e.preventDefault(); if (text.trim()) void send(path, el); }}>
-            <textarea className="v2-textarea" rows={2} maxLength={4000} autoFocus value={text} onChange={(e) => setText(e.target.value)} placeholder="Your comment on this…" aria-label="Comment on this place" data-testid="pin-text" />
+            <textarea className="input" rows={2} maxLength={4000} autoFocus value={text} onChange={(e) => setText(e.target.value)} placeholder="Your comment on this…" aria-label="Comment on this place" data-testid="pin-text" />
             {err ? <span className="v2-hint" style={{ color: 'var(--danger)' }}>{err}</span> : null}
-            <div className="v2-row"><button className="btn btn-sm btn-primary" disabled={busy || !text.trim()} data-testid="pin-add"><Icon name="comment" size={13} />Comment here</button><button type="button" className="btn btn-sm" onClick={() => setPick(null)}>Cancel</button></div>
+            <div className="v2-row"><button className="btn sm primary" disabled={busy || !text.trim()} data-testid="pin-add"><Icon name="comment" size={13} />Comment here</button><button type="button" className="btn sm" onClick={() => setPick(null)}>Cancel</button></div>
           </form>
         ) : null}
       </div>

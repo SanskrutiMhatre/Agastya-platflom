@@ -7,7 +7,7 @@ import { graphicsApi, type Graphic } from '../../api';
 import { Icon } from '../../components/Icon';
 import { GraphicsView } from '../../components/GraphicsView';
 import { PageHeader } from '../../components/PageHeader';
-import { Alert, ConfirmModal, Loading, errText, useAsync } from '../../components/ui';
+import { Callout, ConfirmModal, Loading, Spinner, errText, useAsync } from '../../components/ui';
 import { canWrite, useProject } from '../../layouts/ProjectShell';
 import { useUi } from '../../store/ui';
 
@@ -45,31 +45,38 @@ export function ProjectGraphicsPage() {
 
   const all = list.data ?? [];
   return (
-    <div className="v2-page">
+    <div className="v2-page pp">
       <PageHeader icon="image" title="Graphics" sub={`ICN artwork and symbols of ${summary.project.name}.`}
-        stats={[{ label: 'ICNs', value: all.filter((g) => g.kind === 'icn').length }, { label: 'Symbols', value: all.filter((g) => g.kind === 'symbol').length }, { label: 'Not used', value: all.filter((g) => !g.usedBy.length).length }]} />
+        actions={writable ? <button className="btn primary" disabled={busy} onClick={() => input.current?.click()} data-testid="graphics-add">{busy ? <Spinner /> : <Icon name="upload" size={16} />}Add graphics…</button> : null}
+        stats={[{ label: 'ICNs', value: all.filter((g) => g.kind === 'icn').length }, { label: 'Symbols', value: all.filter((g) => g.kind === 'symbol').length }, { label: 'Not used', value: all.filter((g) => !g.usedBy.length).length, tone: all.some((g) => !g.usedBy.length) ? 'warn' : undefined }]} />
       {writable ? (
-        <div className={`v2-card v2-card-pad v2-drop ${over ? 'over' : ''}`} onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)} onDrop={drop} data-testid="graphics-drop">
-          <div className="v2-drop-row">
-            <Icon name="upload" size={18} />
-            <span>Drop images here, or</span>
-            <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => input.current?.click()} data-testid="graphics-add">Add graphics…</button>
-            <input ref={input} type="file" hidden multiple accept=".png,.jpg,.jpeg,.gif,.svg,.bmp,.webp" onChange={(e) => void upload(e.target.files)} data-testid="graphics-file" />
-            <label className="v2-drop-as">As
-              <select className="v2-select" value={kind} onChange={(e) => setKind(e.target.value as typeof kind)} aria-label="Add as">
-                <option value="auto">Detect from the name</option><option value="icn">ICN artwork</option><option value="symbol">Symbol (icon)</option>
-              </select>
-            </label>
+        <section className={`card v2-drop pp-gap ${over ? 'over' : ''}`} onDragOver={(e) => { e.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)} onDrop={drop} data-testid="graphics-drop" aria-label="Add graphics">
+          <div className="card-body">
+            <div className="v2-drop-row">
+              <Icon name="upload" size={18} />
+              <span>Drop images here, or use <strong>Add graphics…</strong> above.</span>
+              <input ref={input} type="file" hidden multiple accept=".png,.jpg,.jpeg,.gif,.svg,.bmp,.webp" onChange={(e) => void upload(e.target.files)} data-testid="graphics-file" />
+              <label className="v2-drop-as">As
+                <select className="select" value={kind} onChange={(e) => setKind(e.target.value as typeof kind)} aria-label="Add as">
+                  <option value="auto">Detect from the name</option><option value="icn">ICN artwork</option><option value="symbol">Symbol (icon)</option>
+                </select>
+              </label>
+            </div>
+            <p className="pp-note">An ICN is named <b>ICN-…</b> and sits beside the data modules, where the figure's entity finds it. A symbol is any other image and is kept in the project's media folder.</p>
           </div>
-          <p className="v2-hint">An ICN is named <b>ICN-…</b> and sits beside the data modules, where the figure's entity finds it. A symbol is any other image and is kept in the project's media folder.</p>
-        </div>
+        </section>
       ) : null}
-      {problems.length ? <Alert tone="bad"><b>Nothing was added.</b><ul className="v2-gfx-problems">{problems.map((p) => <li key={p}>{p}</li>)}</ul></Alert> : null}
-      {list.error ? <Alert tone="bad">{list.error}</Alert> : null}
-      {list.loading && !list.data ? <Loading /> : <GraphicsView projectId={id} graphics={all} onDelete={writable ? setDel : undefined} empty="This project has no graphics yet." />}
+      {problems.length ? <div className="pp-gap"><Callout tone="danger" title="Nothing was added."><ul className="v2-gfx-problems">{problems.map((p) => <li key={p}>{p}</li>)}</ul></Callout></div> : null}
+      {list.error ? <div className="pp-gap"><Callout tone="danger" title="The graphics could not be read">{list.error}</Callout></div> : null}
+      <section className="card" aria-labelledby="gfx-lib-h">
+        <div className="card-head"><h3 id="gfx-lib-h"><Icon name="library" />Library</h3><span className="faint">{all.length} graphic{all.length === 1 ? '' : 's'}</span></div>
+        <div className="card-body">
+          {list.loading && !list.data ? <Loading /> : <GraphicsView projectId={id} graphics={all} onDelete={writable ? setDel : undefined} empty="This project has no graphics yet." />}
+        </div>
+      </section>
       {del ? (
-        <ConfirmModal title="Delete graphic?" danger confirmLabel={del.usedBy.length ? 'Delete anyway' : 'Delete'} onClose={() => setDel(null)}
-          body={<><p className="v2-mt0"><strong>{del.name}</strong> is removed from this project.</p>{del.usedBy.length ? <p className="v2-error">It is used by {del.usedBy.length} data module{del.usedBy.length === 1 ? '' : 's'} ({del.usedBy.slice(0, 3).join(', ')}{del.usedBy.length > 3 ? ', …' : ''}); those figures will be blank.</p> : null}</>}
+        <ConfirmModal title="Delete graphic?" danger icon="trash" confirmLabel={del.usedBy.length ? 'Delete anyway' : 'Delete'} onClose={() => setDel(null)}
+          body={<><p><strong>{del.name}</strong> is removed from this project.</p>{del.usedBy.length ? <p className="v2-error">It is used by {del.usedBy.length} data module{del.usedBy.length === 1 ? '' : 's'} ({del.usedBy.slice(0, 3).join(', ')}{del.usedBy.length > 3 ? ', …' : ''}); those figures will be blank.</p> : null}</>}
           onConfirm={() => remove(del, del.usedBy.length > 0)} />
       ) : null}
     </div>

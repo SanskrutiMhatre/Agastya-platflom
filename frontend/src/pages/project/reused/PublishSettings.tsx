@@ -16,6 +16,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { settingsApi, type CataloguePage, type SettingsPayload } from '../../../api/settings';
 import { useNavStore } from '../../../store/navStore';
 import { getPath, withPath } from '../../../lib/configPath';
+import { Icon } from '../../../components/Icon';
+import { Callout, EmptyState, Loading, Pill } from '../../../components/ui';
 
 type Tab = 'Publication' | 'Front matter' | 'Layout' | 'Branding';
 const TABS: Tab[] = ['Publication', 'Front matter', 'Layout', 'Branding'];
@@ -39,9 +41,7 @@ const SECURITY: [string, string][] = [
 // ── Small field primitives ─────────────────────────────────────────────────
 
 const Label: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.04em', color: 'var(--x-text-muted)' }}>
-    {children}
-  </span>
+  <span className="pp-flabel">{children}</span>
 );
 
 interface FieldProps {
@@ -55,54 +55,51 @@ interface FieldProps {
 }
 
 const Field: React.FC<FieldProps> = ({ label, value, onChange, textarea, options, hint, disabled }) => (
-  <label style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+  <label className="field">
     <Label>{label}</Label>
     {options ? (
-      <select className="x-select" value={value ?? ''} onChange={e => onChange(e.target.value)}>
+      <select className="select" value={value ?? ''} onChange={e => onChange(e.target.value)}>
         {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
       </select>
     ) : textarea ? (
       <textarea
-        className="x-input"
-        style={{ minHeight: 88, resize: 'vertical', fontFamily: 'inherit' }}
+        className="input pp-area"
         value={value ?? ''}
         onChange={e => onChange(e.target.value)}
       />
     ) : (
-      <input className="x-input" value={value ?? ''} disabled={disabled} onChange={e => onChange(e.target.value)} />
+      <input className="input" value={value ?? ''} disabled={disabled} onChange={e => onChange(e.target.value)} />
     )}
-    {hint && <span style={{ fontSize: 11, color: 'var(--x-text-muted)' }}>{hint}</span>}
+    {hint && <span className="hint">{hint}</span>}
   </label>
 );
 
 const Group: React.FC<{ title: string; hint?: string; children: React.ReactNode }> = ({ title, hint, children }) => (
-  <div className="x-card x-card--pad" style={{ marginBottom: 'var(--x-s4)' }}>
-    <h4 style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>{title}</h4>
-    {hint && <p style={{ fontSize: 12, color: 'var(--x-text-muted)', margin: '4px 0 12px' }}>{hint}</p>}
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 12, marginTop: hint ? 0 : 12 }}>
+  <section className="card pp-group">
+    <div className="card-head"><div><h3>{title}</h3>{hint && <p className="pp-detail-sub">{hint}</p>}</div></div>
+    <div className="card-body pp-fields">
       {children}
     </div>
-  </div>
+  </section>
 );
 
 /** Editor for a string[] — postal address lines, cautions, and the like. */
 const LineList: React.FC<{ value: any; onChange: (v: string[]) => void; placeholder?: string }> = ({ value, onChange, placeholder }) => {
   const arr: string[] = Array.isArray(value) ? value : [];
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <div className="pp-lines">
       {arr.map((v, i) => (
-        <div key={i} style={{ display: 'flex', gap: 6 }}>
+        <div key={i} className="pp-line">
           <input
-            className="x-input"
-            style={{ flex: 1 }}
+            className="input"
             value={v}
             placeholder={placeholder}
             onChange={e => onChange(arr.map((x, j) => (j === i ? e.target.value : x)))}
           />
-          <button className="x-btn" onClick={() => onChange(arr.filter((_, j) => j !== i))} title="Remove" aria-label="Remove">✕</button>
+          <button type="button" className="icon-btn" onClick={() => onChange(arr.filter((_, j) => j !== i))} title="Remove" aria-label="Remove"><Icon name="close" size={14} /></button>
         </div>
       ))}
-      <button className="x-btn" style={{ alignSelf: 'flex-start' }} onClick={() => onChange([...arr, ''])}>+ Add line</button>
+      <button type="button" className="btn sm pp-self-start" onClick={() => onChange([...arr, ''])}><Icon name="plus" size={14} />Add line</button>
     </div>
   );
 };
@@ -140,23 +137,19 @@ const MediaPicker: React.FC<{
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, width: 150 }}>
+    <div className="pp-media">
       <Label>{label}</Label>
       {value && !missing ? (
         <img
           src={settingsApi.mediaUrl(projectId, value)}
           alt=""
-          style={{ width: 72, height: 72, objectFit: 'contain', border: '1px solid var(--x-line)', borderRadius: 6, background: 'var(--image-backdrop)', padding: 4, alignSelf: 'center' }}
+          className="pp-media-img"
         />
       ) : (
-        <div style={{
-          width: 72, height: 72, display: 'grid', placeItems: 'center', alignSelf: 'center',
-          border: '1px dashed var(--x-line)', borderRadius: 6, fontSize: 10,
-          color: missing ? 'var(--x-error)' : 'var(--x-text-faint)', textAlign: 'center', padding: 4,
-        }}>{missing ? 'missing' : 'none'}</div>
+        <div className={`pp-media-img empty${missing ? ' missing' : ''}`}>{missing ? 'missing' : 'none'}</div>
       )}
 
-      <select className="x-select" value={value ?? ''} onChange={e => onChange(e.target.value)}>
+      <select className="select" value={value ?? ''} onChange={e => onChange(e.target.value)}>
         <option value="">— none —</option>
         {/* A value pointing at a file that is not in Media/ renders as nothing
             at all in the PDF, with no error — so keep it visible and flagged
@@ -165,11 +158,11 @@ const MediaPicker: React.FC<{
         {media.map(m => <option key={m} value={m}>{m.replace('Media/', '')}</option>)}
       </select>
 
-      <button className="x-btn" onClick={() => fileRef.current?.click()} disabled={busy}>
-        {busy ? 'Uploading…' : 'Upload…'}
+      <button type="button" className="btn sm" onClick={() => fileRef.current?.click()} disabled={busy} aria-busy={busy || undefined}>
+        <Icon name="upload" size={14} />{busy ? 'Uploading…' : 'Upload…'}
       </button>
       <input ref={fileRef} type="file" accept="image/*" hidden onChange={upload} />
-      {err && <span style={{ fontSize: 11, color: 'var(--x-error)' }}>{err}</span>}
+      {err && <span className="v2-error" role="alert">{err}</span>}
     </div>
   );
 };
@@ -284,58 +277,42 @@ export const PublishSettings: React.FC = () => {
   };
 
   if (!activeProjectId) {
-    return <div className="x-page"><p className="x-page__sub">Select a project first.</p></div>;
+    return <EmptyState icon="settings" title="Select a project first" />;
   }
 
   return (
-    <div className="x-page">
-      <div className="x-page__head">
-        <div className="x-page__title">
-          <h1 className="x-display x-display--lg" style={{ margin: 0 }}>Publishing settings</h1>
-          <p className="x-page__sub">
+    <div className="pp-publish">
+      {/* the section head inside the Settings tab: title and purpose on the left, Reload and Save on the right (the mockup page head, one level down) */}
+      <div className="pp-sec-head">
+        <div>
+          <h2>Publishing settings</h2>
+          <p>
             Front matter, page layout and branding for the published book.
             {data && <> Template: <strong>{data.templateRef}</strong>.</>}
           </p>
         </div>
-        <button className="x-btn" onClick={load} disabled={loading}>Reload</button>
-        <button className="x-btn x-btn--primary" onClick={save} disabled={saving || !dirty || !data}>
-          {saving ? 'Saving…' : dirty ? 'Save settings' : 'Saved'}
-        </button>
+        <div className="pp-actions">
+          <button type="button" className="btn" onClick={load} disabled={loading}><Icon name="refresh" size={16} />Reload</button>
+          <button type="button" className="btn primary" onClick={save} disabled={saving || !dirty || !data} aria-busy={saving || undefined}>
+            <Icon name="save" size={16} />{saving ? 'Saving…' : dirty ? 'Save settings' : 'Saved'}
+          </button>
+        </div>
       </div>
 
       {(error || note) && (
-        <div className="x-card x-card--pad" style={{
-          marginBottom: 'var(--x-s4)',
-          borderColor: error ? 'var(--x-error-line)' : 'var(--x-ok-line)',
-          background: error ? 'var(--x-error-bg)' : 'var(--x-ok-bg)',
-        }}>
-          <div style={{ fontSize: 12.5, color: error ? 'var(--x-error)' : 'var(--x-ok)' }}>{error ?? note}</div>
-        </div>
+        <div className="pp-gap"><Callout tone={error ? 'danger' : 'success'}>{error ?? note}</Callout></div>
       )}
 
       {loading ? (
-        <div className="x-card x-card--pad" style={{ textAlign: 'center', color: 'var(--x-text-muted)' }}>Loading…</div>
+        <div className="card"><Loading /></div>
       ) : !data ? (
-        <div className="x-card x-card--pad" style={{ textAlign: 'center', color: 'var(--x-text-muted)' }}>
-          No settings for this project.
-        </div>
+        <div className="card"><EmptyState icon="settings" title="No settings for this project" /></div>
       ) : (
         <>
-          <div style={{ display: 'flex', gap: 4, marginBottom: 'var(--x-s4)', borderBottom: '1px solid var(--x-line)', overflowX: 'auto' }}>
+          {/* the parts of the publishing settings: the mockup's chips (as the S1000D configuration's sections) */}
+          <div className="chips pp-subtabs pp-gap" role="group" aria-label="Publishing settings sections">
             {TABS.map(t => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className="x-btn"
-                style={{
-                  flex: 'none', whiteSpace: 'nowrap',
-                  border: 'none', borderRadius: 0, background: 'none',
-                  borderBottom: '2px solid',
-                  borderBottomColor: tab === t ? 'var(--x-accent)' : 'transparent',
-                  fontWeight: tab === t ? 600 : 400,
-                  color: tab === t ? 'var(--x-accent)' : 'var(--x-text-muted)',
-                }}
-              >{t}</button>
+              <button key={t} type="button" onClick={() => setTab(t)} className={`chip${tab === t ? ' on' : ''}`} aria-pressed={tab === t}>{t}</button>
             ))}
           </div>
 
@@ -369,19 +346,14 @@ export const PublishSettings: React.FC = () => {
 
           {tab === 'Front matter' && (
             <>
-              <div className="x-card" style={{ marginBottom: 'var(--x-s4)', overflow: 'hidden' }}>
-                <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--x-line)' }}>
-                  <strong style={{ fontSize: 13 }}>Pages</strong>
-                  <div style={{ fontSize: 12, color: 'var(--x-text-muted)', marginTop: 2 }}>
-                    Which pages appear before the content, and in this order.
-                  </div>
-                </div>
-                <table className="x-table">
+              <section className="card pp-group">
+                <div className="card-head"><div><h3>Pages</h3><p className="pp-detail-sub">Which pages appear before the content, and in this order.</p></div></div>
+                <div className="table-wrap"><table className="table">
                   <thead>
                     <tr>
-                      <th style={{ width: 60 }}>On</th>
+                      <th className="pp-tick">On</th>
                       <th>Page</th>
-                      <th style={{ width: '38%' }}>Title override</th>
+                      <th className="pp-title-col">Title override</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -394,17 +366,17 @@ export const PublishSettings: React.FC = () => {
                             disabled={p.required}
                             title={p.required ? 'This page is always included' : undefined}
                             onChange={e => setPage(p.id, { enabled: e.target.checked })}
-                            style={{ accentColor: 'var(--x-accent)' }}
+                            aria-label={`Include ${p.label}`}
                           />
                         </td>
                         <td>
                           {p.label}
-                          {p.required && <span className="x-pill x-pill--neutral" style={{ marginLeft: 6, fontSize: 10 }}>always on</span>}
+                          {p.required && <> <Pill>always on</Pill></>}
                         </td>
                         <td>
                           <input
-                            className="x-input"
-                            style={{ width: '100%' }}
+                            className="input"
+                            aria-label={`Title override for ${p.label}`}
                             placeholder={p.title ?? '(no heading)'}
                             value={p.customTitle}
                             onChange={e => setPage(p.id, { title: e.target.value })}
@@ -413,8 +385,8 @@ export const PublishSettings: React.FC = () => {
                       </tr>
                     ))}
                   </tbody>
-                </table>
-              </div>
+                </table></div>
+              </section>
 
               <Group title="Proprietary notice" hint="Project-specific wording, overlaid on the template default.">
                 <Field label="Applicability" textarea value={getPath(project, 'frontMatter.proprietary.applicability')} onChange={v => setP('frontMatter.proprietary.applicability', v)} />
@@ -424,7 +396,7 @@ export const PublishSettings: React.FC = () => {
               <Group title="Foreword (template default)" hint="Shared by every project using this template.">
                 <Field label="Text"  textarea value={getPath(house, 'frontMatterDefaults.foreword.text')}  onChange={v => setH('frontMatterDefaults.foreword.text', v)} />
                 <Field label="Email"          value={getPath(house, 'frontMatterDefaults.foreword.email')} onChange={v => setH('frontMatterDefaults.foreword.email', v)} />
-                <div style={{ gridColumn: '1 / -1' }}>
+                <div className="field pp-span">
                   <Label>Postal address</Label>
                   <LineList value={getPath(house, 'frontMatterDefaults.foreword.postalAddress')} onChange={v => setH('frontMatterDefaults.foreword.postalAddress', v)} />
                 </div>
@@ -434,12 +406,10 @@ export const PublishSettings: React.FC = () => {
 
           {tab === 'Layout' && (
             <>
-              <div className="x-card x-card--pad" style={{ marginBottom: 'var(--x-s4)', background: 'var(--x-surface)' }}>
-                <div style={{ fontSize: 12.5, color: 'var(--x-text-muted)' }}>
+              <div className="pp-gap"><Callout tone="warning">
                   These belong to the <strong>{data.templateRef}</strong> template and affect every
                   publication that uses it — not just this one.
-                </div>
-              </div>
+              </Callout></div>
 
               <Group title="Page">
                 <Field label="Width"          value={getPath(house, 'layout.page.width')}          onChange={v => setH('layout.page.width', v)} />
@@ -525,16 +495,16 @@ export const PublishSettings: React.FC = () => {
                 />
               </Group>
 
-              <div className="x-card x-card--pad">
-                <h4 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 4px' }}>Publishers</h4>
-                <p style={{ fontSize: 12, color: 'var(--x-text-muted)', margin: '0 0 12px' }}>
+              <section className="card pp-group">
+                <div className="card-head"><div><h3>Publishers</h3><p className="pp-detail-sub">
                   Named on the "jointly prepared &amp; published by" title page. A project list
                   replaces the template's entirely — a joint title page is all-or-nothing.
-                </p>
+                </p></div></div>
+                <div className="card-body pp-form">
                 {publishers.map((pub: any, i: number) => (
-                  <div key={i} className="x-card x-card--pad" style={{ marginBottom: 10 }}>
-                    <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                      <div style={{ flex: 1, display: 'grid', gap: 10 }}>
+                  <div key={i} className="pp-publisher">
+                    <div className="pp-publisher-row">
+                      <div className="pp-publisher-main">
                         <Field
                           label={`Publisher ${i + 1} name`}
                           value={pub.name}
@@ -544,7 +514,7 @@ export const PublishSettings: React.FC = () => {
                             setPublishers(list);
                           }}
                         />
-                        <div>
+                        <div className="field">
                           <Label>Address lines</Label>
                           <LineList
                             value={pub.addressLines}
@@ -569,23 +539,25 @@ export const PublishSettings: React.FC = () => {
                         onUploaded={loadMedia}
                       />
                       <button
-                        className="x-btn"
+                        type="button"
+                        className="btn sm"
                         onClick={() => {
                           const list = publishers.filter((_, j) => j !== i);
                           setPublishers(list);
                         }}
-                      >Remove</button>
+                      ><Icon name="trash" size={14} />Remove</button>
                     </div>
                   </div>
                 ))}
                 <button
-                  className="x-btn"
+                  type="button"
+                  className="btn sm pp-self-start"
                   onClick={() => {
-                    const list = [...publishers];
                     setPublishers([...publishers, { name: '', addressLines: [], logo: '' }]);
                   }}
-                >+ Add publisher</button>
-              </div>
+                ><Icon name="plus" size={14} />Add publisher</button>
+                </div>
+              </section>
             </>
           )}
         </>

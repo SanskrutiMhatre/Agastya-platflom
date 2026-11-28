@@ -81,8 +81,6 @@ html.v2-compact .v2-page { padding: var(--page-pad); }
 /* WP-35 (group 2): the dashboard parts as classes (were inline styles): sections, the two-column split, invitations, the activity feed */
 .v2-alert.accent { background: var(--accent-soft); color: var(--text); border-color: transparent; }
 .v2-gap-b { margin-bottom: 18px; }
-.v2-cols-main { grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); align-items: start; }
-@media (max-width: 1100px) { .v2-cols-main { grid-template-columns: minmax(0, 1fr); } }
 /* UX-025 (rest): a long project title on an Activity card ends in an ellipsis and never runs under the Open button */
 .v2-grow-min { flex: 1; min-width: 0; }
 .v2-no-shrink { flex: none; }
@@ -179,19 +177,7 @@ html.v2-compact .v2-page { padding: var(--page-pad); }
 
 /* ----------------------------------------------- editor page columns */
 
-/* ------------------------------------------------ page header, people, chips */
-.v2-ph { margin-bottom: 20px; }
-.v2-ph-main { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-.v2-ph-icon { width: 46px; height: 46px; border-radius: 12px; background: linear-gradient(135deg, var(--accent-soft), var(--bg-active)); color: var(--text-link); display: grid; place-items: center; flex: none; }
-.v2-ph-text { flex: 1; min-width: 200px; }
-.v2-ph-text :is(h1, h2) { margin: 0; font-size: 21px; font-weight: 700; letter-spacing: -.01em; }
-.v2-ph-text p { margin: 3px 0 0; color: var(--text-muted); font-size: 13px; }
-.v2-ph-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.v2-ph-stats { display: flex; gap: 10px; flex-wrap: wrap; margin: 16px 0 0; padding: 0; }
-.v2-stat { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 10px; padding: 9px 16px; min-width: 104px; }
-.v2-stat dd { margin: 0; font-size: 19px; font-weight: 700; line-height: 1.15; }
-.v2-stat dt { color: var(--text-muted); font-size: 11.5px; margin-top: 2px; }
-.v2-stat.ok dd { color: var(--success); } .v2-stat.warn dd { color: var(--warning); } .v2-stat.bad dd { color: var(--danger); } .v2-stat.accent dd { color: var(--text-link); }
+/* ------------------------------------------------ people, chips (the page head is the mockup .page-head: components/PageHeader.tsx) */
 .v2-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--surface-selected); color: var(--text-link); display: inline-grid; place-items: center; font-size: var(--fs-2xs); font-weight: var(--fw-semibold); flex: none; }
 .v2-people { display: flex; flex-direction: column; gap: 6px; }
 .v2-person { display: flex; align-items: center; gap: 8px; min-width: 0; }

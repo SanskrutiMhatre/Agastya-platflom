@@ -19,6 +19,7 @@ import {
 } from '../../../lib/importPackage';
 import { canAssignModules, canImportPackage, type Can } from '../../../lib/roles';
 import { ImportAssignPanel } from './ImportAssignPanel';
+import '../../../styles/pages/project-pages.css';   // UI consistency pass: the mockup tabs and cards of the dialog
 import { ImportReportView } from './ImportReportView';
 import { ImportResultView } from './ImportResultView';
 import { tablistKeys } from '../../../components/a11y';
@@ -125,8 +126,8 @@ export function ImportPackageDialog({ projectId, can, onClose, onChanged }: {
       <input ref={folderInput} type="file" multiple hidden data-testid="import-pkg-folder" aria-label="Package folder" {...FOLDER_ATTRS} onChange={(e) => choose(e.target, 'folder')} />
       <input ref={zipInput} type="file" accept=".zip,application/zip" hidden data-testid="import-pkg-zip" aria-label="Package zip" onChange={(e) => choose(e.target, 'zip')} />
       {sel ? (
-        <div className="v2-card v2-card-pad v2-stack" style={{ gap: 6 }} data-testid="selection">
-          <div className="v2-row v2-spread"><strong data-testid="selection-summary">{describeSelection(sel, fmtSize)}</strong>{!busy ? <button className="btn btn-sm" onClick={clear} data-testid="selection-clear">Clear</button> : null}</div>
+        <div className="card card-body pp-form" data-testid="selection">
+          <div className="v2-row v2-spread"><strong data-testid="selection-summary">{describeSelection(sel, fmtSize)}</strong>{!busy ? <button className="btn sm" onClick={clear} data-testid="selection-clear">Clear</button> : null}</div>
           <CappedList items={sel.picks} initial={6} page={200} noun="files" testid="selection-list" render={(p) => <span className="v2-mono" style={{ overflowWrap: 'anywhere' }}>{p.path}</span>} />
           {selectionProblem(sel) ? <Alert tone="warn">{selectionProblem(sel)}</Alert> : null}
         </div>
@@ -138,7 +139,7 @@ export function ImportPackageDialog({ projectId, can, onClose, onChanged }: {
     <Section title="Import options" defaultOpen={false} testid="sec-options">
       <div className="v2-stack" style={{ gap: 10 }}>
         <Field label="The project's publication">
-          <select className="v2-select" value={publication} disabled={busy} onChange={(e) => setPublication(e.target.value as PublicationMode)} data-testid="opt-publication">
+          <select className="select" value={publication} disabled={busy} onChange={(e) => setPublication(e.target.value as PublicationMode)} data-testid="opt-publication">
             <option value="auto">Use the package's publication only if this project has none (recommended)</option>
             <option value="keep">Keep this project's publication; the imported modules wait in the unassigned list</option>
             <option value="replace">Replace this project's publication (the old one is kept as publication.xml.bak)</option>
@@ -196,21 +197,21 @@ export function ImportPackageDialog({ projectId, can, onClose, onChanged }: {
   const footer = tab === 'place' ? <button className="btn" onClick={close} data-testid="import-close">Close</button> : (
     <>
       {stage === 'scanning' ? <button className="btn" onClick={() => abort.current?.abort()} data-testid="scan-cancel">Cancel the scan</button> : null}
-      {stage === 'applying' ? <button className="btn btn-primary" disabled><Spinner />Importing…</button> : null}
+      {stage === 'applying' ? <button className="btn primary" disabled><Spinner />Importing…</button> : null}
       {!busy ? <button className="btn" onClick={close} data-testid="import-close">Close</button> : null}
       {mayImport && !busy && stage !== 'applied' && sel && scan ? <button className="btn" onClick={clear} data-testid="import-another">Choose another package</button> : null}
-      {mayImport && !busy && stage !== 'applied' ? <button className={`btn ${scan ? '' : 'btn-primary'}`} disabled={!sel || !!selectionProblem(sel)} onClick={() => void run('scan')} data-testid="import-scan">{scan ? 'Scan again' : 'Scan package'}</button> : null}
-      {mayImport && stage === 'report' && scan ? <button className="btn btn-primary" disabled={dms === 0} onClick={() => void run('apply')} data-testid="import-apply" title={dms === 0 ? 'The package holds no data modules' : undefined}>Apply: import {plural(dms, 'data module')}</button> : null}
+      {mayImport && !busy && stage !== 'applied' ? <button className={`btn ${scan ? '' : 'primary'}`} disabled={!sel || !!selectionProblem(sel)} onClick={() => void run('scan')} data-testid="import-scan">{scan ? 'Scan again' : 'Scan package'}</button> : null}
+      {mayImport && stage === 'report' && scan ? <button className="btn primary" disabled={dms === 0} onClick={() => void run('apply')} data-testid="import-apply" title={dms === 0 ? 'The package holds no data modules' : undefined}>Apply: import {plural(dms, 'data module')}</button> : null}
       {stage === 'applied' ? <button className="btn" onClick={clear} data-testid="import-another">Import another package</button> : null}
-      {stage === 'applied' && (unassignedCount ?? 0) > 0 ? <button className="btn btn-primary" onClick={() => setTab('place')} data-testid="goto-place">Place {plural(unassignedCount ?? 0, 'module')} in the publication…</button> : null}
+      {stage === 'applied' && (unassignedCount ?? 0) > 0 ? <button className="btn primary" onClick={() => setTab('place')} data-testid="goto-place">Place {plural(unassignedCount ?? 0, 'module')} in the publication…</button> : null}
     </>
   );
 
   return (
     <Modal title="Import package" width={900} sticky onClose={close} buttons={footer}>
-      <div className="v2-tabs" role="tablist" aria-label="Import package sections" onKeyDown={tablistKeys} style={{ marginBottom: 14 }}>
-        <button role="tab" aria-selected={tab === 'import'} className={`v2-tab ${tab === 'import' ? 'active' : ''}`} onClick={() => setTab('import')} data-testid="tab-import">Import a package</button>
-        <button role="tab" aria-selected={tab === 'place'} className={`v2-tab ${tab === 'place' ? 'active' : ''}`} onClick={() => setTab('place')} data-testid="tab-place">Modules not in the publication{unassignedCount !== null ? ` (${unassignedCount})` : ''}</button>
+      <div className="tabs pp-tabs" role="tablist" aria-label="Import package sections" onKeyDown={tablistKeys}>
+        <button role="tab" aria-selected={tab === 'import'} className="tab" onClick={() => setTab('import')} data-testid="tab-import">Import a package</button>
+        <button role="tab" aria-selected={tab === 'place'} className="tab" onClick={() => setTab('place')} data-testid="tab-place">Modules not in the publication{unassignedCount !== null ? ` (${unassignedCount})` : ''}</button>
       </div>
       {tab === 'import' ? importBody : placeBody}
     </Modal>

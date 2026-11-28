@@ -12,7 +12,7 @@ import { create } from 'zustand';
 import { xengineApi, FORMAT_LABEL, type Conversion, type ConvertResult, type DocCodes, type Format, type XFinding } from '../api/xengine';
 import { useUi } from '../store/ui';
 import { Icon } from './Icon';
-import { Alert, Modal, Spinner, errText } from './ui';
+import { Callout, Modal, Spinner, errText } from './ui';
 
 // One copy of a project's codes, kept while the author moves between the pages that use them.
 interface CodesStore { byProject: Record<string, DocCodes | null>; put: (id: string, c: DocCodes | null) => void }
@@ -68,7 +68,7 @@ export function ExportProjectButton({ id, dirty = false, saveFirst, small = true
       toast('Project exported.', 'success');
     } catch (e) { toast(errText(e), 'error'); } finally { setBusy(false); }
   };
-  return <button type="button" className={small ? 'btn btn-sm' : 'btn'} onClick={() => void go()} disabled={busy} data-testid="export-project-archive" title="Download the whole project as one file (.jsspub.zip): its files, house style, logos and review comments. Import brings it back as a new project.">{busy ? <Spinner /> : <Icon name="download" size={12} />}{label}</button>;
+  return <button type="button" className={small ? 'btn sm' : 'btn'} onClick={() => void go()} disabled={busy} data-testid="export-project-archive" title="Download the whole project as one file (.jsspub.zip): its files, house style, logos and review comments. Import brings it back as a new project.">{busy ? <Spinner /> : <Icon name="download" size={12} />}{label}</button>;
 }
 
 /** Converting the open document to another format: a new project is made, this one is not changed. */
@@ -86,11 +86,11 @@ export function ConvertButton({ id, from, name, dirty, saveFirst }: { id: string
   };
   return (
     <>
-      <button className="btn btn-sm" onClick={() => { setTitle(''); setOpen(true); }} data-testid="convert-open" title="Make a new project from this document in another format; this one is not changed"><Icon name="refresh" />Convert</button>
+      <button className="btn sm" onClick={() => { setTitle(''); setOpen(true); }} data-testid="convert-open" title="Make a new project from this document in another format; this one is not changed"><Icon name="refresh" />Convert</button>
       {open ? (
         <Modal title={done ? 'Conversion finished' : `Convert “${name}”`} onClose={close} width={640} buttons={done
-          ? <><button className="btn" onClick={close}>Stay here</button><button className="btn btn-primary" onClick={() => nav(`/projects/${done.project.id}`)} data-testid="convert-go">Open “{done.project.name}”</button></>
-          : <><button className="btn" onClick={close}>Cancel</button><button className="btn btn-primary" disabled={!to || busy} onClick={() => void run()} data-testid="convert-run">{busy ? <Spinner /> : null}Convert</button></>}>
+          ? <><button className="btn" onClick={close}>Stay here</button><button className="btn primary" onClick={() => nav(`/projects/${done.project.id}`)} data-testid="convert-go">Open “{done.project.name}”</button></>
+          : <><button className="btn" onClick={close}>Cancel</button><button className="btn primary" disabled={!to || busy} onClick={() => void run()} data-testid="convert-run">{busy ? <Spinner /> : null}Convert</button></>}>
           {done ? (
             <>
               <p>A new {FORMAT_LABEL[done.to]} project, <strong>{done.project.name}</strong>, was made from this {FORMAT_LABEL[done.from]} project: {done.counts.sections} sections{done.counts.pictures ? `, ${done.counts.pictures} pictures` : ''}. This project was not changed.</p>
@@ -106,9 +106,9 @@ export function ConvertButton({ id, from, name, dirty, saveFirst }: { id: string
                     <span><strong>{FORMAT_LABEL[c.to]}</strong><br /><span className="v2-hint">{c.how}</span></span>
                   </label>
                 ))}
-                {conv.length && !options.length ? <Alert tone="warn">No conversion is available from this format.</Alert> : null}
+                {conv.length && !options.length ? <Callout tone="warning">No conversion is available from this format.</Callout> : null}
               </div>
-              <label className="v2-field"><span>Name of the new project (optional)</span><input className="v2-input" value={title} maxLength={80} placeholder={to ? `${name} (${FORMAT_LABEL[to]})` : ''} onChange={(e) => setTitle(e.target.value)} /></label>
+              <label className="v2-field"><span>Name of the new project (optional)</span><input className="input" value={title} maxLength={80} placeholder={to ? `${name} (${FORMAT_LABEL[to]})` : ''} onChange={(e) => setTitle(e.target.value)} /></label>
             </>
           )}
         </Modal>

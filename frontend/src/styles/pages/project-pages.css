@@ -1,0 +1,132 @@
+/* =========================================================================
+   UI consistency pass (2026-11-28): the remaining project pages (Explore for S1000D, JSS and JSG, Graphics, Ancillary pages, Review and
+   release, project Settings with S1000D configuration and Publishing, and the dialogs opened from them) drawn in the language of the
+   owner-approved mockups (docs/audit/mockups/project.html, validation.html, admin.html). The shared pieces (.page-head, .card, .card-head,
+   .card-body, .card-foot, .stat, .table, .badge, .tabs/.tab, .seg, .alert, .input, .select, .field, .check, .kv, .tree .node, .empty-state)
+   come from styles/components.css unchanged; this file holds only the page layouts these screens add. Loaded by components/PageHeader.tsx
+   (every one of these pages uses it). Scoped to `.pp` or to its own `pp-` class names; colours are tokens only.
+   ========================================================================= */
+
+/* the page head: the mockup's h1 (also when the shell makes it an h2) */
+.pp-head :is(h1, h2) { margin: 0; font-size: var(--fs-xl); font-weight: var(--fw-semibold); line-height: var(--lh-tight); }
+.pp-head p { margin: var(--space-1) 0 0; }
+.pp-head .pp-head-text { min-width: 0; }
+.pp-head .pp-head-actions { justify-content: flex-end; }
+.pp-head .pp-head-actions .input.search { width: 240px; }
+
+/* the at-a-glance figures: the mockup's stat cards in one row */
+.pp-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-3); margin: 0 0 var(--space-4); padding: 0; }
+.pp-stat { display: flex; flex-direction: column-reverse; justify-content: flex-end; margin: 0; }
+.pp-stat dd { margin: 0; } .pp-stat dt { margin: 0; }
+.pp-stat .v { font-size: var(--fs-xl); }
+.pp-stat.ok .v { color: var(--success); } .pp-stat.warn .v { color: var(--warning); } .pp-stat.bad .v { color: var(--danger); } .pp-stat.accent .v { color: var(--text-link); }
+
+/* page bodies */
+.pp-gap { margin-bottom: var(--space-4); }
+.pp-stack { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.pp-cols { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: var(--space-4); align-items: start; }
+.pp-cols.wide-side { grid-template-columns: minmax(0, 3fr) minmax(300px, 2fr); }
+.pp-side { position: sticky; top: 0; }
+@media (max-width: 1100px) { .pp-cols, .pp-cols.wide-side { grid-template-columns: minmax(0, 1fr); } .pp-side { position: static; } }
+.pp .card-head h3 .badge { margin-left: var(--space-1); }
+.pp .card-head .faint { font-weight: var(--fw-regular); font-size: var(--fs-xs); }
+.pp .card-body > p:first-child { margin-top: 0; }
+.pp .card-body p { margin: 0 0 var(--space-2); color: var(--text-secondary); }
+.pp .card-body p:last-child { margin-bottom: 0; }
+.pp .card-body .pp-lead { color: var(--text-primary); }
+.pp .table tr.clickable { cursor: pointer; }
+.pp .table .sub { color: var(--text-tertiary); font-size: var(--fs-xs); }
+.pp .table .mono { white-space: nowrap; }
+.pp-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
+.pp-note { font-size: var(--fs-xs); color: var(--text-tertiary); }
+.pp-form { display: flex; flex-direction: column; gap: var(--space-3); }
+
+/* the detail card of Explore: the mockup .kv list (wider labels than the editor's) */
+.pp .kv { margin: 0; grid-template-columns: 120px minmax(0, 1fr); font-size: var(--fs-sm); }
+.pp .kv dd.mono { font-size: var(--fs-xs); }
+.pp-detail-title { margin: 0; }
+.pp-detail-sub { color: var(--text-secondary); font-size: var(--fs-xs); margin-top: var(--space-1); }
+.pp-pic { max-width: 100%; max-height: 180px; object-fit: contain; border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--image-backdrop); }
+
+/* the structure tree: the mockup's .tree .node rows (indent by --depth), nested lists for the tree semantics */
+.pp .tree { margin: 0; list-style: none; }
+.pp .tree ul { margin: 0; padding: 0; list-style: none; }
+.pp .tree .node .label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pp .tree .node .meta { padding-left: var(--space-2); white-space: nowrap; flex: none; }
+.pp .tree .node.missing .label, .pp .tree .node.missing .ico { color: var(--danger); }
+.pp .tree .node.group .ico { color: var(--text-tertiary); }
+
+/* review comments (Release) */
+.pp-cmts { display: flex; flex-direction: column; gap: var(--space-2); }
+.pp-cmt { border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); background: var(--surface-panel); }
+.pp-cmt.changes { border-color: var(--warning-border); background: var(--warning-subtle); }
+.pp-cmt.done { opacity: .7; }
+.pp-cmt-head { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; font-size: var(--fs-xs); }
+.pp-cmt-head .grow { flex: 1; }
+.pp-cmt-body { margin: var(--space-1h) 0 0; white-space: pre-wrap; color: var(--text-primary); }
+.pp-cmt-form { display: flex; flex-direction: column; gap: var(--space-2); }
+.pp-cmt-form .select { width: auto; max-width: 320px; }
+.pp-reader-pick { max-width: 360px; margin-bottom: var(--space-3); }
+
+/* project settings: the tab row under the head, and the narrow forms */
+.pp-tabs { margin-bottom: var(--space-4); overflow-x: auto; }
+.pp-narrow { max-width: 720px; }
+.pp-grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3) var(--space-4); }
+@media (max-width: 900px) { .pp-grid-2 { grid-template-columns: minmax(0, 1fr); } }
+.pp-danger { border-color: var(--danger-border); }
+.pp-danger .card-head h3 { color: var(--danger); }
+.pp-readonly { display: flex; align-items: center; background: var(--surface-inset); color: var(--text-secondary); }
+.pp-role-cell { width: 210px; }
+.pp-role-cell .select { height: 28px; }
+.pp-window { width: 160px; flex: none; }
+.pp .card-head h3 .faint { margin-left: var(--space-1); }
+
+/* S1000D configuration (project Settings > S1000D) and other lists in a card */
+.pp-subtabs { margin-bottom: var(--space-1); }
+.pp-narrow-wide { max-width: 860px; }
+.pp-head-wrap { flex-wrap: wrap; align-items: flex-start; }
+.pp-filter { max-width: 260px; }
+.pp-scroll-box { max-height: 420px; border: 1px solid var(--border-default); border-radius: var(--radius-md); }
+.pp-scroll-box.flush { max-height: 480px; border: 0; border-top: 1px solid var(--border-subtle); border-radius: 0; }
+.pp .table td.pp-tick, .pp .table th.pp-tick { width: 40px; }
+.pp .table td.pp-code { width: 70px; }
+.pp .table th.pp-info { width: 140px; }
+.pp .table td.pp-sns-code { width: 150px; }
+.pp .table td.pp-row-actions { white-space: nowrap; width: 1%; }
+
+/* project Settings > Publishing (the reused publishing settings screen) */
+.pp-sec-head { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-4); }
+.pp-sec-head h2 { margin: 0; font-size: var(--fs-lg); font-weight: var(--fw-semibold); line-height: var(--lh-tight); }
+.pp-sec-head p { margin: var(--space-1) 0 0; color: var(--text-secondary); }
+.pp-group + .pp-group { margin-top: var(--space-4); }
+.pp-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: var(--space-3); }
+.pp-fields .pp-span { grid-column: 1 / -1; }
+.pp-flabel { font-weight: var(--fw-medium); color: var(--text-secondary); font-size: var(--fs-xs); }
+textarea.input.pp-area { min-height: 88px; }
+.pp-lines { display: flex; flex-direction: column; gap: var(--space-1h); }
+.pp-line { display: flex; gap: var(--space-1h); align-items: center; }
+.pp-line .input { flex: 1; }
+.pp-self-start { align-self: flex-start; }
+.pp-media { display: flex; flex-direction: column; gap: var(--space-1); width: 160px; }
+.pp-media-img { width: 72px; height: 72px; object-fit: contain; align-self: center; padding: var(--space-1); border: 1px solid var(--border-default); border-radius: var(--radius-md); background: var(--image-backdrop); }
+.pp-media-img.empty { display: grid; place-items: center; border-style: dashed; background: none; font-size: var(--fs-2xs); color: var(--text-tertiary); text-align: center; }
+.pp-media-img.missing { color: var(--danger); }
+.pp-publisher { border: 1px solid var(--border-default); border-radius: var(--radius-md); padding: var(--space-3); }
+.pp-publisher-row { display: flex; gap: var(--space-3); align-items: flex-start; flex-wrap: wrap; }
+.pp-publisher-main { flex: 1; min-width: 220px; display: grid; gap: var(--space-3); }
+.pp .table th.pp-title-col { width: 38%; }
+
+/* a text area keeps the height its rows ask for (the mockup's one-line textarea grows only by dragging, which hid multi-line page text) */
+.pp textarea.input { height: auto; line-height: 1.45; }
+
+/* project Graphics: the library's toolbar controls keep their own width (the shared .v2-select is 100% wide, which stacked them) */
+.pp .v2-gfx-tools .v2-select { width: auto; }
+
+/* dialogs opened from project pages and the editor (CIR pick, Import package, Convert): the list in a framed scroll box, a count in the footer */
+.pp-dlg-list { max-height: 48vh; }
+.pp-dlg-list .table tr { cursor: pointer; }
+.pp-dlg-list .table tr.pp-have { cursor: default; opacity: .6; }
+.pp-dlg-list .table td.pp-tick { width: 40px; }
+.pp-dlg-list .table td .trunc { max-width: 420px; }
+.pp-dlg-count { margin-right: auto; font-size: var(--fs-xs); }
+.pp-list { margin: var(--space-1) 0 0; padding-left: var(--space-5); }
