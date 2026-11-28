@@ -1308,7 +1308,11 @@ export class DocumentEditor {
     }
   }
 
+  /** Called when the editor is destroyed (a live document leaves its room). */
+  readonly onDestroy: Array<() => void> = [];
+
   destroy() {
+    for (const f of this.onDestroy.splice(0)) { try { f(); } catch { /* a listener's problem */ } }
     this.liveValidate.cancel();
     this.autosave.cancel();
     this.xml.destroy();

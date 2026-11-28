@@ -493,3 +493,8 @@ html[data-editor-focus] .ed-topslot > .topbar { padding-left: var(--space-3); }
 .app.app--embedded .pane-right > .panel-tabs { padding-right: 32px; }
 .props-body .ed-el-where, .props-body .ed-el-text { font-size: var(--fs-xs); color: var(--text-secondary); overflow-wrap: anywhere; }
 .props-body .ed-el-none { font-size: var(--fs-xs); }
+/* Phase 3 (P3-1): who is in a data module now, beside its row in the explorer */
+.ed-node-people { display: inline-flex; flex: none; margin-right: 2px; }
+.ed-node-people .v2-face { width: 18px; height: 18px; font-size: 9px; }
+.v2-edcomments-new { display: grid; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--border-subtle); }
+.v2-edcomments-new .btn { justify-self: start; }

@@ -227,11 +227,15 @@ export class DomBinding {
     }
     // parents first: an element created by its parent's change is already in step when its own records come
     targets.sort((a, b) => depth(a) - depth(b));
+    // typing merges into one undo step (as in the Studio); any other command is a step of its own
+    const typing = /^(Typing|Delete backward|Delete forward)$/.test(ev.label);
+    if (!typing) this.undo.stopCapturing();
     this.ydoc.transact(() => {
       for (const t of targets) this.push(t);
       if (ev.doctypeChanged) ydom.writeDoctype(this.ydoc, this.doc.doctype);
       ydom.writeXmlDecl(this.ydoc, this.doc.xmlDecl);
     }, ORIGIN_LOCAL);
+    if (!typing) this.undo.stopCapturing();
   }
 
   /** The room's version replaces whatever changed here (a refused local change). */

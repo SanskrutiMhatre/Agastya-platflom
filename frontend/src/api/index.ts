@@ -81,7 +81,8 @@ export interface ReleaseOverview {
 }
 
 export type ReviewState = 'draft' | 'in_review' | 'changes_requested' | 'approved';
-export interface ReviewAnchor { path: string; tag: string; text: string }
+/** `y` (Phase 3): the Yjs relative positions of the commented words in a live document (base64), which follow the words while others edit. */
+export interface ReviewAnchor { path: string; tag: string; text: string; y?: { start: string; end: string } }
 export interface ReviewComment { id: number; kind: 'comment' | 'changes'; body: string; dmFile: string | null; anchor: ReviewAnchor | null; releaseId: string | null; by: string | null; byName: string | null; byRole: string | null; at: string; resolved: boolean; resolvedAt: string | null; resolvedBy: string | null }
 export interface Review { state: ReviewState; round: number; comments: ReviewComment[]; open: number; canComment: boolean }
 

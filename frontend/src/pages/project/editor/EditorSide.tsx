@@ -16,6 +16,7 @@ import { useUi } from '../../../store/ui';
 import { MoreRows, VirtualRows, useProgressive } from '../../../components/windowing';
 import { countTreeRows, layoutTree, type TreeItem } from './publicationTree';
 import { PanelClose } from '../../../editors/host/ChromeControls';
+import { baseName, initials, useTeam } from '../../../lib/presence';
 
 type View = 'tree' | 'all';
 
@@ -129,6 +130,19 @@ export function EditorSide({ ctx, refreshKey, treeKey, width, onCollapse }: { ct
     try { localStorage.setItem(`agastya.editor.closed.${ctx.id}`, JSON.stringify([...n])); } catch { /* private mode */ }
   };
   const menuAct = (f: () => void) => () => { setMenuOpen(false); f(); };
+  // Phase 3 (P3-1): who is in which module now (the presence the pages announce; a live document's people announce it too)
+  const team = useTeam(ctx.id);
+  const peopleIn = useMemo(() => {
+    const m = new Map<string, Array<{ name: string; mode: string }>>();
+    for (const p of team.people) {
+      if (p.mine || !p.doc || p.doc.kind !== 'dm') continue;
+      const k = baseName(p.doc.path).toLowerCase();
+      const list = m.get(k) ?? [];
+      if (!list.some((x) => x.name === p.name)) list.push({ name: p.name, mode: p.mode });
+      m.set(k, list);
+    }
+    return m;
+  }, [team.people]);
 
   const row = ({ file, title, sub, indent = 0 }: { file: string; title: string; sub: string; indent?: number }) => {
     const o = openMap.get(file);
@@ -141,6 +155,11 @@ export function EditorSide({ ctx, refreshKey, treeKey, width, onCollapse }: { ct
           <span className="label trunc">{title || file}</span>
           {state ? <span className={`dot ${state}`} title={o?.dirty ? 'Open, unsaved changes' : state === 'danger' ? 'Errors in the last check' : state === 'warning' ? 'Warnings in the last check' : 'No problems in the last check'} /> : null}
         </button>
+        {peopleIn.get(file.toLowerCase())?.length ? (
+          <span className="ed-node-people" data-testid="dm-row-people" title={peopleIn.get(file.toLowerCase())!.map((p) => `${p.name} (${p.mode})`).join('\n')}>
+            {peopleIn.get(file.toLowerCase())!.slice(0, 2).map((p) => <span key={p.name} className="v2-face is-here">{initials(p.name)}</span>)}
+          </span>
+        ) : null}
         {locked ? <Icon name="lock" size={13} className="ico sm" /> : null}
         {writable && mayDelete ? <button className="icon-btn ed-node-del" aria-label={`Delete ${file}`} title="Delete" onClick={() => setDel(file)}><Icon name="trash" size={13} /></button> : null}
       </div>
