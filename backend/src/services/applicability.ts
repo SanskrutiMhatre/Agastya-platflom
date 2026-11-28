@@ -379,7 +379,8 @@ export async function validateProject(projectId: string): Promise<Problem[]> {
   const attrs = new Map(model.attributes.map((a) => [a.id, a])); const conds = new Map(model.conditions.map((c) => [c.id, c]));
   const types = new Map(model.conditionTypes.map((t) => [t.id, t]));
   const tableSet = new Set(Object.values(files).filter(Boolean) as string[]);
-  const add = (f: string, el: Element, code: string, message: string, severity: 'error' | 'warning' = 'error') => out.push({ severity, file: rel(f), line: lineOf(el), location: xpathOf(el), code, message });
+  let sink: Problem[] = out;                                           // phase 8: a module's problems are collected on their own (kept per module)
+  const add = (f: string, el: Element, code: string, message: string, severity: 'error' | 'warning' = 'error') => sink.push({ severity, file: rel(f), line: lineOf(el), location: xpathOf(el), code, message });
 
   // table integrity
   for (const p of modelProblems(model)) out.push({ severity: 'error', file: rel(files.act ?? files.cct ?? files.pct ?? ''), line: 1, location: '/dmodule/content', code: 'APPLIC-TABLE', message: p });
@@ -394,17 +395,61 @@ export async function validateProject(projectId: string): Promise<Problem[]> {
   }
   for (const c of model.conditions) if (!types.has(c.condTypeId) && files.cct) out.push({ severity: 'error', file: rel(files.cct), line: 1, location: `//cond[@id='${c.id}']`, code: 'APPLIC-COND-TYPE', message: `Condition ${c.id} refers to the undeclared condition type ${c.condTypeId}.` });
 
-  // data modules (parsed once: the externalized references look other data modules up by DMC)
-  const docs = new Map<string, Document>(); const byDmc = new Map<string, Document>();
-  for (const d of listDms(projectId)) {
+  /*
+    Data modules. Phase 8 (docs/phase3/cleanup-backend.md, item 5): what one module contributes depends on its text and on the tables (the
+    model, the table files, the CSDB folder name: `ctx`), and - only for a module with externalized applicability (<applicRef>) - on the
+    other modules (looked up by DMC). So each module's problems are kept per file version (size, times, file id) and ctx, and a module whose
+    version and ctx are unchanged and that has no <applicRef> is not parsed again. When a module that IS checked has an <applicRef>, every
+    module is parsed, as before, so its lookup sees exactly what it always saw. The order of the problems is the order of the listing.
+  */
+  const ctx = JSON.stringify({ model, files, csdb: rel('') });
+  const listed = listDms(projectId);
+  const docs: Array<Document | null> = new Array(listed.length).fill(null);
+  const results: Array<Problem[] | null> = new Array(listed.length).fill(null);
+  const sigs: Array<ApplicSig | null> = new Array(listed.length).fill(null);
+  const keys: string[] = new Array(listed.length).fill('');
+  const parseAt = (i: number): Document | null => {
+    if (docs[i]) return docs[i];
+    // as before: a module that cannot be read, parsed or keyed is left out (reported elsewhere)
+    try { const doc = parse(fs.readFileSync(path.join(dir, listed[i].file), 'utf8')); keys[i] = dmcKey(doc.getElementsByTagName('dmCode')[0]); docs[i] = doc; } catch { docs[i] = null; }
+    return docs[i];
+  };
+  let needLookup = false;
+  for (let i = 0; i < listed.length; i++) {
     await tick();
-    try { const doc = parse(fs.readFileSync(path.join(dir, d.file), 'utf8')); docs.set(d.file, doc); byDmc.set(dmcKey(doc.getElementsByTagName('dmCode')[0]), doc); } catch { /* unreadable: reported elsewhere */ }
+    const abs = path.join(dir, listed[i].file);
+    let st: fs.Stats; try { st = fs.statSync(abs); } catch { continue; }
+    const sig: ApplicSig = { size: st.size, mtimeMs: st.mtimeMs, ctimeMs: st.ctimeMs, ino: st.ino }; sigs[i] = sig;
+    const kept = applicKept.get(abs);
+    if (kept && kept.ctx === ctx && sameSig(kept, sig)) { results[i] = kept.problems.map((p) => ({ ...p })); continue; }
+    const doc = parseAt(i);
+    if (doc && !tableSet.has(listed[i].file) && doc.documentElement?.nodeName === 'dmodule' && externalRefs(doc).length) needLookup = true;
+  }
+  const byDmc = new Map<string, Document>();
+  if (needLookup) for (let i = 0; i < listed.length; i++) {
+    await tick();
+    if (parseAt(i)) byDmc.set(keys[i], docs[i]!);
   }
   const lookup: DmLookup = (dmc) => byDmc.get(dmc) ?? null;
-  for (const [file, doc] of docs) {
+  for (let i = 0; i < listed.length; i++) {
+    if (results[i]) { out.push(...results[i]!); continue; }
+    const doc = docs[i]; if (!doc) continue;
     await tick();
-    if (tableSet.has(file)) continue;
-    const root = doc.documentElement; if (!root || root.nodeName !== 'dmodule') continue;
+    const file = listed[i].file;
+    sink = [];
+    const external = checkModule(file, doc);
+    out.push(...sink);
+    const abs = path.join(dir, file);
+    if (sigs[i] && !external) { applicKept.delete(abs); applicKept.set(abs, { ...sigs[i]!, ctx, problems: sink.map((p) => ({ ...p })) }); if (applicKept.size > 20000) { const first = applicKept.keys().next().value; if (first !== undefined) applicKept.delete(first); } }
+    else applicKept.delete(abs);
+    sink = out;
+  }
+  return out;
+
+  /** The problems of one module (into `sink`); true when it has externalized applicability (its answer depends on other modules). */
+  function checkModule(file: string, doc: Document): boolean {
+    if (tableSet.has(file)) return false;
+    const root = doc.documentElement; if (!root || root.nodeName !== 'dmodule') return false;
     const applics = all(doc, 'applic');
     const ids = new Map<string, Element>();
     for (const a of applics) { const id = a.getAttribute('id'); if (id) ids.set(id, a); }
@@ -448,7 +493,14 @@ export async function validateProject(projectId: string): Promise<Problem[]> {
       if (c && !files.act) add(file, actRef, 'APPLIC-ACT-MISSING', 'The data module refers to an applicability cross-reference table, but this project has none.');
       else if (c && files.act && !files.act.toUpperCase().startsWith(`DMC-${c.getAttribute('modelIdentCode')}-`.toUpperCase())) add(file, actRef, 'APPLIC-ACT-OTHER', `The data module's ACT (${c.getAttribute('modelIdentCode')}) is not this project's ACT (${files.act}).`, 'warning');
     } else if (usesAsserts && files.act) add(file, root, 'APPLIC-ACT-REF-MISSING', 'The data module uses applicability assertions but has no <applicCrossRefTableRef> to the project ACT.', 'warning');
+    return externalRefs(doc).length > 0;
   }
-  return out;
 }
+
+interface ApplicSig { size: number; mtimeMs: number; ctimeMs: number; ino: number }
+const sameSig = (a: ApplicSig, b: ApplicSig): boolean => a.size === b.size && a.mtimeMs === b.mtimeMs && a.ctimeMs === b.ctimeMs && a.ino === b.ino;
+/** phase 8: each module's applicability problems, per file version and table context (modules with externalized applicability are never kept) */
+const applicKept = new Map<string, ApplicSig & { ctx: string; problems: Problem[] }>();
+/** Forget the kept per-module problems (tests). */
+export function clearApplicKept(): void { applicKept.clear(); }
 

@@ -45,5 +45,7 @@ export const pdfReviewApi = {
   setStatus: (id: string, aid: string, status: PdfAnnotationStatus) => post<{ annotation: PdfAnnotation }>(`${B(id)}/annotations/${encodeURIComponent(aid)}/status`, { status }),
   place: (id: string, aid: string, body: { fileHash?: string; anchor: PdfAnchor }) => post<{ annotation: PdfAnnotation }>(`${B(id)}/annotations/${encodeURIComponent(aid)}/place`, body),
   setBlockRelease: (id: string, blockRelease: boolean) => put<{ ok: true; blockRelease: boolean }>(`${B(id)}/settings`, { blockRelease }),
+  /** Phase 8: comments from a PDF reader (XFDF) become threads on the version of `key` now in the project. */
+  importXfdf: (id: string, key: string, xfdf: string) => post<{ annotations: PdfAnnotation[]; replies: number; skipped: string[] }>(`${B(id)}/import`, { key, xfdf }),
   exportUrl: (id: string, format: 'csv' | 'xfdf', key?: string) => `${B(id)}/export?format=${format}${key ? `&${q(key)}` : ''}`,
 };

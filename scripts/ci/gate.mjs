@@ -243,10 +243,18 @@ const STAGES = {
   'perf-budgets': async () => {
     const rule = await simpleStage('perf-budgets-rule', nodeBin, ['--test', path.join(ROOT, 'scripts', 'ci', 'perf-budgets.test.mjs')], { limitMs: 2 * 60_000 });
     const be = path.join(EVIDENCE, 'perf-bench-backend.json'); const fe = path.join(EVIDENCE, 'perf-bench-frontend.json');
-    const bench = await simpleStage('perf-bench-backend', nodeBin, [path.join(BACKEND, 'scripts', 'bench', 'phase3-baseline.js'), '--port', process.env.PERF_BENCH_PORT || '4310', '--out', be, '--md', path.join(EVIDENCE, 'perf-bench-backend.md')], { cwd: BACKEND, limitMs: 60 * 60_000 });
+    // phase 8: the backend bench runs PERF_BUDGET_RUNS times (default 3 for the release, 1 for the nightly) and the budgets judge the median
+    const runs = Math.max(1, Math.min(5, Number(process.env.PERF_BUDGET_RUNS) || (profile === 'release' ? 3 : 1)));
+    const bes = []; let bench = true;
+    for (let i = 1; i <= runs; i++) {
+      const out = runs === 1 ? be : path.join(EVIDENCE, `perf-bench-backend-${i}.json`);
+      const md = path.join(EVIDENCE, runs === 1 ? 'perf-bench-backend.md' : `perf-bench-backend-${i}.md`);
+      bench = (await simpleStage(runs === 1 ? 'perf-bench-backend' : `perf-bench-backend-${i}`, nodeBin, [path.join(BACKEND, 'scripts', 'bench', 'phase3-baseline.js'), '--port', process.env.PERF_BENCH_PORT || '4310', '--out', out, '--md', md], { cwd: BACKEND, limitMs: 60 * 60_000 })) && bench;
+      if (fs.existsSync(out)) bes.push(out);
+    }
     const browser = await simpleStage('perf-bench-frontend', nodeBin, [path.join(FRONTEND, 'scripts', 'perf', 'phase3-frontend.mjs'), '--port', process.env.PERF_FE_PORT || '4312', '--out', fe, '--md', path.join(EVIDENCE, 'perf-bench-frontend.md'), '--channel', process.env.E2E_CHANNEL || 'msedge'], { cwd: FRONTEND, limitMs: 30 * 60_000 });
-    const args = [path.join(ROOT, 'scripts', 'ci', 'perf-budgets.mjs'), '--report', path.join(EVIDENCE, 'perf-budgets.md'), ...(fs.existsSync(be) ? ['--backend', be] : []), ...(fs.existsSync(fe) ? ['--frontend', fe] : []), ...(profile === 'release' ? ['--strict'] : [])];
-    const verdict = (fs.existsSync(be) || fs.existsSync(fe)) ? await simpleStage('perf-budgets', nodeBin, args, { limitMs: 2 * 60_000 }) : false;
+    const args = [path.join(ROOT, 'scripts', 'ci', 'perf-budgets.mjs'), '--report', path.join(EVIDENCE, 'perf-budgets.md'), ...bes.flatMap((f) => ['--backend', f]), ...(fs.existsSync(fe) ? ['--frontend', fe] : []), ...(profile === 'release' ? ['--strict'] : [])];
+    const verdict = (bes.length || fs.existsSync(fe)) ? await simpleStage('perf-budgets', nodeBin, args, { limitMs: 2 * 60_000 }) : false;
     return rule && verdict && (profile !== 'release' || (bench && browser));
   },
   // WP-24: the release-engineering tests, one file per process (they compile the host, make and delete a throwaway certificate)

@@ -43,8 +43,10 @@ import { registerGauge } from './metrics';
  * P3-1: the live co-editing rooms (services/collab/rooms.ts) plug in here when they start, instead of being imported: the rooms reach the
  * write path, which announces through this module, so an import would close a cycle (ARC-006).
  */
+/** The signed-in person of a socket as the co-editing rooms read it (the session layer's public user). */
+export interface CollabUser { id: string; username: string; role?: string; full_name?: string | null; fullName?: string | null }
 export interface CollabHooks {
-  connect(c: { id: number; ws: WebSocket; user: any; sessionId: string }): void;
+  connect(c: { id: number; ws: WebSocket; user: CollabUser; sessionId: string }): void;
   disconnect(connId: number): void;
   onMessage(connId: number, data: Uint8Array): Promise<void>;
   refreshUser(userId: string | null): void;

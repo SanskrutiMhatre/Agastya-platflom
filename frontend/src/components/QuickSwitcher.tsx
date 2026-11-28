@@ -14,6 +14,7 @@ import { contentApi, workspaceApi, type Summary } from '../api';
 import type { PaletteCommand } from '../editors/host/CommandPalette';
 import { dialogOpen } from '../editors/host/useHostKeys';
 import { projectRailItems } from '../layouts/projectRail';
+import { gitlabApi } from '../api/gitlab';
 import { Icon, type IconName } from './Icon';
 
 export interface SwitcherPage { to: string; label: string }
@@ -132,6 +133,15 @@ export function QuickSwitcher({ pages, project, onClose }: { pages: SwitcherPage
       const projects = list.map((p) => ({ id: `project:${p.id}`, label: p.name, group: p.type === 'CIR' ? 'Repository' : 'Project', run: go(`/projects/${p.id}/${p.type === 'CIR' ? 'editor' : 'home'}`) }));
       setItems((cur) => [...cur.filter((c) => !c.id.startsWith('project:')), ...projects]);
     }, () => undefined);
+    // phase 8: the Repository page (GitLab) is offered here exactly when the rail shows it: only while an administrator has GitLab on
+    if (project) {
+      void gitlabApi.enabled().then((on) => {
+        if (!live || !on) return;
+        const extra = projectRailItems(project.id, project.summary, { gitlab: true }).filter((i) => i.to.endsWith('/repository'))
+          .map((i) => ({ id: `section:${i.to}`, label: i.label, group: project.summary.project.name, run: go(i.to) }));
+        setItems((cur) => [...cur.filter((c) => !extra.some((x) => x.id === c.id)), ...extra]);
+      });
+    }
     const s1000d = project && (project.summary.project.format ?? 's1000d') === 's1000d' && project.summary.project.type !== 'CIR';
     if (project && s1000d) {
       contentApi.dms(project.id).then((dms) => {

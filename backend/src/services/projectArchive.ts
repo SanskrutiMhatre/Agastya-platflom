@@ -29,6 +29,7 @@ import { createProject, fillImported, readProjectJson, unsafeInputFields, cleanI
 import { restoreSettings, settingsOf } from './packageSettings';
 import { adoptFromContents, dmCount, updateConfig } from './projectConfig';
 import * as review from './review';
+import * as pdfReviewService from './pdfReview';
 import { ZipFileReader, ZipStreamWriter, safeEntryName, safeJoin, DEFAULT_LIMITS, ZipError } from './zipio';
 
 const { checkXmlSafety } = require('../core/auth/xmlGuard');
@@ -62,7 +63,9 @@ function brandPackOf(projectId: string, templateRef: string): string | null {
   try { const h = JSON.parse(fs.readFileSync(path.join(workspace.templatesDir(workspaceDir), `${templateRef}.house.json`), 'utf8')); return typeof h.brandPack === 'string' && BRAND_ID.test(h.brandPack) ? h.brandPack : null; } catch { return null; }
 }
 
-export interface ExportInfo { files: number; comments: number; format: string; fileName: string }
+export interface ExportInfo { files: number; comments: number; pdfComments: number; format: string; fileName: string }
+/** Phase 8: the entry that carries the PDF review (services/pdfReview exportReview / importReview). */
+export const PDF_REVIEW_ENTRY = 'pdf-review.json';
 
 /** The name the download carries: the project's id, so two exports of the same project sort together. */
 export const archiveFileName = (projectId: string): string => `${projectId}.jsspub.zip`;
@@ -92,6 +95,10 @@ export async function exportProjectArchive(projectId: string, out: Writable): Pr
     }, null, 2)));
   }
 
+  // Phase 8: the PDF review (threads, replies, versions, the release setting) travels too; ids are made again on import, the anchors are kept
+  const pdfReview = pdfReviewService.exportReview(projectId);
+  if (pdfReview) await z.addBuffer(PDF_REVIEW_ENTRY, Buffer.from(JSON.stringify(pdfReview, null, 1)));
+
   for (const f of files) await z.addFile(`project/${f.rel}`, f.abs);
 
   const tdir = workspace.templatesDir(workspaceDir);
@@ -103,7 +110,7 @@ export async function exportProjectArchive(projectId: string, out: Writable): Pr
     if (fs.existsSync(pdir) && fs.statSync(pdir).isDirectory()) for (const f of listArchiveFiles(pdir)) await z.addFile(`templates/brand/${pack}/${f.rel}`, f.abs);
   }
   await z.finish();
-  return { files: files.length, comments: comments.length, format, fileName: archiveFileName(projectId) };
+  return { files: files.length, comments: comments.length, pdfComments: pdfReview?.annotations.length ?? 0, format, fileName: archiveFileName(projectId) };
 }
 
 // ── reading one back ──────────────────────────────────────────────────────────────────────────────────
@@ -111,7 +118,7 @@ export async function exportProjectArchive(projectId: string, out: Writable): Pr
 export interface ArchiveManifest { manifestVersion: number; generator?: string; name?: string; type?: string; templateRef?: string; format?: string; domain?: string | null; manualType?: string | null; settings?: unknown; exportedAt?: string }
 
 export interface RestoreFinding { severity: 'info' | 'warning'; message: string }
-export interface RestoreResult { project: Awaited<ReturnType<typeof createProject>>; findings: RestoreFinding[]; counts: { files: number; comments: number } }
+export interface RestoreResult { project: Awaited<ReturnType<typeof createProject>>; findings: RestoreFinding[]; counts: { files: number; comments: number; pdfComments: number } }
 
 const TEXT_RE = /\.(xml|xsl|xslt|ent|dtd)$/i;
 const TEMPLATE_RE = /^templates\/([a-z0-9][a-z0-9._-]{0,63})\.house\.json$/i;
@@ -235,7 +242,20 @@ export async function restoreProjectArchive(user: User, zipPath: string, opts: {
           }
         } catch { findings.push({ severity: 'warning', message: 'The comments file could not be read.' }); }
       }
-      return { project: { ...card, name: merged.name }, findings, counts: { files, comments } };
+
+      // 7. phase 8: the PDF review, under the person who imports (new ids, anchors kept; re-anchored at the first listing of each PDF)
+      let pdfComments = 0;
+      const pf = entries.find((e) => e.name.replace(/\\/g, '/') === PDF_REVIEW_ENTRY);
+      if (pf) {
+        try {
+          if (pf.size > 64 * 1024 * 1024) throw new Error('too large');
+          const got = pdfReviewService.importReview(id, user, JSON.parse((await r.readBuffer(pf)).toString('utf8')));
+          pdfComments = got.annotations;
+          for (const n of got.notes.slice(0, 20)) findings.push({ severity: 'warning', message: n });
+          if (got.notes.length > 20) findings.push({ severity: 'warning', message: `${got.notes.length - 20} more PDF comments were not restored.` });
+        } catch { findings.push({ severity: 'warning', message: 'The PDF review file could not be read.' }); }
+      }
+      return { project: { ...card, name: merged.name }, findings, counts: { files, comments, pdfComments } };
     });
   } finally { try { r.close(); } catch { /* closed */ } }
 }

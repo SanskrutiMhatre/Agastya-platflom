@@ -130,6 +130,24 @@ The registry (`projects`, `files` tables in `vendor/engine/db.js`) only indexes 
 **Single process, single SQLite handle.** `context.ts` is the only place the store, sessions, rate limiter, authz, doc index and revisions are constructed; everything imports from it.
 Consequence: no horizontal scaling, and rate-limit / build-serialisation state is in memory.
 
+### 4.1 Phase 3 components (added 2026-11-28, phase 8)
+
+Phase 3 added these parts to the picture above. Each has its own record; this section says where it sits and what it owns.
+
+| Component | Where | What it owns / how it fits | Record |
+|---|---|---|---|
+| **Collaboration core** (live co-editing) | `backend/src/services/collab/*`, `backend/src/shared/collab/*`, `frontend/src/collab/*`; rooms over the one authenticated WebSocket (`broadcast.ts` `CollabHooks`) | Yjs (CRDT) documents per open document; the server holds the room, applies updates, persists them through the same revisioned, atomic writer as a save (`projectFiles.ts`), so revisions, locks and audit are unchanged. Check-out is an optional exclusive lock. S1000D data modules by default; JSS and JSG bind through `COLLAB-CONTRACT.md` | `docs/phase3/collaboration.md`, `collab-jss.md`, `collab-jsg.md`, `COLLAB-CONTRACT.md` |
+| **PDF review** | `backend/src/services/pdfReview/*`, `routes/pdfReview.ts`, `shared/pdfAnchor.ts` (one anchor module for browser and server), migration 028; `frontend/src/components/pdfreview/*` | Threads anchored on a page of a project PDF (text quote + rectangles + the PDF version's SHA-256); re-anchored by quote when a new build changes the PDF; replies, status by role, CSV/XFDF export, **XFDF import** (phase 8), the release block setting. Travels in the **project archive** as `pdf-review.json` (phase 8: new ids, anchors kept) | `docs/phase3/pdf-review.md` |
+| **GitLab** | `backend/src/services/gitlab/*`, `routes/gitlab.ts`; `frontend/src/pages/project/RepositoryPage.tsx`, `pages/AdminGitlab.tsx` | Optional, off by default; an administrator switches it on. Per-person OAuth or token; the Repository page (rail, Ctrl+K "Jump to", Project Home tile only while enabled) | `docs/phase3/gitlab.md` |
+| **Build cache** | `services/publisher.ts` + build fingerprint | A build whose inputs (sources, settings, house style, tools) are unchanged is "up to date": the PDF is served, FOP does not run again | `docs/phase3/performance.md` section 5 |
+| **Validation cache** | `services/validation.ts` (`.validation.json` + per-module result memo keyed by content hash and rule set), `services/brex.ts` (per-pass chain memo, per-file module facts), `services/applicability.ts` (per-module results) | An unchanged module is not checked again; after one edit only that module (and what depends on it) is re-checked; the results equal a full run (`test/phase8-cleanup.test.js`) | `docs/phase3/performance.md` section 4, `docs/phase3/cleanup-backend.md` item 5 |
+| **Kept CSDB listing** | `services/csdbIndex.ts` (`FileMemo` per file: size, mtime, ctime, inode), identity index | The listing of a project's modules is kept in memory and refreshed per changed file instead of re-reading the folder; uniqueness of a new module is checked against the kept identity index; writes go through `storage/atomicWrite.ts` (single file and, phase 8, batches with one fsync pass) | `docs/phase3/performance.md` section 1, `docs/phase3/cleanup-backend.md` items 1-3 |
+| **Standalone accounts** | `core/auth/*`, setup flow | Installations without a directory: Setup creates the accounts itself; same session, role and audit model | `docs/phase3/standalone.md` |
+
+Still one process: the import, the validation and the collaboration rooms run in the server process, because the document locks, the revision
+log and the room state live there (`docs/phase3/cleanup-backend.md` item 4); heavy CPU parts run in the job pool (`services/jobs/`, worker threads) or as
+child processes.
+
 ---
 
 ## 5. Backend in detail

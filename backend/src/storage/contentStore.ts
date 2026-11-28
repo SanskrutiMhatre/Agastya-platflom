@@ -13,7 +13,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { writeFileAtomic } from './atomicWrite';
+import { writeFileAtomic, writeFilesAtomic, BatchWriteError } from './atomicWrite';
 
 export interface ContentStat { size: number; mtimeMs: number; isDirectory: boolean }
 
@@ -30,6 +30,12 @@ export interface ContentStore {
   writeText(projectId: string, rel: string, text: string): void;
   /** The same for binary content (pictures, uploaded files). */
   writeBuffer(projectId: string, rel: string, data: Uint8Array): void;
+  /**
+   * Phase 8: write several text files with the same per-file guarantee, their flushes grouped (storage/atomicWrite.ts writeFilesAtomic).
+   * Nothing is renamed until every file is flushed and `precommit` (synchronous, right before the renames) has passed; a failure after that
+   * throws a BatchWriteError naming the files already written.
+   */
+  writeTexts(projectId: string, files: Array<{ rel: string; text: string }>, precommit?: () => void): Promise<void>;
   /** Names in a folder of the project; [] when the folder does not exist. */
   list(projectId: string, relDir: string): string[];
   remove(projectId: string, rel: string): void;
@@ -79,6 +85,15 @@ export class LocalFolderStore implements ContentStore {
   writeText(projectId: string, rel: string, text: string): void { const p = this.pathOf(projectId, rel); writeFileAtomic(p, text, 'utf8'); told(projectId, p, 'write'); }
 
   writeBuffer(projectId: string, rel: string, data: Uint8Array): void { const p = this.pathOf(projectId, rel); writeFileAtomic(p, data); told(projectId, p, 'write'); }
+
+  async writeTexts(projectId: string, files: Array<{ rel: string; text: string }>, precommit?: () => void): Promise<void> {
+    const batch = files.map((f) => ({ target: this.pathOf(projectId, f.rel), data: f.text }));
+    try { await writeFilesAtomic(batch, precommit); } catch (e) {
+      if (e instanceof BatchWriteError) for (const p of e.renamed) told(projectId, p, 'write');
+      throw e;
+    }
+    for (const b of batch) told(projectId, b.target, 'write');
+  }
 
   list(projectId: string, relDir: string): string[] {
     const abs = this.pathOf(projectId, relDir);
