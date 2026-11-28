@@ -188,6 +188,18 @@ export function PdfReviewView({ projectId, initialKey, initialId, onKeyChange }:
           <button type="button" className="btn sm subtle" onClick={reloadAll} data-testid="pdf-reload" title="Read the PDF and its comments again"><Icon name="refresh" size={14} />Reload</button>
           {key ? <a className="btn sm subtle" href={pdfReviewApi.exportUrl(projectId, 'csv', key)} download data-testid="pdf-export-csv" title="The comments of this PDF as a spreadsheet"><Icon name="download" size={14} />CSV</a> : null}
           {key ? <a className="btn sm subtle" href={pdfReviewApi.exportUrl(projectId, 'xfdf', key)} download data-testid="pdf-export-xfdf" title="The comments as XFDF, for Acrobat or another PDF reader"><Icon name="download" size={14} />XFDF</a> : null}
+          {key && can?.create ? (
+            <label className="btn sm subtle" data-testid="pdf-import-xfdf" title="Comments made in Acrobat or another PDF reader (an .xfdf file) become comments on this PDF">
+              <Icon name="upload" size={14} />Import XFDF
+              <input type="file" accept=".xfdf,application/vnd.adobe.xfdf,text/xml" hidden data-testid="pdf-import-xfdf-file" onChange={(e) => {
+                const f = e.target.files?.[0]; e.target.value = ''; if (!f || !key) return;
+                void f.text().then((xfdf) => pdfReviewApi.importXfdf(projectId, key, xfdf)).then((r) => {
+                  toast(`${r.annotations.length} comment${r.annotations.length === 1 ? '' : 's'} and ${r.replies} repl${r.replies === 1 ? 'y' : 'ies'} imported${r.skipped.length ? `; ${r.skipped.length} left out: ${r.skipped.slice(0, 3).join(' ')}` : ''}.`, r.skipped.length ? 'info' : 'success');
+                  threads.reload();
+                }, (err) => toast(errText(err), 'error'));
+              }} />
+            </label>
+          ) : null}
         </div>
         {placing ? <div className="prv-bar"><Callout tone="info">Select the words (or draw an area) where the comment belongs now. <button type="button" className="btn sm" onClick={() => setPlacing(null)}>Cancel</button></Callout></div> : null}
         {loadErr ? <div className="prv-bar"><Callout tone="warning">{loadErr}</Callout></div> : null}

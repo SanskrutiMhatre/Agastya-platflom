@@ -13,6 +13,7 @@
 //   POST   annotations/:aid/status        open / resolved (reviewer); accepted / rejected a suggestion (editor)  (reviewer)
 //   POST   annotations/:aid/place         place a thread again by hand on the current version                    (reviewer)
 //   PUT    settings                       block a release while required comments are open                       (manager)
+//   POST   import                         { key, xfdf }: comments from a PDF reader (XFDF) become threads        (reviewer)
 // =============================================================================
 
 import type { Express, Request, RequestHandler } from 'express';
@@ -100,5 +101,12 @@ export function registerPdfReviewRoutes(app: Express): void {
     pdfReview.setBlockRelease(req.project.id, actor(req), req.body.blockRelease);
     log(req, 'pdfreview.settings', { blockRelease: req.body.blockRelease });
     res.json({ ok: true, ...pdfReview.counts(req.project.id) });
+  }));
+
+  // phase 8: comments made in a PDF reader, as XFDF ({ key, xfdf }), become threads on the version of that PDF now in the project
+  app.post(`${base}/import`, comment, wrap(async (req, res) => {
+    const out = await pdfReview.importXfdf(req.project.id, actor(req), req.body?.key, req.body?.xfdf);
+    log(req, 'pdfreview.imported', { format: 'xfdf', file: String(req.body?.key ?? ''), created: out.created.length, replies: out.replies, skipped: out.skipped.length });
+    res.status(201).json({ annotations: out.created, replies: out.replies, skipped: out.skipped });
   }));
 }
