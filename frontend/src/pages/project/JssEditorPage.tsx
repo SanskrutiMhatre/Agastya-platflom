@@ -99,6 +99,8 @@ export function JssEditorPage() {
     <DocEditorShell kind="jss" shortcuts="jss" projectId={id} can={can} role={ctx.role} layout={layout} title={summary.project.name} hostRef={hostRef} loaded={!!loaded} find readOnly={!writable}
       crumb={loaded ? <span className="v2-badge accent" title={`Document type ${loaded.docType}, from the stencil ${loaded.stencil}`}>{loaded.label}</span> : null}
       saveState={host.saveState} guard={host.guard} banners={host.banners(recover)}
+      docName={loaded?.label ?? undefined} findings={host.findings}
+      meta={loaded ? [['Type', loaded.label], ['Type code', <span className="mono">{loaded.docType}</span>], ['Stencil', <span className="mono">{loaded.stencil}</span>], ['Heading depth', String(loaded.maxDepth)]] : []}
       actions={<>
         <button className="btn btn-sm" onClick={() => void host.check()} disabled={!loaded || checking} data-testid="jss-check" title="Check the document for problems without saving or building">{checking ? <Spinner /> : <Icon name="search" size={12} />}Check</button>
         <button className="btn btn-sm" onClick={() => void host.save()} disabled={!writable || !dirty || saving} data-testid="jss-save" title={!writable ? 'You have read-only access' : !dirty ? 'Nothing to save' : 'Save the document (Ctrl+S)'}>{saving ? <Spinner /> : <Icon name="check" size={12} />}Save</button>

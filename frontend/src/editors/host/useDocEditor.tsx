@@ -89,7 +89,10 @@ export function useDocEditor<L extends DocLoaded>(ctx: ProjectCtx, adapter: DocA
   }, [id]);
   useEffect(() => { void load(); }, [load]);
 
-  const applyFindings = (findings: DocFinding[]) => editorRef.current?.setFindings(findings as never[]);
+  // UI redesign: the findings the editor shows are also kept here, for the workspace's status bar and Problems panel
+  const [findings, setFindings] = useState<DocFinding[]>([]);
+  useEffect(() => { setFindings(loaded?.report.findings ?? []); }, [loaded]);
+  const applyFindings = (list: DocFinding[]) => { setFindings(list); editorRef.current?.setFindings(list as never[]); };
 
   const draft = useLocalDraft(id, adapter.kind, () => { const ed = editorRef.current; return ed && ed.isDirty() ? ed.getXml() : null; }, dirty, () => hashRef.current, loaded?.xml ?? null);
 
@@ -223,7 +226,7 @@ export function useDocEditor<L extends DocLoaded>(ctx: ProjectCtx, adapter: DocA
 
   return {
     id, writable, editorRef, hashRef, loaded, setLoaded, error, setError, dirty, setDirty, saving, failed, checking, building, savedAt, stale,
-    src, setSrc, note, progress, draft, load, save, check, generate, applyFindings, guard, banners,
+    src, setSrc, note, progress, draft, load, save, check, generate, applyFindings, findings, guard, banners,
     saveState: { saving, dirty, savedAt, failed },
   };
 }
