@@ -59,7 +59,8 @@ export class BackupError extends Error {
 }
 
 /** Names in the data folder that a backup never copies as files: the live database (it goes in as an image), the server lock, the backups. */
-const EXCLUDE_TOP = new Set(['publisher.db', 'publisher.db-wal', 'publisher.db-shm', 'publisher.db-journal', '.agastya-server.lock', 'backups']);
+// phase 7: '.agastya-cache' holds derived data only (kept validation verdicts), rebuilt on demand
+const EXCLUDE_TOP = new Set(['publisher.db', 'publisher.db-wal', 'publisher.db-shm', 'publisher.db-journal', '.agastya-server.lock', 'backups', '.agastya-cache']);
 
 function* walk(root: string, rel = '', exclude: string[] = []): Generator<{ abs: string; rel: string }> {
   let entries: fs.Dirent[] = [];

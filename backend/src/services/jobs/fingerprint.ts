@@ -16,7 +16,7 @@ import { projectDirFor, repos } from '../../context';
 import { listItems } from '../adminConfig';
 import { buildInfo } from '../version';
 
-const IGNORE = new Set(['.validation.json', '.publish-state.json']);
+const IGNORE = new Set(['.validation.json', '.validation.prev.json', '.publish-state.json']);   // phase 7: and the run kept before the last
 
 function walk(dir: string, rel: string, depth: number, out: string[]): void {
   if (depth > 8) return;
