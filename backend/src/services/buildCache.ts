@@ -37,6 +37,15 @@ function hashFile(abs: string, st: fs.Stats): string {
   return contentMemo.get(abs, st, () => crypto.createHash('sha256').update(fs.readFileSync(abs)).digest('hex'));
 }
 
+/**
+ * The hash of the shipped front-matter page of that name (pipeline jss/frontmatter), or null. A build copies such a page into the project's
+ * front-matter folder when it is missing, so a copy still equal to it is the same input as no file at all (covered by the program build).
+ */
+function staticPageHash(name: string): string | null {
+  const abs = path.join(config.pipelineDir, 'jss', 'frontmatter', name);
+  try { return hashFile(abs, fs.statSync(abs)); } catch { return null; }
+}
+
 function walk(root: string, rel: string, depth: number, out: string[], content: boolean): void {
   if (depth > MAX_DEPTH) return;
   let entries: fs.Dirent[];
@@ -57,7 +66,8 @@ function walk(root: string, rel: string, depth: number, out: string[], content: 
       const st = fs.statSync(abs);
       if (!content) { out.push(`${r}|${sigOf(st)}`); continue; }
       const hash = hashFile(abs, st);
-      out.push(typeof stamp[e.name] === 'string' && hash.slice(0, 32) === stamp[e.name] ? `${r}|generated` : `${r}|${hash}`);
+      const own = (typeof stamp[e.name] === 'string' && hash.slice(0, 32) === stamp[e.name]) || (path.basename(rel) === 'frontmatter' && hash === staticPageHash(e.name));
+      out.push(own ? `${r}|generated` : `${r}|${hash}`);
     } catch { out.push(`${r}|gone`); }
   }
 }
