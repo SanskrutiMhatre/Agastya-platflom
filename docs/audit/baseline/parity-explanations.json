@@ -80,6 +80,36 @@
       "decision": "owner's editor-chrome requests 2026-11-28 (S1000D Quick preview and Refresh in the top bar)",
       "batch": "UI redesign: editor chrome second pass",
       "date": "2026-11-28"
+    },
+    {
+      "category": "tests",
+      "key": "e2e 00-platform.spec.ts > main dashboard has Overview, Workspace, Projects, Graphics, CIR, Backup and Settings; Notifications is a bell beside an icon-only account menu; the theme is one icon button",
+      "reason": "Renamed, not removed: the owner asked for one Settings entry (no redundant options), so the sidebar's Platform > Settings item is gone and Settings is reached from the account menu ('Account settings', which already existed); the /settings route is unchanged. The test now also checks that the sidebar has no Settings link, no 'Offline · on-premises · version · Server connected' foot and no offline icon, that the account menu opens /settings/account and that 'About Agastya' shows the version. Every other assertion is kept",
+      "newHome": "e2e 00-platform.spec.ts > main dashboard has Overview, Workspace, Projects, Graphics, CIR and Backup; Settings and About are in the icon-only account menu beside the Notifications bell; no offline/version status text; the theme is one icon button",
+      "checklistRow": "Global shell: navigation, top bar, account menu",
+      "decision": "Phase 3 item 1 (owner small UI changes, docs/phase3/DECISIONS.md order step 1)",
+      "batch": "Phase 3: small UI + performance baseline",
+      "date": "2026-11-28"
+    },
+    {
+      "category": "testids",
+      "key": "net-state",
+      "reason": "The owner removed the Wi-Fi / 'Offline, on-premises' icon from the top bars: it only stated that the product is on-premises. Its one useful state (the server not answering) is the connection banner, which stays",
+      "newHome": "Connection banner (data-testid server-unreachable, components/SessionDialogs.tsx); version and deployment in the account menu's About Agastya (data-testid about-agastya)",
+      "checklistRow": "Global shell: navigation, top bar, account menu",
+      "decision": "Phase 3 item 1 (owner small UI changes)",
+      "batch": "Phase 3: small UI + performance baseline",
+      "date": "2026-11-28"
+    },
+    {
+      "category": "rail",
+      "key": "global sidebar: Platform > Settings (/settings)",
+      "reason": "Settings was in the sidebar and in the account menu; the owner kept one (the account menu). The route /settings and all its tabs are unchanged; the administrator's 'items waiting' count that the sidebar item carried moved to the account button (badge) and its Account settings entry. Recorded for completeness: the global sidebar is not part of the scanned rail surface",
+      "newHome": "Account menu > Account settings (/settings); count badge on the account button",
+      "checklistRow": "Global shell: navigation, top bar, account menu",
+      "decision": "Phase 3 item 1 (owner small UI changes)",
+      "batch": "Phase 3: small UI + performance baseline",
+      "date": "2026-11-28"
     }
   ]
 }

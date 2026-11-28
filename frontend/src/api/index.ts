@@ -207,8 +207,6 @@ export const contentApi = {
     const res = await request<Response>('POST', `${P(id)}/publish/preview/${encodeURIComponent(file)}`, {}, { raw: true });
     return res.blob();
   },
-  /** Whether the PDF renderer is warm (the project status bar: "Renderer ready"). */
-  rendererStatus: (id: string) => get<{ warm: boolean }>(`${P(id)}/publish/status`, { background: true, ttl: 30_000 }),
   pdfUrl: (id: string, download = false) => `${P(id)}/publish/pdf${download ? '?download=1' : ''}`,
   /** WP-14: the project's jobs, newest first (the Publication page lists its builds from them) */
   jobs: (id: string, limit = 50) => get<{ jobs: JobView[] }>(`${P(id)}/jobs?limit=${limit}`).then((r) => r.jobs),

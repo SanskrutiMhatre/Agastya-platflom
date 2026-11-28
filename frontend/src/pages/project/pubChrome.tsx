@@ -108,7 +108,7 @@ export function PubStatus({ jobs, pdf, view, busy }: { jobs: JobView[] | null; p
   const failed = !!last && last.state !== 'succeeded' && last.state !== 'running' && last.state !== 'queued';
   return (
     <StatusItems>
-      <span className="item"><span className={`dot ${busy ? 'info' : failed ? 'danger' : pdf || good ? 'success' : ''}`} />{busy ? 'Building…' : failed ? 'Last build stopped' : pdf || good ? 'Renderer ready' : 'Not built yet'}</span>
+      <span className="item"><span className={`dot ${busy ? 'info' : failed ? 'danger' : pdf || good ? 'success' : ''}`} />{busy ? 'Building…' : failed ? 'Last build stopped' : pdf || good ? 'Built' : 'Not built yet'}</span>
       {pdf || good ? <span className="item">{n ? `Preview of build ${n}` : 'Preview of the last build'}</span> : null}
       <span className="grow" />
       {view && view.numPages ? <span className="item">{view.first === view.last ? `Page ${view.first}` : `Pages ${view.first}-${view.last}`} of {view.numPages}</span> : null}
