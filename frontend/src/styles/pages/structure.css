@@ -33,9 +33,11 @@
 .pub .pub-sronly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* the structure tree: chapters are group rows, modules their children; a ticked row is in the publication */
-.pub .chk { width: 14px; height: 14px; accent-color: var(--accent); margin: 0; flex: none; }
+/* WCAG 2.5.8: the twist draws 16 px but its click area is 24 x 24 (negative margins keep the drawn layout); the 14 px checkbox
+   keeps 5 px clear of it so its 24 px target circle touches no other target */
+.pub .chk { width: 14px; height: 14px; accent-color: var(--accent); margin: 0 0 0 3px; flex: none; }
 .pub .tree .node { position: relative; }
-.pub .tree button.twist { height: 16px; padding: 0; border: 0; background: none; cursor: pointer; border-radius: var(--radius-sm); }
+.pub .tree button.twist { width: 24px; height: 24px; margin: -4px; padding: 0; border: 0; background: none; cursor: pointer; border-radius: var(--radius-sm); }
 .pub .tree button.twist:hover { color: var(--text-primary); }
 .pub .tree .node .label { min-width: 0; }
 .pub .tree .node h3.label { margin: 0; font: inherit; color: inherit; }

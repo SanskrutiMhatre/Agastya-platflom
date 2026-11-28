@@ -98,5 +98,17 @@ export async function markVolatile(page: Page): Promise<void> {
       if (VOLATILE.test(t) && walker.currentNode.parentElement) walker.currentNode.parentElement.setAttribute('data-vmask', '');
     }
     for (const el of Array.from(document.querySelectorAll('input, textarea'))) if (VOLATILE.test((el as HTMLInputElement).value)) el.setAttribute('data-vmask', '');
+    // Live figures that move between runs without a clock-like pattern: server uptime, a user's first sign-in ("Never" until the
+    // seeded account signs in, which depends on test order) and the rows of a live audit log (their order follows the other tests).
+    const LIVE = /\bUptime\b|^\s*Never\s*$/;
+    const walker2 = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    while (walker2.nextNode()) {
+      const t = walker2.currentNode.textContent || '';
+      if (LIVE.test(t) && walker2.currentNode.parentElement) walker2.currentNode.parentElement.setAttribute('data-vmask', '');
+    }
+    for (const table of Array.from(document.querySelectorAll('table'))) {
+      const head = table.querySelector('thead')?.textContent || '';
+      if (/Actor/.test(head) && /Event/.test(head)) table.querySelector('tbody')?.setAttribute('data-vmask', '');
+    }
   });
 }
