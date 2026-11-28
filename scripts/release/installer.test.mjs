@@ -60,7 +60,7 @@ function setupFor(version) {
   }
   fs.mkdirSync(path.join(stage, 'runtime')); fs.copyFileSync(process.execPath, path.join(stage, 'runtime', 'node.exe'));
   put(path.join(stage, 'app', 'backend', 'dist', 'index.js'), SERVER);
-  for (const s of ['agastya-backup.js', 'first-admin.js']) put(path.join(stage, 'app', 'backend', 'scripts', s), `require(${JSON.stringify(path.join(ROOT, 'backend', 'scripts', s))});\n`);
+  for (const s of ['agastya-backup.js', 'first-admin.js', 'default-accounts.js']) put(path.join(stage, 'app', 'backend', 'scripts', s), `require(${JSON.stringify(path.join(ROOT, 'backend', 'scripts', s))});\n`);
   put(path.join(stage, 'app', 'frontend', 'dist', 'index.html'), '<!doctype html>');
   fs.mkdirSync(path.join(stage, 'docs')); fs.copyFileSync(path.join(ROOT, 'packaging', 'agastya.ini.template'), path.join(stage, 'docs', 'agastya.ini.template'));
   put(path.join(stage, 'version.json'), JSON.stringify({ product: 'Agastya Platform', appId: APP_ID, version }) + '\n');

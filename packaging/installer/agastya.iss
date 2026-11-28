@@ -12,6 +12,10 @@
 ;   WP-28 client of a team server: /CLIENTOF=https://docs.example.local:4040/ writes [client] Server= and installs no service.
 ;   /ADMINUSER=<name> /ADMINPASSWORDFILE=<file>   create the first administrator unattended (the file's first line is a TEMPORARY password,
 ;        changed at the first sign-in; it is read by AgastyaCtl.exe, never put on a command line; delete the file afterwards).
+;   P3-6: without /LAN and /CLIENTOF this is the STANDALONE installation ([server] Deployment=standalone): a fresh data folder gets the default
+;        accounts admin/Admin@123, manager/Manager@123, author/Author@123, auditor/Auditor@123 (each changes its password at the first sign-in),
+;        shown on the finish page with "Save a copy..." (silent: shown by the application's first launch instead). /ADMINUSER, an upgrade or a
+;        data folder that has accounts gets none. /LAN and /CLIENTOF are the common server ([server] Deployment=server): no default accounts.
 ; Uninstall:  unins000.exe /VERYSILENT [/PURGEDATA]   - the data folder is KEPT unless /PURGEDATA is given (interactive: a question, default No).
 ; Exit codes: Inno Setup's (0 = done; 7 = "preparing to install" failed: the server could not be stopped or the pre-update backup failed -
 ;        nothing was changed; see <state>\logs\setup-upgrade-*.log). docs/DEPLOYMENT-KIT.md has the table.
@@ -139,6 +143,10 @@ Type: dirifempty; Name: "{app}"
 var
   DataPage: TInputDirWizardPage;
   PortPage: TInputQueryWizardPage;
+  // P3-6: the standalone default accounts were created by this Setup (AgastyaCtl --default-accounts exit 0): the finish page shows them
+  DefaultAccountsCreated: Boolean;
+  CredMemo: TNewMemo;
+  CredSave: TNewButton;
 
 // ---------------------------------------------------------------------------------------------------------------
 // Settings: a command-line switch wins, then what an existing installation already uses, then the wizard's answer, then the default.
@@ -235,6 +243,25 @@ end;
 function LanWanted: Boolean;
 begin
   Result := IsAdminInstallMode and (WizardIsTaskSelected('lan') or SwitchGiven('LAN'));
+end;
+
+// Phase 3 P3-6: how the accounts begin. A team server (LAN) or a client of one (/CLIENTOF) is a common server: no default accounts, the
+// administrator is created at the first start. Everything else is the standalone EXE: default accounts with the published passwords.
+function WantedDeployment: String;
+begin
+  if LanWanted or (ExpandConstant('{param:CLIENTOF|}') <> '') then Result := 'server' else Result := 'standalone';
+end;
+
+// An existing agastya.ini without Deployment (an upgrade from before P3-6): a team server, a client of one, or a Mode B server behind a proxy
+// on this computer is a common server; a loopback installation is standalone.
+function ExistingIsCommonServer: Boolean;
+var
+  B: String;
+begin
+  B := LowerCase(Trim(ExistingValue('server', 'Bind', 'loopback')));
+  Result := (ExpandConstant('{param:CLIENTOF|}') <> '') or (ExistingValue('client', 'Server', '') <> '')
+    or (LowerCase(Trim(ExistingValue('server', 'Mode', ''))) = 'server')
+    or not ((B = '') or (B = 'loopback') or (B = 'localhost') or (B = '::1') or (Copy(B, 1, 4) = '127.'));
 end;
 
 function ServiceWanted: Boolean;
@@ -381,6 +408,7 @@ begin
       StringChangeEx(Text, '@BIND@', Bind, True);
       StringChangeEx(Text, '@DATADIR@', WantedDataDir, True);
       StringChangeEx(Text, '@SERVICENAME@', WantedServiceName, True);
+      StringChangeEx(Text, '@DEPLOYMENT@', WantedDeployment, True);
       SetArrayLength(Lines, 1); Lines[0] := Text;
       SaveStringsToUTF8File(IniPath, Lines, False);
     end;
@@ -392,6 +420,16 @@ begin
     if SwitchGiven('DATADIR') then SetIniString('storage', 'DataDir', WantedDataDir, IniPath);
     if SwitchGiven('SVCNAME') then SetIniString('service', 'Name', WantedServiceName, IniPath);
     if SwitchGiven('LAN') then SetIniString('server', 'Bind', 'lan', IniPath);
+    // P3-6: a file from before Deployment existed gets it once, from what the installation already is (a loopback installation that is not
+    // a Mode B server behind a proxy is standalone). It never creates accounts on a data folder that has any (core/auth/defaultAccounts.js).
+    if SwitchGiven('LAN') then SetIniString('server', 'Deployment', 'server', IniPath)
+    else if ExistingValue('server', 'Deployment', '') = '' then
+    begin
+      if ExistingIsCommonServer then
+        SetIniString('server', 'Deployment', 'server', IniPath)
+      else
+        SetIniString('server', 'Deployment', 'standalone', IniPath);
+    end;
   end;
 
   // The data folder holds the database (password hashes, sessions, the audit log) and every project; the state folder holds the
@@ -504,6 +542,95 @@ begin
   if Code <> 0 then Log('The first administrator could not be created (code ' + IntToStr(Code) + '); see the host log');
 end;
 
+// ---------------------------------------------------------------------------------------------------------------
+// Phase 3 P3-6 (docs/phase3/standalone.md): the standalone installation's default accounts.
+// The credentials are FIXED by the owner and published (they are the same as policy.DEFAULT_ACCOUNTS in backend/src/core/auth/policy.js;
+// backend/test/standalone-accounts.test.js keeps the two lists the same). Setup creates the accounts before the first start
+// (AgastyaCtl --default-accounts -> backend/scripts/default-accounts.js, the server's own first-start step) so the finish page can show the
+// ones that really exist; on an upgrade, or a data folder that already has accounts, nothing is created and nothing is shown. The text is
+// never written to disk by Setup (not even to its log): only "Save a copy..." writes it, to the file the person chooses.
+// A silent installation shows nothing; the application's first launch screen shows the same credentials until someone acknowledges it.
+// ---------------------------------------------------------------------------------------------------------------
+function DefaultCredentialsText: String;
+begin
+  Result :=
+    'Agastya Platform - default sign-in details of this computer' + #13#10 +
+    '' + #13#10 +
+    '  Administrator          admin     Admin@123' + #13#10 +
+    '  Project Manager        manager   Manager@123' + #13#10 +
+    '  Author                 author    Author@123' + #13#10 +
+    '  Auditor (read-only)    auditor   Auditor@123' + #13#10 +
+    '' + #13#10 +
+    'Each account must choose its own password at its first sign-in; the default password then stops working and can never be used again.' + #13#10 +
+    'Until then these accounts sign in on this computer only. Store this note safely (or destroy it once every password is changed): anyone' + #13#10 +
+    'who reads it can sign in as an account that has not changed its password yet.' + #13#10;
+end;
+
+procedure CreateDefaultAccounts;
+var
+  Code: Integer;
+begin
+  DefaultAccountsCreated := False;
+  if LowerCase(ExistingValue('server', 'Deployment', '')) <> 'standalone' then Exit;   // a common server: the administrator is created at first start
+  Code := RunHidden(ExpandConstant('{app}\AgastyaCtl.exe'), '--default-accounts');
+  if Code = 0 then
+  begin
+    DefaultAccountsCreated := True;
+    Log('The standalone default accounts were created (admin, manager, author, auditor); each changes its password at its first sign-in.');
+  end
+  else if Code = 3 then Log('Default accounts: nothing to create (this data folder already had accounts or was initialised before).')
+  else Log('The default accounts could not be created now (code ' + IntToStr(Code) + '); the server creates them at its first start. See the host log.');
+end;
+
+procedure SaveCredentialsClick(Sender: TObject);
+var
+  FileName: String;
+begin
+  FileName := 'Agastya sign-in details.txt';
+  if GetSaveFileName('Save a copy of the sign-in details', FileName, ExpandConstant('{userdocs}'), 'Text files (*.txt)|*.txt|All files (*.*)|*.*', 'txt') then
+  begin
+    if SaveStringToFile(FileName, DefaultCredentialsText, False) then
+      MsgBox('Saved to ' + FileName + '.' + #13#10#13#10 + 'Keep this file somewhere safe, and delete it once every default password has been changed.', mbInformation, MB_OK)
+    else
+      MsgBox('The file could not be written: ' + FileName, mbError, MB_OK);
+  end;
+end;
+
+procedure CurPageChanged(CurPageID: Integer);
+var
+  Top: Integer;
+begin
+  if (CurPageID <> wpFinished) or (not DefaultAccountsCreated) or Assigned(CredMemo) then Exit;
+  WizardForm.FinishedLabel.Caption := 'Agastya Platform is installed. Sign in with one of these accounts; each must choose its own password at its first sign-in. ' +
+    'Store these details safely - they are shown again when the application first opens, until you confirm you stored them.';
+  WizardForm.FinishedLabel.AdjustHeight;
+  Top := WizardForm.FinishedLabel.Top + WizardForm.FinishedLabel.Height + ScaleY(8);
+  if WizardForm.RunList.Visible then
+  begin
+    WizardForm.RunList.Top := Top;
+    Top := Top + WizardForm.RunList.Height + ScaleY(8);
+  end;
+  CredMemo := TNewMemo.Create(WizardForm);
+  CredMemo.Parent := WizardForm.FinishedPage;
+  CredMemo.Left := WizardForm.FinishedLabel.Left;
+  CredMemo.Top := Top;
+  CredMemo.Width := WizardForm.FinishedLabel.Width;
+  CredMemo.Height := ScaleY(118);
+  CredMemo.ReadOnly := True;
+  CredMemo.ScrollBars := ssVertical;
+  CredMemo.WordWrap := False;
+  CredMemo.Font.Name := 'Consolas';
+  CredMemo.Text := DefaultCredentialsText;
+  CredSave := TNewButton.Create(WizardForm);
+  CredSave.Parent := WizardForm.FinishedPage;
+  CredSave.Caption := 'Save a copy...';
+  CredSave.Left := CredMemo.Left;
+  CredSave.Top := CredMemo.Top + CredMemo.Height + ScaleY(6);
+  CredSave.Width := ScaleX(110);
+  CredSave.Height := ScaleY(23);
+  CredSave.OnClick := @SaveCredentialsClick;
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   Ctl: String;
@@ -519,6 +646,8 @@ begin
     ConfigureFirewall;
     ProvisionWebView2;
     CreateFirstAdministrator;
+    // P3-6: after /ADMINUSER (an unattended administrator means the data folder has an account, so no default accounts are made)
+    CreateDefaultAccounts;
     if ServiceWanted then
     begin
       Ctl := ExpandConstant('{app}\AgastyaCtl.exe');

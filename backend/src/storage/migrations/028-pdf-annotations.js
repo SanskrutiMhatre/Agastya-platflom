@@ -1,11 +1,11 @@
 'use strict';
-// Migration 027-pdf-annotations (Phase 3, P3-4: PDF review). One body per database engine (WP-10); additive only (new tables, nothing
-// existing is touched). Number chosen by the PDF review branch as the next free one after 026-jobs; the collaboration branch may also
-// claim 027 in parallel; the lead renumbers on merge (the step's name is all that has to change, nothing refers to the number).
+// Migration 028-pdf-annotations (Phase 3, P3-4: PDF review). One body per database engine (WP-10); additive only (new tables, nothing
+// existing is touched). Number chosen by the PDF review branch as the next free one after 026-jobs; another branch took
+// 027 in parallel (027-default-accounts), so this was renumbered to 028 on merging main (the step's name is all that has to change, nothing refers to the number).
 
 const step = {
     /*
-      027 - PDF review annotations: notes ON a PDF page (a generated build, a quick preview or a PDF stored in the project), never inside a
+      028 - PDF review annotations: notes ON a PDF page (a generated build, a quick preview or a PDF stored in the project), never inside a
       source document. Deliberately apart from review_comments (notes about a data module, 009/019) and from the editors' live comments
       (the collaboration work): a PDF annotation is anchored in the PDF, not in the XML.
 
@@ -19,7 +19,7 @@ const step = {
                             can be said.
       pdf_review_settings   per project: block a release while required comments are open (default off).
     */
-    name: '027-pdf-annotations',
+    name: '028-pdf-annotations',
     sql: `CREATE TABLE IF NOT EXISTS pdf_annotations (
             id            TEXT PRIMARY KEY,
             project_id    TEXT NOT NULL,

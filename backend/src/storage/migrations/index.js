@@ -31,7 +31,8 @@ const ORDER = [
   '024-directory-groups-permissions',
   '025-audit-chain',               // WP-29
   '026-jobs',                      // WP-14
-  '027-pdf-annotations',           // Phase 3 P3-4 PDF review (renumbered by the lead if the collaboration branch also took 027)
+  '027-default-accounts',          // Phase 3 P3-6 (standalone default accounts)
+  '028-pdf-annotations',           // Phase 3 P3-4 PDF review
 ];
 
 const MIGRATIONS = ORDER.map((name) => require(`./${name}`));

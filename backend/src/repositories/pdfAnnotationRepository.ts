@@ -1,5 +1,5 @@
 // =============================================================================
-// PDF review annotations (Phase 3, P3-4; migration 027-pdf-annotations). Behind an interface like every repository (WP-10, PRD-002).
+// PDF review annotations (Phase 3, P3-4; migration 028-pdf-annotations). Behind an interface like every repository (WP-10, PRD-002).
 // Threads anchored on a page of a project PDF, their replies, the versions of each reviewed PDF, and the per-project release setting.
 // Named "pdf annotations" on purpose: the editors' live comments (collaboration) are a different model in the document itself.
 // =============================================================================

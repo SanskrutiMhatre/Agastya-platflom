@@ -125,7 +125,9 @@ class SessionService {
         username: row.username,
         fullName: row.full_name,
         role: row.role,
-        mustChangePassword: !!row.must_change_password,
+        // P3-6: an account that still has its fixed standalone default password is behind the forced-change gate whatever its flag says
+        mustChangePassword: !!row.must_change_password || !!row.default_password,
+        defaultPassword: !!row.default_password,
         onboardingPending: !!row.onboarding_pending,
         usernameLocked: !!row.username_locked,
         disabledAt: row.disabled_at,

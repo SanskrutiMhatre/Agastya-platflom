@@ -4,18 +4,19 @@
 // simply the only way out of them.
 
 import { useId, useState, type FormEvent, type ReactNode } from 'react';
-import { authApi } from '../api';
+import { authApi, type DefaultCredential } from '../api';
+import { saveTextAs } from '../lib/saveTextAs';
 import { Icon } from '../components/Icon';
 import { Alert, Field, errText } from '../components/ui';
 import { PasswordInput } from '../components/PasswordInput';
 import { useSession } from '../store/session';
 import { useDocumentTitle } from '../components/a11y';
 
-function Frame({ title, sub, children }: { title: string; sub?: string; children: ReactNode }) {
+function Frame({ title, sub, children, testId, wide }: { title: string; sub?: string; children: ReactNode; testId?: string; wide?: boolean }) {
   useDocumentTitle(title, 'Agastya Platform');   // WP-23 (WCAG 2.4.2)
   return (
     <main className="v2-auth">
-      <div className="card raised v2-auth-card">
+      <div className={`card raised v2-auth-card${wide ? ' v2-auth-card-wide' : ''}`} data-testid={testId}>
         <div className="row v2-auth-brand">
           <span className="brand-mark"><Icon name="book" size={18} /></span><strong>Agastya Platform</strong>
         </div>
@@ -141,30 +142,84 @@ function Onboarding() {
 }
 
 function ForcedChange() {
-  const { load, logout } = useSession();
+  const { load, logout, gates, user } = useSession();
+  // P3-6: a standalone default account's first change - its password is the published default, so the screen says why it must go
+  const isDefault = !!gates.defaultPassword;
   const [cur, setCur] = useState('');
   const [p, setP] = useState('');
   const [p2, setP2] = useState('');
   const rep = useRepeat(p, p2);
   const a = useAction();
   return (
-    <Frame title="Choose a new password" sub="An administrator reset your password. Set a new one to continue.">
+    <Frame title={isDefault ? 'Choose your own password' : 'Choose a new password'}
+      sub={isDefault
+        ? `${user?.username ? `"${user.username}" is` : 'This is'} a default account of this installation, and its password is published with the product. Choose your own password to continue; the default one then stops working.`
+        : 'An administrator reset your password. Set a new one to continue.'}
+      testId={isDefault ? 'forced-change-default' : 'forced-change'}>
       <Form submit="Change password" busy={a.busy} error={a.error} onSubmit={() => (rep.check() ? a.run(async () => {
         await authApi.changePassword(cur, p);
         await load();
       }) : Promise.resolve())}>
-        <Field label="Temporary password"><PasswordInput autoFocus value={cur} onChange={(e) => setCur(e.target.value)} autoComplete="current-password" /></Field>
-        <Field label="New password"><PasswordInput value={p} onChange={(e) => setP(e.target.value)} autoComplete="new-password" /></Field>
-        <Field label="Repeat password" error={rep.error}><PasswordInput id={rep.id} value={p2} onChange={(e) => setP2(e.target.value)} autoComplete="new-password" /></Field>
+        <Field label={isDefault ? 'Default password' : 'Temporary password'}><PasswordInput autoFocus value={cur} onChange={(e) => setCur(e.target.value)} autoComplete="current-password" name="currentPassword" /></Field>
+        <Field label="New password" hint={isDefault ? 'At least 15 characters (a few words make a good one); not a default or common password, nor your name.' : undefined}>
+          <PasswordInput value={p} onChange={(e) => setP(e.target.value)} autoComplete="new-password" name="newPassword" /></Field>
+        <Field label="Repeat password" error={rep.error}><PasswordInput id={rep.id} value={p2} onChange={(e) => setP2(e.target.value)} autoComplete="new-password" name="newPassword2" /></Field>
       </Form>
       <p className="v2-auth-alt"><button type="button" className="link-btn v2-linkbtn" onClick={() => { void logout(); }}>Sign out</button></p>
     </Frame>
   );
 }
 
+/** P3-6: the text "Save a copy" writes (the same wording as the installer's finish page, packaging/installer/agastya.iss). */
+function credentialsText(creds: DefaultCredential[]): string {
+  const rows = creds.map((c) => `  ${c.label.padEnd(22)} ${c.username.padEnd(9)} ${c.password}`);
+  return [
+    'Agastya Platform - default sign-in details of this computer', '', ...rows, '',
+    'Each account must choose its own password at its first sign-in; the default password then stops working and can never be used again.',
+    'Until then these accounts sign in on this computer only. Store this note safely (or destroy it once every password is changed): anyone',
+    'who reads it can sign in as an account that has not changed its password yet.', '',
+  ].join('\r\n');
+}
+
+/**
+ * P3-6: a standalone installation's first launch. The default accounts that still have their published password, a "Save a copy" to a
+ * file the person chooses, and the note to store it safely. Shown until "I have stored them" (then never again); "Sign in now" goes to
+ * the sign-in screen for this visit only.
+ */
+function FirstLaunch({ creds }: { creds: DefaultCredential[] }) {
+  const { acknowledgeFirstLaunch, dismissFirstLaunch } = useSession();
+  const [saved, setSaved] = useState<'' | 'saved' | 'downloaded'>('');
+  const a = useAction();
+  return (
+    <Frame title="Your sign-in details" wide testId="first-launch"
+      sub="This installation was set up with one account per role. Sign in with any of them; each one must choose its own password the first time it signs in.">
+      <div className="v2-stack">
+        <table className="v2-auth-creds" aria-label="Default accounts">
+          <thead><tr><th scope="col">Role</th><th scope="col">Username</th><th scope="col">Password</th></tr></thead>
+          <tbody>{creds.map((c) => (
+            <tr key={c.username} data-testid={`first-launch-${c.username}`}><td>{c.label}</td><td><code>{c.username}</code></td><td><code>{c.password}</code></td></tr>
+          ))}</tbody>
+        </table>
+        <Alert tone="warn">Store these details safely. Anyone who reads them can sign in as an account that has not changed its password yet. They work on this computer only, and only until each account chooses its own password.</Alert>
+        {saved ? <Alert tone="ok">{saved === 'saved' ? 'Saved where you chose.' : 'Handed to the browser as a download: check where it saved it, and move it somewhere safe.'}</Alert> : null}
+        {a.error ? <Alert tone="bad">{a.error}</Alert> : null}
+        <div className="row v2-auth-actions">
+          <button type="button" className="btn" data-testid="first-launch-save" onClick={() => { void a.run(async () => {
+            const r = await saveTextAs(credentialsText(creds), 'Agastya sign-in details.txt');
+            if (r !== 'cancelled') setSaved(r);
+          }); }}><Icon name="download" />Save a copy…</button>
+          <button type="button" className="btn primary btn-primary" data-testid="first-launch-ack" disabled={a.busy} onClick={() => { void a.run(() => acknowledgeFirstLaunch()); }}>I have stored them</button>
+        </div>
+      </div>
+      <p className="v2-auth-alt"><button type="button" className="link-btn v2-linkbtn" data-testid="first-launch-later" onClick={() => dismissFirstLaunch()}>Sign in now (show this again next time)</button></p>
+    </Frame>
+  );
+}
+
 export function AuthScreens() {
-  const { status, gates } = useSession();
+  const { status, gates, firstLaunch } = useSession();
   if (status === 'setup') return <Setup />;
   if (status === 'gated') return gates.onboarding ? <Onboarding /> : <ForcedChange />;
+  if (firstLaunch && firstLaunch.length) return <FirstLaunch creds={firstLaunch} />;
   return <Login />;
 }

@@ -1120,6 +1120,21 @@ namespace Agastya
             return rc;
         }
 
+        /// <summary>Phase 3 P3-6: the standalone installation's default accounts, made by Setup before the first start so its finish page shows the
+        /// credentials that really exist (scripts/default-accounts.js; the same step the server takes at its first start). Exit 0 = created now,
+        /// 3 = nothing to do (an upgrade, or a data folder that already has accounts), 1 = refused or failed. No password is printed or written.</summary>
+        public static int DefaultAccounts(Settings cfg)
+        {
+            if (cfg.Deployment != "standalone") { Console.Error.WriteLine("agastya.ini [server] Deployment is not standalone: a common server gets no default accounts."); return 3; }
+            string script = Path.Combine(Path.Combine(Path.Combine(Layout.AppDir, "backend"), "scripts"), "default-accounts.js");
+            if (!System.IO.File.Exists(script) || !System.IO.File.Exists(Layout.NodeExe)) { Console.Error.WriteLine("The installation is incomplete: " + script); return 1; }
+            string o;
+            int rc = RunNode(Layout.ExeDir, "\"" + script + "\" --workspace \"" + cfg.WorkspaceDir + "\"", null, 300000, out o);
+            Console.WriteLine(o);
+            Host.Info("default-accounts finished with code " + rc);
+            return rc;
+        }
+
         /// <summary>The uninstaller's "remove my data too" (/PURGEDATA): the data folder and the configuration/log folder, after checks that they
         /// are this product's folders. Never runs without --confirm.</summary>
         public static int RemoveData(Settings cfg, bool confirm)

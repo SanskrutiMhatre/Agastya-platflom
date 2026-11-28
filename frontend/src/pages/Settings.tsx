@@ -140,6 +140,8 @@ function UserStatus({ u }: { u: User }) {
     <span className="row adm-badges">
       <span className={`badge${s.tone ? ` ${s.tone}` : ''}`} title={'title' in s ? s.title : undefined}><Dot tone={s.tone} />{s.label}</span>
       {u.authSource === 'directory' ? <Pill title="Signs in with the domain password">Directory</Pill> : null}
+      {/* P3-6: a standalone default account that still has its published default password */}
+      {u.defaultPassword ? <span className="badge warning" title="A default account of this installation that still has its published default password (this computer only)" data-testid={`default-password-${u.username}`}>Default password</span> : null}
     </span>
   );
 }
