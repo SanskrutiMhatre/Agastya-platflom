@@ -33,6 +33,42 @@ export interface JsgEditorLike {
   goToModule?(key: string): boolean;
 }
 
+// ── Phase 3 (P3-1): live co-editing (frontend/src/collab/jsg.ts binds an editor to its room through these; the editing logic is unchanged, D16) ──
+
+/** A field an editor drew from the model: a live document puts another person's change into it in place, and maps carets through it. */
+export interface JsgSlot {
+  el: HTMLElement;
+  /** the model object the field edits, and the property (for a field held in an XML attribute, the attribute's name; 'inline' for rich text) */
+  owner: object;
+  key: string | number;
+  /** rich: a run of rich text (contenteditable); title: plain text in a contenteditable; input: a form field; cell: an ISPL appendix cell (no caret mapping) */
+  kind: 'rich' | 'title' | 'input' | 'cell';
+  /** draw the model's current value into the element */
+  show(): void;
+}
+/** What a live editor reports and delegates: every change (the binding brings the room to the model), undo and redo, and what "unsaved" means. */
+export interface JsgCollab {
+  changed(typing: boolean): void;
+  undo(): void;
+  redo(): void;
+  canUndo(): boolean;
+  canRedo(): boolean;
+  dirty(): boolean;
+}
+/** What the live binding needs of either editor. */
+export interface JsgLiveSurface {
+  getDoc(): JsgDoc;
+  setCollab(c: JsgCollab | null): void;
+  /** the fields drawn now (connected ones) */
+  liveSlots(): JsgSlot[];
+  /** draw the whole sheet again from the model (another person's structural change), keeping the scroll position */
+  liveRedraw(): void;
+  /** after a change from the room: the outline, the counts, the undo buttons and the preview follow the model */
+  afterRemote(): void;
+  /** the editor's parts the binding draws on: its root, the sheet, its scroll box and its outline */
+  liveParts(): { root: HTMLElement; sheet: HTMLElement; scroll: HTMLElement; nav: HTMLElement };
+}
+
 export const escH = (s: string): string => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 export function injectCss(id: string, css: string): void {
