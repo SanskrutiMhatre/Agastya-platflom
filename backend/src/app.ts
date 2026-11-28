@@ -51,6 +51,7 @@ import { capabilityTableFrom, readableCapabilitiesFrom, setCapabilityTable } fro
 import { registerAccessRoutes } from './routes/access';
 import { requestMetrics } from './services/metrics';
 import { registerTeamServerRoutes } from './routes/teamServer';
+import { registerGitlabRoutes } from './routes/gitlab';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { registerAuthRoutes } = require('./core/auth/routes');
@@ -150,6 +151,7 @@ export function createApp(): express.Express {
   registerAuditRoutes(app);              // WP-29: audit chain verification, checkpoints, streamed export, event catalogue (administrators)
   registerAccessRoutes(app);             // WP-27: directory sign-on administration, groups, project group grants and capability rules
   registerTeamServerRoutes(app);         // WP-28: who is working where (presence), server load figures (administrators)
+  registerGitlabRoutes(app);             // Phase 3 (P3-5): the intranet GitLab (configuration, accounts, repositories, releases, merge requests)
   // The client's `can` map is read from the guards just registered (WP-13, FE-019): one rule, stated once, on the server.
   setCapabilityTable(capabilityTableFrom(app), readableCapabilitiesFrom(app));
 
