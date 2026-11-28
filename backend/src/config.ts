@@ -142,6 +142,13 @@ export interface Config {
    * AGASTYA_DIRECTORY_URL and its companions; the group-to-role mapping is kept in the database and edited by administrators.
    */
   directory: DirectoryConfig | null;
+  /**
+   * Phase 3 (P3-5): the intranet GitLab integration. The connection itself (address, CA, OAuth application, tokens) is entered by the
+   * administrator in the UI and kept in the database; secrets are encrypted with the key in `secretsKeyFile` (AGASTYA_SECRETS_KEY_FILE,
+   * default <workspace>/keys/secrets.key, made on first use, owner-only). `allowHttp` (AGASTYA_GITLAB_ALLOW_HTTP=1) accepts a plain-http
+   * GitLab address (never recommended; off by default: the integration needs TLS).
+   */
+  gitlab: { secretsKeyFile: string; allowHttp: boolean };
   /** WP-14 (PERF-001, PUB-027, PRD-001): the job service that runs validation, the publish gate and publication in worker processes. */
   jobs: JobsConfig;
   /**
@@ -523,6 +530,10 @@ export function buildConfig(env: Env = process.env): Config {
       };
     })(),
     directory: parseDirectory(env, mode),
+    gitlab: {
+      secretsKeyFile: env.AGASTYA_SECRETS_KEY_FILE && env.AGASTYA_SECRETS_KEY_FILE.trim() ? path.resolve(env.AGASTYA_SECRETS_KEY_FILE.trim()) : path.join(workspaceDir, 'keys', 'secrets.key'),
+      allowHttp: env.AGASTYA_GITLAB_ALLOW_HTTP === '1',
+    },
   };
 }
 

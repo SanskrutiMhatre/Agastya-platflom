@@ -208,7 +208,8 @@ test('PRD-002: the migration files are complete for the SQLite engine, unique, a
     '017-s1000d-completion', '018-sns-preset-model', '019-review-comment-anchor', '020-login-throttle', '021-project-lifecycle', '022-audit-project-index',
     '023-document-leases', '024-directory-groups-permissions', '025-audit-chain', '026-jobs',
     '027-default-accounts',    // Phase 3 P3-6 (standalone default accounts), appended
-    '028-pdf-annotations'],    // Phase 3 P3-4 (PDF review), appended
+    '028-pdf-annotations',     // Phase 3 P3-4 (PDF review), appended
+    '029-gitlab'],             // Phase 3 P3-5 (GitLab integration), appended
   'a shipped migration is never renamed or reordered; a new one is appended');
   assert.equal(new Set(ORDER).size, ORDER.length);
   for (const m of MIGRATIONS) { assert.ok(m.sqlite && (m.sqlite.sql || m.sqlite.columns), `${m.name} has a sqlite body`); assert.equal(path.basename(m.name), m.name); }

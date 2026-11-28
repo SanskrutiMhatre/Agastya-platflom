@@ -12,6 +12,9 @@
   "POST /api/projects/:id/jsg/validate": "Validates the posted or saved JSG document; writes nothing."
  },
  "authOnlyWrites": {
+  "POST /api/gitlab/connect/oauth": "Phase 3 (P3-5): starts the caller's own GitLab connection (state bound to the caller); 404 FEATURE_OFF until an administrator configured GitLab.",
+  "POST /api/gitlab/connect/token": "Phase 3 (P3-5): connects the caller's own GitLab account with the caller's own personal access token; 404 FEATURE_OFF until configured.",
+  "DELETE /api/gitlab/me": "Phase 3 (P3-5): disconnects the caller's own GitLab account (and revokes its OAuth token).",
   "POST /api/auth/logout": "Ends the caller's own session.",
   "POST /api/auth/activity": "Refreshes the caller's own session (idle limit).",
   "POST /api/auth/change-password": "Changes the caller's own password; the current password is required.",
