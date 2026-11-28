@@ -1,8 +1,13 @@
 {
   "_comment": "WP-36 (CLN-004): items scripts/cleanup/check.mjs reports as unreferenced but that must stay. Every entry needs a reason (at least 10 characters). files: { file, reason }; exports: { file, name, reason }; classes: { name | pattern (a regular expression), reason }. A stale entry (the item is gone or referenced again) is a warning: remove it. Ambient .d.ts files, test-only files and generated classes (a template or concatenation ending in prefix-) are kept by the scan itself and need no entry.",
   "files": [],
-  "exports": [],
+  "exports": [
+    { "file": "src/layouts/shellSlots.tsx", "name": "TopbarActions", "reason": "UI redesign step 1: the project shell's top-bar actions slot (mockups project.html, publication.html, validation.html) for the screen 2-6 pages" },
+    { "file": "src/layouts/shellSlots.tsx", "name": "StatusItems", "reason": "UI redesign step 1: the project shell's status-bar slot (mockups publication.html, validation.html, editor.html) for the screen 2-6 pages" }
+  ],
   "classes": [
+    { "pattern": "^(chip|chips|dialog-scrim|doctab|doctabs|focused|grp|hist|ico-wrap|lg|link-btn|mod|opt|pane-head|panel-resize|raised|sec-h|subtle|tl|twist|vsep)$", "reason": "UI redesign step 1: the owner-approved mockups' component library (styles/components.css, class names exactly as docs/audit/mockups/components.css) that screens 2-6 are being built from" },
+    { "name": "adm-cols", "reason": "UI redesign screen 6 (admin.css, mockup admin.html two-column body): defined by the screen 6 merge, not yet used by its page; for the screen 6 owner to use or drop" },
     { "pattern": "^cm-", "reason": "CodeMirror 6 builds these elements itself (cm-content, cm-gutters, cm-tooltip, ...): the Studio's code view restyles the library's own classes" },
     { "name": "markedContent", "reason": "pdf.js text layer: TextLayer creates <span class=\"markedContent\"> for marked content (styles/pdf.css)" },
     { "name": "endOfContent", "reason": "pdf.js text layer: the selection end marker TextLayer appends (styles/pdf.css)" }

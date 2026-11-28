@@ -102,4 +102,4 @@
 }
 
 /* ------------------------------------------------ WP-35 second pass: moved from platform.css unchanged (WorkingNow's card title) */
-.v2-home-card-head h2, .v2-card-title { font-size: 13px; font-weight: 650; margin: 0; }
+.v2-card-title { font-size: 13px; font-weight: 650; margin: 0; }
